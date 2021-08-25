@@ -61,7 +61,7 @@ type PodStorage interface {
 	rest.Getter
 }
 
-type GenericREST struct {
+type REST struct {
 	*genericregistry.Store
 	primaryIPFamily   api.IPFamily
 	secondaryIPFamily api.IPFamily
@@ -72,14 +72,14 @@ type GenericREST struct {
 }
 
 var (
-	_ rest.CategoriesProvider     = &GenericREST{}
-	_ rest.ShortNamesProvider     = &GenericREST{}
-	_ rest.StorageVersionProvider = &GenericREST{}
-	_ rest.ResetFieldsStrategy    = &GenericREST{}
-	_ rest.Redirector             = &GenericREST{}
+	_ rest.CategoriesProvider     = &REST{}
+	_ rest.ShortNamesProvider     = &REST{}
+	_ rest.StorageVersionProvider = &REST{}
+	_ rest.ResetFieldsStrategy    = &REST{}
+	_ rest.Redirector             = &REST{}
 )
 
-// NewREST returns a RESTStorage object that will work against services.
+// NewREST returns a REST object that will work against services.
 func NewREST(
 	optsGetter generic.RESTOptionsGetter,
 	serviceIPFamily api.IPFamily,
@@ -87,7 +87,7 @@ func NewREST(
 	portAlloc portallocator.Interface,
 	endpoints EndpointsStorage,
 	pods PodStorage,
-	proxyTransport http.RoundTripper) (*GenericREST, *StatusREST, *svcreg.ProxyREST, error) {
+	proxyTransport http.RoundTripper) (*REST, *StatusREST, *svcreg.ProxyREST, error) {
 
 	strategy, _ := svcreg.StrategyForServiceCIDRs(ipAllocs[serviceIPFamily].CIDR(), len(ipAllocs) > 1)
 
@@ -119,7 +119,7 @@ func NewREST(
 	if len(ipAllocs) > 1 {
 		secondaryIPFamily = otherFamily(serviceIPFamily)
 	}
-	genericStore := &GenericREST{
+	genericStore := &REST{
 		Store:             store,
 		primaryIPFamily:   primaryIPFamily,
 		secondaryIPFamily: secondaryIPFamily,
@@ -146,21 +146,21 @@ func otherFamily(fam api.IPFamily) api.IPFamily {
 }
 
 var (
-	_ rest.ShortNamesProvider = &GenericREST{}
-	_ rest.CategoriesProvider = &GenericREST{}
+	_ rest.ShortNamesProvider = &REST{}
+	_ rest.CategoriesProvider = &REST{}
 )
 
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
-func (r *GenericREST) ShortNames() []string {
+func (r *REST) ShortNames() []string {
 	return []string{"svc"}
 }
 
 // Categories implements the CategoriesProvider interface. Returns a list of categories a resource is part of.
-func (r *GenericREST) Categories() []string {
+func (r *REST) Categories() []string {
 	return []string{"all"}
 }
 
-// StatusREST implements the GenericREST endpoint for changing the status of a service.
+// StatusREST implements the REST endpoint for changing the status of a service.
 type StatusREST struct {
 	store *genericregistry.Store
 }
@@ -191,7 +191,7 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 // applies on Get, Create, and Update, but we need to distinguish between them.
 //
 // This will be called on both Service and ServiceList types.
-func (r *GenericREST) defaultOnRead(obj runtime.Object) {
+func (r *REST) defaultOnRead(obj runtime.Object) {
 	switch s := obj.(type) {
 	case *api.Service:
 		r.defaultOnReadService(s)
@@ -204,7 +204,7 @@ func (r *GenericREST) defaultOnRead(obj runtime.Object) {
 }
 
 // defaultOnReadServiceList defaults a ServiceList.
-func (r *GenericREST) defaultOnReadServiceList(serviceList *api.ServiceList) {
+func (r *REST) defaultOnReadServiceList(serviceList *api.ServiceList) {
 	if serviceList == nil {
 		return
 	}
@@ -215,7 +215,7 @@ func (r *GenericREST) defaultOnReadServiceList(serviceList *api.ServiceList) {
 }
 
 // defaultOnReadService defaults a single Service.
-func (r *GenericREST) defaultOnReadService(service *api.Service) {
+func (r *REST) defaultOnReadService(service *api.Service) {
 	if service == nil {
 		return
 	}
@@ -293,7 +293,7 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 	}
 }
 
-func (r *GenericREST) afterDelete(obj runtime.Object, options *metav1.DeleteOptions) {
+func (r *REST) afterDelete(obj runtime.Object, options *metav1.DeleteOptions) {
 	svc := obj.(*api.Service)
 
 	// Normally this defaulting is done automatically, but the hook (Decorator)
@@ -319,7 +319,7 @@ func (r *GenericREST) afterDelete(obj runtime.Object, options *metav1.DeleteOpti
 	}
 }
 
-func (r *GenericREST) beginCreate(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (genericregistry.FinishFunc, error) {
+func (r *REST) beginCreate(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (genericregistry.FinishFunc, error) {
 	svc := obj.(*api.Service)
 
 	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
@@ -349,7 +349,7 @@ func (r *GenericREST) beginCreate(ctx context.Context, obj runtime.Object, optio
 	return finish, nil
 }
 
-func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, options *metav1.UpdateOptions) (genericregistry.FinishFunc, error) {
+func (r *REST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, options *metav1.UpdateOptions) (genericregistry.FinishFunc, error) {
 	newSvc := obj.(*api.Service)
 	oldSvc := oldObj.(*api.Service)
 
@@ -381,7 +381,7 @@ func (r *GenericREST) beginUpdate(ctx context.Context, obj, oldObj runtime.Objec
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (r *GenericREST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
+func (r *REST) ResourceLocation(ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "svcname", "svcname:port", or "scheme:svcname:port".
 	svcScheme, svcName, portStr, valid := utilnet.SplitSchemeNamePort(id)
 	if !valid {
