@@ -77,7 +77,7 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 	//TODO(thockin): validation should not pass with empty clusterIP, but it
 	//does (and is tested!).  Fixing that all is a big PR and will have to
 	//happen later.
-	if txn, err := al.allocServiceClusterIPsNew(service, dryRun); err != nil {
+	if txn, err := al.txnAllocClusterIPs(service, dryRun); err != nil {
 		result.Revert()
 		return nil, err
 	} else {
@@ -302,8 +302,7 @@ func (al *RESTAllocStuff) allocServiceClusterIP(service *api.Service, dryRun boo
 	return allocated, err
 }
 
-//FIXME: merge into allocServiceClusterIPs rather than call it
-func (al *RESTAllocStuff) allocServiceClusterIPsNew(service *api.Service, dryRun bool) (transaction, error) {
+func (al *RESTAllocStuff) txnAllocClusterIPs(service *api.Service, dryRun bool) (transaction, error) {
 	// clusterIPs that were allocated may need to be released in case of
 	// failure at a higher level.
 	toReleaseClusterIPs, err := al.allocServiceClusterIPs(service, dryRun)
