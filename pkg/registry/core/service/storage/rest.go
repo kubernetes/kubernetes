@@ -145,7 +145,7 @@ func (al *RESTAllocStuff) updateHealthCheckNodePort(oldService, service *api.Ser
 	// Insert health check node port into the service's HealthCheckNodePort field if needed.
 	case !neededHealthCheckNodePort && needsHealthCheckNodePort:
 		klog.Infof("Transition to LoadBalancer type service with ExternalTrafficPolicy=Local")
-		if err := allocHealthCheckNodePort(service, nodePortOp); err != nil {
+		if err := al.allocHealthCheckNodePort(service, nodePortOp); err != nil {
 			return false, errors.NewInternalError(err)
 		}
 
@@ -932,7 +932,7 @@ func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
 }
 
 // allocHealthCheckNodePort allocates health check node port to service.
-func allocHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func (al *RESTAllocStuff) allocHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	healthCheckNodePort := service.Spec.HealthCheckNodePort
 	if healthCheckNodePort != 0 {
 		// If the request has a health check nodePort in mind, attempt to reserve it.
@@ -981,7 +981,7 @@ func (al *RESTAllocStuff) txnAllocNodePorts(service *api.Service, dryRun bool) (
 
 	// Handle ExternalTraffic related fields during service creation.
 	if apiservice.NeedsHealthCheck(service) {
-		if err := allocHealthCheckNodePort(service, nodePortOp); err != nil {
+		if err := al.allocHealthCheckNodePort(service, nodePortOp); err != nil {
 			txn.Revert()
 			return nil, errors.NewInternalError(err)
 		}
