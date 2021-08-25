@@ -33,9 +33,9 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
-// RESTAllocStuff is a temporary struct to facilitate the flattening of service
-// REST layers.  It will be cleaned up over a series of commits.
-type RESTAllocStuff struct {
+// Allocators encapsulates the various allocators (IPs, ports) used in
+// Services.
+type Allocators struct {
 	serviceIPAllocatorsByFamily map[api.IPFamily]ipallocator.Interface
 	defaultServiceIPFamily      api.IPFamily // --service-cluster-ip-range[0]
 	serviceNodePorts            portallocator.Interface
@@ -52,15 +52,15 @@ type ServiceNodePort struct {
 }
 
 // This is a trasitionary function to facilitate service REST flattening.
-func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) RESTAllocStuff {
-	return RESTAllocStuff{
+func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator.Interface, portAlloc portallocator.Interface) Allocators {
+	return Allocators{
 		defaultServiceIPFamily:      defaultFamily,
 		serviceIPAllocatorsByFamily: ipAllocs,
 		serviceNodePorts:            portAlloc,
 	}
 }
 
-func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (transaction, error) {
+func (al *Allocators) allocateCreate(service *api.Service, dryRun bool) (transaction, error) {
 	result := metaTransaction{}
 
 	// Ensure IP family fields are correctly initialized.  We do it here, since
@@ -93,7 +93,7 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 
 // attempts to default service ip families according to cluster configuration
 // while ensuring that provided families are configured on cluster.
-func (al *RESTAllocStuff) initIPFamilyFields(after After, before Before) error {
+func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 	oldService, service := before.Service, after.Service
 
 	// can not do anything here
@@ -302,7 +302,7 @@ func (al *RESTAllocStuff) initIPFamilyFields(after After, before Before) error {
 	return nil
 }
 
-func (al *RESTAllocStuff) txnAllocClusterIPs(service *api.Service, dryRun bool) (transaction, error) {
+func (al *Allocators) txnAllocClusterIPs(service *api.Service, dryRun bool) (transaction, error) {
 	// clusterIPs that were allocated may need to be released in case of
 	// failure at a higher level.
 	toReleaseClusterIPs, err := al.allocClusterIPs(service, dryRun)
@@ -326,7 +326,7 @@ func (al *RESTAllocStuff) txnAllocClusterIPs(service *api.Service, dryRun bool) 
 }
 
 // allocates ClusterIPs for a service
-func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
+func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
 	// external name don't get ClusterIPs
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil, nil
@@ -387,7 +387,7 @@ func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, dryRun bool) (ma
 
 // standard allocator for dualstackgate==Off, hard wired dependency
 // and ignores policy, families and clusterIPs
-func (al *RESTAllocStuff) allocClusterIP(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
+func (al *Allocators) allocClusterIP(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
 	toAlloc := make(map[api.IPFamily]string)
 
 	// get clusterIP.. empty string if user did not specify an ip
@@ -404,7 +404,7 @@ func (al *RESTAllocStuff) allocClusterIP(service *api.Service, dryRun bool) (map
 	return allocated, err
 }
 
-func (al *RESTAllocStuff) allocIPs(service *api.Service, toAlloc map[api.IPFamily]string, dryRun bool) (map[api.IPFamily]string, error) {
+func (al *Allocators) allocIPs(service *api.Service, toAlloc map[api.IPFamily]string, dryRun bool) (map[api.IPFamily]string, error) {
 	allocated := make(map[api.IPFamily]string)
 
 	for family, ip := range toAlloc {
@@ -431,7 +431,7 @@ func (al *RESTAllocStuff) allocIPs(service *api.Service, toAlloc map[api.IPFamil
 }
 
 // releases clusterIPs per family
-func (al *RESTAllocStuff) releaseIPs(toRelease map[api.IPFamily]string) (map[api.IPFamily]string, error) {
+func (al *Allocators) releaseIPs(toRelease map[api.IPFamily]string) (map[api.IPFamily]string, error) {
 	if toRelease == nil {
 		return nil, nil
 	}
@@ -455,7 +455,7 @@ func (al *RESTAllocStuff) releaseIPs(toRelease map[api.IPFamily]string) (map[api
 	return released, nil
 }
 
-func (al *RESTAllocStuff) txnAllocNodePorts(service *api.Service, dryRun bool) (transaction, error) {
+func (al *Allocators) txnAllocNodePorts(service *api.Service, dryRun bool) (transaction, error) {
 	// The allocator tracks dry-run-ness internally.
 	nodePortOp := portallocator.StartOperation(al.serviceNodePorts, dryRun)
 
@@ -545,7 +545,7 @@ func initNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocatio
 }
 
 // allocHealthCheckNodePort allocates health check node port to service.
-func (al *RESTAllocStuff) allocHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func (al *Allocators) allocHealthCheckNodePort(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
 	healthCheckNodePort := service.Spec.HealthCheckNodePort
 	if healthCheckNodePort != 0 {
 		// If the request has a health check nodePort in mind, attempt to reserve it.
@@ -567,7 +567,7 @@ func (al *RESTAllocStuff) allocHealthCheckNodePort(service *api.Service, nodePor
 	return nil
 }
 
-func (al *RESTAllocStuff) allocateUpdate(after After, before Before, dryRun bool) (transaction, error) {
+func (al *Allocators) allocateUpdate(after After, before Before, dryRun bool) (transaction, error) {
 	result := metaTransaction{}
 
 	// Ensure IP family fields are correctly initialized.  We do it here, since
@@ -598,7 +598,7 @@ func (al *RESTAllocStuff) allocateUpdate(after After, before Before, dryRun bool
 	return result, nil
 }
 
-func (al *RESTAllocStuff) txnUpdateClusterIPs(after After, before Before, dryRun bool) (transaction, error) {
+func (al *Allocators) txnUpdateClusterIPs(after After, before Before, dryRun bool) (transaction, error) {
 	service := after.Service
 
 	allocated, released, err := al.updateClusterIPs(after, before, dryRun)
@@ -638,7 +638,7 @@ func (al *RESTAllocStuff) txnUpdateClusterIPs(after After, before Before, dryRun
 // this func does not perform actual release of clusterIPs. it returns
 // a map[family]ip for the caller to release when everything else has
 // executed successfully
-func (al *RESTAllocStuff) updateClusterIPs(after After, before Before, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
+func (al *Allocators) updateClusterIPs(after After, before Before, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
 	oldService, service := before.Service, after.Service
 
 	// We don't want to auto-upgrade (add an IP) or downgrade (remove an IP)
@@ -727,7 +727,7 @@ func (al *RESTAllocStuff) updateClusterIPs(after After, before Before, dryRun bo
 	return nil, nil, nil
 }
 
-func (al *RESTAllocStuff) txnUpdateNodePorts(after After, before Before, dryRun bool) (transaction, error) {
+func (al *Allocators) txnUpdateNodePorts(after After, before Before, dryRun bool) (transaction, error) {
 	oldService, service := before.Service, after.Service
 
 	// The allocator tracks dry-run-ness internally.
@@ -770,7 +770,7 @@ func (al *RESTAllocStuff) txnUpdateNodePorts(after After, before Before, dryRun 
 	return txn, nil
 }
 
-func (al *RESTAllocStuff) releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
+func (al *Allocators) releaseNodePorts(service *api.Service, nodePortOp *portallocator.PortAllocationOperation) {
 	nodePorts := collectServiceNodePorts(service)
 
 	for _, nodePort := range nodePorts {
@@ -778,7 +778,7 @@ func (al *RESTAllocStuff) releaseNodePorts(service *api.Service, nodePortOp *por
 	}
 }
 
-func (al *RESTAllocStuff) updateNodePorts(after After, before Before, nodePortOp *portallocator.PortAllocationOperation) error {
+func (al *Allocators) updateNodePorts(after After, before Before, nodePortOp *portallocator.PortAllocationOperation) error {
 	oldService, newService := before.Service, after.Service
 
 	oldNodePortsNumbers := collectServiceNodePorts(oldService)
@@ -834,7 +834,7 @@ func (al *RESTAllocStuff) updateNodePorts(after After, before Before, nodePortOp
 
 // updateHealthCheckNodePort handles HealthCheckNodePort allocation/release
 // and adjusts HealthCheckNodePort during service update if needed.
-func (al *RESTAllocStuff) updateHealthCheckNodePort(after After, before Before, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
+func (al *Allocators) updateHealthCheckNodePort(after After, before Before, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
 	oldService, service := before.Service, after.Service
 
 	neededHealthCheckNodePort := apiservice.NeedsHealthCheck(oldService)
@@ -862,7 +862,7 @@ func (al *RESTAllocStuff) updateHealthCheckNodePort(after After, before Before, 
 	return true, nil
 }
 
-func (al *RESTAllocStuff) releaseAllocatedResources(svc *api.Service) {
+func (al *Allocators) releaseAllocatedResources(svc *api.Service) {
 	al.releaseClusterIPs(svc)
 
 	for _, nodePort := range collectServiceNodePorts(svc) {
@@ -886,7 +886,7 @@ func (al *RESTAllocStuff) releaseAllocatedResources(svc *api.Service) {
 }
 
 // releases allocated ClusterIPs for service that is about to be deleted
-func (al *RESTAllocStuff) releaseClusterIPs(service *api.Service) (released map[api.IPFamily]string, err error) {
+func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.IPFamily]string, err error) {
 	// external name don't get ClusterIPs
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil, nil
@@ -913,7 +913,7 @@ func (al *RESTAllocStuff) releaseClusterIPs(service *api.Service) (released map[
 }
 
 // for pre dual stack (gate == off). Hardwired to ClusterIP and ignores all new fields
-func (al *RESTAllocStuff) releaseClusterIP(service *api.Service) (released map[api.IPFamily]string, err error) {
+func (al *Allocators) releaseClusterIP(service *api.Service) (released map[api.IPFamily]string, err error) {
 	toRelease := make(map[api.IPFamily]string)
 
 	// we need to do that to handle cases where allocator is no longer configured on
