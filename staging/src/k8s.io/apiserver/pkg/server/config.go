@@ -1145,6 +1145,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	if c.ShutdownSendRetryAfter {
 		handler = genericfilters.WithRetryAfter(handler, c.lifecycleSignals.NotAcceptingNewRequest.Signaled())
 	}
+	handler = genericfilters.WithOptInRetryAfter(handler, c.newServerFullyInitializedFunc())
 	handler = genericfilters.WithHTTPLogging(handler)
 	handler = genericapifilters.WithLatencyTrackers(handler)
 	// WithRoutine will execute future handlers in a separate goroutine and serving
