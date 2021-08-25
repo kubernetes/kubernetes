@@ -95,7 +95,7 @@ var (
 		# Load the kubectl completion code for fish[2] into the current shell
 		    kubectl completion fish | source
 		# To load completions for each session, execute once: 
-		    kubectl completion fish > ~/.config/fish/completions/kubectl.fish`))
+		    kubectl completion fish > ~/.config/fish/completions/kubectl.fish
 
 		# Load the kubectl completion code for powershell into the current shell
 		    kubectl completion powershell | Out-String | Invoke-Expression
