@@ -61,6 +61,11 @@ var eventStorageAgeLimit = flag.String("event_storage_age_limit", "default=24h",
 var eventStorageEventLimit = flag.String("event_storage_event_limit", "default=100000", "Max number of events to store (per type). Value is a comma separated list of key values, where the keys are event types (e.g.: creation, oom) or \"default\" and the value is an integer. Default is applied to all non-specified event types")
 var applicationMetricsCountLimit = flag.Int("application_metrics_count_limit", 100, "Max number of application metrics to store (per container)")
 
+var HousekeepingConfigFlags = HouskeepingConfig{
+	flag.Duration("max_housekeeping_interval", 60*time.Second, "Largest interval to allow between container housekeepings"),
+	flag.Bool("allow_dynamic_housekeeping", true, "Whether to allow the housekeeping interval to be dynamic"),
+}
+
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
 type Manager interface {

@@ -459,7 +459,7 @@ github.com/openshift/build-machinery-go v0.0.0-20210712174854-1bb7fd1518d3/go.mo
 github.com/openshift/client-go v0.0.0-20210730113412-1811c1b3fc0e/go.mod h1:P1pjphFOgm/nYjmtouHGaSLGtdP25dQICJnYtcYhfEs=
 github.com/openshift/ginkgo v4.7.0-origin.0+incompatible h1:2qD1n/RAnycWMPjYS6MEAUzRmVoF0ql7ozk1ANv8dcM=
 github.com/openshift/ginkgo v4.7.0-origin.0+incompatible/go.mod h1:8METQ1gDhl0KW+pGH4c0DIJYEN/ksVCL6hOuHPmXGnk=
-github.com/openshift/google-cadvisor v0.33.2-0.20210610135131-57b941c7657a/go.mod h1:kN93gpdevu+bpS227TyHVZyCU5bbqCzTj5T9drl34MI=
+github.com/openshift/google-cadvisor v0.33.2-0.20210825140152-3e7875ab2744/go.mod h1:kN93gpdevu+bpS227TyHVZyCU5bbqCzTj5T9drl34MI=
 github.com/openshift/library-go v0.0.0-20210730114916-d82fae7e3feb/go.mod h1:3GagmGg6gikg+hAqma7E7axBzs2pjx4+GrAbdl4OYdY=
 github.com/openshift/library-go v0.0.0-20210730130811-cb83700729ae/go.mod h1:3GagmGg6gikg+hAqma7E7axBzs2pjx4+GrAbdl4OYdY=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
