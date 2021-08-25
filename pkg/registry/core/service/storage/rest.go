@@ -284,7 +284,7 @@ func (al *RESTAllocStuff) releaseIPs(toRelease map[api.IPFamily]string) (map[api
 
 // standard allocator for dualstackgate==Off, hard wired dependency
 // and ignores policy, families and clusterIPs
-func (al *RESTAllocStuff) allocServiceClusterIP(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
+func (al *RESTAllocStuff) allocClusterIP(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
 	toAlloc := make(map[api.IPFamily]string)
 
 	// get clusterIP.. empty string if user did not specify an ip
@@ -337,7 +337,7 @@ func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service, dryRun bo
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return al.allocServiceClusterIP(service, dryRun)
+		return al.allocClusterIP(service, dryRun)
 	}
 
 	toAlloc := make(map[api.IPFamily]string)
