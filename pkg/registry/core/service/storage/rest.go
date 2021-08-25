@@ -131,9 +131,9 @@ func shouldAllocateNodePorts(service *api.Service) bool {
 	return false
 }
 
-// healthCheckNodePortUpdate handles HealthCheckNodePort allocation/release
+// updateHealthCheckNodePort handles HealthCheckNodePort allocation/release
 // and adjusts HealthCheckNodePort during service update if needed.
-func (al *RESTAllocStuff) healthCheckNodePortUpdate(oldService, service *api.Service, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
+func (al *RESTAllocStuff) updateHealthCheckNodePort(oldService, service *api.Service, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
 	neededHealthCheckNodePort := apiservice.NeedsHealthCheck(oldService)
 	oldHealthCheckNodePort := oldService.Spec.HealthCheckNodePort
 
@@ -222,7 +222,7 @@ func (al *RESTAllocStuff) txnUpdateNodePorts(service, oldService *api.Service, d
 	}
 
 	// Handle ExternalTraffic related updates.
-	success, err := al.healthCheckNodePortUpdate(oldService, service, nodePortOp)
+	success, err := al.updateHealthCheckNodePort(oldService, service, nodePortOp)
 	if !success || err != nil {
 		txn.Revert()
 		return nil, err
