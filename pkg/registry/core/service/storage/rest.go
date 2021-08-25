@@ -304,7 +304,7 @@ func (al *RESTAllocStuff) allocClusterIP(service *api.Service, dryRun bool) (map
 func (al *RESTAllocStuff) txnAllocClusterIPs(service *api.Service, dryRun bool) (transaction, error) {
 	// clusterIPs that were allocated may need to be released in case of
 	// failure at a higher level.
-	toReleaseClusterIPs, err := al.allocServiceClusterIPs(service, dryRun)
+	toReleaseClusterIPs, err := al.allocClusterIPs(service, dryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -325,7 +325,7 @@ func (al *RESTAllocStuff) txnAllocClusterIPs(service *api.Service, dryRun bool) 
 }
 
 // allocates ClusterIPs for a service
-func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
+func (al *RESTAllocStuff) allocClusterIPs(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
 	// external name don't get ClusterIPs
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil, nil
@@ -445,7 +445,7 @@ func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Serv
 	// CASE A:
 	// Update service from ExternalName to non-ExternalName, should initialize ClusterIP.
 	if oldService.Spec.Type == api.ServiceTypeExternalName && service.Spec.Type != api.ServiceTypeExternalName {
-		allocated, err := al.allocServiceClusterIPs(service, dryRun)
+		allocated, err := al.allocClusterIPs(service, dryRun)
 		return allocated, nil, err
 	}
 
