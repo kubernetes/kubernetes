@@ -107,12 +107,14 @@ aliases:
   # SIG Release
   release-engineering-approvers:
     - cpanato # Release Manager / SIG Technical Lead
+    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
     - justaugustus # Release Manager / SIG Chair
     - puerco # Release Manager / SIG Technical Lead
     - saschagrunert # Release Manager / SIG Chair
     - xmudrii # Release Manager
   release-engineering-reviewers:
     - cpanato # Release Manager / SIG Technical Lead
+    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
     - justaugustus # Release Manager / SIG Chair
     - puerco # Release Manager / SIG Technical Lead
     - saschagrunert # Release Manager / SIG Chair
@@ -127,6 +129,7 @@ aliases:
     - cblecker
     - cpanato # Release Manager / SIG Technical Lead
     - dims
+    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
     - justaugustus # Release Manager / SIG Chair
     - puerco # Release Manager / SIG Technical Lead
     - saschagrunert # Release Manager / SIG Chair
