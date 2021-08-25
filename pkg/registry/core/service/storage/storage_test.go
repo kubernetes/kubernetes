@@ -147,7 +147,7 @@ func makePortAllocator(ports machineryutilnet.PortRange) portallocator.Interface
 // wrapperRESTForTests is a *trivial* wrapper for the real REST, which allows us to do
 // things that are specifically to enhance test safety.
 type wrapperRESTForTests struct {
-	*GenericREST
+	*REST
 }
 
 func (f *wrapperRESTForTests) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
@@ -155,7 +155,7 @@ func (f *wrapperRESTForTests) Create(ctx context.Context, obj runtime.Object, cr
 	// are not going to propagate to verification code, which used to happen
 	// resulting in tests that passed when they shouldn't have.
 	obj = obj.DeepCopyObject()
-	return f.GenericREST.Create(ctx, obj, createValidation, options)
+	return f.REST.Create(ctx, obj, createValidation, options)
 }
 
 //
