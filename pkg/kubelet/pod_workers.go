@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 )
@@ -576,7 +575,7 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		options.KillPodOptions.PodTerminationGracePeriodSecondsOverride = &gracePeriod
 
 		// if a static pod comes through, start tracking it explicitly (cleared by the pod worker loop)
-		if kubelettypes.IsStaticPod(pod) {
+		if kubetypes.IsStaticPod(pod) {
 			p.terminatingStaticPodFullnames[kubecontainer.GetPodFullName(pod)] = struct{}{}
 		}
 
