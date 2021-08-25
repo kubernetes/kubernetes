@@ -5,7 +5,6 @@ approvers:
   - wilsonehusin # 1.21 Release Notes Lead
   - cpanato # Release Manager
   - feiskyer # Release Manager
-  - hasheddan # Release Manager / SIG Technical Lead
   - idealhack # Release Manager
   - justaugustus # Release Manager / SIG Chair
   - puerco # Release Manager

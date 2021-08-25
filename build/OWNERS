@@ -5,7 +5,6 @@ reviewers:
   - cblecker
   - dims
   - fejta
-  - hasheddan # Release Manager / SIG Technical Lead
   - justaugustus # Release Manager / SIG Chair
   - lavalamp
   - saschagrunert # Release Manager / SIG Chair
