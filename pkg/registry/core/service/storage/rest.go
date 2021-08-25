@@ -512,7 +512,7 @@ func (al *RESTAllocStuff) handleClusterIPsForUpdatedService(oldService *api.Serv
 }
 
 // for pre dual stack (gate == off). Hardwired to ClusterIP and ignores all new fields
-func (al *RESTAllocStuff) releaseServiceClusterIP(service *api.Service) (released map[api.IPFamily]string, err error) {
+func (al *RESTAllocStuff) releaseClusterIP(service *api.Service) (released map[api.IPFamily]string, err error) {
 	toRelease := make(map[api.IPFamily]string)
 
 	// we need to do that to handle cases where allocator is no longer configured on
@@ -539,7 +539,7 @@ func (al *RESTAllocStuff) releaseServiceClusterIPs(service *api.Service) (releas
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return al.releaseServiceClusterIP(service)
+		return al.releaseClusterIP(service)
 	}
 
 	toRelease := make(map[api.IPFamily]string)
