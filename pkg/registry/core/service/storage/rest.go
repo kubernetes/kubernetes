@@ -96,7 +96,7 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 }
 
 func (al *RESTAllocStuff) releaseAllocatedResources(svc *api.Service) {
-	al.releaseServiceClusterIPs(svc)
+	al.releaseClusterIPs(svc)
 
 	for _, nodePort := range collectServiceNodePorts(svc) {
 		err := al.serviceNodePorts.Release(nodePort)
@@ -527,7 +527,7 @@ func (al *RESTAllocStuff) releaseClusterIP(service *api.Service) (released map[a
 }
 
 // releases allocated ClusterIPs for service that is about to be deleted
-func (al *RESTAllocStuff) releaseServiceClusterIPs(service *api.Service) (released map[api.IPFamily]string, err error) {
+func (al *RESTAllocStuff) releaseClusterIPs(service *api.Service) (released map[api.IPFamily]string, err error) {
 	// external name don't get ClusterIPs
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil, nil
