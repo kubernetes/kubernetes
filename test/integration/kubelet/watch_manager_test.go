@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -62,8 +61,7 @@ func TestWatchBasedManager(t *testing.T) {
 	// We want all watches to be up and running to stress test it.
 	// So don't treat any secret as immutable here.
 	isImmutable := func(_ runtime.Object) bool { return false }
-	fakeClock := clock.NewFakeClock(time.Now())
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute)
+	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"})
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")
