@@ -106,33 +106,32 @@ aliases:
 
   # SIG Release
   release-engineering-approvers:
-    - cpanato # Release Manager / SIG Technical Lead
+    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - jeremyrickard # SIG Technical Lead / RelEng subproject owner
-    - justaugustus # Release Manager / SIG Chair
-    - puerco # Release Manager / SIG Technical Lead
-    - saschagrunert # Release Manager / SIG Chair
-    - xmudrii # Release Manager
+    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
   release-engineering-reviewers:
-    - cpanato # Release Manager / SIG Technical Lead
+    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - jeremyrickard # SIG Technical Lead / RelEng subproject owner
-    - justaugustus # Release Manager / SIG Chair
-    - puerco # Release Manager / SIG Technical Lead
-    - saschagrunert # Release Manager / SIG Chair
+    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
   build-image-approvers:
     - BenTheElder
     - cblecker
     - dims
-    - justaugustus # Release Manager / SIG Chair
+    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
   build-image-reviewers:
     - BenTheElder
     - cblecker
-    - cpanato # Release Manager / SIG Technical Lead
+    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
     - dims
     - jeremyrickard # SIG Technical Lead / RelEng subproject owner
-    - justaugustus # Release Manager / SIG Chair
-    - puerco # Release Manager / SIG Technical Lead
-    - saschagrunert # Release Manager / SIG Chair
+    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
+    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
+    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
     - xmudrii # Release Manager
 
   sig-storage-approvers:
