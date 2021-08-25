@@ -172,7 +172,7 @@ func (al *RESTAllocStuff) allocateUpdate(service, oldService *api.Service, dryRu
 	//TODO(thockin): validation should not pass with empty clusterIP, but it
 	//does (and is tested!).  Fixing that all is a big PR and will have to
 	//happen later.
-	if txn, err := al.allocUpdateServiceClusterIPsNew(service, oldService, dryRun); err != nil {
+	if txn, err := al.txnUpdateClusterIPs(service, oldService, dryRun); err != nil {
 		result.Revert()
 		return nil, err
 	} else {
@@ -385,8 +385,7 @@ func (al *RESTAllocStuff) allocServiceClusterIPs(service *api.Service, dryRun bo
 	return allocated, err
 }
 
-//FIXME: rename and merge with handleClusterIPsForUpdatedService
-func (al *RESTAllocStuff) allocUpdateServiceClusterIPsNew(service *api.Service, oldService *api.Service, dryRun bool) (transaction, error) {
+func (al *RESTAllocStuff) txnUpdateClusterIPs(service *api.Service, oldService *api.Service, dryRun bool) (transaction, error) {
 	allocated, released, err := al.handleClusterIPsForUpdatedService(oldService, service, dryRun)
 	if err != nil {
 		return nil, err
