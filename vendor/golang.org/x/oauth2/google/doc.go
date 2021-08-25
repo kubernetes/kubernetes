@@ -4,9 +4,9 @@
 
 // Package google provides support for making OAuth2 authorized and authenticated
 // HTTP requests to Google APIs. It supports the Web server flow, client-side
-// credentials, service accounts, Google Compute Engine service accounts, Google
-// App Engine service accounts and workload identity federation from non-Google
-// cloud platforms.
+// credentials, service accounts, Google Compute Engine service accounts,
+// Google App Engine service accounts and workload identity federation
+// from non-Google cloud platforms.
 //
 // A brief overview of the package follows. For more information, please read
 // https://developers.google.com/accounts/docs/OAuth2

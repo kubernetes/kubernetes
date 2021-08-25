@@ -1,3 +1,4 @@
+//go:build !notest
 // +build !notest
 
 /*
