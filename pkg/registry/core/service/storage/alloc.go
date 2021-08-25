@@ -17,15 +17,11 @@ limitations under the License.
 package storage
 
 import (
-	"context"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	apiservice "k8s.io/kubernetes/pkg/api/service"
@@ -918,32 +914,6 @@ func (al *RESTAllocStuff) releaseClusterIP(service *api.Service) (released map[a
 	}
 
 	return al.releaseIPs(toRelease)
-}
-
-func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Getter) error {
-	if addr.TargetRef == nil {
-		return fmt.Errorf("Address has no target ref, skipping: %v", addr)
-	}
-	if genericapirequest.NamespaceValue(ctx) != addr.TargetRef.Namespace {
-		return fmt.Errorf("Address namespace doesn't match context namespace")
-	}
-	obj, err := pods.Get(ctx, addr.TargetRef.Name, &metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return fmt.Errorf("failed to cast to pod: %v", obj)
-	}
-	if pod == nil {
-		return fmt.Errorf("pod is missing, skipping (%s/%s)", addr.TargetRef.Namespace, addr.TargetRef.Name)
-	}
-	for _, podIP := range pod.Status.PodIPs {
-		if podIP.IP == addr.IP {
-			return nil
-		}
-	}
-	return fmt.Errorf("pod ip(s) doesn't match endpoint ip, skipping: %v vs %s (%s/%s)", pod.Status.PodIPs, addr.IP, addr.TargetRef.Namespace, addr.TargetRef.Name)
 }
 
 // This is O(N), but we expect haystack to be small;
