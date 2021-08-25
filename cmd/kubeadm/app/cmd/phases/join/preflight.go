@@ -143,7 +143,7 @@ func runPreflight(c workflow.RunData) error {
 func checkIfReadyForAdditionalControlPlane(initConfiguration *kubeadmapi.ClusterConfiguration, hasCertificateKey bool) error {
 	// blocks if the cluster was created without a stable control plane endpoint
 	if initConfiguration.ControlPlaneEndpoint == "" {
-		return errors.New("unable to add a new control plane instance a cluster that doesn't have a stable controlPlaneEndpoint address")
+		return errors.New("unable to add a new control plane instance to a cluster that doesn't have a stable controlPlaneEndpoint address")
 	}
 
 	if !hasCertificateKey {
