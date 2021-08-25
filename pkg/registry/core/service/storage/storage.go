@@ -65,7 +65,7 @@ type REST struct {
 	*genericregistry.Store
 	primaryIPFamily   api.IPFamily
 	secondaryIPFamily api.IPFamily
-	alloc             RESTAllocStuff
+	alloc             Allocators
 	endpoints         EndpointsStorage
 	pods              PodStorage
 	proxyTransport    http.RoundTripper
