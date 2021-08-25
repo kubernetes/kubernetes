@@ -74,7 +74,9 @@ const (
 	// AnnStorageProvisioner annotation is added to a PVC that is supposed to be dynamically
 	// provisioned. Its value is name of volume plugin that is supposed to provision
 	// a volume for this PVC.
-	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+	// TODO: remove beta anno once deprecation period ends
+	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
+	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 )
 
 // IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
