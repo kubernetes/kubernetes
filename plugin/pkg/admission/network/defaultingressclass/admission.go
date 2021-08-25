@@ -133,7 +133,7 @@ func getDefaultClass(lister networkingv1listers.IngressClassLister) (*networking
 
 	defaultClasses := []*networkingv1.IngressClass{}
 	for _, class := range list {
-		if class.Annotations[networkingv1beta1.AnnotationIsDefaultIngressClass] == "true" {
+		if class.Annotations[networkingv1.AnnotationIsDefaultIngressClass] == "true" {
 			defaultClasses = append(defaultClasses, class)
 		}
 	}
