@@ -302,6 +302,17 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissio
 		return allowedResponse()
 	}
 
+	// short-circuit on privileged enforce+audit+warn namespaces
+	namespace, err := a.NamespaceGetter.GetNamespace(ctx, attrs.GetNamespace())
+	if err != nil {
+		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
+		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+	}
+	nsPolicy, _ := a.PolicyToEvaluate(namespace.Labels)
+	if nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+		return allowedResponse()
+	}
+
 	obj, err := attrs.GetObject()
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
@@ -338,6 +349,17 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
+		return allowedResponse()
+	}
+
+	// short-circuit on privileged audit+warn namespaces
+	namespace, err := a.NamespaceGetter.GetNamespace(ctx, attrs.GetNamespace())
+	if err != nil {
+		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
+		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+	}
+	nsPolicy, _ := a.PolicyToEvaluate(namespace.Labels)
+	if nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
 		return allowedResponse()
 	}
 
