@@ -65,7 +65,7 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 
 	// Ensure IP family fields are correctly initialized.  We do it here, since
 	// we want this to be visible even when dryRun == true.
-	if err := al.initIPFamilyFields(nil, service); err != nil {
+	if err := al.initIPFamilyFields(After{service}, Before{nil}); err != nil {
 		return nil, err
 	}
 
@@ -93,7 +93,9 @@ func (al *RESTAllocStuff) allocateCreate(service *api.Service, dryRun bool) (tra
 
 // attempts to default service ip families according to cluster configuration
 // while ensuring that provided families are configured on cluster.
-func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) error {
+func (al *RESTAllocStuff) initIPFamilyFields(after After, before Before) error {
+	oldService, service := before.Service, after.Service
+
 	// can not do anything here
 	if service.Spec.Type == api.ServiceTypeExternalName {
 		return nil
@@ -113,7 +115,7 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 	// when:
 	// - changing ipFamilyPolicy to "RequireDualStack" or "SingleStack" AND
 	// - adding or removing a secondary clusterIP or ipFamily
-	if isMatchingPreferDualStackClusterIPFields(oldService, service) {
+	if isMatchingPreferDualStackClusterIPFields(after, before) {
 		return nil // nothing more to do.
 	}
 
@@ -172,11 +174,11 @@ func (al *RESTAllocStuff) initIPFamilyFields(oldService, service *api.Service) e
 		} else {
 			// If the policy is anything but single-stack AND they reduced these
 			// fields, it's an error.  They need to specify policy.
-			if reducedClusterIPs(oldService, service) {
+			if reducedClusterIPs(After{service}, Before{oldService}) {
 				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
 					"must be 'SingleStack' to release the secondary cluster IP"))
 			}
-			if reducedIPFamilies(oldService, service) {
+			if reducedIPFamilies(After{service}, Before{oldService}) {
 				el = append(el, field.Invalid(field.NewPath("spec", "ipFamilyPolicy"), service.Spec.IPFamilyPolicy,
 					"must be 'SingleStack' to release the secondary IP family"))
 			}
@@ -565,12 +567,12 @@ func (al *RESTAllocStuff) allocHealthCheckNodePort(service *api.Service, nodePor
 	return nil
 }
 
-func (al *RESTAllocStuff) allocateUpdate(service, oldService *api.Service, dryRun bool) (transaction, error) {
+func (al *RESTAllocStuff) allocateUpdate(after After, before Before, dryRun bool) (transaction, error) {
 	result := metaTransaction{}
 
 	// Ensure IP family fields are correctly initialized.  We do it here, since
 	// we want this to be visible even when dryRun == true.
-	if err := al.initIPFamilyFields(oldService, service); err != nil {
+	if err := al.initIPFamilyFields(after, before); err != nil {
 		return nil, err
 	}
 
@@ -578,7 +580,7 @@ func (al *RESTAllocStuff) allocateUpdate(service, oldService *api.Service, dryRu
 	//TODO(thockin): validation should not pass with empty clusterIP, but it
 	//does (and is tested!).  Fixing that all is a big PR and will have to
 	//happen later.
-	if txn, err := al.txnUpdateClusterIPs(service, oldService, dryRun); err != nil {
+	if txn, err := al.txnUpdateClusterIPs(after, before, dryRun); err != nil {
 		result.Revert()
 		return nil, err
 	} else {
@@ -586,7 +588,7 @@ func (al *RESTAllocStuff) allocateUpdate(service, oldService *api.Service, dryRu
 	}
 
 	// Allocate ports
-	if txn, err := al.txnUpdateNodePorts(service, oldService, dryRun); err != nil {
+	if txn, err := al.txnUpdateNodePorts(after, before, dryRun); err != nil {
 		result.Revert()
 		return nil, err
 	} else {
@@ -596,8 +598,10 @@ func (al *RESTAllocStuff) allocateUpdate(service, oldService *api.Service, dryRu
 	return result, nil
 }
 
-func (al *RESTAllocStuff) txnUpdateClusterIPs(service *api.Service, oldService *api.Service, dryRun bool) (transaction, error) {
-	allocated, released, err := al.updateClusterIPs(oldService, service, dryRun)
+func (al *RESTAllocStuff) txnUpdateClusterIPs(after After, before Before, dryRun bool) (transaction, error) {
+	service := after.Service
+
+	allocated, released, err := al.updateClusterIPs(after, before, dryRun)
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +638,8 @@ func (al *RESTAllocStuff) txnUpdateClusterIPs(service *api.Service, oldService *
 // this func does not perform actual release of clusterIPs. it returns
 // a map[family]ip for the caller to release when everything else has
 // executed successfully
-func (al *RESTAllocStuff) updateClusterIPs(oldService *api.Service, service *api.Service, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
+func (al *RESTAllocStuff) updateClusterIPs(after After, before Before, dryRun bool) (allocated map[api.IPFamily]string, toRelease map[api.IPFamily]string, err error) {
+	oldService, service := before.Service, after.Service
 
 	// We don't want to auto-upgrade (add an IP) or downgrade (remove an IP)
 	// PreferDualStack services following a cluster change to/from
@@ -644,7 +649,7 @@ func (al *RESTAllocStuff) updateClusterIPs(oldService *api.Service, service *api
 	// when:
 	// - changing ipFamilyPolicy to "RequireDualStack" or "SingleStack" AND
 	// - adding or removing a secondary clusterIP or ipFamily
-	if isMatchingPreferDualStackClusterIPFields(oldService, service) {
+	if isMatchingPreferDualStackClusterIPFields(after, before) {
 		return allocated, toRelease, nil // nothing more to do.
 	}
 
@@ -722,7 +727,9 @@ func (al *RESTAllocStuff) updateClusterIPs(oldService *api.Service, service *api
 	return nil, nil, nil
 }
 
-func (al *RESTAllocStuff) txnUpdateNodePorts(service, oldService *api.Service, dryRun bool) (transaction, error) {
+func (al *RESTAllocStuff) txnUpdateNodePorts(after After, before Before, dryRun bool) (transaction, error) {
+	oldService, service := before.Service, after.Service
+
 	// The allocator tracks dry-run-ness internally.
 	nodePortOp := portallocator.StartOperation(al.serviceNodePorts, dryRun)
 
@@ -747,14 +754,14 @@ func (al *RESTAllocStuff) txnUpdateNodePorts(service, oldService *api.Service, d
 
 	// Update service from any type to NodePort or LoadBalancer, should update NodePort.
 	if service.Spec.Type == api.ServiceTypeNodePort || service.Spec.Type == api.ServiceTypeLoadBalancer {
-		if err := al.updateNodePorts(oldService, service, nodePortOp); err != nil {
+		if err := al.updateNodePorts(After{service}, Before{oldService}, nodePortOp); err != nil {
 			txn.Revert()
 			return nil, err
 		}
 	}
 
 	// Handle ExternalTraffic related updates.
-	success, err := al.updateHealthCheckNodePort(oldService, service, nodePortOp)
+	success, err := al.updateHealthCheckNodePort(After{service}, Before{oldService}, nodePortOp)
 	if !success || err != nil {
 		txn.Revert()
 		return nil, err
@@ -771,7 +778,9 @@ func (al *RESTAllocStuff) releaseNodePorts(service *api.Service, nodePortOp *por
 	}
 }
 
-func (al *RESTAllocStuff) updateNodePorts(oldService, newService *api.Service, nodePortOp *portallocator.PortAllocationOperation) error {
+func (al *RESTAllocStuff) updateNodePorts(after After, before Before, nodePortOp *portallocator.PortAllocationOperation) error {
+	oldService, newService := before.Service, after.Service
+
 	oldNodePortsNumbers := collectServiceNodePorts(oldService)
 	newNodePorts := []ServiceNodePort{}
 	portAllocated := map[int]bool{}
@@ -825,7 +834,9 @@ func (al *RESTAllocStuff) updateNodePorts(oldService, newService *api.Service, n
 
 // updateHealthCheckNodePort handles HealthCheckNodePort allocation/release
 // and adjusts HealthCheckNodePort during service update if needed.
-func (al *RESTAllocStuff) updateHealthCheckNodePort(oldService, service *api.Service, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
+func (al *RESTAllocStuff) updateHealthCheckNodePort(after After, before Before, nodePortOp *portallocator.PortAllocationOperation) (bool, error) {
+	oldService, service := before.Service, after.Service
+
 	neededHealthCheckNodePort := apiservice.NeedsHealthCheck(oldService)
 	oldHealthCheckNodePort := oldService.Spec.HealthCheckNodePort
 
@@ -976,7 +987,9 @@ func collectServiceNodePorts(service *api.Service) []int {
 
 // tests if two preferred dual-stack service have matching ClusterIPFields
 // assumption: old service is a valid, default service (e.g., loaded from store)
-func isMatchingPreferDualStackClusterIPFields(oldService, service *api.Service) bool {
+func isMatchingPreferDualStackClusterIPFields(after After, before Before) bool {
+	oldService, service := before.Service, after.Service
+
 	if oldService == nil {
 		return false
 	}
@@ -1044,11 +1057,13 @@ func sameClusterIPs(lhs, rhs *api.Service) bool {
 	return true
 }
 
-func reducedClusterIPs(before, after *api.Service) bool {
-	if len(after.Spec.ClusterIPs) == 0 { // Not specified
+func reducedClusterIPs(after After, before Before) bool {
+	oldSvc, newSvc := before.Service, after.Service
+
+	if len(newSvc.Spec.ClusterIPs) == 0 { // Not specified
 		return false
 	}
-	return len(after.Spec.ClusterIPs) < len(before.Spec.ClusterIPs)
+	return len(newSvc.Spec.ClusterIPs) < len(oldSvc.Spec.ClusterIPs)
 }
 
 func sameIPFamilies(lhs, rhs *api.Service) bool {
@@ -1065,11 +1080,13 @@ func sameIPFamilies(lhs, rhs *api.Service) bool {
 	return true
 }
 
-func reducedIPFamilies(before, after *api.Service) bool {
-	if len(after.Spec.IPFamilies) == 0 { // Not specified
+func reducedIPFamilies(after After, before Before) bool {
+	oldSvc, newSvc := before.Service, after.Service
+
+	if len(newSvc.Spec.IPFamilies) == 0 { // Not specified
 		return false
 	}
-	return len(after.Spec.IPFamilies) < len(before.Spec.IPFamilies)
+	return len(newSvc.Spec.IPFamilies) < len(oldSvc.Spec.IPFamilies)
 }
 
 // Helper to get the IP family of a given IP.

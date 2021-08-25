@@ -402,7 +402,7 @@ func TestNormalizeClusterIPs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			normalizeClusterIPs(tc.oldService, tc.newService)
+			normalizeClusterIPs(After{tc.newService}, Before{tc.oldService})
 
 			if tc.newService == nil {
 				t.Fatalf("unexpected new service to be nil")
@@ -506,7 +506,7 @@ func TestPatchAllocatedValues(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			update := tc.update.DeepCopy()
-			patchAllocatedValues(update, tc.before)
+			patchAllocatedValues(After{update}, Before{tc.before})
 
 			beforeIP := tc.before.Spec.ClusterIP
 			updateIP := update.Spec.ClusterIP

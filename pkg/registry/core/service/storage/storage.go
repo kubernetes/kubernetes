@@ -186,6 +186,25 @@ func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	return r.store.GetResetFields()
 }
 
+// We have a lot of functions that take a pair of "before" and "after" or
+// "oldSvc" and "newSvc" args.  Convention across the codebase is to pass them
+// as (new, old), but it's easy to screw up when they are the same type.
+//
+// These types force us to pay attention.  If the order of the arguments
+// matters, please receive them as:
+//    func something(after After, before Before) {
+//        oldSvc, newSvc := before.Service, after.Service
+//
+// If the order of arguments DOES NOT matter, please receive them as:
+//    func something(lhs, rhs *api.Service) {
+
+type Before struct {
+	*api.Service
+}
+type After struct {
+	*api.Service
+}
+
 // defaultOnRead sets interlinked fields that were not previously set on read.
 // We can't do this in the normal defaulting path because that same logic
 // applies on Get, Create, and Update, but we need to distinguish between them.
@@ -222,8 +241,7 @@ func (r *REST) defaultOnReadService(service *api.Service) {
 
 	// We might find Services that were written before ClusterIP became plural.
 	// We still want to present a consistent view of them.
-	// NOTE: the args are (old, new)
-	normalizeClusterIPs(nil, service)
+	normalizeClusterIPs(After{service}, Before{nil})
 
 	// The rest of this does not apply unless dual-stack is enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
@@ -324,8 +342,7 @@ func (r *REST) beginCreate(ctx context.Context, obj runtime.Object, options *met
 
 	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
-	// NOTE: the args are (old, new)
-	normalizeClusterIPs(nil, svc)
+	normalizeClusterIPs(After{svc}, Before{nil})
 
 	// Allocate IPs and ports. If we had a transactional store, this would just
 	// be part of the larger transaction.  We don't have that, so we have to do
@@ -355,15 +372,14 @@ func (r *REST) beginUpdate(ctx context.Context, obj, oldObj runtime.Object, opti
 
 	// Fix up allocated values that the client may have not specified (for
 	// idempotence).
-	patchAllocatedValues(newSvc, oldSvc)
+	patchAllocatedValues(After{newSvc}, Before{oldSvc})
 
 	// Make sure ClusterIP and ClusterIPs are in sync.  This has to happen
 	// early, before anyone looks at them.
-	// NOTE: the args are (old, new)
-	normalizeClusterIPs(oldSvc, newSvc)
+	normalizeClusterIPs(After{newSvc}, Before{oldSvc})
 
 	// Allocate and initialize fields.
-	txn, err := r.alloc.allocateUpdate(newSvc, oldSvc, dryrun.IsDryRun(options.DryRun))
+	txn, err := r.alloc.allocateUpdate(After{newSvc}, Before{oldSvc}, dryrun.IsDryRun(options.DryRun))
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +497,9 @@ func isValidAddress(ctx context.Context, addr *api.EndpointAddress, pods rest.Ge
 
 // normalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not
 // consider any other fields.
-func normalizeClusterIPs(oldSvc, newSvc *api.Service) {
+func normalizeClusterIPs(after After, before Before) {
+	oldSvc, newSvc := before.Service, after.Service
+
 	// In all cases here, we don't need to over-think the inputs.  Validation
 	// will be called on the new object soon enough.  All this needs to do is
 	// try to divine what user meant with these linked fields. The below
@@ -546,7 +564,9 @@ func normalizeClusterIPs(oldSvc, newSvc *api.Service) {
 // preserving values that we allocated on their behalf.  For example, they
 // might create a Service without specifying the ClusterIP, in which case we
 // allocate one.  If they resubmit that same YAML, we want it to succeed.
-func patchAllocatedValues(newSvc, oldSvc *api.Service) {
+func patchAllocatedValues(after After, before Before) {
+	oldSvc, newSvc := before.Service, after.Service
+
 	if needsClusterIP(oldSvc) && needsClusterIP(newSvc) {
 		if newSvc.Spec.ClusterIP == "" {
 			newSvc.Spec.ClusterIP = oldSvc.Spec.ClusterIP
