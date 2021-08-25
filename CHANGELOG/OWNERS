@@ -1,15 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
+  - release-engineering-approvers
+  - release-engineering-reviewers
   - pmmalinov01 # 1.22 Release Notes Lead
   - wilsonehusin # 1.21 Release Notes Lead
-  - cpanato # Release Manager
-  - feiskyer # Release Manager
-  - idealhack # Release Manager
-  - justaugustus # Release Manager / SIG Chair
-  - puerco # Release Manager
-  - saschagrunert # Release Manager / SIG Chair
-  - xmudrii # Release Manager
 reviewers:
   - pmmalinov01 # 1.22 Release Notes Lead
   - cici37 # 1.22 Release Notes shadow
