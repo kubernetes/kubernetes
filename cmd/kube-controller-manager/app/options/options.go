@@ -456,6 +456,9 @@ func (s KubeControllerManagerOptions) Config(allControllers []string, disabledBy
 		libgorestclient.DefaultServerName(kubeconfig)
 		kubeconfig.Wrap(s.OpenShiftContext.PreferredHostRoundTripperWrapperFn)
 	}
+	for _, customOpenShiftRoundTripper := range s.OpenShiftContext.CustomRoundTrippers {
+		kubeconfig.Wrap(customOpenShiftRoundTripper)
+	}
 
 	client, err := clientset.NewForConfig(restclient.AddUserAgent(kubeconfig, KubeControllerManagerUserAgent))
 	if err != nil {
