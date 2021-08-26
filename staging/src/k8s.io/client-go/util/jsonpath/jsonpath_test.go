@@ -280,6 +280,7 @@ func TestStructInput(t *testing.T) {
 
 	missingKeyTests := []jsonpathTest{
 		{"nonexistent field", "{.hello}", storeData, "", false},
+		{"nonexistent field 2", "before-{.hello}after", storeData, "before-after", false},
 	}
 	testJSONPath(missingKeyTests, true, t)
 
