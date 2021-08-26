@@ -702,7 +702,7 @@ function gke-setup-inplace {
   if [[ -d  "${src_dir}" ]]; then
     copy-manifests "${src_dir}" "/etc/kubernetes/manifests"
   fi
-  mv ${KUBE_HOME}/inplace/in-place-status.yaml ${KUBE_HOME}/inplace/in-place-status.init.yaml
+  cp ${KUBE_HOME}/inplace/in-place-status.yaml ${KUBE_HOME}/inplace/in-place-status.init.yaml
   cat <<EOF >/etc/systemd/system/inplace.service
 # Systemd configuration for inplace server
 [Unit]
