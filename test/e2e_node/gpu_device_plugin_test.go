@@ -107,7 +107,7 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 
 		ginkgo.It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
 			ginkgo.By("Creating one GPU pod on a node with at least two GPUs")
-			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs"
+			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs && sleep 120"
 			p1 := f.PodClient().CreateSync(makeBusyboxPod(e2egpu.NVIDIAGPUResourceName, podRECMD))
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
