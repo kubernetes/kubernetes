@@ -54,8 +54,7 @@ func NVIDIADevicePlugin() *v1.Pod {
 	framework.ExpectNoError(err)
 	p := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
-			Namespace: metav1.NamespaceSystem,
+			Name: "device-plugin-nvidia-gpu-" + string(uuid.NewUUID()),
 		},
 		Spec: ds.Spec.Template.Spec,
 	}
@@ -70,7 +69,6 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 
 	ginkgo.Context("DevicePlugin", func() {
 		var devicePluginPod *v1.Pod
-		var err error
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Ensuring that Nvidia GPUs exists on the node")
 			if !checkIfNvidiaGPUsExistOnNode() {
@@ -81,14 +79,13 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 				ginkgo.Skip("Test works only with in-tree dockershim. Skipping test.")
 			}
 
-			ginkgo.By("Creating the Google Device Plugin pod for NVIDIA GPU in GKE")
-			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), NVIDIADevicePlugin(), metav1.CreateOptions{})
-			framework.ExpectNoError(err)
+			ginkgo.By("Creating the Google Device Plugin pod for NVIDIA GPU")
+			devicePluginPod = f.PodClient().Create(NVIDIADevicePlugin())
 
 			ginkgo.By("Waiting for GPUs to become available on the local node")
 			gomega.Eventually(func() bool {
 				return numberOfNVIDIAGPUs(getLocalNode(f)) > 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue(), "GPUs never became available on the local node")
 
 			if numberOfNVIDIAGPUs(getLocalNode(f)) < 2 {
 				ginkgo.Skip("Not enough GPUs to execute this test (at least two needed)")
