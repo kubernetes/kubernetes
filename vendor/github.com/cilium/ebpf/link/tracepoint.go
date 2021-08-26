@@ -11,7 +11,7 @@ import (
 // tracepoints. The top-level directory is the group, the event's subdirectory
 // is the name. Example:
 //
-//	Tracepoint("syscalls", "sys_enter_fork")
+//	Tracepoint("syscalls", "sys_enter_fork", prog)
 //
 // Note that attaching eBPF programs to syscalls (sys_enter_*/sys_exit_*) is
 // only possible as of kernel 4.14 (commit cf5f5ce).
@@ -44,7 +44,7 @@ func Tracepoint(group, name string, prog *ebpf.Program) (Link, error) {
 		tracefsID: tid,
 		group:     group,
 		name:      name,
-		progType:  ebpf.TracePoint,
+		typ:       tracepointEvent,
 	}
 
 	if err := pe.attach(prog); err != nil {

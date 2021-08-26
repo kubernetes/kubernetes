@@ -65,8 +65,8 @@ require (
 	github.com/onsi/ginkgo v4.7.0-origin.0+incompatible
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/runc v1.0.0-rc95
-	github.com/opencontainers/selinux v1.8.0
+	github.com/opencontainers/runc v1.0.1
+	github.com/opencontainers/selinux v1.8.2
 	github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee
 	github.com/openshift/apiserver-library-go v0.0.0-20210730115713-954659d29e40
 	github.com/openshift/client-go v0.0.0-20210730113412-1811c1b3fc0e
@@ -185,6 +185,7 @@ replace (
 	github.com/benbjohnson/clock => github.com/benbjohnson/clock v1.0.3
 	github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 	github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
+	github.com/bits-and-blooms/bitset => github.com/bits-and-blooms/bitset v1.2.0
 	github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c
 	github.com/blang/semver => github.com/blang/semver v3.5.1+incompatible
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
@@ -196,7 +197,7 @@ replace (
 	github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 	github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 	github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
-	github.com/cilium/ebpf => github.com/cilium/ebpf v0.5.0
+	github.com/cilium/ebpf => github.com/cilium/ebpf v0.6.2
 	github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/cncf/udpa/go => github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403
 	github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20200714090401-bf6692d28da5
@@ -388,9 +389,9 @@ replace (
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc95
+	github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.1
 	github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
-	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
+	github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.2
 	github.com/openshift/api => github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee
 	github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20210730115713-954659d29e40
 	github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20210712174854-1bb7fd1518d3
@@ -423,7 +424,7 @@ replace (
 	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
 	github.com/sergi/go-diff => github.com/sergi/go-diff v1.1.0
 	github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
-	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.7.0
+	github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.8.1
 	github.com/smartystreets/assertions => github.com/smartystreets/assertions v1.1.0
 	github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 	github.com/soheilhy/cmux => github.com/soheilhy/cmux v0.1.5
@@ -445,7 +446,6 @@ replace (
 	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.1.0
 	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.3
-	github.com/willf/bitset => github.com/willf/bitset v1.1.11
 	github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 	github.com/xlab/handysort => github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1
 	github.com/xlab/treeprint => github.com/xlab/treeprint v0.0.0-20181112141820-a009c3971eca

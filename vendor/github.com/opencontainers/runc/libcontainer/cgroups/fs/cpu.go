@@ -13,8 +13,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-type CpuGroup struct {
-}
+type CpuGroup struct{}
 
 func (s *CpuGroup) Name() string {
 	return "cpu"
@@ -26,7 +25,7 @@ func (s *CpuGroup) Apply(path string, d *cgroupData) error {
 	if path == "" {
 		return nil
 	}
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, 0o755); err != nil {
 		return err
 	}
 	// We should set the real-Time group scheduling settings before moving
@@ -42,12 +41,12 @@ func (s *CpuGroup) Apply(path string, d *cgroupData) error {
 
 func (s *CpuGroup) SetRtSched(path string, r *configs.Resources) error {
 	if r.CpuRtPeriod != 0 {
-		if err := fscommon.WriteFile(path, "cpu.rt_period_us", strconv.FormatUint(r.CpuRtPeriod, 10)); err != nil {
+		if err := cgroups.WriteFile(path, "cpu.rt_period_us", strconv.FormatUint(r.CpuRtPeriod, 10)); err != nil {
 			return err
 		}
 	}
 	if r.CpuRtRuntime != 0 {
-		if err := fscommon.WriteFile(path, "cpu.rt_runtime_us", strconv.FormatInt(r.CpuRtRuntime, 10)); err != nil {
+		if err := cgroups.WriteFile(path, "cpu.rt_runtime_us", strconv.FormatInt(r.CpuRtRuntime, 10)); err != nil {
 			return err
 		}
 	}
@@ -57,7 +56,7 @@ func (s *CpuGroup) SetRtSched(path string, r *configs.Resources) error {
 func (s *CpuGroup) Set(path string, r *configs.Resources) error {
 	if r.CpuShares != 0 {
 		shares := r.CpuShares
-		if err := fscommon.WriteFile(path, "cpu.shares", strconv.FormatUint(shares, 10)); err != nil {
+		if err := cgroups.WriteFile(path, "cpu.shares", strconv.FormatUint(shares, 10)); err != nil {
 			return err
 		}
 		// read it back
@@ -73,12 +72,12 @@ func (s *CpuGroup) Set(path string, r *configs.Resources) error {
 		}
 	}
 	if r.CpuPeriod != 0 {
-		if err := fscommon.WriteFile(path, "cpu.cfs_period_us", strconv.FormatUint(r.CpuPeriod, 10)); err != nil {
+		if err := cgroups.WriteFile(path, "cpu.cfs_period_us", strconv.FormatUint(r.CpuPeriod, 10)); err != nil {
 			return err
 		}
 	}
 	if r.CpuQuota != 0 {
-		if err := fscommon.WriteFile(path, "cpu.cfs_quota_us", strconv.FormatInt(r.CpuQuota, 10)); err != nil {
+		if err := cgroups.WriteFile(path, "cpu.cfs_quota_us", strconv.FormatInt(r.CpuQuota, 10)); err != nil {
 			return err
 		}
 	}
@@ -86,7 +85,7 @@ func (s *CpuGroup) Set(path string, r *configs.Resources) error {
 }
 
 func (s *CpuGroup) GetStats(path string, stats *cgroups.Stats) error {
-	f, err := fscommon.OpenFile(path, "cpu.stat", os.O_RDONLY)
+	f, err := cgroups.OpenFile(path, "cpu.stat", os.O_RDONLY)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
