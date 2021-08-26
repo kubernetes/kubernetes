@@ -10,7 +10,7 @@ approvers:
 - release-engineering-approvers
 reviewers:
 - sig-api-machinery-api-reviewers
-- release-engineering-reviewers
+- release-managers
 
 labels:
 - sig/api-machinery
