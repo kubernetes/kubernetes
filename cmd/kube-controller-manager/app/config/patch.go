@@ -15,4 +15,5 @@ type OpenShiftContext struct {
 	UnsupportedKubeAPIOverPreferredHost bool
 	PreferredHostRoundTripperWrapperFn  transport.WrapperFunc
 	PreferredHostHealthMonitor          *health.Prober
+	CustomRoundTrippers                 []transport.WrapperFunc
 }
