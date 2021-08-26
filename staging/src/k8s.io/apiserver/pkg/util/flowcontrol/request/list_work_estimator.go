@@ -59,7 +59,7 @@ func (e *listWorkEstimator) estimate(r *http.Request) WorkEstimate {
 	}
 	isListFromCache := !shouldListFromStorage(query, &listOptions)
 
-	count, err := e.countGetterFn(key(requestInfo))
+	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
 	case err == ObjectCountStaleErr:
 		// object count going stale is indicative of degradation, so we should
@@ -82,23 +82,23 @@ func (e *listWorkEstimator) estimate(r *http.Request) WorkEstimate {
 		return WorkEstimate{Seats: maximumSeats}
 	}
 
-	// TODO: For resources that implement indexes at the watchcache level,
-	//  we need to adjust the cost accordingly
+	limit := numStored
+	if utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking) && listOptions.Limit > 0 &&
+		listOptions.Limit < numStored {
+		limit = listOptions.Limit
+	}
+
 	var estimatedObjectsToBeProcessed int64
+
 	switch {
 	case isListFromCache:
-		// if we are here, count is known
-		estimatedObjectsToBeProcessed = count
+		// TODO: For resources that implement indexes at the watchcache level,
+		//  we need to adjust the cost accordingly
+		estimatedObjectsToBeProcessed = numStored
+	case listOptions.FieldSelector != "" || listOptions.LabelSelector != "":
+		estimatedObjectsToBeProcessed = numStored + limit
 	default:
-		// Even if a selector is specified and we may need to list and go over more objects from etcd
-		// to produce the result of size <limit>, each individual chunk will be of size at most <limit>.
-		// As a result. the work estimate of the request should be computed based on <limit> and the actual
-		// cost of processing more elements will be hidden in the request processing latency.
-		estimatedObjectsToBeProcessed = listOptions.Limit
-		if estimatedObjectsToBeProcessed == 0 {
-			// limit has not been specified, fall back to count
-			estimatedObjectsToBeProcessed = count
-		}
+		estimatedObjectsToBeProcessed = 2 * limit
 	}
 
 	// for now, our rough estimate is to allocate one seat to each 100 obejcts that

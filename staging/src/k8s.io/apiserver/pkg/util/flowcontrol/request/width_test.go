@@ -61,54 +61,41 @@ func TestWorkEstimator(t *testing.T) {
 			seatsExpected: maximumSeats,
 		},
 		{
+			name:       "request verb is list, has limit and resource version is 1",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=399&resourceVersion=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 699,
+			},
+			seatsExpected: 8,
+		},
+		{
+			name:       "request verb is list, limit not set",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=1",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 699,
+			},
+			seatsExpected: 7,
+		},
+		{
 			name:       "request verb is list, resource version not set",
-			requestURI: "http://server/apis/foo.bar/v1/events?limit=499",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=399",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
 			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			seatsExpected: 5,
-		},
-		{
-			name:       "request verb is list, continuation is set",
-			requestURI: "http://server/apis/foo.bar/v1/events?continue=token&limit=499&resourceVersion=1",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "list",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			seatsExpected: 5,
-		},
-		{
-			name:       "request verb is list, has limit",
-			requestURI: "http://server/apis/foo.bar/v1/events?limit=499&resourceVersion=1",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "list",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
-			},
-			seatsExpected: 5,
-		},
-		{
-			name:       "request verb is list, resource version is zero",
-			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0",
-			requestInfo: &apirequest.RequestInfo{
-				Verb:     "list",
-				APIGroup: "foo.bar",
-				Resource: "events",
-			},
-			counts: map[string]int64{
-				"events.foo.bar": 799,
+				"events.foo.bar": 699,
 			},
 			seatsExpected: 8,
 		},
@@ -121,7 +108,7 @@ func TestWorkEstimator(t *testing.T) {
 				Resource: "events",
 			},
 			counts: map[string]int64{
-				"events.foo.bar": 799,
+				"events.foo.bar": 399,
 			},
 			seatsExpected: 8,
 		},
@@ -137,8 +124,34 @@ func TestWorkEstimator(t *testing.T) {
 			seatsExpected: maximumSeats,
 		},
 		{
-			name:       "request verb is list, resource version match is Exact",
-			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo&resourceVersionMatch=Exact&limit=499",
+			name:       "request verb is list, continuation is set",
+			requestURI: "http://server/apis/foo.bar/v1/events?continue=token&limit=399",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 699,
+			},
+			seatsExpected: 8,
+		},
+		{
+			name:       "request verb is list, resource version is zero",
+			requestURI: "http://server/apis/foo.bar/v1/events?limit=299&resourceVersion=0",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 399,
+			},
+			seatsExpected: 4,
+		},
+		{
+			name:       "request verb is list, resource version is zero, no limit",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=0",
 			requestInfo: &apirequest.RequestInfo{
 				Verb:     "list",
 				APIGroup: "foo.bar",
@@ -147,7 +160,20 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			seatsExpected: 5,
+			seatsExpected: 8,
+		},
+		{
+			name:       "request verb is list, resource version match is Exact",
+			requestURI: "http://server/apis/foo.bar/v1/events?resourceVersion=foo&resourceVersionMatch=Exact&limit=399",
+			requestInfo: &apirequest.RequestInfo{
+				Verb:     "list",
+				APIGroup: "foo.bar",
+				Resource: "events",
+			},
+			counts: map[string]int64{
+				"events.foo.bar": 699,
+			},
+			seatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, resource version match is NotOlderThan, limit not specified",
