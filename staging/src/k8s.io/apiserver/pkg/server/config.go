@@ -485,6 +485,51 @@ func (c *Config) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
 	}
 }
 
+// HasBeenReadySignal exposes a server's lifecycle signal which is signaled when the readyz endpoint succeeds for the first time.
+func (c *Config) HasBeenReadySignal() <-chan struct{} {
+	return c.lifecycleSignals.HasBeenReady.Signaled()
+}
+
+// shouldAddWithRetryAfterFilter returns an appropriate ShouldRespondWithRetryAfterFunc
+// if the apiserver should respond with a Retry-After response header based on option
+// 'shutdown-send-retry-after' or 'startup-send-retry-after-until-ready'.
+func (c *Config) shouldAddWithRetryAfterFilter() genericfilters.ShouldRespondWithRetryAfterFunc {
+	if !(c.ShutdownSendRetryAfter || c.StartupSendRetryAfterUntilReady) {
+		return nil
+	}
+
+	// follow lifecycle, avoiding go routines per request
+	const (
+		startup int32 = iota
+		running
+		terminating
+	)
+	state := startup
+	go func() {
+		<-c.lifecycleSignals.HasBeenReady.Signaled()
+		atomic.StoreInt32(&state, running)
+		<-c.lifecycleSignals.AfterShutdownDelayDuration.Signaled()
+		atomic.StoreInt32(&state, terminating)
+	}()
+
+	return func() (*genericfilters.RetryAfterParams, bool) {
+		state := atomic.LoadInt32(&state)
+		switch {
+		case c.StartupSendRetryAfterUntilReady && state == startup:
+			return &genericfilters.RetryAfterParams{
+				Message: "The apiserver hasn't been fully initialized yet, please try again later.",
+			}, true
+		case c.ShutdownSendRetryAfter && state == terminating:
+			return &genericfilters.RetryAfterParams{
+				TearDownConnection: true,
+				Message:            "The apiserver is shutting down, please try again later.",
+			}, true
+		default:
+			return nil, false
+		}
+	}
+}
+
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
