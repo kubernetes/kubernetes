@@ -3,7 +3,9 @@ package app
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"path"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/json"
@@ -11,6 +13,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/transport"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -21,7 +24,9 @@ import (
 
 var InformerFactoryOverride informers.SharedInformerFactory
 
-func SetUpPreferredHostForOpenShift(controllerManagerOptions *options.KubeControllerManagerOptions) error {
+func SetUpCustomRoundTrippersForOpenShift(controllerManagerOptions *options.KubeControllerManagerOptions) error {
+	controllerManagerOptions.OpenShiftContext.CustomRoundTrippers = []transport.WrapperFunc{newRejectIfNotReadyHeaderRoundTripper([]string{"generic-garbage-collector", "namespace-controller"})}
+
 	if !controllerManagerOptions.OpenShiftContext.UnsupportedKubeAPIOverPreferredHost {
 		return nil
 	}
@@ -54,6 +59,7 @@ func SetUpPreferredHostForOpenShift(controllerManagerOptions *options.KubeContro
 
 	controllerManagerOptions.Authentication.WithCustomRoundTripper(controllerManagerOptions.OpenShiftContext.PreferredHostRoundTripperWrapperFn)
 	controllerManagerOptions.Authorization.WithCustomRoundTripper(controllerManagerOptions.OpenShiftContext.PreferredHostRoundTripperWrapperFn)
+
 	return nil
 }
 
@@ -132,4 +138,29 @@ func createRestConfigForHealthMonitor(restConfig *rest.Config) *rest.Config {
 	rest.AddUserAgent(&restConfigCopy, fmt.Sprintf("%s-health-monitor", options.KubeControllerManagerUserAgent))
 
 	return &restConfigCopy
+}
+
+// newRejectIfNotReadyHeaderRoundTripper a middleware for setting X-OpenShift-Internal-If-Not-Ready HTTP Header for the given users.
+// In general, setting the header will result in getting 429 when the server hasn't been ready.
+// This prevents certain controllers like GC, Namespace from accidentally removing resources when the caches haven't been fully synchronized.
+func newRejectIfNotReadyHeaderRoundTripper(eligibleUsers []string) func(http.RoundTripper) http.RoundTripper {
+	return func(rt http.RoundTripper) http.RoundTripper {
+		return &rejectIfNotReadyHeaderRT{baseRT: rt, eligibleUsers: eligibleUsers}
+	}
+}
+
+type rejectIfNotReadyHeaderRT struct {
+	baseRT        http.RoundTripper
+	eligibleUsers []string
+}
+
+func (rt *rejectIfNotReadyHeaderRT) RoundTrip(r *http.Request) (*http.Response, error) {
+	currentUser := r.UserAgent()
+	for _, eligibleUser := range rt.eligibleUsers {
+		if strings.Contains(currentUser, eligibleUser) {
+			r.Header.Set("X-OpenShift-Internal-If-Not-Ready", "reject")
+			break
+		}
+	}
+	return rt.baseRT.RoundTrip(r)
 }
