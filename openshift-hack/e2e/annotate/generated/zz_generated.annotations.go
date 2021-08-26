@@ -1135,13 +1135,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should release NodePorts on delete": "should release NodePorts on delete [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod [Feature:ServiceInternalTrafficPolicy] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod (hostNetwork: true) to Pod [Feature:ServiceInternalTrafficPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod to Pod (hostNetwork: true) [Feature:ServiceInternalTrafficPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] Services should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy]": "should respect internalTrafficPolicy=Local Pod to Pod [Feature:ServiceInternalTrafficPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should serve a basic endpoint from pods  [Conformance]": "should serve a basic endpoint from pods  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 

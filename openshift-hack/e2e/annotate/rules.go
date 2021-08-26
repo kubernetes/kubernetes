@@ -88,12 +88,6 @@ var (
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
 			`should drop INVALID conntrack entries`,
 
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1986306
-			`\[sig-cli\] Kubectl client kubectl wait should ignore not found error with --for=delete`,
-
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1986307
-			`\[Feature:ServiceInternalTrafficPolicy\]`,
-
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1980141
 			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
 			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector`,
