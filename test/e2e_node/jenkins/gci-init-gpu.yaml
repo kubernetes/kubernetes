@@ -2,7 +2,18 @@
 
 runcmd:
   - modprobe configs
-  - docker run -v /dev:/dev -v /home/kubernetes/bin/nvidia:/rootfs/nvidia -v /etc/os-release:/rootfs/etc/os-release -v /proc/sysrq-trigger:/sysrq -e BASE_DIR=/rootfs/nvidia --privileged k8s.gcr.io/cos-nvidia-driver-install@sha256:cb55c7971c337fece62f2bfe858662522a01e43ac9984a2dd1dd5c71487d225c
+  # Setup the installation target at make it executable
+  - mkdir -p /home/kubernetes/bin/nvidia
+  - mount --bind /home/kubernetes/bin/nvidia /home/kubernetes/bin/nvidia
+  - mount -o remount,exec /home/kubernetes/bin/nvidia
+  # Compile and install the nvidia driver (precompiled driver installation currently fails)
+  - docker run --net=host --pid=host -v /dev:/dev -v /:/root -v /home/kubernetes/bin/nvidia:/usr/local/nvidia -e NVIDIA_INSTALL_DIR_HOST=/home/kubernetes/bin/nvidia -e NVIDIA_INSTALL_DIR_CONTAINER=/usr/local/nvidia -e NVIDIA_DRIVER_VERSION=460.91.03 --privileged gcr.io/cos-cloud/cos-gpu-installer:latest
+  # Run the installer again, as on the first try it doesn't detect the libnvidia-ml.so
+  # on the second attempt we detect it and update the ld cache.
+  - docker run --net=host --pid=host -v /dev:/dev -v /:/root -v /home/kubernetes/bin/nvidia:/usr/local/nvidia -e NVIDIA_INSTALL_DIR_HOST=/home/kubernetes/bin/nvidia -e NVIDIA_INSTALL_DIR_CONTAINER=/usr/local/nvidia -e NVIDIA_DRIVER_VERSION=460.91.03 --privileged gcr.io/cos-cloud/cos-gpu-installer:latest
+  # Remove build containers. They're very large.
+  - docker rm -f $(docker ps -aq)
+  # Standard installation proceeds
   - mount /tmp /tmp -o remount,exec,suid
   - usermod -a -G docker jenkins
   - mkdir -p /var/lib/kubelet
