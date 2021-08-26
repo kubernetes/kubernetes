@@ -19,7 +19,7 @@ package nodevolumelimits
 import (
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -71,7 +71,10 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	}
 
 	var mpaSet sets.String
-	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
+	mpa, ok := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
+	if !ok {
+		mpa = csiNodeAnn[v1.MigratedPluginsAlphaAnnotationKey]
+	}
 	if len(mpa) == 0 {
 		mpaSet = sets.NewString()
 	} else {

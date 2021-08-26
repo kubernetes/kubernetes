@@ -132,7 +132,8 @@ const (
 	// list of in-tree plugins that will be serviced by the CSI backend on the Node represented by CSINode.
 	// This annotation is used by the Attach Detach Controller to determine whether to use the in-tree or
 	// CSI Backend for a volume plugin on a specific node.
-	MigratedPluginsAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
+	MigratedPluginsAnnotationKey      = "storage.kubernetes.io/migrated-plugins"
+	MigratedPluginsAlphaAnnotationKey = "storage.alpha.kubernetes.io/migrated-plugins"
 
 	// PodDeletionCost can be used to set to an int32 that represent the cost of deleting
 	// a pod compared to other pods belonging to the same ReplicaSet. Pods with lower

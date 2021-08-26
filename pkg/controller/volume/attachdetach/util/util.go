@@ -366,7 +366,10 @@ func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, v
 		return false, nil
 	}
 
-	mpa := ann[v1.MigratedPluginsAnnotationKey]
+	mpa, ok := ann[v1.MigratedPluginsAnnotationKey]
+	if !ok {
+		mpa = ann[v1.MigratedPluginsAlphaAnnotationKey]
+	}
 	tok := strings.Split(mpa, ",")
 	mpaSet := sets.NewString(tok...)
 

@@ -1056,7 +1056,10 @@ func isPluginMigratedToCSIOnNode(pluginName string, csiNode *storagev1.CSINode) 
 	}
 
 	var mpaSet sets.String
-	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
+	mpa, ok := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
+	if !ok {
+		mpa = csiNodeAnn[v1.MigratedPluginsAlphaAnnotationKey]
+	}
 	if len(mpa) == 0 {
 		mpaSet = sets.NewString()
 	} else {

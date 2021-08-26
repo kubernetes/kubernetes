@@ -480,7 +480,10 @@ func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *
 	}
 
 	var oldAnnotationSet sets.String
-	mpa := nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey]
+	mpa, ok := nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey]
+	if !ok {
+		mpa = nodeInfoAnnotations[v1.MigratedPluginsAlphaAnnotationKey]
+	}
 	tok := strings.Split(mpa, ",")
 	if len(mpa) == 0 {
 		oldAnnotationSet = sets.NewString()
@@ -503,7 +506,9 @@ func setMigrationAnnotation(migratedPlugins map[string](func() bool), nodeInfo *
 	if len(nas) != 0 {
 		nodeInfoAnnotations[v1.MigratedPluginsAnnotationKey] = nas
 	} else {
+		// delete both alpha and ga version annotation
 		delete(nodeInfoAnnotations, v1.MigratedPluginsAnnotationKey)
+		delete(nodeInfoAnnotations, v1.MigratedPluginsAlphaAnnotationKey)
 	}
 
 	nodeInfo.Annotations = nodeInfoAnnotations
