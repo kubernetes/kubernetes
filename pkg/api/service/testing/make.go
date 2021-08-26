@@ -159,3 +159,10 @@ func SetAllocateLoadBalancerNodePorts(val bool) Tweak {
 		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(val)
 	}
 }
+
+// SetHealthCheckNodePort sets the healthCheckNodePort field for a Service.
+func SetHealthCheckNodePort(value int32) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.HealthCheckNodePort = value
+	}
+}
