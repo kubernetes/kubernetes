@@ -900,49 +900,210 @@ func TestServiceRegistryUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
+	type proof func(t *testing.T, s *api.Service)
+	prove := func(proofs ...proof) []proof {
+		return proofs
+	}
+	proveClusterIP := func(idx int, ip string) proof {
+		return func(t *testing.T, s *api.Service) {
+			if want, got := ip, s.Spec.ClusterIPs[idx]; want != got {
+				t.Errorf("wrong ClusterIPs[%d]: want %q, got %q", idx, want, got)
+			}
+		}
+	}
+	proveNodePort := func(idx int, port int32) proof {
+		return func(t *testing.T, s *api.Service) {
+			got := s.Spec.Ports[idx].NodePort
+			if port > 0 && got != port {
+				t.Errorf("wrong Ports[%d].NodePort: want %d, got %d", idx, port, got)
+			} else if port < 0 && got == -port {
+				t.Errorf("wrong Ports[%d].NodePort: wanted anything but %d", idx, got)
+			}
+		}
+	}
+	proveHCNP := func(port int32) proof {
+		return func(t *testing.T, s *api.Service) {
+			got := s.Spec.HealthCheckNodePort
+			if port > 0 && got != port {
+				t.Errorf("wrong HealthCheckNodePort: want %d, got %d", port, got)
+			} else if port < 0 && got == -port {
+				t.Errorf("wrong HealthCheckNodePort: wanted anything but %d", got)
+			}
+		}
+	}
+
 	testCases := []struct {
-		name  string
-		svc   *api.Service // Need a clusterIP, NodePort, and HealthCheckNodePort allocated
-		tweak func(*api.Service)
+		name        string
+		create      *api.Service // Needs clusterIP, NodePort, and HealthCheckNodePort allocated
+		update      *api.Service // Needs clusterIP, NodePort, and/or HealthCheckNodePort blank
+		expectError bool
+		prove       []proof
 	}{{
-		name: "single-port",
-		svc: svctest.MakeService("foo",
+		name: "single-ip_single-port",
+		create: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("1.2.3.4"),
+			svctest.SetNodePorts(30093),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal)),
-		tweak: nil,
+		prove: prove(
+			proveClusterIP(0, "1.2.3.4"),
+			proveNodePort(0, 30093),
+			proveHCNP(30118)),
 	}, {
-		name: "multi-port",
-		svc: svctest.MakeService("foo",
+		name: "multi-ip_multi-port",
+		create: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("1.2.3.4", "2000::1"),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 30076),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
-		tweak: nil,
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP))),
+		prove: prove(
+			proveClusterIP(0, "1.2.3.4"),
+			proveClusterIP(1, "2000::1"),
+			proveNodePort(0, 30093),
+			proveNodePort(1, 30076),
+			proveHCNP(30118)),
 	}, {
-		name: "shuffle-ports",
-		svc: svctest.MakeService("foo",
+		name: "multi-ip_partial",
+		create: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("1.2.3.4", "2000::1"),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 30076),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetClusterIPs("1.2.3.4")),
+		expectError: true,
+	}, {
+		name: "multi-port_partial",
+		create: svctest.MakeService("foo",
 			svctest.SetTypeLoadBalancer,
 			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
 			svctest.SetPorts(
-				svctest.MakeServicePort("p", 80, intstr.FromInt(80), api.ProtocolTCP),
-				svctest.MakeServicePort("q", 443, intstr.FromInt(443), api.ProtocolTCP))),
-		tweak: func(s *api.Service) {
-			s.Spec.Ports[0], s.Spec.Ports[1] = s.Spec.Ports[1], s.Spec.Ports[0]
-		},
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 30076),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 0)), // provide just 1 value
+		prove: prove(
+			proveNodePort(0, 30093),
+			proveNodePort(1, 30076),
+			proveHCNP(30118)),
+	}, {
+		name: "swap-ports",
+		create: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 30076),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				// swapped from above
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP),
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP))),
+		prove: prove(
+			proveNodePort(0, 30076),
+			proveNodePort(1, 30093),
+			proveHCNP(30118)),
+	}, {
+		name: "partial-swap-ports",
+		create: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 30076),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30076, 0), // set [0] to [1], omit [1]
+			svctest.SetHealthCheckNodePort(30118)),
+		prove: prove(
+			proveNodePort(0, 30076),
+			proveNodePort(1, -30076),
+			proveHCNP(30118)),
+	}, {
+		name: "swap-port-with-hcnp",
+		create: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 30076),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30076, 30118)), // set [0] to [1], set [1] to HCNP
+		expectError: true,
+	}, {
+		name: "partial-swap-port-with-hcnp",
+		create: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30093, 30076),
+			svctest.SetHealthCheckNodePort(30118)),
+		update: svctest.MakeService("foo",
+			svctest.SetTypeLoadBalancer,
+			svctest.SetExternalTrafficPolicy(api.ServiceExternalTrafficPolicyTypeLocal),
+			svctest.SetPorts(
+				svctest.MakeServicePort("p", 867, intstr.FromInt(867), api.ProtocolTCP),
+				svctest.MakeServicePort("q", 5309, intstr.FromInt(5309), api.ProtocolTCP)),
+			svctest.SetNodePorts(30118, 0)), // set [0] to HCNP, omit [1]
+		expectError: true,
 	}}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := genericapirequest.NewDefaultContext()
 			storage, _, server := NewTestREST(t, nil, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
-
 			defer server.Terminate(t)
 
-			svc := tc.svc.DeepCopy()
+			svc := tc.create.DeepCopy()
 			obj, err := storage.Create(ctx, svc.DeepCopy(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
-				t.Fatalf("Expected no error: %v", err)
+				t.Fatalf("unexpected error on create: %v", err)
 			}
 			createdSvc := obj.(*api.Service)
 			if createdSvc.Spec.ClusterIP == "" {
@@ -960,13 +1121,21 @@ func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
 				t.Fatalf("expected HealthCheckNodePort to be set")
 			}
 
-			// Update from the original object - just change the selector.
+			// Update - change the selector to be sure.
+			svc = tc.update.DeepCopy()
 			svc.Spec.Selector = map[string]string{"bar": "baz2"}
 			svc.ResourceVersion = "1"
 
-			obj, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc.DeepCopy()), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			obj, _, err = storage.Update(ctx, svc.Name, rest.DefaultUpdatedObjectInfo(svc.DeepCopy()),
+				rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("unexpected success on update")
+				}
+				return
+			}
 			if err != nil {
-				t.Fatalf("Expected no error: %v", err)
+				t.Fatalf("unexpected error on update: %v", err)
 			}
 			updatedSvc := obj.(*api.Service)
 
@@ -976,18 +1145,9 @@ func TestServiceRegistryUpdateUnspecifiedAllocations(t *testing.T) {
 			if want, got := createdSvc.Spec.ClusterIPs, updatedSvc.Spec.ClusterIPs; !reflect.DeepEqual(want, got) {
 				t.Errorf("expected ClusterIPs to not change: wanted %v, got %v", want, got)
 			}
-			portmap := func(s *api.Service) map[string]int32 {
-				ret := map[string]int32{}
-				for _, p := range s.Spec.Ports {
-					ret[p.Name] = p.NodePort
-				}
-				return ret
-			}
-			if want, got := portmap(createdSvc), portmap(updatedSvc); !reflect.DeepEqual(want, got) {
-				t.Errorf("expected NodePort to not change: wanted %v, got %v", want, got)
-			}
-			if want, got := createdSvc.Spec.HealthCheckNodePort, updatedSvc.Spec.HealthCheckNodePort; want != got {
-				t.Errorf("expected HealthCheckNodePort to not change: wanted %v, got %v", want, got)
+
+			for _, proof := range tc.prove {
+				proof(t, updatedSvc)
 			}
 		})
 	}

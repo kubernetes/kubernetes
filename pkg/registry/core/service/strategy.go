@@ -323,6 +323,20 @@ func patchAllocatedValues(newSvc, oldSvc *api.Service) {
 	}
 
 	if needsNodePort(oldSvc) && needsNodePort(newSvc) {
+		nodePortsUsed := func(svc *api.Service) sets.Int32 {
+			used := sets.NewInt32()
+			for _, p := range svc.Spec.Ports {
+				if p.NodePort != 0 {
+					used.Insert(p.NodePort)
+				}
+			}
+			return used
+		}
+
+		// Build a set of all the ports in oldSvc that are also in newSvc.  We know
+		// we can't patch these values.
+		used := nodePortsUsed(oldSvc).Intersection(nodePortsUsed(newSvc))
+
 		// Map NodePorts by name.  The user may have changed other properties
 		// of the port, but we won't see that here.
 		np := map[string]int32{}
@@ -330,10 +344,16 @@ func patchAllocatedValues(newSvc, oldSvc *api.Service) {
 			p := &oldSvc.Spec.Ports[i]
 			np[p.Name] = p.NodePort
 		}
+
+		// If newSvc is missing values, try to patch them in when we know them and
+		// they haven't been used for another port.
 		for i := range newSvc.Spec.Ports {
 			p := &newSvc.Spec.Ports[i]
 			if p.NodePort == 0 {
-				p.NodePort = np[p.Name]
+				oldVal := np[p.Name]
+				if !used.Has(oldVal) {
+					p.NodePort = oldVal
+				}
 			}
 		}
 	}
