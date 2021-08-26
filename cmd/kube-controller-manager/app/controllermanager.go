@@ -139,7 +139,7 @@ controller, and serviceaccounts controller.`,
 			}
 			cliflag.PrintFlags(cmd.Flags())
 
-			if err := SetUpPreferredHostForOpenShift(s); err != nil {
+			if err := SetUpCustomRoundTrippersForOpenShift(s); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
