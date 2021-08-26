@@ -93,22 +93,21 @@ var (
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1986307
 			`\[Feature:ServiceInternalTrafficPolicy\]`,
-			`Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service`,
-			`Networking Granular Checks: Services should function for node-Service: http`,
-			`NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
-			`NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector`,
-			`NetworkPolicy between server and client should enforce policy based on NamespaceSelector with MatchExpressions`,
-			`NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions`,
-			`NetworkPolicy between server and client should enforce policy based on PodSelector or NamespaceSelector`,
-			`NetworkPolicy between server and client should deny ingress from pods on other namespaces`,
-			`NetworkPolicy between server and client should enforce updated policy`,
-			`NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors`,
-			`NetworkPolicy between server and client should enforce policy based on any PodSelectors`,
-			`NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector`,
-			`NetworkPolicy between server and client using UDP should support a 'default-deny-ingress' policy`,
-			`NetworkPolicy between server and client using UDP should enforce policy based on Ports`,
-			`NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
-			`Networking IPerf2`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1980141
+			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
+			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector`,
+			`Netpol NetworkPolicy between server and client should enforce policy based on NamespaceSelector with MatchExpressions`,
+			`Netpol NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions`,
+			`Netpol NetworkPolicy between server and client should enforce policy based on PodSelector or NamespaceSelector`,
+			`Netpol NetworkPolicy between server and client should deny ingress from pods on other namespaces`,
+			`Netpol NetworkPolicy between server and client should enforce updated policy`,
+			`Netpol NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors`,
+			`Netpol NetworkPolicy between server and client should enforce policy based on any PodSelectors`,
+			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector`,
+			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should support a 'default-deny-ingress' policy`,
+			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy based on Ports`,
+			`Netpol \[LinuxOnly\] NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
