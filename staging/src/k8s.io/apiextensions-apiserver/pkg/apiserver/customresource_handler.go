@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -241,6 +242,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		)
 		return
 	}
+	// TODO: publically expose and use handler.StrictValidation()
+	validateParam := req.URL.Query()["validate"]
+	strictValidation := len(validateParam) == 1 && validateParam[0] == "strict"
+	// TODO: this is just for manual testing, remove when we figure out how to test with query params
+	strictValidation = true
 	if !requestInfo.IsResourceRequest {
 		pathParts := splitPath(requestInfo.Path)
 		// only match /apis/<group>/<version>
@@ -316,7 +322,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name, strictValidation)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -602,7 +608,7 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
-	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
+	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name, false)
 	if err != nil {
 		return nil, err
 	}
@@ -611,7 +617,7 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
 // Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
-func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
+func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string, strictValidation bool) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[uid]; ok {
 		return ret, nil
@@ -841,12 +847,12 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		// CRDs explicitly do not support protobuf, but some objects returned by the API server do
 		negotiatedSerializer := unstructuredNegotiatedSerializer{
-			typer:                 typer,
-			creator:               creator,
-			converter:             safeConverter,
-			structuralSchemas:     structuralSchemas,
-			structuralSchemaGK:    kind.GroupKind(),
-			preserveUnknownFields: crd.Spec.PreserveUnknownFields,
+			typer:                  typer,
+			creator:                creator,
+			converter:              safeConverter,
+			structuralSchemas:      structuralSchemas,
+			structuralSchemaGK:     kind.GroupKind(),
+			unknownFieldsDirective: makeUnknownFieldsDirective(crd.Spec.PreserveUnknownFields, strictValidation),
 		}
 		var standardSerializers []runtime.SerializerInfo
 		for _, s := range negotiatedSerializer.SupportedMediaTypes() {
@@ -1032,9 +1038,9 @@ type unstructuredNegotiatedSerializer struct {
 	creator   runtime.ObjectCreater
 	converter runtime.ObjectConvertor
 
-	structuralSchemas     map[string]*structuralschema.Structural // by version
-	structuralSchemaGK    schema.GroupKind
-	preserveUnknownFields bool
+	structuralSchemas      map[string]*structuralschema.Structural // by version
+	structuralSchemaGK     schema.GroupKind
+	unknownFieldsDirective unknownFieldsDirective
 }
 
 func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.SerializerInfo {
@@ -1077,7 +1083,7 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchemas: s.structuralSchemas, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchemas: s.structuralSchemas, structuralSchemaGK: s.structuralSchemaGK, unknownFieldsDirective: s.unknownFieldsDirective}}
 	return versioning.NewCodec(nil, d, runtime.UnsafeObjectConvertor(Scheme), Scheme, Scheme, unstructuredDefaulter{
 		delegate:           Scheme,
 		structuralSchemas:  s.structuralSchemas,
@@ -1191,16 +1197,16 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 	if err == nil {
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
 			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
-			dropInvalidMetadata:   true,
-			repairGeneration:      true,
-			structuralSchemas:     t.structuralSchemas,
-			structuralSchemaGK:    t.structuralSchemaGK,
-			preserveUnknownFields: t.preserveUnknownFields,
+			dropInvalidMetadata:    true,
+			repairGeneration:       true,
+			structuralSchemas:      t.structuralSchemas,
+			structuralSchemaGK:     t.structuralSchemaGK,
+			unknownFieldsDirective: makeUnknownFieldsDirective(t.preserveUnknownFields, false),
 		}}
 		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{
-			structuralSchemas:     t.structuralSchemas,
-			structuralSchemaGK:    t.structuralSchemaGK,
-			preserveUnknownFields: t.preserveUnknownFields,
+			structuralSchemas:      t.structuralSchemas,
+			structuralSchemaGK:     t.structuralSchemaGK,
+			unknownFieldsDirective: makeUnknownFieldsDirective(t.preserveUnknownFields, false),
 		}}
 		ret.StorageConfig.Codec = versioning.NewCodec(
 			ret.StorageConfig.Codec,
@@ -1286,6 +1292,30 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 	return v.delegate.ConvertFieldLabel(gvk, label, value)
 }
 
+// unknownFieldsDirective instructs what should happen
+// if a custom resource is received with unknown fields that
+// are not part of the schema. The options are:
+// - drop the unknown fields
+// - preserve the unknown fields
+// - fail to handle the request and error out.
+type unknownFieldsDirective int
+
+const (
+	drop unknownFieldsDirective = iota
+	preserve
+	fail
+)
+
+func makeUnknownFieldsDirective(preserveUnknownFields, failOnUnknownFields bool) unknownFieldsDirective {
+	if failOnUnknownFields {
+		return fail
+	}
+	if preserveUnknownFields {
+		return preserve
+	}
+	return drop
+}
+
 // unstructuredSchemaCoercer adds to unstructured unmarshalling what json.Unmarshal does
 // in addition for native types when decoding into Golang structs:
 //
@@ -1296,9 +1326,9 @@ type unstructuredSchemaCoercer struct {
 	dropInvalidMetadata bool
 	repairGeneration    bool
 
-	structuralSchemas     map[string]*structuralschema.Structural
-	structuralSchemaGK    schema.GroupKind
-	preserveUnknownFields bool
+	structuralSchemas      map[string]*structuralschema.Structural
+	structuralSchemaGK     schema.GroupKind
+	unknownFieldsDirective unknownFieldsDirective
 }
 
 func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
@@ -1322,9 +1352,18 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 		return err
 	}
 	if gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
-		if !v.preserveUnknownFields {
+		if v.unknownFieldsDirective != preserve {
 			// TODO: switch over pruning and coercing at the root to  schemaobjectmeta.Coerce too
+			// TODO: this seems like a very error prone way of detecting unknown fields
+			// copy the original object to detect whether any fields are pruned
+			objCopy := (&unstructured.Unstructured{
+				Object: u.Object,
+			}).DeepCopy()
 			structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version], false)
+			objCopy.Object["metadata"] = u.Object["metadata"]
+			if v.unknownFieldsDirective == fail && !reflect.DeepEqual(objCopy.Object, u.Object) {
+				return fmt.Errorf("failed with unknown fields: %v", objCopy)
+			}
 			structuraldefaulting.PruneNonNullableNullsWithoutDefaults(u.Object, v.structuralSchemas[gv.Version])
 		}
 		if err := schemaobjectmeta.Coerce(nil, u.Object, v.structuralSchemas[gv.Version], false, v.dropInvalidMetadata); err != nil {
