@@ -379,7 +379,8 @@ func getSupportedUnifiedControllers() sets.String {
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
 	resources := &libcontainerconfigs.Resources{
-		SkipDevices: true,
+		SkipDevices:     true,
+		SkipFreezeOnSet: true,
 	}
 	if resourceConfig == nil {
 		return resources
