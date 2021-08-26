@@ -103,7 +103,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/utils/exec"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -392,8 +392,6 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		return nil, err
 	}
 
-	mounter := mount.New(s.ExperimentalMounterPath)
-	subpather := subpath.New(mounter)
 	hu := hostutil.NewHostUtil()
 	var pluginRunner = exec.New()
 
@@ -420,8 +418,6 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 		HeartbeatClient:     nil,
 		EventClient:         nil,
 		HostUtil:            hu,
-		Mounter:             mounter,
-		Subpather:           subpather,
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       plugins,
@@ -892,7 +888,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 			},
 			func() float64 {
 				if c := clientCertificateManager.Current(); c != nil && c.Leaf != nil {
-					return math.Trunc(c.Leaf.NotAfter.Sub(time.Now()).Seconds())
+					return math.Trunc(time.Until(c.Leaf.NotAfter).Seconds())
 				}
 				return math.Inf(1)
 			},
@@ -1122,7 +1118,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	var nodeIPs []net.IP
 	if kubeServer.NodeIP != "" {
 		for _, ip := range strings.Split(kubeServer.NodeIP, ",") {
-			parsedNodeIP := net.ParseIP(strings.TrimSpace(ip))
+			parsedNodeIP := netutils.ParseIPSloppy(strings.TrimSpace(ip))
 			if parsedNodeIP == nil {
 				klog.InfoS("Could not parse --node-ip ignoring", "IP", ip)
 			} else {
@@ -1132,7 +1128,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && len(nodeIPs) > 1 {
 		return fmt.Errorf("dual-stack --node-ip %q not supported in a single-stack cluster", kubeServer.NodeIP)
-	} else if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && utilnet.IsIPv6(nodeIPs[0]) == utilnet.IsIPv6(nodeIPs[1])) {
+	} else if len(nodeIPs) > 2 || (len(nodeIPs) == 2 && netutils.IsIPv6(nodeIPs[0]) == netutils.IsIPv6(nodeIPs[1])) {
 		return fmt.Errorf("bad --node-ip %q; must contain either a single IP or a dual-stack pair of IPs", kubeServer.NodeIP)
 	} else if len(nodeIPs) == 2 && kubeServer.CloudProvider != "" {
 		return fmt.Errorf("dual-stack --node-ip %q not supported when using a cloud provider", kubeServer.NodeIP)
@@ -1172,9 +1168,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.RegisterNode,
 		kubeServer.RegisterWithTaints,
 		kubeServer.AllowedUnsafeSysctls,
-		kubeServer.ExperimentalMounterPath,
 		kubeServer.KernelMemcgNotification,
-		kubeServer.ExperimentalCheckNodeCapabilitiesBeforeMount,
 		kubeServer.ExperimentalNodeAllocatableIgnoreEvictionThreshold,
 		kubeServer.MinimumGCAge,
 		kubeServer.MaxPerPodContainerCount,
@@ -1224,7 +1218,7 @@ func startKubelet(k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubele
 		go k.ListenAndServe(kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
-		go k.ListenAndServeReadOnly(net.ParseIP(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
+		go k.ListenAndServeReadOnly(netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort))
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResources) {
 		go k.ListenAndServePodResources()
@@ -1248,9 +1242,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerNode bool,
 	registerWithTaints []api.Taint,
 	allowedUnsafeSysctls []string,
-	experimentalMounterPath string,
 	kernelMemcgNotification bool,
-	experimentalCheckNodeCapabilitiesBeforeMount bool,
 	experimentalNodeAllocatableIgnoreEvictionThreshold bool,
 	minimumGCAge metav1.Duration,
 	maxPerPodContainerCount int32,
@@ -1283,9 +1275,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerNode,
 		registerWithTaints,
 		allowedUnsafeSysctls,
-		experimentalMounterPath,
 		kernelMemcgNotification,
-		experimentalCheckNodeCapabilitiesBeforeMount,
 		experimentalNodeAllocatableIgnoreEvictionThreshold,
 		minimumGCAge,
 		maxPerPodContainerCount,

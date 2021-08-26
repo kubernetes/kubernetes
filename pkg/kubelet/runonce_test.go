@@ -110,7 +110,6 @@ func TestRunOnce(t *testing.T) {
 		kb.hostutil,
 		kb.getPodsDir(),
 		kb.recorder,
-		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
 		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 
