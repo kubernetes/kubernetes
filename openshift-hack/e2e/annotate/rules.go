@@ -88,6 +88,11 @@ var (
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
 			`should drop INVALID conntrack entries`,
 
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1993845
+			`Services should respect internalTrafficPolicy=Local Pod to Pod \(hostNetwork: true\)`,
+			`Services should respect internalTrafficPolicy=Local Pod \(hostNetwork: true\) to Pod \(hostNetwork: true\)`,
+			`Services should respect internalTrafficPolicy=Local Pod \(hostNetwork: true\) to Pod`,
+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1980141
 			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
 			`Netpol NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector`,
