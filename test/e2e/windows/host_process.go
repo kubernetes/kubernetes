@@ -18,11 +18,15 @@ package windows
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -86,6 +90,68 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 			metav1.GetOptions{})
 
 		framework.ExpectNoError(err, "Error retrieving pod")
+		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
+	})
+
+	ginkgo.It("should support init containers", func() {
+		ginkgo.By("scheduling a pod with a container that verifies init container can configure the node")
+		trueVar := true
+		podName := "host-process-init-pods"
+		user := "NT AUTHORITY\\SYSTEM"
+		filename := fmt.Sprintf("/testfile%s.txt", string(uuid.NewUUID()))
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &user,
+					},
+				},
+				HostNetwork: true,
+				InitContainers: []v1.Container{
+					{
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Name:    "configure-node",
+						Command: []string{"powershell", "-c", "Set-content", "-Path", filename, "-V", "test"},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Name:    "read-configuration",
+						Command: []string{"powershell", "-c", "ls", filename},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeSelector: map[string]string{
+					"kubernetes.io/os": "windows",
+				},
+			},
+		}
+
+		f.PodClient().Create(pod)
+
+		ginkgo.By("Waiting for pod to run")
+		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+
+		ginkgo.By("Then ensuring pod finished running successfully")
+		p, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(
+			context.TODO(),
+			podName,
+			metav1.GetOptions{})
+
+		framework.ExpectNoError(err, "Error retrieving pod")
+
+		if p.Status.Phase != v1.PodSucceeded {
+			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, "read-configuration")
+			if err != nil {
+				framework.Logf("Error pulling logs: %v", err)
+			}
+			framework.Logf("Pod phase: %v\nlogs:\n%s", p.Status.Phase, logs)
+		}
 		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 })
