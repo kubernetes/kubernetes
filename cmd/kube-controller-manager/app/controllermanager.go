@@ -147,7 +147,7 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 
-			if err := SetUpPreferredHostForOpenShift(s); err != nil {
+			if err := SetUpCustomRoundTrippersForOpenShift(s); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
