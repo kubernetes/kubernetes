@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -140,7 +141,12 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 		hasPVC = true
 		pvc, err := pl.PVCLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if err != nil {
-			// The error has already enough context ("persistentvolumeclaim "myclaim" not found")
+			// The error usually has already enough context ("persistentvolumeclaim "myclaim" not found"),
+			// but we can do better for generic ephemeral inline volumes where that situation
+			// is normal directly after creating a pod.
+			if ephemeral && apierrors.IsNotFound(err) {
+				err = fmt.Errorf("waiting for ephemeral volume controller to create the persistentvolumeclaim %q", pvcName)
+			}
 			return hasPVC, err
 		}
 
