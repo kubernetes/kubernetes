@@ -475,7 +475,7 @@ type DeleteOptions struct {
 	// The duration in seconds before the object should be deleted. Value must be non-negative integer.
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
 	// specified type will be used.
-	// Defaults to a per object value if not specified. zero means delete immediately.
+	//
 	// +optional
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds,omitempty" protobuf:"varint,1,opt,name=gracePeriodSeconds"`
 
