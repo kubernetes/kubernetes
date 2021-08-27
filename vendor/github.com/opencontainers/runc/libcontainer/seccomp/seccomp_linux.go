@@ -67,7 +67,7 @@ func InitSeccomp(config *configs.Seccomp) error {
 		if call == nil {
 			return errors.New("encountered nil syscall while initializing Seccomp")
 		}
-		if err := matchCall(filter, call); err != nil {
+		if err := matchCall(filter, call, defaultAction); err != nil {
 			return err
 		}
 	}
@@ -142,7 +142,7 @@ func getCondition(arg *configs.Arg) (libseccomp.ScmpCondition, error) {
 }
 
 // Add a rule to match a single syscall
-func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
+func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall, defAct libseccomp.ScmpAction) error {
 	if call == nil || filter == nil {
 		return errors.New("cannot use nil as syscall to block")
 	}
@@ -151,17 +151,22 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 		return errors.New("empty string is not a valid syscall")
 	}
 
+	// Convert the call's action to the libseccomp equivalent
+	callAct, err := getAction(call.Action, call.ErrnoRet)
+	if err != nil {
+		return fmt.Errorf("action in seccomp profile is invalid: %w", err)
+	}
+	if callAct == defAct {
+		// This rule is redundant, silently skip it
+		// to avoid error from AddRule.
+		return nil
+	}
+
 	// If we can't resolve the syscall, assume it's not supported on this kernel
 	// Ignore it, don't error out
 	callNum, err := libseccomp.GetSyscallFromName(call.Name)
 	if err != nil {
 		return nil
-	}
-
-	// Convert the call's action to the libseccomp equivalent
-	callAct, err := getAction(call.Action, call.ErrnoRet)
-	if err != nil {
-		return fmt.Errorf("action in seccomp profile is invalid: %s", err)
 	}
 
 	// Unconditional match - just add the rule

@@ -37,7 +37,7 @@ func (l *linuxSetnsInit) Init() error {
 		if err := selinux.SetKeyLabel(l.config.ProcessLabel); err != nil {
 			return err
 		}
-		defer selinux.SetKeyLabel("")
+		defer selinux.SetKeyLabel("") //nolint: errcheck
 		// Do not inherit the parent's session keyring.
 		if _, err := keys.JoinSessionKeyring(l.getSessionRingName()); err != nil {
 			// Same justification as in standart_init_linux.go as to why we
@@ -65,7 +65,7 @@ func (l *linuxSetnsInit) Init() error {
 	if err := selinux.SetExecLabel(l.config.ProcessLabel); err != nil {
 		return err
 	}
-	defer selinux.SetExecLabel("")
+	defer selinux.SetExecLabel("") //nolint: errcheck
 	// Without NoNewPrivileges seccomp is a privileged operation, so we need to
 	// do this before dropping capabilities; otherwise do it as late as possible
 	// just before execve so as few syscalls take place after it as possible.

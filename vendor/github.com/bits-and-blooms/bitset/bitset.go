@@ -209,6 +209,27 @@ func (b *BitSet) Flip(i uint) *BitSet {
 	return b
 }
 
+// FlipRange bit in [start, end).
+// If end>= Cap(), this function will panic.
+// Warning: using a very large value for 'end'
+// may lead to a memory shortage and a panic: the caller is responsible
+// for providing sensible parameters in line with their memory capacity.
+func (b *BitSet) FlipRange(start, end uint) *BitSet {
+	if start >= end {
+		return b
+	}
+
+	b.extendSetMaybe(end - 1)
+	var startWord uint = start >> log2WordSize
+	var endWord uint = end >> log2WordSize
+	b.set[startWord] ^= ^(^uint64(0) << (start & (wordSize - 1)))
+	for i := startWord; i < endWord; i++ {
+		b.set[i] = ^b.set[i]
+	}
+	b.set[endWord] ^= ^uint64(0) >> (-end & (wordSize - 1))
+	return b
+}
+
 // Shrink shrinks BitSet so that the provided value is the last possible
 // set value. It clears all bits > the provided index and reduces the size
 // and length of the set.
@@ -519,7 +540,7 @@ func (b *BitSet) Copy(c *BitSet) (count uint) {
 }
 
 // Count (number of set bits).
-// Also known as "popcount" or "popularity count".
+// Also known as "popcount" or "population count".
 func (b *BitSet) Count() uint {
 	if b != nil && b.set != nil {
 		return uint(popcntSlice(b.set))

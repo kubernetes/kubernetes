@@ -102,6 +102,23 @@ func bpfLinkCreate(attr *bpfLinkCreateAttr) (*internal.FD, error) {
 	return internal.NewFD(uint32(ptr)), nil
 }
 
+type bpfLinkCreateIterAttr struct {
+	prog_fd       uint32
+	target_fd     uint32
+	attach_type   ebpf.AttachType
+	flags         uint32
+	iter_info     internal.Pointer
+	iter_info_len uint32
+}
+
+func bpfLinkCreateIter(attr *bpfLinkCreateIterAttr) (*internal.FD, error) {
+	ptr, err := internal.BPF(internal.BPF_LINK_CREATE, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
+	if err != nil {
+		return nil, err
+	}
+	return internal.NewFD(uint32(ptr)), nil
+}
+
 type bpfLinkUpdateAttr struct {
 	linkFd    uint32
 	newProgFd uint32

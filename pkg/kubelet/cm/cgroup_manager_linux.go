@@ -33,7 +33,6 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
-	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
@@ -380,16 +379,8 @@ func getSupportedUnifiedControllers() sets.String {
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
 	resources := &libcontainerconfigs.Resources{
-		Devices: []*libcontainerdevices.Rule{
-			{
-				Type:        'a',
-				Permissions: "rwm",
-				Allow:       true,
-				Minor:       libcontainerdevices.Wildcard,
-				Major:       libcontainerdevices.Wildcard,
-			},
-		},
-		SkipDevices: true,
+		SkipDevices:     true,
+		SkipFreezeOnSet: true,
 	}
 	if resourceConfig == nil {
 		return resources
