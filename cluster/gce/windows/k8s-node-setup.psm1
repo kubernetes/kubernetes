@@ -2256,7 +2256,6 @@ $PARSERS_CONFIG = @'
 # This section would be deprecated soon
 #
 
-$STACKDRIVER_VERSION = 'v1-11'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
 # Restarts the Stackdriver logging agent, or starts it if it is not currently
