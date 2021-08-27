@@ -249,10 +249,10 @@ func (vec HistogramVec) Validate() error {
 	return nil
 }
 
-// GetMetricFamilyFromGatherer collects a metric family, that matches the input metricName,
+// GetHistogramVecFromGatherer collects a metric, that matches the input labelValue map,
 // from a gatherer implementing k8s.io/component-base/metrics.Gatherer interface.
 // Used only for testing purposes where we need to gather metrics directly from a running binary (without metrics endpoint).
-func GetMetricFamilyFromGatherer(gatherer metrics.Gatherer, metricName string) (*dto.MetricFamily, error) {
+func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, lvMap map[string]string) (HistogramVec, error) {
 	var metricFamily *dto.MetricFamily
 	m, err := gatherer.Gather()
 	if err != nil {
@@ -273,11 +273,6 @@ func GetMetricFamilyFromGatherer(gatherer metrics.Gatherer, metricName string) (
 		return nil, fmt.Errorf("metric %q is empty", metricName)
 	}
 
-	return metricFamily, nil
-}
-
-// GetHistogramVec collects a vector of Histogram from a metric family, that matches the input labelValue map.
-func GetHistogramVec(metricFamily *dto.MetricFamily, lvMap map[string]string) HistogramVec {
 	vec := make(HistogramVec, 0)
 	for _, metric := range metricFamily.GetMetric() {
 		if LabelsMatch(metric, lvMap) {
@@ -286,7 +281,7 @@ func GetHistogramVec(metricFamily *dto.MetricFamily, lvMap map[string]string) Hi
 			}
 		}
 	}
-	return vec
+	return vec, nil
 }
 
 func uint64Ptr(u uint64) *uint64 {

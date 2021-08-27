@@ -208,16 +208,10 @@ func (*metricsCollector) run(ctx context.Context) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for name, labelVals := range pc.Metrics {
-		metricFamily, err := testutil.GetMetricFamilyFromGatherer(legacyregistry.DefaultGatherer, name)
-		if err != nil {
-			klog.Error(err)
-			return dataItems
-		}
+	for metric, labelVals := range pc.Metrics {
 		// no filter is specified, aggregate all the metrics within the same metricFamily.
 		if labelVals == nil {
-			vec := testutil.GetHistogramVec(metricFamily, nil)
-			dataItem := collectHistogramData(vec, pc.labels, nil, name)
+			dataItem := collectHistogramVec(metric, pc.labels, nil)
 			if dataItem != nil {
 				dataItems = append(dataItems, *dataItem)
 			}
@@ -225,8 +219,7 @@ func (pc *metricsCollector) collect() []DataItem {
 			// fetch the metric from metricFamily which match each of the lvMap.
 			for _, value := range labelVals.values {
 				lvMap := map[string]string{labelVals.label: value}
-				vec := testutil.GetHistogramVec(metricFamily, lvMap)
-				dataItem := collectHistogramData(vec, pc.labels, lvMap, name)
+				dataItem := collectHistogramVec(metric, pc.labels, lvMap)
 				if dataItem != nil {
 					dataItems = append(dataItems, *dataItem)
 				}
@@ -236,10 +229,13 @@ func (pc *metricsCollector) collect() []DataItem {
 	return dataItems
 }
 
-func collectHistogramData(vec testutil.HistogramVec, labels, lvMap map[string]string, metric string) *DataItem {
-	if len(vec) == 0 {
+func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
+	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
+	if err != nil {
+		klog.Error(err)
 		return nil
 	}
+
 	if err := vec.Validate(); err != nil {
 		klog.Error(err)
 		return nil
