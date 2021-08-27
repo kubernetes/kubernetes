@@ -111,13 +111,12 @@ aliases:
     - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
     - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
     - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
-  release-engineering-reviewers:
-    - cpanato # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - jeremyrickard # SIG Technical Lead / RelEng subproject owner
-    - justaugustus # SIG Chair / RelEng subproject owner / Release Manager
-    - puerco # SIG Technical Lead / RelEng subproject owner / Release Manager
-    - saschagrunert # SIG Chair / RelEng subproject owner / Release Manager
-    - xmudrii # Release Manager
+  release-managers:
+    - cpanato
+    - justaugustus
+    - puerco
+    - saschagrunert
+    - xmudrii
   build-image-approvers:
     - BenTheElder
     - cblecker

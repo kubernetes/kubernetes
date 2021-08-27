@@ -2,7 +2,7 @@
 
 approvers:
   - release-engineering-approvers
-  - release-engineering-reviewers
+  - release-managers
   - pmmalinov01 # 1.22 Release Notes Lead
   - wilsonehusin # 1.21 Release Notes Lead
 reviewers:
