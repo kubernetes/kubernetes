@@ -1537,7 +1537,7 @@ message FCVolumeSource {
   repeated string wwids = 5;
 }
 
-// FlexPersistentVolumeSource represents a generic persistent volume resource that is
+// FlexPersistentVolumeSource represents a generic PersistentVolume resource that is
 // provisioned/attached using an exec based plugin.
 message FlexPersistentVolumeSource {
   // Driver is the name of the driver to use for this volume.
@@ -2608,7 +2608,7 @@ message PersistentVolume {
   optional PersistentVolumeStatus status = 3;
 }
 
-// PersistentVolumeClaim is a user's request for and claim to a persistent volume
+// PersistentVolumeClaim is a user's request for and claim to a PersistentVolume
 message PersistentVolumeClaim {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -2959,17 +2959,18 @@ message PersistentVolumeSource {
   optional CSIPersistentVolumeSource csi = 22;
 }
 
-// PersistentVolumeSpec is the specification of a persistent volume.
+// PersistentVolumeSpec has most of the details required to define a PersistentVolume.
 message PersistentVolumeSpec {
-  // capacity is the description of the persistent volume's resources and capacity.
+  // capacity represents the available capacity of a PersistentVolume.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
   // +optional
   map<string, k8s.io.apimachinery.pkg.api.resource.Quantity> capacity = 1;
 
-  // persistentVolumeSource is the actual volume backing the persistent volume.
+  // persistentVolumeSource is the actual volume backing the PersistentVolume.
   optional PersistentVolumeSource persistentVolumeSource = 2;
 
-  // accessModes describe the volume's access modes. Possible values are:
+  // accessModes describe all the ways a PersistentVolume can be accessed.
+  // Possible values are:
   // * ReadWriteOnce - can be mounted read/write mode to exactly 1 node.
   // * ReadOnlyMany - can be mounted in read-only mode to many nodes.
   // * ReadWriteMany - can be mounted in read/write mode to many nodes.
@@ -2986,7 +2987,7 @@ message PersistentVolumeSpec {
   // +optional
   optional ObjectReference claimRef = 4;
 
-  // persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim.
+  // persistentVolumeReclaimPolicy defines what happens to a PersistentVolume when released from its claim.
   // Valid options are
   // * Retain (default for manually created PersistentVolumes)
   // * Delete (default for dynamically provisioned PersistentVolumes)
@@ -2996,7 +2997,7 @@ message PersistentVolumeSpec {
   // +optional
   optional string persistentVolumeReclaimPolicy = 5;
 
-  // storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value
+  // storageClassName is the name of StorageClass to which this PersistentVolume belongs. Empty value
   // means that this volume does not belong to any StorageClass.
   // +optional
   optional string storageClassName = 6;
@@ -3008,12 +3009,14 @@ message PersistentVolumeSpec {
   repeated string mountOptions = 7;
 
   // Describes the volume mode. Can be one of the following:
-  // * Filesystem - the volume contains a filesystem. If it doesn't,
-  //   the storage plugin creates a filesystem before mounting it for the
-  //   first time.
-  // * Block - the volume will not be formatted with a filesystem and will
-  //   remain a raw block device.
-  // Value of Filesystem is the default when not included in spec.
+  // * Filesystem - the volume will be mounted into the Pod onto a directory.
+  //   If the volume is backed by a block device and the device is empty, the
+  //   storage driver creates a filesystem on the device before mounting it
+  //   for the first time.
+  // * Block - the volume is presented to the Pod as a block device, without
+  //   any filesystem on it. The Pod needs to understand how to use a raw
+  //   block device.
+  // Defaults to Filesystem when unset.
   // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode
   // +optional
   optional string volumeMode = 8;

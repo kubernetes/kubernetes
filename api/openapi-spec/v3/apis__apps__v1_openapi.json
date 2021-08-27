@@ -2437,7 +2437,7 @@
         "x-kubernetes-map-type": "atomic"
       },
       "io.k8s.api.core.v1.PersistentVolumeClaim": {
-        "description": "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
+        "description": "PersistentVolumeClaim is a user's request for and claim to a PersistentVolume",
         "properties": {
           "apiVersion": {
             "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",

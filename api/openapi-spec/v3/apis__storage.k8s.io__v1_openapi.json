@@ -243,7 +243,7 @@
         "type": "object"
       },
       "io.k8s.api.core.v1.FlexPersistentVolumeSource": {
-        "description": "FlexPersistentVolumeSource represents a generic persistent volume resource that is provisioned/attached using an exec based plugin.",
+        "description": "FlexPersistentVolumeSource represents a generic PersistentVolume resource that is provisioned/attached using an exec based plugin.",
         "properties": {
           "driver": {
             "default": "",
@@ -581,10 +581,10 @@
         "x-kubernetes-map-type": "atomic"
       },
       "io.k8s.api.core.v1.PersistentVolumeSpec": {
-        "description": "PersistentVolumeSpec is the specification of a persistent volume.",
+        "description": "PersistentVolumeSpec has most of the details required to define a PersistentVolume.",
         "properties": {
           "accessModes": {
-            "description": "accessModes describe the volume's access modes. Possible values are: * ReadWriteOnce - can be mounted read/write mode to exactly 1 node. * ReadOnlyMany - can be mounted in read-only mode to many nodes. * ReadWriteMany - can be mounted in read/write mode to many nodes. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
+            "description": "accessModes describe all the ways a PersistentVolume can be accessed. Possible values are: * ReadWriteOnce - can be mounted read/write mode to exactly 1 node. * ReadOnlyMany - can be mounted in read-only mode to many nodes. * ReadWriteMany - can be mounted in read/write mode to many nodes. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
             "items": {
               "default": "",
               "type": "string"
@@ -608,7 +608,7 @@
               "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity",
               "default": {}
             },
-            "description": "capacity is the description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
+            "description": "capacity represents the available capacity of a PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
             "type": "object"
           },
           "cephfs": {
@@ -676,7 +676,7 @@
             "description": "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
           },
           "persistentVolumeReclaimPolicy": {
-            "description": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are * Retain (default for manually created PersistentVolumes) * Delete (default for dynamically provisioned PersistentVolumes) * Recycle (deprecated) Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming\n\nPossible enum values:\n - `\"Delete\"` means the volume will be deleted from Kubernetes on release from its claim. The volume plugin must support Deletion.\n - `\"Recycle\"` means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim. The volume plugin must support Recycling.\n - `\"Retain\"` means the volume will be left in its current phase (Released) for manual reclamation by the administrator. The default policy is Retain.",
+            "description": "persistentVolumeReclaimPolicy defines what happens to a PersistentVolume when released from its claim. Valid options are * Retain (default for manually created PersistentVolumes) * Delete (default for dynamically provisioned PersistentVolumes) * Recycle (deprecated) Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming\n\nPossible enum values:\n - `\"Delete\"` means the PersistentVolume will be deleted from Kubernetes on release from its claim. The volume plugin must support Deletion.\n - `\"Recycle\"` means the volume will be recycled back into the pool of unbound PersistentVolumes on release from its claim. The volume plugin must support Recycling.\n - `\"Retain\"` means the PersistentVolume will be left in its current phase (Released) for manual reclamation by the administrator. The default policy is Retain.",
             "enum": [
               "Delete",
               "Recycle",
@@ -705,7 +705,7 @@
             "description": "scaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes."
           },
           "storageClassName": {
-            "description": "storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+            "description": "storageClassName is the name of StorageClass to which this PersistentVolume belongs. Empty value means that this volume does not belong to any StorageClass.",
             "type": "string"
           },
           "storageos": {
@@ -713,7 +713,7 @@
             "description": "storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://examples.k8s.io/volumes/storageos/README.md"
           },
           "volumeMode": {
-            "description": "Describes the volume mode. Can be one of the following: * Filesystem - the volume contains a filesystem. If it doesn't,\n  the storage plugin creates a filesystem before mounting it for the\n  first time.\n* Block - the volume will not be formatted with a filesystem and will\n  remain a raw block device.\nValue of Filesystem is the default when not included in spec. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode",
+            "description": "Describes the volume mode. Can be one of the following: * Filesystem - the volume will be mounted into the Pod onto a directory.\n  If the volume is backed by a block device and the device is empty, the\n  storage driver creates a filesystem on the device before mounting it\n  for the first time.\n* Block - the volume is presented to the Pod as a block device, without\n  any filesystem on it. The Pod needs to understand how to use a raw\n  block device.\nDefaults to Filesystem when unset. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode",
             "type": "string"
           },
           "vsphereVolume": {

@@ -702,7 +702,7 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_FlexPersistentVolumeSource = map[string]string{
-	"":          "FlexPersistentVolumeSource represents a generic persistent volume resource that is provisioned/attached using an exec based plugin.",
+	"":          "FlexPersistentVolumeSource represents a generic PersistentVolume resource that is provisioned/attached using an exec based plugin.",
 	"driver":    "Driver is the name of the driver to use for this volume.",
 	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
 	"secretRef": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
@@ -1270,7 +1270,7 @@ func (PersistentVolume) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeClaim = map[string]string{
-	"":         "PersistentVolumeClaim is a user's request for and claim to a persistent volume",
+	"":         "PersistentVolumeClaim is a user's request for and claim to a PersistentVolume",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec defines the desired characteristics of a volume requested by a pod author. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
 	"status":   "status represents the current information/status of a persistent volume claim. Read-only. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#persistentvolumeclaims",
@@ -1393,14 +1393,14 @@ func (PersistentVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeSpec = map[string]string{
-	"":                              "PersistentVolumeSpec is the specification of a persistent volume.",
-	"capacity":                      "capacity is the description of the persistent volume's resources and capacity. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
-	"accessModes":                   "accessModes describe the volume's access modes. Possible values are: * ReadWriteOnce - can be mounted read/write mode to exactly 1 node. * ReadOnlyMany - can be mounted in read-only mode to many nodes. * ReadWriteMany - can be mounted in read/write mode to many nodes. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
+	"":                              "PersistentVolumeSpec has most of the details required to define a PersistentVolume.",
+	"capacity":                      "capacity represents the available capacity of a PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity",
+	"accessModes":                   "accessModes describe all the ways a PersistentVolume can be accessed. Possible values are: * ReadWriteOnce - can be mounted read/write mode to exactly 1 node. * ReadOnlyMany - can be mounted in read-only mode to many nodes. * ReadWriteMany - can be mounted in read/write mode to many nodes. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
 	"claimRef":                      "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. When set to non-nil value, PVC.Spec.Selector of the referenced PVC is ignored, i.e. labels of this PV do not need to match PVC selector. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding",
-	"persistentVolumeReclaimPolicy": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are * Retain (default for manually created PersistentVolumes) * Delete (default for dynamically provisioned PersistentVolumes) * Recycle (deprecated) Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
-	"storageClassName":              "storageClassName is the name of StorageClass to which this persistent volume belongs. Empty value means that this volume does not belong to any StorageClass.",
+	"persistentVolumeReclaimPolicy": "persistentVolumeReclaimPolicy defines what happens to a PersistentVolume when released from its claim. Valid options are * Retain (default for manually created PersistentVolumes) * Delete (default for dynamically provisioned PersistentVolumes) * Recycle (deprecated) Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming",
+	"storageClassName":              "storageClassName is the name of StorageClass to which this PersistentVolume belongs. Empty value means that this volume does not belong to any StorageClass.",
 	"mountOptions":                  "mountOptions is the list of mount options, e.g. [\"ro\", \"soft\"]. Not validated - mount will simply fail if one is invalid. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#mount-options",
-	"volumeMode":                    "Describes the volume mode. Can be one of the following: * Filesystem - the volume contains a filesystem. If it doesn't,\n  the storage plugin creates a filesystem before mounting it for the\n  first time.\n* Block - the volume will not be formatted with a filesystem and will\n  remain a raw block device.\nValue of Filesystem is the default when not included in spec. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode",
+	"volumeMode":                    "Describes the volume mode. Can be one of the following: * Filesystem - the volume will be mounted into the Pod onto a directory.\n  If the volume is backed by a block device and the device is empty, the\n  storage driver creates a filesystem on the device before mounting it\n  for the first time.\n* Block - the volume is presented to the Pod as a block device, without\n  any filesystem on it. The Pod needs to understand how to use a raw\n  block device.\nDefaults to Filesystem when unset. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode",
 	"nodeAffinity":                  "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume.",
 }
 
