@@ -189,6 +189,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(int64)
 		**out = **in
 	}
+	if in.ResolverConfig != nil {
+		in, out := &in.ResolverConfig, &out.ResolverConfig
+		*out = new(string)
+		**out = **in
+	}
 	if in.CPUCFSQuota != nil {
 		in, out := &in.CPUCFSQuota, &out.CPUCFSQuota
 		*out = new(bool)

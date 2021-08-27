@@ -209,11 +209,11 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		klog.Warningf("cannot determine if systemd-resolved is active: %v", err)
 	}
 	if ok {
-		if kc.config.ResolverConfig == "" {
-			kc.config.ResolverConfig = kubeletSystemdResolverConfig
+		if kc.config.ResolverConfig == nil {
+			kc.config.ResolverConfig = utilpointer.String(kubeletSystemdResolverConfig)
 		} else {
-			if kc.config.ResolverConfig != kubeletSystemdResolverConfig {
-				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, kc.config.ResolverConfig)
+			if kc.config.ResolverConfig != utilpointer.String(kubeletSystemdResolverConfig) {
+				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, *kc.config.ResolverConfig)
 			}
 		}
 	}
