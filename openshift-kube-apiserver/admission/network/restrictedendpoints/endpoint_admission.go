@@ -110,17 +110,38 @@ var (
 	}
 )
 
+func checkRestrictedIP(ipString string, restricted []*net.IPNet) error {
+	ip := net.ParseIP(ipString)
+	if ip == nil {
+		return nil
+	}
+	for _, net := range restricted {
+		if net.Contains(ip) {
+			return fmt.Errorf("endpoint address %s is not allowed", ipString)
+		}
+	}
+	return nil
+}
+
+func checkRestrictedPort(protocol kapi.Protocol, port int32, restricted []kapi.EndpointPort) error {
+	for _, rport := range restricted {
+		if protocol == rport.Protocol && port == rport.Port {
+			return fmt.Errorf("endpoint port %s:%d is not allowed", protocol, port)
+		}
+	}
+	return nil
+}
+
 func (r *restrictedEndpointsAdmission) findRestrictedIP(ep *kapi.Endpoints, restricted []*net.IPNet) error {
 	for _, subset := range ep.Subsets {
 		for _, addr := range subset.Addresses {
-			ip := net.ParseIP(addr.IP)
-			if ip == nil {
-				continue
+			if err := checkRestrictedIP(addr.IP, restricted); err != nil {
+				return err
 			}
-			for _, net := range restricted {
-				if net.Contains(ip) {
-					return fmt.Errorf("endpoint address %s is not allowed", addr.IP)
-				}
+		}
+		for _, addr := range subset.NotReadyAddresses {
+			if err := checkRestrictedIP(addr.IP, restricted); err != nil {
+				return err
 			}
 		}
 	}
@@ -130,10 +151,8 @@ func (r *restrictedEndpointsAdmission) findRestrictedIP(ep *kapi.Endpoints, rest
 func (r *restrictedEndpointsAdmission) findRestrictedPort(ep *kapi.Endpoints, restricted []kapi.EndpointPort) error {
 	for _, subset := range ep.Subsets {
 		for _, port := range subset.Ports {
-			for _, restricted := range restricted {
-				if port.Protocol == restricted.Protocol && port.Port == restricted.Port {
-					return fmt.Errorf("endpoint port %s:%d is not allowed", string(port.Protocol), port.Port)
-				}
+			if err := checkRestrictedPort(port.Protocol, port.Port, restricted); err != nil {
+				return err
 			}
 		}
 	}
