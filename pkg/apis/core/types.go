@@ -300,15 +300,16 @@ type PersistentVolume struct {
 	Status PersistentVolumeStatus
 }
 
-// PersistentVolumeSpec has most of the details required to define a persistent volume
+// PersistentVolumeSpec has most of the details required to define a PersistentVolume.
 type PersistentVolumeSpec struct {
-	// A description of the persistent volume's resources and capacity.
+	// Capacity represents the available capacity of a PersistentVolume.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
-	// +optional// Resources represents the actual resources of the volume
+	// +optional
 	Capacity ResourceList
-	// The actual volume backing the persistent volume.
+	// The actual volume backing the PersistentVolume.
 	PersistentVolumeSource
-	// Describes the volume's access modes. Possible values are:
+	// Describes all the ways a PersistentVolume can be accessed.
+	// Possible values are:
 	// * ReadWriteOnce - can be mounted read/write mode to exactly 1 node.
 	// * ReadOnlyMany - can be mounted in read-only mode to many nodes.
 	// * ReadWriteMany - can be mounted in read/write mode to many nodes.
@@ -323,7 +324,7 @@ type PersistentVolumeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding
 	// +optional
 	ClaimRef *ObjectReference
-	// What happens to a persistent volume when released from its claim.
+	// What happens to a PersistentVolume when released from its claim.
 	// Valid options are
 	// * Retain (default for manually created PersistentVolumes)
 	// * Delete (default for dynamically provisioned PersistentVolumes)
@@ -332,7 +333,7 @@ type PersistentVolumeSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming
 	// +optional
 	PersistentVolumeReclaimPolicy PersistentVolumeReclaimPolicy
-	// Name of StorageClass to which this persistent volume belongs. Empty value
+	// Name of StorageClass to which this PersistentVolume belongs. Empty value
 	// means that this volume does not belong to any StorageClass.
 	// +optional
 	StorageClassName string
@@ -342,12 +343,14 @@ type PersistentVolumeSpec struct {
 	// +optional
 	MountOptions []string
 	// Describes the volume mode. Can be one of the following:
-	// * Filesystem - the volume contains a filesystem. If it doesn't,
-	//   the storage plugin creates a filesystem before mounting it for the
-	//   first time.
-	// * Block - the volume will not be formatted with a filesystem and will
-	//   remain a raw block device.
-	// Value of Filesystem is the default when not included in spec.
+	// * Filesystem - the volume will be mounted into the Pod onto a directory.
+	//   If the volume is backed by a block device and the device is empty, the
+	//   storage driver creates a filesystem on the device before mounting it
+	//   for the first time.
+	// * Block - the volume is presented to the Pod as a block device, without
+	//   any filesystem on it. The Pod needs to understand how to use a raw
+	//   block device.
+	// Defaults to Filesystem when unset.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode
 	// +optional
 	VolumeMode *PersistentVolumeMode
@@ -363,18 +366,18 @@ type VolumeNodeAffinity struct {
 	Required *NodeSelector
 }
 
-// PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of persistent volumes
+// PersistentVolumeReclaimPolicy describes a policy for end-of-life maintenance of PersistentVolumes.
 type PersistentVolumeReclaimPolicy string
 
 const (
-	// PersistentVolumeReclaimRecycle means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim.
+	// PersistentVolumeReclaimRecycle means the volume will be recycled back into the pool of unbound PersistentVolumes on release from its claim.
 	// The volume plugin must support Recycling.
 	// DEPRECATED: The PersistentVolumeReclaimRecycle called Recycle is being deprecated. See announcement here: https://groups.google.com/forum/#!topic/kubernetes-dev/uexugCza84I
 	PersistentVolumeReclaimRecycle PersistentVolumeReclaimPolicy = "Recycle"
-	// PersistentVolumeReclaimDelete means the volume will be deleted from Kubernetes on release from its claim.
+	// PersistentVolumeReclaimDelete means the PersistentVolume will be deleted from Kubernetes on release from its claim.
 	// The volume plugin must support Deletion.
 	PersistentVolumeReclaimDelete PersistentVolumeReclaimPolicy = "Delete"
-	// PersistentVolumeReclaimRetain means the volume will be left in its current phase (Released) for manual reclamation by the administrator.
+	// PersistentVolumeReclaimRetain means the PersistentVolume will be left in its current phase (Released) for manual reclamation by the administrator.
 	// The default policy is Retain.
 	PersistentVolumeReclaimRetain PersistentVolumeReclaimPolicy = "Retain"
 )
@@ -414,7 +417,7 @@ type PersistentVolumeList struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// PersistentVolumeClaim is a user's request for and claim to a persistent volume
+// PersistentVolumeClaim is a user's request for and claim to a PersistentVolume
 type PersistentVolumeClaim struct {
 	metav1.TypeMeta
 	// +optional
@@ -633,18 +636,18 @@ type PersistentVolumePhase string
 
 // These are the valid values for PersistentVolumePhase
 const (
-	// used for PersistentVolumes that are not available
+	// Used for PersistentVolumes that are not available.
 	VolumePending PersistentVolumePhase = "Pending"
-	// used for PersistentVolumes that are not yet bound
-	// Available volumes are held by the binder and matched to PersistentVolumeClaims
+	// Used for PersistentVolumes that are not yet bound.
+	// Available volumes are held by the binder and matched to PersistentVolumeClaims.
 	VolumeAvailable PersistentVolumePhase = "Available"
-	// used for PersistentVolumes that are bound
+	// Used for PersistentVolumes that are bound.
 	VolumeBound PersistentVolumePhase = "Bound"
-	// used for PersistentVolumes where the bound PersistentVolumeClaim was deleted
-	// released volumes must be recycled before becoming available again
-	// this phase is used by the persistent volume claim binder to signal to another process to reclaim the resource
+	// Used for PersistentVolumes where the bound PersistentVolumeClaim was deleted.
+	// Released volumes must be recycled before becoming available again.
+	// This phase is used by the PersistentVolumeClaim binder to signal to another process to reclaim the resource.
 	VolumeReleased PersistentVolumePhase = "Released"
-	// used for PersistentVolumes that failed to be correctly recycled or deleted after being released from a claim
+	// Used for PersistentVolumes that failed to be correctly recycled or deleted after being released from a claim.
 	VolumeFailed PersistentVolumePhase = "Failed"
 )
 
@@ -889,7 +892,7 @@ type FCVolumeSource struct {
 	WWIDs []string
 }
 
-// FlexPersistentVolumeSource represents a generic persistent volume resource that is
+// FlexPersistentVolumeSource represents a generic PersistentVolume resource that is
 // provisioned/attached using an exec based plugin.
 type FlexPersistentVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
@@ -5005,7 +5008,7 @@ const (
 	LimitTypePod LimitType = "Pod"
 	// LimitTypeContainer defines limit that applies to all containers in a namespace
 	LimitTypeContainer LimitType = "Container"
-	// LimitTypePersistentVolumeClaim defines limit that applies to all persistent volume claims in a namespace
+	// LimitTypePersistentVolumeClaim defines limit that applies to all PersistentVolumeClaims in a namespace
 	LimitTypePersistentVolumeClaim LimitType = "PersistentVolumeClaim"
 )
 
