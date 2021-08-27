@@ -412,22 +412,6 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 		probeCmd += fmt.Sprintf(`test -n "$$(getent hosts %s)" && echo OK > /results/%s;`, name, fileName)
 	}
 
-	podARecByUDPFileName := fmt.Sprintf("%s_udp@PodARecord", fileNamePrefix)
-	podARecByTCPFileName := fmt.Sprintf("%s_tcp@PodARecord", fileNamePrefix)
-
-	// getent doesn't work properly on Windows hosts and hostname -i doesn't return an IPv6 address
-	// so we  have to use a different command per IP family
-	if isIPv6 {
-		probeCmd += fmt.Sprintf(`podARec=$$(getent hosts $$(hostname -s) | tr ":." "-" | awk '{print $$1".%s.pod.%s"}');`, namespace, dnsDomain)
-	} else {
-		probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}');`, namespace, dnsDomain)
-	}
-
-	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} %s)" && test -n "$$check" && echo OK > /results/%s;`, dnsRecord, podARecByUDPFileName)
-	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} %s)" && test -n "$$check" && echo OK > /results/%s;`, dnsRecord, podARecByTCPFileName)
-	fileNames = append(fileNames, podARecByUDPFileName)
-	fileNames = append(fileNames, podARecByTCPFileName)
-
 	if len(ptrLookupIP) > 0 {
 		ptrLookup, err := dnsclient.Reverseaddr(ptrLookupIP)
 		if err != nil {
