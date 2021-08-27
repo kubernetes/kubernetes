@@ -23,7 +23,6 @@ package app
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"strings"
 
 	cloudprovider "k8s.io/cloud-provider"
@@ -32,6 +31,7 @@ import (
 	cloudnodelifecyclecontroller "k8s.io/cloud-provider/controllers/nodelifecycle"
 	routecontroller "k8s.io/cloud-provider/controllers/route"
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/features"
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
@@ -39,7 +39,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-func startCloudNodeController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+func startCloudNodeController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (controller.Interface, bool, error) {
 	// Start the CloudNodeController
 	nodeController, err := cloudnodecontroller.NewCloudNodeController(
 		ctx.SharedInformers.Core().V1().Nodes(),
@@ -58,7 +58,7 @@ func startCloudNodeController(initContext ControllerInitContext, ctx *config.Com
 	return nil, true, nil
 }
 
-func startCloudNodeLifecycleController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+func startCloudNodeLifecycleController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (controller.Interface, bool, error) {
 	// Start the cloudNodeLifecycleController
 	cloudNodeLifecycleController, err := cloudnodelifecyclecontroller.NewCloudNodeLifecycleController(
 		ctx.SharedInformers.Core().V1().Nodes(),
@@ -77,7 +77,7 @@ func startCloudNodeLifecycleController(initContext ControllerInitContext, ctx *c
 	return nil, true, nil
 }
 
-func startServiceController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+func startServiceController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (controller.Interface, bool, error) {
 	// Start the service controller
 	serviceController, err := servicecontroller.New(
 		cloud,
@@ -98,7 +98,7 @@ func startServiceController(initContext ControllerInitContext, ctx *config.Compl
 	return nil, true, nil
 }
 
-func startRouteController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (http.Handler, bool, error) {
+func startRouteController(initContext ControllerInitContext, ctx *config.CompletedConfig, cloud cloudprovider.Interface, stopCh <-chan struct{}) (controller.Interface, bool, error) {
 	if !ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes {
 		klog.Infof("Will not configure cloud provider routes, --configure-cloud-routes: %v", ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil

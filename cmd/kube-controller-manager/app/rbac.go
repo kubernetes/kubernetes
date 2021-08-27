@@ -17,13 +17,12 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/clusterroleaggregation"
 )
 
-func startClusterRoleAggregrationController(ctx ControllerContext) (http.Handler, bool, error) {
+func startClusterRoleAggregrationController(ctx ControllerContext) (controller.Interface, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1", Resource: "clusterroles"}] {
 		return nil, false, nil
 	}

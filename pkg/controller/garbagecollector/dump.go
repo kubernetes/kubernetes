@@ -281,3 +281,7 @@ func (h *debugHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 	w.WriteHeader(http.StatusOK)
 }
+
+func (gc *GarbageCollector) DebuggingHandler() http.Handler {
+	return NewDebugHandler(gc)
+}
