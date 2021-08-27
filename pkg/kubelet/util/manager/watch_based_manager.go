@@ -95,7 +95,11 @@ func (i *objectCacheItem) setImmutable() {
 func (i *objectCacheItem) stopIfIdle(now time.Time, maxIdleTime time.Duration) bool {
 	i.lock.Lock()
 	defer i.lock.Unlock()
-	if !i.stopped && now.After(i.lastAccessTime.Add(maxIdleTime)) {
+	// Ensure that we don't try to stop not yet initialized reflector.
+	// In case of overloaded kube-apiserver, if the list request is
+	// already being processed, all the work would lost and would have
+	// to be retried.
+	if !i.stopped && i.store.hasSynced() && now.After(i.lastAccessTime.Add(maxIdleTime)) {
 		return i.stopThreadUnsafe()
 	}
 	return false
@@ -287,11 +291,14 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	if !exists {
 		return nil, fmt.Errorf("object %q/%q not registered", namespace, name)
 	}
+	// Record last access time independently if it succeeded or not.
+	// This protects from premature (racy) reflector closure.
+	item.setLastAccessTime(c.clock.Now())
+
 	item.restartReflectorIfNeeded()
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
 		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
 	}
-	item.setLastAccessTime(c.clock.Now())
 	obj, exists, err := item.store.GetByKey(c.key(namespace, name))
 	if err != nil {
 		return nil, err
