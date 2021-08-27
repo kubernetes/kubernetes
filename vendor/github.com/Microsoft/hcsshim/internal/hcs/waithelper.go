@@ -65,5 +65,4 @@ func waitForNotification(ctx context.Context, callbackNumber uintptr, expectedNo
 	case <-c:
 		return ErrTimeout
 	}
-	return nil
 }

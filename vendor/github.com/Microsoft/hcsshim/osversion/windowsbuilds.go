@@ -24,4 +24,15 @@ const (
 	// V19H1 (version 1903) corresponds to Windows Server 1903 (semi-annual
 	// channel).
 	V19H1 = 18362
+
+	// V19H2 (version 1909) corresponds to Windows Server 1909 (semi-annual
+	// channel).
+	V19H2 = 18363
+
+	// V20H1 (version 2004) corresponds to Windows Server 2004 (semi-annual
+	// channel).
+	V20H1 = 19041
+
+	// V20H2 corresponds to Windows Server 20H2 (semi-annual channel).
+	V20H2 = 19042
 )
