@@ -100,6 +100,9 @@ type AvailableConditionController struct {
 
 	// metrics registered into legacy registry
 	metrics *availabilityMetrics
+
+	// hasBeenReady is signaled when the readyz endpoint succeeds for the first time.
+	hasBeenReady <-chan struct{}
 }
 
 type tlsTransportCache struct {
@@ -152,6 +155,7 @@ func NewAvailableConditionController(
 	proxyCurrentCertKeyContent certKeyFunc,
 	serviceResolver ServiceResolver,
 	egressSelector *egressselector.EgressSelector,
+	hasBeenReady <-chan struct{},
 ) (*AvailableConditionController, error) {
 	c := &AvailableConditionController{
 		apiServiceClient: apiServiceClient,
@@ -171,6 +175,7 @@ func NewAvailableConditionController(
 		proxyCurrentCertKeyContent: proxyCurrentCertKeyContent,
 		tlsCache:                   &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
 		metrics:                    newAvailabilityMetrics(),
+		hasBeenReady:               hasBeenReady,
 	}
 
 	if egressSelector != nil {
@@ -427,6 +432,16 @@ func (c *AvailableConditionController) sync(key string) error {
 		}
 
 		if lastError != nil {
+			// the availability checks depend on fully initialized SDN
+			// OpenShift carries a few reachability checks that affect /readyz protocol
+			// skip posting failures to avoid getting false positives until the server becomes ready
+			select {
+			case <-c.hasBeenReady: // the server has been ready and we can perform the checks
+			default:
+				// returning an error will requeue the item in an exponential fashion
+				return fmt.Errorf("the server hasn't been ready yet, skipping updating availability of the aggreaged API until the server becomes ready to avoid false positives, lastError = %v", lastError)
+			}
+
 			availableCondition.Status = apiregistrationv1.ConditionFalse
 			availableCondition.Reason = "FailedDiscoveryCheck"
 			availableCondition.Message = lastError.Error()
