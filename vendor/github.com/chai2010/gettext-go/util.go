@@ -9,17 +9,17 @@ import (
 	"strings"
 )
 
-func getDefaultLocale() string {
+func getDefaultLanguage() string {
 	if v := os.Getenv("LC_MESSAGES"); v != "" {
-		return simplifiedLocale(v)
+		return simplifiedLanguage(v)
 	}
 	if v := os.Getenv("LANG"); v != "" {
-		return simplifiedLocale(v)
+		return simplifiedLanguage(v)
 	}
 	return "default"
 }
 
-func simplifiedLocale(lang string) string {
+func simplifiedLanguage(lang string) string {
 	// en_US/en_US.UTF-8/zh_CN/zh_TW/el_GR@euro/...
 	if idx := strings.Index(lang, ":"); idx != -1 {
 		lang = lang[:idx]

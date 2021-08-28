@@ -70,7 +70,11 @@ func encodePoString(text string) string {
 				buf.WriteRune(r)
 			}
 		}
-		buf.WriteString(`\n"` + "\n")
+		if i < len(lines)-1 {
+			buf.WriteString(`\n"` + "\n")
+		} else {
+			buf.WriteString(`"` + "\n")
+		}
 	}
 	return buf.String()
 }

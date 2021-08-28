@@ -37,17 +37,21 @@ type File struct {
 	Messages     []Message
 }
 
+// Load loads mo file format data.
+func Load(data []byte) (*File, error) {
+	return loadData(data)
+}
+
 // Load loads a named mo file.
-func Load(name string) (*File, error) {
-	data, err := ioutil.ReadFile(name)
+func LoadFile(path string) (*File, error) {
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return LoadData(data)
+	return loadData(data)
 }
 
-// LoadData loads mo file format data.
-func LoadData(data []byte) (*File, error) {
+func loadData(data []byte) (*File, error) {
 	r := bytes.NewReader(data)
 
 	var magicNumber uint32

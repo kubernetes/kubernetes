@@ -37,3 +37,16 @@ func (p Message) String() string {
 	}
 	return buf.String()
 }
+
+func (m_i *Message) less(m_j *Message) bool {
+	if a, b := m_i.MsgContext, m_j.MsgContext; a != b {
+		return a < b
+	}
+	if a, b := m_i.MsgId, m_j.MsgId; a != b {
+		return a < b
+	}
+	if a, b := m_i.MsgIdPlural, m_j.MsgIdPlural; a != b {
+		return a < b
+	}
+	return false
+}
