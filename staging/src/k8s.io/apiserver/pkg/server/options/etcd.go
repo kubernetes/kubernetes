@@ -42,7 +42,7 @@ import (
 type EtcdOptions struct {
 	// The value of Paging on StorageConfig will be overridden by the
 	// calculated feature gate value.
-	StorageConfig                    storagebackend.Config
+	StorageConfig                    storagebackend.FactoryConfig
 	EncryptionProviderConfigFilepath string
 
 	EtcdServersOverrides []string
@@ -65,7 +65,7 @@ var storageTypes = sets.NewString(
 	storagebackend.StorageTypeETCD3,
 )
 
-func NewEtcdOptions(backendConfig *storagebackend.Config) *EtcdOptions {
+func NewEtcdOptions(backendConfig *storagebackend.FactoryConfig) *EtcdOptions {
 	options := &EtcdOptions{
 		StorageConfig:           *backendConfig,
 		DefaultStorageMediaType: "application/json",
@@ -255,7 +255,7 @@ type SimpleRestOptionsFactory struct {
 
 func (f *SimpleRestOptionsFactory) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
-		StorageConfig:             &f.Options.StorageConfig,
+		StorageConfig:             f.Options.StorageConfig.ForGroupResource(resource),
 		Decorator:                 generic.UndecoratedStorage,
 		EnableGarbageCollection:   f.Options.EnableGarbageCollection,
 		DeleteCollectionWorkers:   f.Options.DeleteCollectionWorkers,

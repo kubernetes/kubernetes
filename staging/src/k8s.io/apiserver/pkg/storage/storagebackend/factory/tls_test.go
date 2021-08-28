@@ -29,6 +29,7 @@ import (
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -68,7 +69,7 @@ func TestTLSConnection(t *testing.T) {
 	}
 
 	client := testserver.RunEtcd(t, etcdConfig)
-	cfg := storagebackend.Config{
+	cfg := storagebackend.FactoryConfig{
 		Type: storagebackend.StorageTypeETCD3,
 		Transport: storagebackend.TransportConfig{
 			ServerList:    client.Endpoints(),
@@ -77,8 +78,8 @@ func TestTLSConnection(t *testing.T) {
 			TrustedCAFile: caFile,
 		},
 		Codec: codec,
-	}
-	storage, destroyFunc, err := newETCD3Storage(cfg, nil)
+	}.ForGroupResource(schema.GroupResource{Group: "", Resource: "abc"})
+	storage, destroyFunc, err := newETCD3Storage(*cfg, nil)
 	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)

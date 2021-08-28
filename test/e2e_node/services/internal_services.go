@@ -32,7 +32,7 @@ type e2eServices struct {
 	rmDirs []string
 	// statically linked e2e services
 	etcdServer   *etcd3testing.EtcdTestServer
-	etcdStorage  *storagebackend.Config
+	etcdStorage  *storagebackend.FactoryConfig
 	apiServer    *APIServer
 	nsController *NamespaceController
 }
@@ -117,7 +117,7 @@ func (es *e2eServices) startEtcd(t *testing.T) error {
 }
 
 // startAPIServer starts the embedded API server or returns an error.
-func (es *e2eServices) startAPIServer(etcdStorage *storagebackend.Config) error {
+func (es *e2eServices) startAPIServer(etcdStorage *storagebackend.FactoryConfig) error {
 	klog.Info("Starting API server")
 	es.apiServer = NewAPIServer(*etcdStorage)
 	return es.apiServer.Start()

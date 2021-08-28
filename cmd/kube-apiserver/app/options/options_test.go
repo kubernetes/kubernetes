@@ -150,7 +150,7 @@ func TestAddFlags(t *testing.T) {
 			},
 		},
 		Etcd: &apiserveroptions.EtcdOptions{
-			StorageConfig: storagebackend.Config{
+			StorageConfig: storagebackend.FactoryConfig{
 				Type: "etcd3",
 				Transport: storagebackend.TransportConfig{
 					ServerList:    nil,

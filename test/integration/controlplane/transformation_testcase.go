@@ -57,7 +57,7 @@ type unSealSecret func(cipherText []byte, ctx value.Context, config apiservercon
 
 type transformTest struct {
 	logger            kubeapiservertesting.Logger
-	storageConfig     *storagebackend.Config
+	storageConfig     *storagebackend.FactoryConfig
 	configDir         string
 	transformerConfig string
 	kubeAPIServer     kubeapiservertesting.TestServer

@@ -126,7 +126,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	s.RecommendedOptions.SecureServing.ServerCert.FixtureDirectory = filepath.Join(pkgPath, "testdata")
 
 	if storageConfig != nil {
-		s.RecommendedOptions.Etcd.StorageConfig = *storageConfig
+		s.RecommendedOptions.Etcd.StorageConfig = storageConfig.FactoryConfig
 	}
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 

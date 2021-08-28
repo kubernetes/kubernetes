@@ -21,6 +21,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -51,8 +52,8 @@ type TransportConfig struct {
 	TracerProvider *trace.TracerProvider
 }
 
-// Config is configuration for creating a storage backend.
-type Config struct {
+// FactoryConfig is configuration of a storage factory
+type FactoryConfig struct {
 	// Type defines the type of storage backend. Default ("") is "etcd3".
 	Type string
 	// Prefix is the prefix to all keys passed to storage.Interface methods.
@@ -73,7 +74,6 @@ type Config struct {
 	EncodeVersioner runtime.GroupVersioner
 	// Transformer allows the value to be transformed prior to persisting into etcd.
 	Transformer value.Transformer
-
 	// CompactionInterval is an interval of requesting compaction from apiserver.
 	// If the value is 0, no compaction will be issued.
 	CompactionInterval time.Duration
@@ -85,14 +85,29 @@ type Config struct {
 	HealthcheckTimeout time.Duration
 
 	LeaseManagerConfig etcd3.LeaseManagerConfig
-
 	// StorageObjectCountTracker is used to keep track of the total
 	// number of objects in the storage per resource.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
 }
 
-func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
+func (config FactoryConfig) ForGroupResource(groupResource schema.GroupResource) *Config {
 	return &Config{
+		FactoryConfig:       config,
+		GroupResourceString: groupResource.String(),
+	}
+}
+
+// Config is configuration for creating a storage backend.
+type Config struct {
+	FactoryConfig
+
+	// GroupResourceString is the string representation of the `schema.GroupResource`
+	// that this Config is for.
+	GroupResourceString string
+}
+
+func NewDefaultConfig(prefix string, codec runtime.Codec) *FactoryConfig {
+	return &FactoryConfig{
 		Paging:               true,
 		Prefix:               prefix,
 		Codec:                codec,

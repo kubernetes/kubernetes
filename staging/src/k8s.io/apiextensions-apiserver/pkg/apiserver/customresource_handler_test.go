@@ -455,11 +455,11 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	cl := fake.NewSimpleClientset()
 	informers := informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
 	crdInformer := informers.Apiextensions().V1().CustomResourceDefinitions()
-
+	crd := multiVersionFixture.DeepCopy()
+	groupResource := schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}
 	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	defer server.Terminate(t)
 
-	crd := multiVersionFixture.DeepCopy()
 	if _, err := cl.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
@@ -470,7 +470,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 	restOptionsGetter := generic.RESTOptions{
-		StorageConfig:           &etcdOptions.StorageConfig,
+		StorageConfig:           etcdOptions.StorageConfig.ForGroupResource(groupResource),
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: true,
 		DeleteCollectionWorkers: 1,

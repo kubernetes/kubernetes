@@ -36,7 +36,7 @@ func TestEtcdOptionsValidate(t *testing.T) {
 		{
 			name: "test when ServerList is not specified",
 			testOptions: &EtcdOptions{
-				StorageConfig: storagebackend.Config{
+				StorageConfig: storagebackend.FactoryConfig{
 					Type:   "etcd3",
 					Prefix: "/registry",
 					Transport: storagebackend.TransportConfig{
@@ -60,7 +60,7 @@ func TestEtcdOptionsValidate(t *testing.T) {
 		{
 			name: "test when storage-backend is invalid",
 			testOptions: &EtcdOptions{
-				StorageConfig: storagebackend.Config{
+				StorageConfig: storagebackend.FactoryConfig{
 					Type:   "etcd4",
 					Prefix: "/registry",
 					Transport: storagebackend.TransportConfig{
@@ -84,7 +84,7 @@ func TestEtcdOptionsValidate(t *testing.T) {
 		{
 			name: "test when etcd-servers-overrides is invalid",
 			testOptions: &EtcdOptions{
-				StorageConfig: storagebackend.Config{
+				StorageConfig: storagebackend.FactoryConfig{
 					Type: "etcd3",
 					Transport: storagebackend.TransportConfig{
 						ServerList:    []string{"http://127.0.0.1"},
@@ -108,7 +108,7 @@ func TestEtcdOptionsValidate(t *testing.T) {
 		{
 			name: "test when EtcdOptions is valid",
 			testOptions: &EtcdOptions{
-				StorageConfig: storagebackend.Config{
+				StorageConfig: storagebackend.FactoryConfig{
 					Type:   "etcd3",
 					Prefix: "/registry",
 					Transport: storagebackend.TransportConfig{

@@ -360,7 +360,7 @@ func RunAnAPIServerUsingServer(controlPlaneConfig *controlplane.Config, s *httpt
 }
 
 // SharedEtcd creates a storage config for a shared etcd instance, with a unique prefix.
-func SharedEtcd() *storagebackend.Config {
+func SharedEtcd() *storagebackend.FactoryConfig {
 	cfg := storagebackend.NewDefaultConfig(path.Join(uuid.New().String(), "registry"), nil)
 	cfg.Transport.ServerList = []string{GetEtcdURL()}
 	return cfg

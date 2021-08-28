@@ -40,7 +40,7 @@ func Create(c storagebackend.Config, newFunc func() runtime.Object) (storage.Int
 }
 
 // CreateHealthCheck creates a healthcheck function based on given config.
-func CreateHealthCheck(c storagebackend.Config) (func() error, error) {
+func CreateHealthCheck(c storagebackend.FactoryConfig) (func() error, error) {
 	switch c.Type {
 	case storagebackend.StorageTypeETCD2:
 		return nil, fmt.Errorf("%s is no longer a supported storage backend", c.Type)

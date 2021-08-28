@@ -1135,7 +1135,7 @@ func (d unstructuredDefaulter) Default(in runtime.Object) {
 }
 
 type CRDRESTOptionsGetter struct {
-	StorageConfig             storagebackend.Config
+	StorageConfig             storagebackend.FactoryConfig
 	StoragePrefix             string
 	EnableWatchCache          bool
 	DefaultWatchCacheSize     int
@@ -1147,7 +1147,7 @@ type CRDRESTOptionsGetter struct {
 
 func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
-		StorageConfig:             &t.StorageConfig,
+		StorageConfig:             t.StorageConfig.ForGroupResource(resource),
 		Decorator:                 generic.UndecoratedStorage,
 		EnableGarbageCollection:   t.EnableGarbageCollection,
 		DeleteCollectionWorkers:   t.DeleteCollectionWorkers,

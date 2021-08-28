@@ -107,7 +107,7 @@ func (n *fakeNegotiater) DecoderToVersion(serializer runtime.Decoder, gv runtime
 
 func TestConfigurableStorageFactory(t *testing.T) {
 	ns := &fakeNegotiater{types: []string{"test/test"}}
-	f := NewDefaultStorageFactory(storagebackend.Config{}, "test/test", ns, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
+	f := NewDefaultStorageFactory(storagebackend.FactoryConfig{}, "test/test", ns, NewDefaultResourceEncodingConfig(scheme), NewResourceConfig(), nil)
 	f.AddCohabitatingResources(example.Resource("test"), schema.GroupResource{Resource: "test2", Group: "2"})
 	called := false
 	testEncoderChain := func(e runtime.Encoder) runtime.Encoder {
@@ -153,7 +153,7 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
-		defaultConfig := storagebackend.Config{
+		defaultConfig := storagebackend.FactoryConfig{
 			Prefix: "/registry",
 			Transport: storagebackend.TransportConfig{
 				ServerList: defaultEtcdLocation,

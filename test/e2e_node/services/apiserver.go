@@ -42,12 +42,12 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 
 // APIServer is a server which manages apiserver.
 type APIServer struct {
-	storageConfig storagebackend.Config
+	storageConfig storagebackend.FactoryConfig
 	stopCh        chan struct{}
 }
 
 // NewAPIServer creates an apiserver.
-func NewAPIServer(storageConfig storagebackend.Config) *APIServer {
+func NewAPIServer(storageConfig storagebackend.FactoryConfig) *APIServer {
 	return &APIServer{
 		storageConfig: storageConfig,
 		stopCh:        make(chan struct{}),

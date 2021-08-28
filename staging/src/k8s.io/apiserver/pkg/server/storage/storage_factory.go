@@ -65,7 +65,7 @@ type StorageFactory interface {
 type DefaultStorageFactory struct {
 	// StorageConfig describes how to create a storage backend in general.
 	// Its authentication information will be used for every storage.Interface returned.
-	StorageConfig storagebackend.Config
+	StorageConfig storagebackend.FactoryConfig
 
 	Overrides map[schema.GroupResource]groupResourceOverrides
 
@@ -152,7 +152,7 @@ var _ StorageFactory = &DefaultStorageFactory{}
 const AllResources = "*"
 
 func NewDefaultStorageFactory(
-	config storagebackend.Config,
+	config storagebackend.FactoryConfig,
 	defaultMediaType string,
 	defaultSerializer runtime.StorageSerializer,
 	resourceEncodingConfig ResourceEncodingConfig,
@@ -254,7 +254,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	// operate on copy
-	storageConfig := s.StorageConfig
+	storageConfig := storagebackend.Config{FactoryConfig: s.StorageConfig, GroupResourceString: groupResource.String()}
 	codecConfig := StorageCodecConfig{
 		StorageMediaType:  s.DefaultMediaType,
 		StorageSerializer: s.DefaultSerializer,
