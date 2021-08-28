@@ -2211,7 +2211,8 @@ var _ = common.SIGDescribe("Services", func() {
 		}
 		node0 := nodes.Items[0]
 		node1 := nodes.Items[1]
-
+		// split node name to ensure only hostname (and not FQDN) is compared with return from agnhost's /hostname endpoint.
+		node0Hostname := strings.Split(node0.Name, ".")[0]
 		serviceName := "svc-itp"
 		ns := f.Namespace.Name
 		servicePort := 80
@@ -2262,7 +2263,7 @@ var _ = common.SIGDescribe("Services", func() {
 		for i := 0; i < 5; i++ {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			// note that the expected hostname is the node name because the backend pod is on host network
-			execHostnameTest(*pausePod0, serviceAddress, node0.Name)
+			execHostnameTest(*pausePod0, serviceAddress, node0Hostname)
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
@@ -2291,7 +2292,7 @@ var _ = common.SIGDescribe("Services", func() {
 		for i := 0; i < 5; i++ {
 			// the first pause pod should be on the same node as the webserver, so it can connect to the local pod using clusterIP
 			// note that the expected hostname is the node name because the backend pod is on host network
-			execHostnameTest(*pausePod2, serviceAddress, node0.Name)
+			execHostnameTest(*pausePod2, serviceAddress, node0Hostname)
 
 			// the second pause pod is on a different node, so it should see a connection error every time
 			cmd := fmt.Sprintf(`curl -q -s --connect-timeout 5 %s/hostname`, serviceAddress)
