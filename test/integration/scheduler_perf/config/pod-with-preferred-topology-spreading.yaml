@@ -13,7 +13,7 @@ spec:
         matchLabels:
           color: blue
   containers:
-  - image: k8s.gcr.io/pause:3.5
+  - image: k8s.gcr.io/pause:3.6
     name: pause
     ports:
     - containerPort: 80

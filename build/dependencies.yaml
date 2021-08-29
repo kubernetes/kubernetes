@@ -154,7 +154,7 @@ dependencies:
       match: TAG\s*\?=
 
   - name: "k8s.gcr.io/pause: dependents"
-    version: 3.5
+    version: 3.6
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
