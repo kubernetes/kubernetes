@@ -244,7 +244,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}, nil
 }
 
-func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
+func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err

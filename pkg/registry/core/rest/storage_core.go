@@ -201,7 +201,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
 		if err != nil {
 			return nil, err
 		}
@@ -220,7 +220,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 			mem := allocator.NewAllocationMap(max, rangeSpec)
 			// TODO etcdallocator package to return a storage interface via the storageFactory
-			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
 			if err != nil {
 				return nil, err
 			}
@@ -237,7 +237,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	serviceNodePortAllocator, err := portallocator.New(c.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorageConfig)
+		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", serviceStorageConfig.ForResource(api.Resource("servicenodeportallocations")))
 		if err != nil {
 			return nil, err
 		}

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -40,7 +41,7 @@ import (
 func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{
-		StorageConfig:           etcdStorage,
+		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "services",
@@ -415,7 +416,7 @@ func TestServiceDefaultOnRead(t *testing.T) {
 		makeStorage := func(t *testing.T) (*GenericREST, *etcd3testing.EtcdTestServer) {
 			etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 			restOptions := generic.RESTOptions{
-				StorageConfig:           etcdStorage,
+				StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
 				Decorator:               generic.UndecoratedStorage,
 				DeleteCollectionWorkers: 1,
 				ResourcePrefix:          "services",
@@ -473,7 +474,7 @@ func TestServiceDefaulting(t *testing.T) {
 	makeStorage := func(t *testing.T, primaryCIDR string, isDualStack bool) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
 		etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 		restOptions := generic.RESTOptions{
-			StorageConfig:           etcdStorage,
+			StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "services"}),
 			Decorator:               generic.UndecoratedStorage,
 			DeleteCollectionWorkers: 1,
 			ResourcePrefix:          "services",

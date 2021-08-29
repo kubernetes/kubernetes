@@ -21,6 +21,7 @@ import (
 
 	"go.opentelemetry.io/otel/trace"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
@@ -89,6 +90,23 @@ type Config struct {
 	// StorageObjectCountTracker is used to keep track of the total
 	// number of objects in the storage per resource.
 	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
+}
+
+// ConfigForResource is a Config specialized to a particular `schema.GroupResource`
+type ConfigForResource struct {
+	// Config is the resource-independent configuration
+	Config
+
+	// GroupResource is the relevant one
+	GroupResource schema.GroupResource
+}
+
+// ForResource specializes to the given resource
+func (config *Config) ForResource(resource schema.GroupResource) *ConfigForResource {
+	return &ConfigForResource{
+		Config:        *config,
+		GroupResource: resource,
+	}
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {

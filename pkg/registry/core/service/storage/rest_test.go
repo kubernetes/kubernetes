@@ -29,6 +29,7 @@ import (
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
@@ -175,7 +176,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 	serviceStorage := &serviceStorage{}
 
 	podStorage, err := podstore.NewStorage(generic.RESTOptions{
-		StorageConfig:           etcdStorage,
+		StorageConfig:           etcdStorage.ForResource(schema.GroupResource{Resource: "pods"}),
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 3,
 		ResourcePrefix:          "pods",
@@ -191,7 +192,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 		}
 	}
 	endpointStorage, err := endpointstore.NewREST(generic.RESTOptions{
-		StorageConfig:  etcdStorage,
+		StorageConfig:  etcdStorage.ForResource(schema.GroupResource{Resource: "endpoints"}),
 		Decorator:      generic.UndecoratedStorage,
 		ResourcePrefix: "endpoints",
 	})
