@@ -69,7 +69,7 @@ type Reflector struct {
 
 	// backoff manages backoff of ListWatch
 	backoffManager wait.BackoffManager
-	// initConnBackoffManager manages backoff the initial connection with the Watch calll of ListAndWatch.
+	// initConnBackoffManager manages backoff the initial connection with the Watch call of ListAndWatch.
 	initConnBackoffManager wait.BackoffManager
 
 	resyncPeriod time.Duration
