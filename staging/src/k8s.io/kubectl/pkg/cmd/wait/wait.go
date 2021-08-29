@@ -55,8 +55,11 @@ var (
 		Alternatively, the command can wait for the given set of resources to be deleted
 		by providing the "delete" keyword as the value to the --for flag.
 
+		The exit code will be zero if the condition has been met before the timeout,
+		nonzero otherwise.
+
 		A successful message will be printed to stdout indicating when the specified
-        condition has been met. You can use -o option to change to output destination.`))
+		condition has been met. You can use -o option to change to output destination.`))
 
 	waitExample = templates.Examples(i18n.T(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready"
