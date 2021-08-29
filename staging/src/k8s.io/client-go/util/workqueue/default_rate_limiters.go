@@ -40,18 +40,32 @@ func DefaultControllerRateLimiter() RateLimiter {
 	return NewMaxOfRateLimiter(
 		NewItemExponentialFailureRateLimiter(5*time.Millisecond, 1000*time.Second),
 		// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
-		&BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+		NewBucketRateLimiter(rate.NewLimiter(rate.Limit(10), 100), 500*time.Second),
 	)
 }
 
 // BucketRateLimiter adapts a standard bucket to the workqueue ratelimiter API
 type BucketRateLimiter struct {
 	*rate.Limiter
+	maxDelay time.Duration
 }
 
 var _ RateLimiter = &BucketRateLimiter{}
 
+func DefaultBucketRateLimiter(limiter *rate.Limiter)  RateLimiter{
+	return &BucketRateLimiter{limiter, 500*time.Second}
+}
+
+func NewBucketRateLimiter(limiter *rate.Limiter, maxDelay time.Duration)  RateLimiter{
+	return &BucketRateLimiter{limiter, maxDelay}
+}
+
 func (r *BucketRateLimiter) When(item interface{}) time.Duration {
+	delayTime := r.Limiter.Reserve().Delay()
+
+	if delayTime> r.maxDelay {
+		return r.maxDelay
+	}
 	return r.Limiter.Reserve().Delay()
 }
 

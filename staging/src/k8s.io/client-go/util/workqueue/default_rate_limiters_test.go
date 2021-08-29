@@ -17,6 +17,7 @@ limitations under the License.
 package workqueue
 
 import (
+	"golang.org/x/time/rate"
 	"testing"
 	"time"
 )
@@ -181,4 +182,24 @@ func TestMaxOfRateLimiter(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
+}
+
+func TestBucketRateLimiterOverFlow(t *testing.T)  {
+	limiter := DefaultBucketRateLimiter(rate.NewLimiter(rate.Limit(10), 100))
+
+	for i := 0; i < 50; i++ {
+		if e, a := 0 * time.Second, limiter.When(i); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+
+	for i := 50; i < 3000; i++ {
+		limiter.When(i)
+	}
+
+	for i := 3000; i < 3100; i++ {
+		if e, a := 500 * time.Second, limiter.When(i); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
 }
