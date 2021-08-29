@@ -39,6 +39,56 @@ func seccompLocalhostPath(profileName string) string {
 	return "localhost/" + seccompLocalhostRef(profileName)
 }
 
+func TestIsInitContainerFailed(t *testing.T) {
+	tests := []struct {
+		status   *kubecontainer.Status
+		isFailed bool
+	}{
+		{
+			status: &kubecontainer.Status{
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 1,
+			},
+			isFailed: true,
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateUnknown,
+			},
+			isFailed: true,
+		},
+		{
+			status: &kubecontainer.Status{
+				Reason: "OOMKilled",
+			},
+			isFailed: true,
+		},
+		{
+			status: &kubecontainer.Status{
+				State:    kubecontainer.ContainerStateExited,
+				ExitCode: 0,
+			},
+			isFailed: false,
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateRunning,
+			},
+			isFailed: false,
+		},
+		{
+			status: &kubecontainer.Status{
+				State: kubecontainer.ContainerStateCreated,
+			},
+			isFailed: false,
+		},
+	}
+	for i, test := range tests {
+		isFailed := isInitContainerFailed(test.status)
+		assert.Equal(t, test.isFailed, isFailed, "TestCase[%d]", i)
+	}
+}
+
 func TestStableKey(t *testing.T) {
 	container := &v1.Container{
 		Name:  "test_container",
