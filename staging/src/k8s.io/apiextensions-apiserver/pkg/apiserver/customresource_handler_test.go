@@ -470,7 +470,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 	restOptionsGetter := generic.RESTOptions{
-		StorageConfig:           &etcdOptions.StorageConfig,
+		StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: true,
 		DeleteCollectionWorkers: 1,
