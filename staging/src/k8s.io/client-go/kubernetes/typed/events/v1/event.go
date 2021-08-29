@@ -33,7 +33,7 @@ import (
 	rest "k8s.io/client-go/rest"
 )
 
-// EventsGetter has a method to return a EventInterface.
+// EventsGetter has a method to return an EventInterface.
 // A group's client should implement this interface.
 type EventsGetter interface {
 	Events(namespace string) EventInterface
@@ -59,7 +59,7 @@ type events struct {
 	ns     string
 }
 
-// newEvents returns a Events
+// newEvents returns an events
 func newEvents(c *EventsV1Client, namespace string) *events {
 	return &events{
 		client: c.RESTClient(),
@@ -112,7 +112,7 @@ func (c *events) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Inte
 		Watch(ctx)
 }
 
-// Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
+// Create takes the representation of an event and creates it.  Returns the server's representation of the event, and an error, if there is any.
 func (c *events) Create(ctx context.Context, event *v1.Event, opts metav1.CreateOptions) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Post().
@@ -125,7 +125,7 @@ func (c *events) Create(ctx context.Context, event *v1.Event, opts metav1.Create
 	return
 }
 
-// Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
+// Update takes the representation of an event and updates it. Returns the server's representation of the event, and an error, if there is any.
 func (c *events) Update(ctx context.Context, event *v1.Event, opts metav1.UpdateOptions) (result *v1.Event, err error) {
 	result = &v1.Event{}
 	err = c.client.Put().

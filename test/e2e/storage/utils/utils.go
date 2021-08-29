@@ -683,7 +683,7 @@ func WaitUntil(poll, timeout time.Duration, checkDone func() bool) bool {
 	return false
 }
 
-// WaitForGVRFinalizer waits until a object from a given GVR contains a finalizer
+// WaitForGVRFinalizer waits until an object from a given GVR contains a finalizer
 // If namespace is empty, assume it is a non-namespaced object
 func WaitForGVRFinalizer(ctx context.Context, c dynamic.Interface, gvr schema.GroupVersionResource, objectName, objectNamespace, finalizer string, poll, timeout time.Duration) error {
 	framework.Logf("Waiting up to %v for object %s %s of resource %s to contain finalizer %s", timeout, objectNamespace, objectName, gvr.Resource, finalizer)

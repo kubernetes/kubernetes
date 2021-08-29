@@ -85,7 +85,7 @@ type Config struct {
 	// operation if no indexer found.
 	Indexers *cache.Indexers
 
-	// NewFunc is a function that creates new empty object storing a object of type Type.
+	// NewFunc is a function that creates new empty object storing an object of type Type.
 	NewFunc func() runtime.Object
 
 	// NewList is a function that creates new empty object storing a list of
@@ -254,7 +254,7 @@ type Cacher struct {
 	// Versioner is used to handle resource versions.
 	versioner storage.Versioner
 
-	// newFunc is a function that creates new empty object storing a object of type Type.
+	// newFunc is a function that creates new empty object storing an object of type Type.
 	newFunc func() runtime.Object
 
 	// indexedTrigger is used for optimizing amount of watchers that needs to process

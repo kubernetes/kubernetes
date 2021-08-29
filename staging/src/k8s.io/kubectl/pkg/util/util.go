@@ -41,7 +41,7 @@ func ParseRFC3339(s string, nowFn func() metav1.Time) (metav1.Time, error) {
 	return metav1.Time{Time: t}, nil
 }
 
-// HashObject returns the hash of a Object hash by a Codec
+// HashObject returns the hash of an Object hash by a Codec
 func HashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 	data, err := runtime.Encode(codec, obj)
 	if err != nil {

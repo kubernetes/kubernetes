@@ -232,7 +232,7 @@ var _ = SIGDescribe("ConfigMap", func() {
 	/*
 		Release: v1.9
 		Testname: ConfigMap Volume, create, update and delete
-		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in a error reading that item(file).
+		Description: The ConfigMap that is created MUST be accessible to read from the newly created Pod using the volume mount that is mapped to custom path in the Pod. When the config map is updated the change to the config map MUST be verified by reading the content from the mounted file in the Pod. Also when the item(file) is deleted from the map that MUST result in an error reading that item(file).
 	*/
 	framework.ConformanceIt("optional updates should be reflected in volume [NodeConformance]", func() {
 		podLogTimeout := e2epod.GetPodSecretUpdateTimeout(f.ClientSet)

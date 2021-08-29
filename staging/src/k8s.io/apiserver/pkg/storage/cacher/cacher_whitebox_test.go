@@ -547,7 +547,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		select {
 		case <-w.ResultChan():
 		case <-time.After(time.Second):
-			t.Fatal("expected received a event on ResultChan")
+			t.Fatal("expected received an event on ResultChan")
 		}
 		w.Stop()
 	}

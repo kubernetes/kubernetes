@@ -17,7 +17,7 @@ limitations under the License.
 package manager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -43,7 +43,7 @@ type Manager interface {
 	UnregisterPod(pod *v1.Pod)
 }
 
-// Store is the interface for a object cache that
+// Store is the interface for an object cache that
 // can be used by cacheBasedManager.
 type Store interface {
 	// AddReference adds a reference to the object to the store.

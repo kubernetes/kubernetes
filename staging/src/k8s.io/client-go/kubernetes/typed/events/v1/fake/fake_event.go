@@ -83,7 +83,7 @@ func (c *FakeEvents) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 
 }
 
-// Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
+// Create takes the representation of an event and creates it.  Returns the server's representation of the event, and an error, if there is any.
 func (c *FakeEvents) Create(ctx context.Context, event *eventsv1.Event, opts v1.CreateOptions) (result *eventsv1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(eventsResource, c.ns, event), &eventsv1.Event{})
@@ -94,7 +94,7 @@ func (c *FakeEvents) Create(ctx context.Context, event *eventsv1.Event, opts v1.
 	return obj.(*eventsv1.Event), err
 }
 
-// Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
+// Update takes the representation of an event and updates it. Returns the server's representation of the event, and an error, if there is any.
 func (c *FakeEvents) Update(ctx context.Context, event *eventsv1.Event, opts v1.UpdateOptions) (result *eventsv1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(eventsResource, c.ns, event), &eventsv1.Event{})

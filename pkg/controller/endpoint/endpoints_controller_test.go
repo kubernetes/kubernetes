@@ -162,7 +162,7 @@ func makeTestServer(t *testing.T, namespace string) (*httptest.Server, *utiltest
 }
 
 // makeBlockingEndpointDeleteTestServer will signal the blockNextAction channel on endpoint "POST" & "DELETE" requests. All
-// block endpoint "DELETE" requestsi will wait on a blockDelete signal to delete endpoint. If controller is nil, a error will
+// block endpoint "DELETE" requestsi will wait on a blockDelete signal to delete endpoint. If controller is nil, an error will
 // be sent in the response.
 func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointController, endpoint *v1.Endpoints, blockDelete, blockNextAction chan struct{}, namespace string) *httptest.Server {
 

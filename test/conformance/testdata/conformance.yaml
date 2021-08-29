@@ -1790,9 +1790,9 @@
 - testname: Pod events, verify event from Scheduler and Kubelet
   codename: '[sig-node] Events should be sent by kubelets and the scheduler about
     pods scheduling and running  [Conformance]'
-  description: Create a Pod, make sure that the Pod can be queried. Create a event
+  description: Create a Pod, make sure that the Pod can be queried. Create an event
     selector for the kind=Pod and the source is the Scheduler. List of the events
-    MUST be at least one. Create a event selector for kind=Pod and the source is the
+    MUST be at least one. Create an event selector for kind=Pod and the source is the
     Kubelet. List of the events MUST be at least one. Both Scheduler and Kubelet MUST
     send events when scheduling and running a Pod.
   release: v1.9
@@ -2344,7 +2344,7 @@
     created Pod using the volume mount that is mapped to custom path in the Pod. When
     the config map is updated the change to the config map MUST be verified by reading
     the content from the mounted file in the Pod. Also when the item(file) is deleted
-    from the map that MUST result in a error reading that item(file).
+    from the map that MUST result in an error reading that item(file).
   release: v1.9
   file: test/e2e/common/storage/configmap_volume.go
 - testname: ConfigMap Volume, without mapping
@@ -2442,7 +2442,7 @@
   codename: '[sig-storage] Downward API volume should provide container''s cpu limit
     [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the CPU limits. The container runtime MUST be able to access
+    contains an item for the CPU limits. The container runtime MUST be able to access
     CPU limits from the specified path on the mounted volume.
   release: v1.9
   file: test/e2e/common/storage/downwardapi_volume.go
@@ -2450,7 +2450,7 @@
   codename: '[sig-storage] Downward API volume should provide container''s cpu request
     [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the CPU request. The container runtime MUST be able to access
+    contains an item for the CPU request. The container runtime MUST be able to access
     CPU request from the specified path on the mounted volume.
   release: v1.9
   file: test/e2e/common/storage/downwardapi_volume.go
@@ -2458,7 +2458,7 @@
   codename: '[sig-storage] Downward API volume should provide container''s memory
     limit [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the memory limits. The container runtime MUST be able to access
+    contains an item for the memory limits. The container runtime MUST be able to access
     memory limits from the specified path on the mounted volume.
   release: v1.9
   file: test/e2e/common/storage/downwardapi_volume.go
@@ -2466,7 +2466,7 @@
   codename: '[sig-storage] Downward API volume should provide container''s memory
     request [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the memory request. The container runtime MUST be able to
+    contains an item for the memory request. The container runtime MUST be able to
     access memory request from the specified path on the mounted volume.
   release: v1.9
   file: test/e2e/common/storage/downwardapi_volume.go
@@ -2474,7 +2474,7 @@
   codename: '[sig-storage] Downward API volume should provide node allocatable (cpu)
     as default cpu limit if the limit is not set [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the CPU limits. CPU limits is not specified for the container.
+    contains an item for the CPU limits. CPU limits is not specified for the container.
     The container runtime MUST be able to access CPU limits from the specified path
     on the mounted volume and the value MUST be default node allocatable.
   release: v1.9
@@ -2483,7 +2483,7 @@
   codename: '[sig-storage] Downward API volume should provide node allocatable (memory)
     as default memory limit if the limit is not set [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the memory limits. memory limits is not specified for the
+    contains an item for the memory limits. memory limits is not specified for the
     container. The container runtime MUST be able to access memory limits from the
     specified path on the mounted volume and the value MUST be default node allocatable.
   release: v1.9
@@ -2492,7 +2492,7 @@
   codename: '[sig-storage] Downward API volume should provide podname only [NodeConformance]
     [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the Pod name. The container runtime MUST be able to access
+    contains an item for the Pod name. The container runtime MUST be able to access
     Pod name from the specified path on the mounted volume.
   release: v1.9
   file: test/e2e/common/storage/downwardapi_volume.go
@@ -2500,7 +2500,7 @@
   codename: '[sig-storage] Downward API volume should set DefaultMode on files [LinuxOnly]
     [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource with the volumesource
-    mode set to -r-------- and DownwardAPIVolumeFiles contains a item for the Pod
+    mode set to -r-------- and DownwardAPIVolumeFiles contains an item for the Pod
     name. The container runtime MUST be able to access Pod name from the specified
     path on the mounted volume. This test is marked LinuxOnly since Windows does not
     support setting specific file permissions.
@@ -2510,7 +2510,7 @@
   codename: '[sig-storage] Downward API volume should set mode on item file [LinuxOnly]
     [NodeConformance] [Conformance]'
   description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles
-    contains a item for the Pod name with the file mode set to -r--------. The container
+    contains an item for the Pod name with the file mode set to -r--------. The container
     runtime MUST be able to access Pod name from the specified path on the mounted
     volume. This test is marked LinuxOnly since Windows does not support setting specific
     file permissions.

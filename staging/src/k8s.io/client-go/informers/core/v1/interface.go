@@ -30,7 +30,7 @@ type Interface interface {
 	ConfigMaps() ConfigMapInformer
 	// Endpoints returns a EndpointsInformer.
 	Endpoints() EndpointsInformer
-	// Events returns a EventInformer.
+	// Events returns an EventInformer.
 	Events() EventInformer
 	// LimitRanges returns a LimitRangeInformer.
 	LimitRanges() LimitRangeInformer
@@ -84,7 +84,7 @@ func (v *version) Endpoints() EndpointsInformer {
 	return &endpointsInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
-// Events returns a EventInformer.
+// Events returns an EventInformer.
 func (v *version) Events() EventInformer {
 	return &eventInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

@@ -44,7 +44,7 @@ kube::test::get_caller() {
   echo "$(basename "${caller_file}"):${caller_line}"
 }
 
-# Force exact match of a returned result for a object query.  Wrap this with || to support multiple
+# Force exact match of a returned result for an object query.  Wrap this with || to support multiple
 # valid return types.
 # This runs `kubectl get` once and asserts that the result is as expected.
 # $1: Object on which get should be run

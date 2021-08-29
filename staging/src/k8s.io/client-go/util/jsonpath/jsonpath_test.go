@@ -720,7 +720,7 @@ func TestNegativeIndex(t *testing.T) {
 				false,
 			},
 			{
-				"test containers[-5], expect a error cause it out of bounds",
+				"test containers[-5], expect an error cause it out of bounds",
 				`{.spec.containers[-5].name}`,
 				data,
 				"",
@@ -741,14 +741,14 @@ func TestNegativeIndex(t *testing.T) {
 				false,
 			},
 			{
-				"test containers[3:1], expect a error cause start index is greater than end index",
+				"test containers[3:1], expect an error cause start index is greater than end index",
 				`{.spec.containers[3:1].name}`,
 				data,
 				"",
 				true,
 			},
 			{
-				"test containers[-1:-2], it equals containers[3:2], expect a error cause start index is greater than end index",
+				"test containers[-1:-2], it equals containers[3:2], expect an error cause start index is greater than end index",
 				`{.spec.containers[-1:-2].name}`,
 				data,
 				"",

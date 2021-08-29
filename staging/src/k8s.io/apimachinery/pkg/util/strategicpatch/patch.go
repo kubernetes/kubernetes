@@ -419,7 +419,7 @@ func normalizeElementOrder(patch, serverOnly, patchOrder, serverOrder []interfac
 // It will insert each item in `left` list to `right` list. In most cases, the 2 lists will be interleaved.
 // The relative order of left and right are guaranteed to be kept.
 // They have higher precedence than the order in the live list.
-// The place for a item in `left` is found by:
+// The place for an item in `left` is found by:
 // scan from the place of last insertion in `right` to the end of `right`,
 // the place is before the first item that is greater than the item we want to insert.
 // example usage: using server-only items as left and patch items as right. We insert server-only items

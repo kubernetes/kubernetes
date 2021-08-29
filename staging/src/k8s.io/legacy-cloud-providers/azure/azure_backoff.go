@@ -68,7 +68,7 @@ func (az *Cloud) RequestBackoff() (resourceRequestBackoff wait.Backoff) {
 	return resourceRequestBackoff
 }
 
-// Event creates a event for the specified object.
+// Event creates an event for the specified object.
 func (az *Cloud) Event(obj runtime.Object, eventType, reason, message string) {
 	if obj != nil && reason != "" {
 		az.eventRecorder.Event(obj, eventType, reason, message)

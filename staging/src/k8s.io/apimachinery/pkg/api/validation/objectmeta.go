@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// FieldImmutableErrorMsg is a error message for field is immutable.
+// FieldImmutableErrorMsg is an error message for field is immutable.
 const FieldImmutableErrorMsg string = `field is immutable`
 
 const TotalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB

@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	fcache "k8s.io/client-go/tools/cache/testing"
 
-	"github.com/google/gofuzz"
+	fuzz "github.com/google/gofuzz"
 )
 
 func Example() {
@@ -436,7 +436,7 @@ func TestPanicPropagated(t *testing.T) {
 		}()
 		controller.Run(stop)
 	}()
-	// Let's add a object to the source. It will trigger a panic.
+	// Let's add an object to the source. It will trigger a panic.
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}})
 
 	// Check if the panic propagated up.

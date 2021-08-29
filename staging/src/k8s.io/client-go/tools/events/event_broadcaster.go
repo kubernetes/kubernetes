@@ -78,7 +78,7 @@ type EventSinkImpl struct {
 	Interface typedeventsv1.EventsV1Interface
 }
 
-// Create takes the representation of a event and creates it. Returns the server's representation of the event, and an error, if there is any.
+// Create takes the representation of an event and creates it. Returns the server's representation of the event, and an error, if there is any.
 func (e *EventSinkImpl) Create(event *eventsv1.Event) (*eventsv1.Event, error) {
 	if event.Namespace == "" {
 		return nil, fmt.Errorf("can't create an event with empty namespace")
@@ -86,7 +86,7 @@ func (e *EventSinkImpl) Create(event *eventsv1.Event) (*eventsv1.Event, error) {
 	return e.Interface.Events(event.Namespace).Create(context.TODO(), event, metav1.CreateOptions{})
 }
 
-// Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
+// Update takes the representation of an event and updates it. Returns the server's representation of the event, and an error, if there is any.
 func (e *EventSinkImpl) Update(event *eventsv1.Event) (*eventsv1.Event, error) {
 	if event.Namespace == "" {
 		return nil, fmt.Errorf("can't update an event with empty namespace")

@@ -123,7 +123,7 @@ func TestExecInContainer(t *testing.T) {
 		execProbeTimeout:   true,
 		expectError:        context.DeadlineExceeded,
 	}, {
-		description:        "[ExecProbeTimeout=false] StartExec that takes longer than the probe timeout returns a error",
+		description:        "[ExecProbeTimeout=false] StartExec that takes longer than the probe timeout returns an error",
 		timeout:            1 * time.Second,
 		returnCreateExec1:  &dockertypes.IDResponse{ID: "12345678"},
 		returnCreateExec2:  nil,

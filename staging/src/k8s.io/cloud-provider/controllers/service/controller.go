@@ -441,7 +441,7 @@ func (s *Controller) ensureLoadBalancer(service *v1.Service) (*v1.LoadBalancerSt
 		return nil, err
 	}
 
-	// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
+	// If there are no available nodes for LoadBalancer service, make an EventTypeWarning event for it.
 	if len(nodes) == 0 {
 		s.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
 	}
@@ -794,7 +794,7 @@ func (s *Controller) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []
 	// This operation doesn't normally take very long (and happens pretty often), so we only record the final event
 	err := s.balancer.UpdateLoadBalancer(context.TODO(), s.clusterName, service, hosts)
 	if err == nil {
-		// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
+		// If there are no available nodes for LoadBalancer service, make an EventTypeWarning event for it.
 		if len(hosts) == 0 {
 			s.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
 		} else {

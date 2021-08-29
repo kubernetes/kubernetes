@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// IsNegativeErrorMsg is a error message for value must be greater than or equal to 0.
+// IsNegativeErrorMsg is an error message for value must be greater than or equal to 0.
 const IsNegativeErrorMsg string = `must be greater than or equal to 0`
 
 // ValidateNameFunc validates that the provided name is valid for a given resource type.

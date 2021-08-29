@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -160,7 +160,7 @@ func MarkPodsNotReady(kubeClient clientset.Interface, recorder record.EventRecor
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
 }
 
-// RecordNodeEvent records a event related to a node.
+// RecordNodeEvent records an event related to a node.
 func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
 	ref := &v1.ObjectReference{
 		APIVersion: "v1",
@@ -173,7 +173,7 @@ func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
-// RecordNodeStatusChange records a event related to a node status change. (Common to lifecycle and ipam)
+// RecordNodeStatusChange records an event related to a node status change. (Common to lifecycle and ipam)
 func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newStatus string) {
 	ref := &v1.ObjectReference{
 		APIVersion: "v1",

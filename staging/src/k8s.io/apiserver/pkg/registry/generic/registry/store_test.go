@@ -1242,7 +1242,7 @@ func TestStoreDelete(t *testing.T) {
 		t.Errorf("Expected call to AfterDelete, but got none")
 	}
 
-	// try to get a item which should be deleted
+	// try to get an item which should be deleted
 	_, err = registry.Get(testContext, podA.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
@@ -1274,7 +1274,7 @@ func TestStoreGracefulDeleteWithResourceVersion(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// try to get a item which should be deleted
+	// try to get an item which should be deleted
 	obj, err := registry.Get(testContext, podA.Name, &metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
@@ -1299,7 +1299,7 @@ func TestStoreGracefulDeleteWithResourceVersion(t *testing.T) {
 		t.Errorf("unexpected, pod %s should have been deleted immediately", podA.Name)
 	}
 
-	// try to get a item which should be deleted
+	// try to get an item which should be deleted
 	_, err = registry.Get(testContext, podA.Name, &metav1.GetOptions{})
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)

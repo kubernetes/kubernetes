@@ -132,7 +132,7 @@ var FieldManagerMaxLength = 128
 // only has printable characters.
 func ValidateFieldManager(fieldManager string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// the field can not be set as a `*string`, so a empty string ("") is
+	// the field can not be set as a `*string`, so an empty string ("") is
 	// considered as not set and is defaulted by the rest of the process
 	// (unless apply is used, in which case it is required).
 	if len(fieldManager) > FieldManagerMaxLength {

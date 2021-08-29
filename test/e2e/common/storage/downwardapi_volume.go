@@ -45,7 +45,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, pod name
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the Pod name. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the Pod name. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
 	*/
 	framework.ConformanceIt("should provide podname only [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -59,7 +59,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, volume mode 0400
-		Description: A Pod is configured with DownwardAPIVolumeSource with the volumesource mode set to -r-------- and DownwardAPIVolumeFiles contains a item for the Pod name. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
+		Description: A Pod is configured with DownwardAPIVolumeSource with the volumesource mode set to -r-------- and DownwardAPIVolumeFiles contains an item for the Pod name. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should set DefaultMode on files [LinuxOnly] [NodeConformance]", func() {
@@ -75,7 +75,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, file mode 0400
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the Pod name with the file mode set to -r--------. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the Pod name with the file mode set to -r--------. The container runtime MUST be able to access Pod name from the specified path on the mounted volume.
 		This test is marked LinuxOnly since Windows does not support setting specific file permissions.
 	*/
 	framework.ConformanceIt("should set mode on item file [LinuxOnly] [NodeConformance]", func() {
@@ -185,7 +185,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, CPU limits
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the CPU limits. The container runtime MUST be able to access CPU limits from the specified path on the mounted volume.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the CPU limits. The container runtime MUST be able to access CPU limits from the specified path on the mounted volume.
 	*/
 	framework.ConformanceIt("should provide container's cpu limit [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -199,7 +199,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, memory limits
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the memory limits. The container runtime MUST be able to access memory limits from the specified path on the mounted volume.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the memory limits. The container runtime MUST be able to access memory limits from the specified path on the mounted volume.
 	*/
 	framework.ConformanceIt("should provide container's memory limit [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -213,7 +213,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, CPU request
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the CPU request. The container runtime MUST be able to access CPU request from the specified path on the mounted volume.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the CPU request. The container runtime MUST be able to access CPU request from the specified path on the mounted volume.
 	*/
 	framework.ConformanceIt("should provide container's cpu request [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -227,7 +227,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, memory request
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the memory request. The container runtime MUST be able to access memory request from the specified path on the mounted volume.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the memory request. The container runtime MUST be able to access memory request from the specified path on the mounted volume.
 	*/
 	framework.ConformanceIt("should provide container's memory request [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -241,7 +241,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, CPU limit, default node allocatable
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the CPU limits. CPU limits is not specified for the container. The container runtime MUST be able to access CPU limits from the specified path on the mounted volume and the value MUST be default node allocatable.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the CPU limits. CPU limits is not specified for the container. The container runtime MUST be able to access CPU limits from the specified path on the mounted volume and the value MUST be default node allocatable.
 	*/
 	framework.ConformanceIt("should provide node allocatable (cpu) as default cpu limit if the limit is not set [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
@@ -253,7 +253,7 @@ var _ = SIGDescribe("Downward API volume", func() {
 	/*
 		Release: v1.9
 		Testname: DownwardAPI volume, memory limit, default node allocatable
-		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains a item for the memory limits. memory limits is not specified for the container. The container runtime MUST be able to access memory limits from the specified path on the mounted volume and the value MUST be default node allocatable.
+		Description: A Pod is configured with DownwardAPIVolumeSource and DownwardAPIVolumeFiles contains an item for the memory limits. memory limits is not specified for the container. The container runtime MUST be able to access memory limits from the specified path on the mounted volume and the value MUST be default node allocatable.
 	*/
 	framework.ConformanceIt("should provide node allocatable (memory) as default memory limit if the limit is not set [NodeConformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())

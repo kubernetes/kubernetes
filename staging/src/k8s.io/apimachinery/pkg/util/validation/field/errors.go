@@ -125,7 +125,7 @@ const (
 	ErrorTypeInternal ErrorType = "InternalError"
 )
 
-// String converts a ErrorType into its corresponding canonical error message.
+// String converts an ErrorType into its corresponding canonical error message.
 func (t ErrorType) String() string {
 	switch t {
 	case ErrorTypeNotFound:
@@ -227,7 +227,7 @@ func InternalError(field *Path, err error) *Error {
 type ErrorList []*Error
 
 // NewErrorTypeMatcher returns an errors.Matcher that returns true
-// if the provided error is a Error and has the provided ErrorType.
+// if the provided error is an Error and has the provided ErrorType.
 func NewErrorTypeMatcher(t ErrorType) utilerrors.Matcher {
 	return func(err error) bool {
 		if e, ok := err.(*Error); ok {

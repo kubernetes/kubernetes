@@ -232,7 +232,7 @@ func CheckServiceName(ss *appsv1.StatefulSet, expectedServiceName string) error 
 	return nil
 }
 
-// ExecInStatefulPods executes cmd in all Pods in ss. If a error occurs it is returned and cmd is not execute in any subsequent Pods.
+// ExecInStatefulPods executes cmd in all Pods in ss. If an error occurs it is returned and cmd is not execute in any subsequent Pods.
 func ExecInStatefulPods(c clientset.Interface, ss *appsv1.StatefulSet, cmd string) error {
 	podList := GetPodList(c, ss)
 	for _, statefulPod := range podList.Items {

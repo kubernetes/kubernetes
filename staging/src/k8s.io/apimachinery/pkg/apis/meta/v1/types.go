@@ -1204,7 +1204,7 @@ const (
 // or a string representing a sub-field or item. The string will follow one of these four formats:
 // 'f:<name>', where <name> is the name of a field in a struct, or key in a map
 // 'v:<value>', where <value> is the exact json formatted value of a list item
-// 'i:<index>', where <index> is position of a item in a list
+// 'i:<index>', where <index> is position of an item in a list
 // 'k:<keys>', where <keys> is a map of  a list item's key fields to their unique values
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //

@@ -46,7 +46,7 @@ func NewEtcdObjectReader(etcdClient *clientv3.Client, restOptions *generic.RESTO
 
 // WaitForStorageVersion calls the updateObjFn periodically and waits for the version of the custom resource stored in etcd to be set to the provided version.
 // Typically updateObjFn should perform a noop update to the object so that when stored version of a CRD changes, the object is written at the updated storage version.
-// If the timeout is exceeded a error is returned.
+// If the timeout is exceeded an error is returned.
 // This is useful when updating the stored version of an existing CRD because the update does not take effect immediately.
 func (s *EtcdObjectReader) WaitForStorageVersion(version string, ns, name string, timeout time.Duration, updateObjFn func()) error {
 	waitCh := time.After(timeout)
