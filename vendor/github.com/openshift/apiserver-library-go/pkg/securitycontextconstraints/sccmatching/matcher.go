@@ -38,7 +38,8 @@ func NewDefaultSCCMatcher(c securityv1listers.SecurityContextConstraintsLister, 
 }
 
 // FindApplicableSCCs implements SCCMatcher interface
-// It finds all SCCs that the subjects in the `users` argument may use.
+// It finds all SCCs that the subjects in the `users` argument may use for the given `namespace`.
+// If `users` is omitted, `namespace` is ignored.
 // The returned SCCs are sorted by priority.
 func (d *defaultSCCMatcher) FindApplicableSCCs(ctx context.Context, namespace string, users ...user.Info) ([]*securityv1.SecurityContextConstraints, error) {
 	var matchedConstraints []*securityv1.SecurityContextConstraints

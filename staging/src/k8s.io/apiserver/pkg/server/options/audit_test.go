@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/natefinch/lumberjack.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	"k8s.io/apiserver/pkg/server"
@@ -55,6 +56,15 @@ func TestAuditValidOptions(t *testing.T) {
 		options: func() *AuditOptions {
 			o := NewAuditOptions()
 			o.LogOptions.Path = auditPath
+			o.PolicyFile = policy
+			return o
+		},
+		expected: "ignoreErrors<log>",
+	}, {
+		name: "stdout log",
+		options: func() *AuditOptions {
+			o := NewAuditOptions()
+			o.LogOptions.Path = "-"
 			o.PolicyFile = policy
 			return o
 		},
@@ -146,6 +156,22 @@ func TestAuditValidOptions(t *testing.T) {
 				assert.Nil(t, config.AuditBackend)
 			} else {
 				assert.Equal(t, tc.expected, fmt.Sprintf("%s", config.AuditBackend))
+			}
+
+			w, err := options.LogOptions.getWriter()
+			require.NoError(t, err, "Writer creation should not fail.")
+
+			// Don't check writer if logging is disabled.
+			if w == nil {
+				return
+			}
+
+			if options.LogOptions.Path == "-" {
+				assert.Equal(t, os.Stdout, w)
+				assert.NoFileExists(t, options.LogOptions.Path)
+			} else {
+				assert.IsType(t, (*lumberjack.Logger)(nil), w)
+				assert.FileExists(t, options.LogOptions.Path)
 			}
 		})
 	}

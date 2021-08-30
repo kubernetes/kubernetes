@@ -650,7 +650,7 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
-# github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee => github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee
+# github.com/openshift/api v0.0.0-20210817132244-67c28690af52 => github.com/openshift/api v0.0.0-20210817132244-67c28690af52
 ## explicit
 github.com/openshift/api/apiserver/v1
 github.com/openshift/api/apps/v1
@@ -673,7 +673,7 @@ github.com/openshift/api/security
 github.com/openshift/api/security/v1
 github.com/openshift/api/template/v1
 github.com/openshift/api/user/v1
-# github.com/openshift/apiserver-library-go v0.0.0-20210730115713-954659d29e40 => github.com/openshift/apiserver-library-go v0.0.0-20210730115713-954659d29e40
+# github.com/openshift/apiserver-library-go v0.0.0-20210823130908-fb12da91a79d => github.com/openshift/apiserver-library-go v0.0.0-20210823130908-fb12da91a79d
 ## explicit
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy
 github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/apis/imagepolicy/v1
@@ -799,7 +799,7 @@ github.com/openshift/client-go/user/informers/externalversions/internalinterface
 github.com/openshift/client-go/user/informers/externalversions/user
 github.com/openshift/client-go/user/informers/externalversions/user/v1
 github.com/openshift/client-go/user/listers/user/v1
-# github.com/openshift/library-go v0.0.0-20210730130811-cb83700729ae => github.com/openshift/library-go v0.0.0-20210730130811-cb83700729ae
+# github.com/openshift/library-go v0.0.0-20210826214843-cc316ba4331b => github.com/openshift/library-go v0.0.0-20210826214843-cc316ba4331b
 ## explicit
 github.com/openshift/library-go/pkg/apiserver/admission/admissionregistrationtesting
 github.com/openshift/library-go/pkg/apiserver/admission/admissionrestconfig
@@ -1219,7 +1219,7 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
-# golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba => golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+# golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac => golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 ## explicit
 golang.org/x/time/rate
 # golang.org/x/tools v0.1.2 => golang.org/x/tools v0.1.2
@@ -2465,7 +2465,8 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings
 k8s.io/utils/trace
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.22 => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.22
+## explicit
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
 # sigs.k8s.io/kustomize/api v0.8.11 => sigs.k8s.io/kustomize/api v0.8.11
@@ -2805,11 +2806,11 @@ sigs.k8s.io/yaml
 # github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.2
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 # github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.2
-# github.com/openshift/api => github.com/openshift/api v0.0.0-20210730095913-85e1d547cdee
-# github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20210730115713-954659d29e40
-# github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20210712174854-1bb7fd1518d3
+# github.com/openshift/api => github.com/openshift/api v0.0.0-20210817132244-67c28690af52
+# github.com/openshift/apiserver-library-go => github.com/openshift/apiserver-library-go v0.0.0-20210823130908-fb12da91a79d
+# github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37
 # github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210730113412-1811c1b3fc0e
-# github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20210730130811-cb83700729ae
+# github.com/openshift/library-go => github.com/openshift/library-go v0.0.0-20210826214843-cc316ba4331b
 # github.com/opentracing/opentracing-go => github.com/opentracing/opentracing-go v1.1.0
 # github.com/pascaldekloe/goe => github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c
 # github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
@@ -2902,7 +2903,7 @@ sigs.k8s.io/yaml
 # golang.org/x/sys => golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 # golang.org/x/term => golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 # golang.org/x/text => golang.org/x/text v0.3.6
-# golang.org/x/time => golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
+# golang.org/x/time => golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 # golang.org/x/tools => golang.org/x/tools v0.1.2
 # golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 # gonum.org/v1/gonum => gonum.org/v1/gonum v0.6.2
@@ -2971,7 +2972,7 @@ sigs.k8s.io/yaml
 # modernc.org/strutil => modernc.org/strutil v1.0.0
 # modernc.org/xc => modernc.org/xc v1.0.0
 # rsc.io/pdf => rsc.io/pdf v0.1.1
-# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.21
+# sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.22
 # sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.8
 # sigs.k8s.io/kube-storage-version-migrator => sigs.k8s.io/kube-storage-version-migrator v0.0.4
 # sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.11
