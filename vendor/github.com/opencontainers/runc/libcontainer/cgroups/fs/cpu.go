@@ -76,7 +76,6 @@ func (s *CpuGroup) Set(path string, r *configs.Resources) error {
 
 	var period string
 	if r.CpuPeriod != 0 {
-<<<<<<< HEAD
 		period = strconv.FormatUint(r.CpuPeriod, 10)
 		if err := cgroups.WriteFile(path, "cpu.cfs_period_us", period); err != nil {
 			// Sometimes when the period to be set is smaller
@@ -90,10 +89,6 @@ func (s *CpuGroup) Set(path string, r *configs.Resources) error {
 			}
 		} else {
 			period = ""
-=======
-		if err := cgroups.WriteFile(path, "cpu.cfs_period_us", strconv.FormatUint(r.CpuPeriod, 10)); err != nil {
-			return err
->>>>>>> v1.22.1
 		}
 	}
 	if r.CpuQuota != 0 {
