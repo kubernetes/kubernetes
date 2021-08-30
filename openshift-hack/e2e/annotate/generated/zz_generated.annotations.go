@@ -1477,13 +1477,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] Security Context when creating containers with AllowPrivilegeEscalation should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance]": "should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21]": "should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeConformance] should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21]": "should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid sysctls [MinimumKubeletVersion:1.21] [Conformance]": "should reject invalid sysctls [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeConformance] should reject invalid sysctls [MinimumKubeletVersion:1.21] [Conformance]": "should reject invalid sysctls [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls [MinimumKubeletVersion:1.21] [Conformance]": "should support sysctls [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeConformance] should support sysctls [MinimumKubeletVersion:1.21] [Conformance]": "should support sysctls [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21] [Conformance]": "should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeConformance] should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21]": "should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Variable Expansion should allow composing env vars into new env vars [NodeConformance] [Conformance]": "should allow composing env vars into new env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
