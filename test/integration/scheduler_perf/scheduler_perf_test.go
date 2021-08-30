@@ -106,9 +106,6 @@ type testCase struct {
 	// Default path to spec file describing the pods to create. Optional.
 	// This path can be overridden in createPodsOp by setting PodTemplatePath .
 	DefaultPodTemplatePath *string
-	// Default path to spec file describing the nodes to create. Optional.
-	// This path can be overridden in createNodesOp by setting NodeTemplatePath .
-	DefaultNodeTemplatePath *string
 }
 
 func (tc *testCase) collectsMetrics() bool {
@@ -261,7 +258,6 @@ type createNodesOp struct {
 	// Template parameter for Count.
 	CountParam string
 	// Path to spec file describing the nodes to create. Optional.
-	// If nil, DefaultNodeTemplatePath will be used.
 	NodeTemplatePath *string
 	// At most one of the following strategies can be defined. Optional, defaults
 	// to TrivialNodePrepareStrategy if unspecified.
@@ -668,9 +664,6 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 		}
 		switch concreteOp := realOp.(type) {
 		case *createNodesOp:
-			if concreteOp.NodeTemplatePath == nil {
-				concreteOp.NodeTemplatePath = tc.DefaultNodeTemplatePath
-			}
 			nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), concreteOp, client)
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
