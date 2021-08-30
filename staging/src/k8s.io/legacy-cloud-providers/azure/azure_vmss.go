@@ -1377,8 +1377,17 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(nodeName, backendPoolID str
 func (ss *scaleSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, string, error) {
 	matches := vmssIPConfigurationRE.FindStringSubmatch(ipConfigurationID)
 	if len(matches) != 4 {
+		if ss.DisableAvailabilitySetNodes {
+			return "", "", ErrorNotVmssInstance
+		}
+
 		klog.V(4).Infof("Can not extract scale set name from ipConfigurationID (%s), assuming it is managed by availability set", ipConfigurationID)
-		return "", "", ErrorNotVmssInstance
+		name, rg, err := ss.availabilitySet.GetNodeNameByIPConfigurationID(ipConfigurationID)
+		if err != nil {
+			klog.Errorf("GetNodeNameByIPConfigurationID: failed to invoke availabilitySet.GetNodeNameByIPConfigurationID: %s", err.Error())
+			return "", "", err
+		}
+		return name, rg, nil
 	}
 
 	resourceGroup := matches[1]

@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
@@ -93,6 +94,7 @@ func registerNodeFlags(flags *flag.FlagSet) {
 
 func init() {
 	// Enable embedded FS file lookup as fallback
+	e2etestfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
 	e2etestfiles.AddFileSource(e2enodetestingmanifests.GetE2ENodeTestingManifestsFS())
 }
 

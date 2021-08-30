@@ -26,10 +26,11 @@ import (
 
 func TestCleanVerb(t *testing.T) {
 	testCases := []struct {
-		desc         string
-		initialVerb  string
-		request      *http.Request
-		expectedVerb string
+		desc          string
+		initialVerb   string
+		suggestedVerb string
+		request       *http.Request
+		expectedVerb  string
 	}{
 		{
 			desc:         "An empty string should be designated as unknown",
@@ -62,6 +63,28 @@ func TestCleanVerb(t *testing.T) {
 				},
 			},
 			expectedVerb: "LIST",
+		},
+		{
+			desc:          "LIST is transformed to WATCH for the old pattern watch",
+			initialVerb:   "LIST",
+			suggestedVerb: "WATCH",
+			request: &http.Request{
+				URL: &url.URL{
+					RawQuery: "/api/v1/watch/pods",
+				},
+			},
+			expectedVerb: "WATCH",
+		},
+		{
+			desc:          "LIST is transformed to WATCH for the old pattern watchlist",
+			initialVerb:   "LIST",
+			suggestedVerb: "WATCHLIST",
+			request: &http.Request{
+				URL: &url.URL{
+					RawQuery: "/api/v1/watch/pods",
+				},
+			},
+			expectedVerb: "WATCH",
 		},
 		{
 			desc:         "WATCHLIST should be transformed to WATCH",
@@ -104,7 +127,7 @@ func TestCleanVerb(t *testing.T) {
 			if tt.request != nil {
 				req = tt.request
 			}
-			cleansedVerb := cleanVerb(tt.initialVerb, req)
+			cleansedVerb := cleanVerb(tt.initialVerb, tt.suggestedVerb, req)
 			if cleansedVerb != tt.expectedVerb {
 				t.Errorf("Got %s, but expected %s", cleansedVerb, tt.expectedVerb)
 			}

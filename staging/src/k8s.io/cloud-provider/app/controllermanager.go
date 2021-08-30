@@ -294,6 +294,7 @@ func startControllers(cloud cloudprovider.Interface, ctx genericcontrollermanage
 	}
 
 	c.SharedInformers.Start(stopCh)
+	ctx.InformerFactory.Start(ctx.Stop)
 
 	select {}
 }

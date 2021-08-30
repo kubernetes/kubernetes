@@ -396,10 +396,17 @@ func resetFailedUnit(cm *dbusConnManager, name string) {
 	}
 }
 
+<<<<<<< HEAD
 func getUnitTypeProperty(cm *dbusConnManager, unitName string, unitType string, propertyName string) (*systemdDbus.Property, error) {
 	var prop *systemdDbus.Property
 	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) (Err error) {
 		prop, Err = c.GetUnitTypePropertyContext(context.TODO(), unitName, unitType, propertyName)
+=======
+func getUnitProperty(cm *dbusConnManager, unitName string, propertyName string) (*systemdDbus.Property, error) {
+	var prop *systemdDbus.Property
+	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) (Err error) {
+		prop, Err = c.GetUnitPropertyContext(context.TODO(), unitName, propertyName)
+>>>>>>> v1.22.1
 		return Err
 	})
 	return prop, err

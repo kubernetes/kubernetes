@@ -342,6 +342,11 @@ func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, patte
 		init()
 		defer cleanup()
 
+		if strings.HasPrefix(driverName, "hostPath") {
+			// TODO: This skip should be removed once #61446 is fixed
+			e2eskipper.Skipf("Driver %s does not support reconstruction, skipping", driverName)
+		}
+
 		testSubpathReconstruction(f, l.hostExec, l.pod, false)
 	})
 

@@ -346,11 +346,14 @@ func (m *legacyManager) freezeBeforeSet(unitName string, r *configs.Resources) (
 	// Special case for SkipDevices, as used by Kubernetes to create pod
 	// cgroups with allow-all device policy).
 	if r.SkipDevices {
+<<<<<<< HEAD
 		if r.SkipFreezeOnSet {
 			// Both needsFreeze and needsThaw are false.
 			return
 		}
 
+=======
+>>>>>>> v1.22.1
 		// No need to freeze if SkipDevices is set, and either
 		// (1) systemd unit does not (yet) exist, or
 		// (2) it has DevicePolicy=auto and empty DeviceAllow list.
@@ -359,6 +362,7 @@ func (m *legacyManager) freezeBeforeSet(unitName string, r *configs.Resources) (
 		// a non-existent unit returns default properties,
 		// and settings in (2) are the defaults.
 		//
+<<<<<<< HEAD
 		// Do not return errors from getUnitTypeProperty, as they alone
 		// should not prevent Set from working.
 
@@ -373,6 +377,17 @@ func (m *legacyManager) freezeBeforeSet(unitName string, r *configs.Resources) (
 					needsThaw = false
 					return
 				}
+=======
+		// Do not return errors from getUnitProperty, as they alone
+		// should not prevent Set from working.
+		devPolicy, e := getUnitProperty(m.dbus, unitName, "DevicePolicy")
+		if e == nil && devPolicy.Value == dbus.MakeVariant("auto") {
+			devAllow, e := getUnitProperty(m.dbus, unitName, "DeviceAllow")
+			if e == nil && devAllow.Value == dbus.MakeVariant([]deviceAllowEntry{}) {
+				needsFreeze = false
+				needsThaw = false
+				return
+>>>>>>> v1.22.1
 			}
 		}
 	}

@@ -53,6 +53,11 @@ func (mounter *Mounter) MountSensitiveWithoutSystemd(source string, target strin
 	return errUnsupported
 }
 
+// MountSensitiveWithoutSystemdWithMountFlags always returns an error on unsupported platforms
+func (mounter *Mounter) MountSensitiveWithoutSystemdWithMountFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
+	return errUnsupported
+}
+
 // Unmount always returns an error on unsupported platforms
 func (mounter *Mounter) Unmount(target string) error {
 	return errUnsupported

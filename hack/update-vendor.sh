@@ -363,7 +363,12 @@ for repo in $(kube::util::list_staging_repos); do
 done
 
 
-# Phase 7: rebuild vendor directory
+# Phase 7: update internal modules
+kube::log::status "vendor: updating internal modules"
+hack/update-internal-modules.sh >>"${LOG_FILE}" 2>&1
+
+
+# Phase 8: rebuild vendor directory
 kube::log::status "vendor: running 'go mod vendor'"
 go mod vendor >>"${LOG_FILE}" 2>&1
 
