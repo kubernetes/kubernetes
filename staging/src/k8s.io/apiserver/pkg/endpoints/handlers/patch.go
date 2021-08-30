@@ -140,9 +140,14 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 		gv := scope.Kind.GroupVersion()
 
+		scopeSerializer := scope.Serializer
+		if strictValidation(req.URL) {
+			scopeSerializer = scope.StrictSerializer
+		}
+
 		codec := runtime.NewCodec(
-			scope.Serializer.EncoderForVersion(s.Serializer, gv),
-			scope.Serializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion),
+			scopeSerializer.EncoderForVersion(s.Serializer, gv),
+			scopeSerializer.DecoderToVersion(s.Serializer, scope.HubGroupVersion),
 		)
 
 		userInfo, _ := request.UserFrom(ctx)

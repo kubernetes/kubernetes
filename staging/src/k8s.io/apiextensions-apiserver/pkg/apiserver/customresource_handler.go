@@ -242,11 +242,6 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		)
 		return
 	}
-	// TODO: publically expose and use handler.StrictValidation()
-	validateParam := req.URL.Query()["validate"]
-	strictValidation := len(validateParam) == 1 && validateParam[0] == "strict"
-	// TODO: this is just for manual testing, remove when we figure out how to test with query params
-	strictValidation = true
 	if !requestInfo.IsResourceRequest {
 		pathParts := splitPath(requestInfo.Path)
 		// only match /apis/<group>/<version>
@@ -322,7 +317,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
-	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name, strictValidation)
+	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if apierrors.IsNotFound(err) {
 		r.delegate.ServeHTTP(w, req)
 		return
@@ -608,7 +603,7 @@ func (r *crdHandler) tearDown(oldInfo *crdInfo) {
 // GetCustomResourceListerCollectionDeleter returns the ListerCollectionDeleter of
 // the given crd.
 func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensionsv1.CustomResourceDefinition) (finalizer.ListerCollectionDeleter, error) {
-	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name, false)
+	info, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -617,7 +612,7 @@ func (r *crdHandler) GetCustomResourceListerCollectionDeleter(crd *apiextensions
 
 // getOrCreateServingInfoFor gets the CRD serving info for the given CRD UID if the key exists in the storage map.
 // Otherwise the function fetches the up-to-date CRD using the given CRD name and creates CRD serving info.
-func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string, strictValidation bool) (*crdInfo, error) {
+func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crdInfo, error) {
 	storageMap := r.customStorage.Load().(crdStorageMap)
 	if ret, ok := storageMap[uid]; ok {
 		return ret, nil
@@ -846,13 +841,22 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string, stric
 		clusterScoped := crd.Spec.Scope == apiextensionsv1.ClusterScoped
 
 		// CRDs explicitly do not support protobuf, but some objects returned by the API server do
+		// TODO: we could have two serializers one with strict directive and one without?
 		negotiatedSerializer := unstructuredNegotiatedSerializer{
 			typer:                  typer,
 			creator:                creator,
 			converter:              safeConverter,
 			structuralSchemas:      structuralSchemas,
 			structuralSchemaGK:     kind.GroupKind(),
-			unknownFieldsDirective: makeUnknownFieldsDirective(crd.Spec.PreserveUnknownFields, strictValidation),
+			unknownFieldsDirective: makeUnknownFieldsDirective(crd.Spec.PreserveUnknownFields, false),
+		}
+		strictNegotiatedSerializer := unstructuredNegotiatedSerializer{
+			typer:                  typer,
+			creator:                creator,
+			converter:              safeConverter,
+			structuralSchemas:      structuralSchemas,
+			structuralSchemaGK:     kind.GroupKind(),
+			unknownFieldsDirective: makeUnknownFieldsDirective(crd.Spec.PreserveUnknownFields, true),
 		}
 		var standardSerializers []runtime.SerializerInfo
 		for _, s := range negotiatedSerializer.SupportedMediaTypes() {
@@ -869,6 +873,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string, stric
 				SelfLinkPathPrefix: selfLinkPrefix,
 			},
 			Serializer:          negotiatedSerializer,
+			StrictSerializer:    strictNegotiatedSerializer,
 			ParameterCodec:      parameterCodec,
 			StandardSerializers: standardSerializers,
 

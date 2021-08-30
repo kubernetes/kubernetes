@@ -69,7 +69,8 @@ const (
 type RequestScope struct {
 	Namer ScopeNamer
 
-	Serializer runtime.NegotiatedSerializer
+	StrictSerializer runtime.NegotiatedSerializer
+	Serializer       runtime.NegotiatedSerializer
 	runtime.ParameterCodec
 
 	// StandardSerializers, if set, restricts which serializers can be used when
@@ -454,6 +455,11 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 
 func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
+}
+
+func strictValidation(url *url.URL) bool {
+	validateParam := url.Query()["validate"]
+	return len(validateParam) == 1 && validateParam[0] == "strict"
 }
 
 type etcdError interface {
