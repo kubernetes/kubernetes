@@ -431,14 +431,32 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 		}
 
 		// Disk is unformatted so format it.
-		args := []string{source}
+		args := []string{}
 		if fstype == "ext4" || fstype == "ext3" {
 			args = []string{
 				"-F",  // Force flag
 				"-m0", // Zero blocks reserved for super-user
-				source,
 			}
 		}
+
+		if mounter.MkfsNodiscard {
+			if fstype == "ext4" {
+				args = append(
+					args,
+					"-E",
+					"nodiscard",
+				)
+			}
+
+			if fstype == "xfs" {
+				args = append(
+					args,
+					"-K", // Do not attempt to discard blocks at mkfs time.
+				)
+			}
+		}
+
+		args = append(args, source)
 
 		klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 		output, err := mounter.Exec.Command("mkfs."+fstype, args...).CombinedOutput()

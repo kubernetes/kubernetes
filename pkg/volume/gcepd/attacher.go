@@ -319,6 +319,9 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 	}
 	if notMnt {
 		diskMounter := volumeutil.NewSafeFormatAndMountFromHost(gcePersistentDiskPluginName, attacher.host)
+		// because we want to speed up mkfs, we're not going to discard used blocks at mkfs time, which is fine
+		// for PD if the disk is unused before
+		diskMounter.MkfsNodiscard = true
 		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
