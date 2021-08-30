@@ -16,7 +16,11 @@ limitations under the License.
 
 package controller
 
-import "net/http"
+import (
+	"net/http"
+
+	"k8s.io/controller-manager/pkg/healthz"
+)
 
 // Interface defines the base of a controller managed by a controller manager
 type Interface interface {
@@ -35,4 +39,17 @@ type Debuggable interface {
 	//
 	// The handler will be accessible at "/debug/controllers/{controllerName}/".
 	DebuggingHandler() http.Handler
+}
+
+// HealthCheckable defines a controller that allows the controller manager
+// to include it in the health checks.
+//
+// If a controller implements HealthCheckable, and the returned check
+// is not nil, the controller manager can expose the check to the
+// /healthz endpoint.
+type HealthCheckable interface {
+	// HealthChecker returns a UnnamedHealthChecker that the controller manager
+	// can choose to mount on the /healthz endpoint, or nil if no custom
+	// health check is desired.
+	HealthChecker() healthz.UnnamedHealthChecker
 }
