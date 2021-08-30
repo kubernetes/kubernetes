@@ -21,8 +21,9 @@ import (
 	"net"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -224,7 +225,7 @@ func (r *rangeAllocator) occupyCIDRs(node *v1.Node) error {
 		return nil
 	}
 	for idx, cidr := range node.Spec.PodCIDRs {
-		_, podCIDR, err := net.ParseCIDR(cidr)
+		_, podCIDR, err := netutils.ParseCIDRSloppy(cidr)
 		if err != nil {
 			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
 		}
@@ -286,7 +287,7 @@ func (r *rangeAllocator) ReleaseCIDR(node *v1.Node) error {
 	}
 
 	for idx, cidr := range node.Spec.PodCIDRs {
-		_, podCIDR, err := net.ParseCIDR(cidr)
+		_, podCIDR, err := netutils.ParseCIDRSloppy(cidr)
 		if err != nil {
 			return fmt.Errorf("failed to parse CIDR %s on Node %v: %v", cidr, node.Name, err)
 		}

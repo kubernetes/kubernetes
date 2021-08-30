@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -502,6 +503,20 @@ func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState str
 	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
 	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
 	return vmPowerStateStopped, nil
+}
+
+// GetProvisioningStateByNodeName returns the provisioningState for the specified node.
+func (as *availabilitySet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+	vm, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeDefault)
+	if err != nil {
+		return provisioningState, err
+	}
+
+	if vm.VirtualMachineProperties == nil || vm.VirtualMachineProperties.ProvisioningState == nil {
+		return provisioningState, nil
+	}
+
+	return to.String(vm.VirtualMachineProperties.ProvisioningState), nil
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.

@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/metrics"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -248,7 +250,7 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 	if len(fields) < 4 {
 		return nil, fmt.Errorf("unexpected address output %s ", lines[0])
 	}
-	ip, _, err := net.ParseCIDR(fields[3])
+	ip, _, err := netutils.ParseCIDRSloppy(fields[3])
 	if err != nil {
 		return nil, fmt.Errorf("CNI failed to parse ip from output %s due to %v", output, err)
 	}

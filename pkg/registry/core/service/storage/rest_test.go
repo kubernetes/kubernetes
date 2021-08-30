@@ -49,7 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	netutil "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
@@ -215,12 +215,12 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 		var r ipallocator.Interface
 		switch family {
 		case api.IPv4Protocol:
-			r, err = ipallocator.NewCIDRRange(makeIPNet(t))
+			r, err = ipallocator.NewInMemory(makeIPNet(t))
 			if err != nil {
 				t.Fatalf("cannot create CIDR Range %v", err)
 			}
 		case api.IPv6Protocol:
-			r, err = ipallocator.NewCIDRRange(makeIPNet6(t))
+			r, err = ipallocator.NewInMemory(makeIPNet6(t))
 			if err != nil {
 				t.Fatalf("cannot create CIDR Range %v", err)
 			}
@@ -234,7 +234,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 	}
 
 	portRange := utilnet.PortRange{Base: 30000, Size: 1000}
-	portAllocator, err := portallocator.NewPortAllocator(portRange)
+	portAllocator, err := portallocator.NewInMemory(portRange)
 	if err != nil {
 		t.Fatalf("cannot create port allocator %v", err)
 	}
@@ -245,14 +245,14 @@ func NewTestRESTWithPods(t *testing.T, endpoints []*api.Endpoints, pods []api.Po
 }
 
 func makeIPNet(t *testing.T) *net.IPNet {
-	_, net, err := net.ParseCIDR("1.2.3.0/24")
+	_, net, err := netutils.ParseCIDRSloppy("1.2.3.0/24")
 	if err != nil {
 		t.Error(err)
 	}
 	return net
 }
 func makeIPNet6(t *testing.T) *net.IPNet {
-	_, net, err := net.ParseCIDR("2000::/108")
+	_, net, err := netutils.ParseCIDRSloppy("2000::/108")
 	if err != nil {
 		t.Error(err)
 	}
@@ -261,7 +261,7 @@ func makeIPNet6(t *testing.T) *net.IPNet {
 
 func ipIsAllocated(t *testing.T, alloc ipallocator.Interface, ipstr string) bool {
 	t.Helper()
-	ip := net.ParseIP(ipstr)
+	ip := netutils.ParseIPSloppy(ipstr)
 	if ip == nil {
 		t.Errorf("error parsing IP %q", ipstr)
 		return false
@@ -334,7 +334,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 				allocator := storage.serviceIPAllocatorsByFamily[family]
 				c := allocator.CIDR()
 				cidr := &c
-				if !cidr.Contains(net.ParseIP(createdService.Spec.ClusterIPs[i])) {
+				if !cidr.Contains(netutils.ParseIPSloppy(createdService.Spec.ClusterIPs[i])) {
 					t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[i])
 				}
 			}
@@ -993,7 +993,7 @@ func TestServiceRegistryDeleteDryRun(t *testing.T) {
 		t.Errorf("expected NodePort to be allocated")
 	}
 
-	isValidClusterIPFields(t, storage, svc, svc)
+	isValidClusterIPFields(t, storage, svc, createdSvc)
 
 	_, _, err = storage.Delete(ctx, svc.Name, rest.ValidateAllObjectFunc, &metav1.DeleteOptions{DryRun: []string{metav1.DryRunAll}})
 	if err != nil {
@@ -1309,7 +1309,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	if createdSvc1.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", createdSvc1.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdSvc1.Spec.ClusterIPs[0])) {
+	if !makeIPNet(t).Contains(netutils.ParseIPSloppy(createdSvc1.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdSvc1.Spec.ClusterIPs[0])
 	}
 
@@ -1323,7 +1323,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	if createdSvc2.Name != "bar" {
 		t.Errorf("Expected bar, but got %v", createdSvc2.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdSvc2.Spec.ClusterIPs[0])) {
+	if !makeIPNet(t).Contains(netutils.ParseIPSloppy(createdSvc2.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdSvc2.Spec.ClusterIPs[0])
 	}
 
@@ -1362,7 +1362,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	if createdSvc1.Name != "foo" {
 		t.Errorf("Expected foo, but got %v", createdSvc1.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdSvc1.Spec.ClusterIPs[0])) {
+	if !makeIPNet(t).Contains(netutils.ParseIPSloppy(createdSvc1.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdSvc1.Spec.ClusterIPs[0])
 	}
 
@@ -1371,7 +1371,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 		t.Errorf("Unexpected error deleting service: %v", err)
 	}
 
-	svc2 := svctest.MakeService("bar", svctest.SetClusterIPs(svc1.Spec.ClusterIP))
+	svc2 := svctest.MakeService("bar", svctest.SetClusterIPs(createdSvc1.Spec.ClusterIP))
 	ctx = genericapirequest.NewDefaultContext()
 	obj, err = storage.Create(ctx, svc2, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
@@ -1381,7 +1381,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	if createdSvc2.Name != "bar" {
 		t.Errorf("Expected bar, but got %v", createdSvc2.Name)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdSvc2.Spec.ClusterIPs[0])) {
+	if !makeIPNet(t).Contains(netutils.ParseIPSloppy(createdSvc2.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdSvc2.Spec.ClusterIPs[0])
 	}
 }
@@ -1400,7 +1400,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	if createdService.Spec.Ports[0].Port != svc.Spec.Ports[0].Port {
 		t.Errorf("Expected port %d, but got %v", svc.Spec.Ports[0].Port, createdService.Spec.Ports[0].Port)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdService.Spec.ClusterIPs[0])) {
+	if !makeIPNet(t).Contains(netutils.ParseIPSloppy(createdService.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[0])
 	}
 
@@ -1451,7 +1451,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	if createdService.Spec.Ports[0].Port != svc.Spec.Ports[0].Port {
 		t.Errorf("Expected port %d, but got %v", svc.Spec.Ports[0].Port, createdService.Spec.Ports[0].Port)
 	}
-	if !makeIPNet(t).Contains(net.ParseIP(createdService.Spec.ClusterIPs[0])) {
+	if !makeIPNet(t).Contains(netutils.ParseIPSloppy(createdService.Spec.ClusterIPs[0])) {
 		t.Errorf("Unexpected ClusterIP: %s", createdService.Spec.ClusterIPs[0])
 	}
 
@@ -1797,7 +1797,7 @@ func TestInitClusterIP(t *testing.T) {
 				if !ok {
 					t.Fatalf("test is incorrect, allocator does not exist on rest")
 				}
-				if err := allocator.Allocate(net.ParseIP(ip)); err != nil {
+				if err := allocator.Allocate(netutils.ParseIPSloppy(ip)); err != nil {
 					t.Fatalf("test is incorrect, allocator failed to pre allocate IP with error:%v", err)
 				}
 			}
@@ -1821,7 +1821,7 @@ func TestInitClusterIP(t *testing.T) {
 			if newSvc.Spec.ClusterIPs[0] != api.ClusterIPNone {
 				for _, ip := range newSvc.Spec.ClusterIPs {
 					family := api.IPv4Protocol
-					if netutil.IsIPv6String(ip) {
+					if netutils.IsIPv6String(ip) {
 						family = api.IPv6Protocol
 					}
 					allocator := storage.serviceIPAllocatorsByFamily[family]
@@ -2225,7 +2225,7 @@ func TestServiceUpgrade(t *testing.T) {
 			// allocated IP
 			for family, ip := range testCase.allocateIPsBeforeUpdate {
 				alloc := storage.serviceIPAllocatorsByFamily[family]
-				if err := alloc.Allocate(net.ParseIP(ip)); err != nil {
+				if err := alloc.Allocate(netutils.ParseIPSloppy(ip)); err != nil {
 					t.Fatalf("test is incorrect, unable to preallocate ip:%v", ip)
 				}
 			}
@@ -3585,6 +3585,8 @@ func TestDefaultingValidation(t *testing.T) {
 // validates that the service created, updated by REST
 // has correct ClusterIPs related fields
 func isValidClusterIPFields(t *testing.T, storage *REST, pre *api.Service, post *api.Service) {
+	t.Helper()
+
 	// valid for gate off/on scenarios
 	// ClusterIP
 	if len(post.Spec.ClusterIP) == 0 {
@@ -3653,7 +3655,7 @@ func isValidClusterIPFields(t *testing.T, storage *REST, pre *api.Service, post 
 	}
 	// ips must match families
 	for i, ip := range post.Spec.ClusterIPs {
-		isIPv6 := netutil.IsIPv6String(ip)
+		isIPv6 := netutils.IsIPv6String(ip)
 		if isIPv6 && post.Spec.IPFamilies[i] != api.IPv6Protocol {
 			t.Fatalf("ips does not match assigned families %+v %+v", post.Spec.ClusterIPs, post.Spec.IPFamilies)
 		}

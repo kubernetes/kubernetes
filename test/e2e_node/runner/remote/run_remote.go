@@ -205,7 +205,7 @@ func main() {
 	// process and all its children, we ignore it here, while our children ssh connections
 	// are stopped. This allows us to gather artifacts and print out test state before
 	// being killed.
-	c := make(chan os.Signal)
+	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		<-c

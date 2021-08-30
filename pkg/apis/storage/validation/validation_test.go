@@ -1965,6 +1965,12 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 				new.Spec.RequiresRepublish = &requiresRepublish
 			},
 		},
+		{
+			name: "StorageCapacity changed",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.StorageCapacity = &notStorageCapacity
+			},
+		},
 	}
 	for _, test := range successCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -2062,15 +2068,15 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "StorageCapacity changed",
-			modify: func(new *storage.CSIDriver) {
-				new.Spec.StorageCapacity = &notStorageCapacity
-			},
-		},
-		{
 			name: "TokenRequests invalidated",
 			modify: func(new *storage.CSIDriver) {
 				new.Spec.TokenRequests = []storage.TokenRequest{{Audience: gcp}, {Audience: gcp}}
+			},
+		},
+		{
+			name: "invalid nil StorageCapacity",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.StorageCapacity = nil
 			},
 		},
 	}

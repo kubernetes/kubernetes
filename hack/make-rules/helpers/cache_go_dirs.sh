@@ -39,14 +39,17 @@ function kfind() {
     # We want to include the "special" vendor directories which are actually
     # part of the Kubernetes source tree (./staging/*) but we need them to be
     # named as their ./vendor/* equivalents.  Also, we  do not want all of
-    # ./vendor or even all of ./vendor/k8s.io.
+    # ./vendor , ./hack/tools/vendor or even all of ./vendor/k8s.io.
     find -H .                      \
         \(                         \
         -not \(                    \
             \(                     \
                 -name '_*' -o      \
                 -name '.[^.]*' -o  \
-                -path './vendor'   \
+                \(                 \
+                  -name 'vendor'   \
+                  -type d          \
+                \)                 \
             \) -prune              \
         \)                         \
         \)                         \

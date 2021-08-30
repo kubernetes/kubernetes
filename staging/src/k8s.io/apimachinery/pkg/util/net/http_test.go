@@ -1,3 +1,4 @@
+//go:build go1.8
 // +build go1.8
 
 /*
@@ -37,11 +38,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
+	netutils "k8s.io/utils/net"
 )
 
 func TestGetClientIP(t *testing.T) {
 	ipString := "10.0.0.1"
-	ip := net.ParseIP(ipString)
+	ip := netutils.ParseIPSloppy(ipString)
 	invalidIPString := "invalidIPString"
 	testCases := []struct {
 		Request    http.Request

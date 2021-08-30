@@ -176,8 +176,8 @@ func makeUpgradeTransport(config *rest.Config, keepalive time.Duration) (proxy.U
 
 // NewServer creates and installs a new Server.
 // 'filter', if non-nil, protects requests to the api only.
-func NewServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *rest.Config, keepalive time.Duration) (*Server, error) {
-	proxyHandler, err := NewProxyHandler(apiProxyPrefix, filter, cfg, keepalive)
+func NewServer(filebase string, apiProxyPrefix string, staticPrefix string, filter *FilterServer, cfg *rest.Config, keepalive time.Duration, appendLocationPath bool) (*Server, error) {
+	proxyHandler, err := NewProxyHandler(apiProxyPrefix, filter, cfg, keepalive, appendLocationPath)
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +192,7 @@ func NewServer(filebase string, apiProxyPrefix string, staticPrefix string, filt
 }
 
 // NewProxyHandler creates an api proxy handler for the cluster
-func NewProxyHandler(apiProxyPrefix string, filter *FilterServer, cfg *rest.Config, keepalive time.Duration) (http.Handler, error) {
+func NewProxyHandler(apiProxyPrefix string, filter *FilterServer, cfg *rest.Config, keepalive time.Duration, appendLocationPath bool) (http.Handler, error) {
 	host := cfg.Host
 	if !strings.HasSuffix(host, "/") {
 		host = host + "/"
@@ -215,6 +215,7 @@ func NewProxyHandler(apiProxyPrefix string, filter *FilterServer, cfg *rest.Conf
 	proxy.UpgradeTransport = upgradeTransport
 	proxy.UseRequestLocation = true
 	proxy.UseLocationHost = true
+	proxy.AppendLocationPath = appendLocationPath
 
 	proxyServer := http.Handler(proxy)
 	if filter != nil {

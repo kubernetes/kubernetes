@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -318,7 +319,7 @@ func needPodCIDRsUpdate(node *v1.Node, podCIDRs []*net.IPNet) (bool, error) {
 	if node.Spec.PodCIDR == "" {
 		return true, nil
 	}
-	_, nodePodCIDR, err := net.ParseCIDR(node.Spec.PodCIDR)
+	_, nodePodCIDR, err := netutils.ParseCIDRSloppy(node.Spec.PodCIDR)
 	if err != nil {
 		klog.ErrorS(err, "Found invalid node.Spec.PodCIDR", "node.Spec.PodCIDR", node.Spec.PodCIDR)
 		// We will try to overwrite with new CIDR(s)

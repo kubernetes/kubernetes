@@ -50,6 +50,7 @@ import (
 	wardlev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	wardlev1beta1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1"
 	sampleserver "k8s.io/sample-apiserver/pkg/cmd/server"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAggregatedAPIServer(t *testing.T) {
@@ -80,7 +81,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	go func() {
 		o := sampleserver.NewWardleServerOptions(os.Stdout, os.Stderr)
 		o.RecommendedOptions.SecureServing.Listener = listener
-		o.RecommendedOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
+		o.RecommendedOptions.SecureServing.BindAddress = netutils.ParseIPSloppy("127.0.0.1")
 		wardleCmd := sampleserver.NewCommandStartWardleServer(o, stopCh)
 		wardleCmd.SetArgs([]string{
 			"--authentication-kubeconfig", wardleToKASKubeConfigFile,

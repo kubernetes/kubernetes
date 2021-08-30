@@ -888,15 +888,11 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// If new nodes are disconnected too soon, they'll be considered not started
 		// instead of unready, and cluster won't be considered unhealthy.
 		//
-		// More precisely, Cluster Autoscaler compares last transition time of
-		// several readiness conditions to node create time. If it's within
-		// 2 minutes, it'll assume node is just starting and not unhealthy.
-		//
-		// Nodes become ready in less than 1 minute after being created,
-		// so waiting extra 2 minutes before breaking them (which triggers
-		// readiness condition transition) should be sufficient, while
-		// making no assumptions about minimal node startup time.
-		time.Sleep(2 * time.Minute)
+		// More precisely, Cluster Autoscaler will never consider a
+		// node to be unhealthy unless it was created more than 15m
+		// ago. Within that 15m window, it'll assume node is just
+		// starting and not unhealthy.
+		time.Sleep(15 * time.Minute)
 
 		ginkgo.By("Block network connectivity to some nodes to simulate unhealthy cluster")
 		nodesToBreakCount := int(math.Ceil(math.Max(float64(unhealthyClusterThreshold), 0.5*float64(clusterSize))))

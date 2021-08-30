@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -1060,9 +1061,6 @@ func TestEnsureInternalLoadBalancerSubsetting(t *testing.T) {
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.EqualError(t, err, cloudprovider.ImplementedElsewhere.Error())
-	expectedEvent := fmt.Sprintf("Normal SkippingEnsureInternalLoadBalancer Skipped ensureInternalLoadBalancer"+
-		" since %s feature is enabled.", AlphaFeatureILBSubsets)
-	checkEvent(t, recorder, expectedEvent, true)
 	// No loadbalancer resources will be created due to the ILB Feature Gate
 	assert.Empty(t, status)
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
@@ -1664,8 +1662,6 @@ func TestEnsureLoadBalancerSkipped(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
-	recorder := record.NewFakeRecorder(1024)
-	gce.eventRecorder = recorder
 
 	nodeNames := []string{"test-node-1"}
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
@@ -1675,10 +1671,6 @@ func TestEnsureLoadBalancerSkipped(t *testing.T) {
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.EqualError(t, err, cloudprovider.ImplementedElsewhere.Error())
-	expectedEvent := fmt.Sprintf("Normal SkippingEnsureInternalLoadBalancer Skipped ensureInternalLoadBalancer"+
-		" as service contains '%s' finalizer",
-		ILBFinalizerV2)
-	checkEvent(t, recorder, expectedEvent, true)
 	// No loadbalancer resources will be created due to the ILB Feature Gate
 	assert.Empty(t, status)
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)

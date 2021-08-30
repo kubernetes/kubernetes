@@ -360,6 +360,9 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 func finishNothing(context.Context, bool) {}
 
 // Create inserts a new item according to the unique key from the object.
+// Note that registries may mutate the input object (e.g. in the strategy
+// hooks).  Tests which call this might want to call DeepCopy if they expect to
+// be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
 	var finishCreate FinishFunc = finishNothing
 

@@ -20,14 +20,16 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/lithammer/dedent"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/version"
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
+
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/lithammer/dedent"
 )
 
 const KubeadmGroupName = "kubeadm.k8s.io"
@@ -393,6 +395,58 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 						t.Fatalf("migration failed to produce config kind: %s", expectedKind)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestIsKubeadmPrereleaseVersion(t *testing.T) {
+	validVersionInfo := &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0-alpha.1"}
+	tests := []struct {
+		name           string
+		versionInfo    *apimachineryversion.Info
+		k8sVersion     *version.Version
+		mcpVersion     *version.Version
+		expectedResult bool
+	}{
+		{
+			name:           "invalid versionInfo",
+			versionInfo:    &apimachineryversion.Info{},
+			expectedResult: false,
+		},
+		{
+			name:           "kubeadm is not a prerelease version",
+			versionInfo:    &apimachineryversion.Info{Major: "1", GitVersion: "v1.23.0"},
+			expectedResult: false,
+		},
+		{
+			name:           "mcpVersion is equal to k8sVersion",
+			versionInfo:    validVersionInfo,
+			k8sVersion:     version.MustParseSemantic("v1.21.0"),
+			mcpVersion:     version.MustParseSemantic("v1.21.0"),
+			expectedResult: true,
+		},
+		{
+			name:           "k8sVersion is 1 MINOR version older than mcpVersion",
+			versionInfo:    validVersionInfo,
+			k8sVersion:     version.MustParseSemantic("v1.21.0"),
+			mcpVersion:     version.MustParseSemantic("v1.22.0"),
+			expectedResult: true,
+		},
+		{
+			name:           "k8sVersion is 2 MINOR versions older than mcpVersion",
+			versionInfo:    validVersionInfo,
+			k8sVersion:     version.MustParseSemantic("v1.21.0"),
+			mcpVersion:     version.MustParseSemantic("v1.23.0"),
+			expectedResult: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := isKubeadmPrereleaseVersion(tc.versionInfo, tc.k8sVersion, tc.mcpVersion)
+			if result != tc.expectedResult {
+				t.Errorf("expected result: %v, got %v", tc.expectedResult, result)
 			}
 		})
 	}

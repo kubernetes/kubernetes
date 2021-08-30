@@ -18,7 +18,6 @@ package endpointslicemirroring
 
 import (
 	"fmt"
-	"net"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	netutils "k8s.io/utils/net"
 )
 
 // addrTypePortMapKey is used to uniquely identify groups of endpoint ports and
@@ -50,7 +50,7 @@ func (pk addrTypePortMapKey) addressType() discovery.AddressType {
 }
 
 func getAddressType(address string) *discovery.AddressType {
-	ip := net.ParseIP(address)
+	ip := netutils.ParseIPSloppy(address)
 	if ip == nil {
 		return nil
 	}

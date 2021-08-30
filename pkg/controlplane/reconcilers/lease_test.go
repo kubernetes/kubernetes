@@ -23,7 +23,6 @@ https://github.com/openshift/origin/blob/bb340c5dd5ff72718be86fb194dedc0faed7f4c
 
 import (
 	"context"
-	"net"
 	"reflect"
 	"testing"
 
@@ -31,6 +30,7 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
+	netutils "k8s.io/utils/net"
 )
 
 type fakeLeases struct {
@@ -459,7 +459,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 
 		epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
 		r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-		err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, true)
+		err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, true)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
@@ -560,7 +560,7 @@ func TestLeaseEndpointReconciler(t *testing.T) {
 			}
 			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err := r.ReconcileEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts, false)
+			err := r.ReconcileEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts, false)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}
@@ -680,7 +680,7 @@ func TestLeaseRemoveEndpoints(t *testing.T) {
 			}
 			epAdapter := EndpointsAdapter{endpointClient: clientset.CoreV1()}
 			r := NewLeaseEndpointReconciler(epAdapter, fakeLeases)
-			err := r.RemoveEndpoints(test.serviceName, net.ParseIP(test.ip), test.endpointPorts)
+			err := r.RemoveEndpoints(test.serviceName, netutils.ParseIPSloppy(test.ip), test.endpointPorts)
 			if err != nil {
 				t.Errorf("case %q: unexpected error: %v", test.testName, err)
 			}

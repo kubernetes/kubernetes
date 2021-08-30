@@ -430,13 +430,6 @@ const (
 	// Enable Endpoint Slice consumption by kube-proxy in Windows for improved scalability.
 	WindowsEndpointSliceProxying featuregate.Feature = "WindowsEndpointSliceProxying"
 
-	// owner: @deads2k
-	// beta: v1.17
-	// GA: v1.21
-	//
-	// Enables the users to skip TLS verification of kubelets on pod logs requests
-	AllowInsecureBackendProxy featuregate.Feature = "AllowInsecureBackendProxy"
-
 	// owner: @mortent
 	// alpha: v1.3
 	// beta:  v1.5
@@ -577,7 +570,7 @@ const (
 	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
 
 	// owner: @andrewsykim
-	// alpha: v1.22
+	// alpha: v1.23
 	//
 	// Disable in-tree functionality in kubelet to authenticate to cloud provider container registries for image pull credentials.
 	DisableKubeletCloudCredentialProviders featuregate.Feature = "DisableKubeletCloudCredentialProviders"
@@ -842,7 +835,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProxyTerminatingEndpoints:                      {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSliceNodeName:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.25
 	WindowsEndpointSliceProxying:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta},                    // on by default in 1.22

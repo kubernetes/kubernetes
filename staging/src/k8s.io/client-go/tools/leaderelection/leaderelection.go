@@ -143,7 +143,7 @@ type LeaderElectionConfig struct {
 	Callbacks LeaderCallbacks
 
 	// WatchDog is the associated health checker
-	// WatchDog may be null if its not needed/configured.
+	// WatchDog may be null if it's not needed/configured.
 	WatchDog *HealthzAdaptor
 
 	// ReleaseOnCancel should be set true if the lock should be released

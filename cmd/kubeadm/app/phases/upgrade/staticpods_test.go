@@ -28,6 +28,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+
+	"k8s.io/client-go/tools/clientcmd"
+	certutil "k8s.io/client-go/util/cert"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -43,12 +49,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
-
-	"k8s.io/client-go/tools/clientcmd"
-	certutil "k8s.io/client-go/util/cert"
-
-	"github.com/pkg/errors"
-	"go.etcd.io/etcd/client/pkg/v3/transport"
 )
 
 const (
@@ -464,7 +464,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpEtcdDataDir)
 
-			oldcfg, err := getConfig(constants.MinimumControlPlaneVersion.String(), tempCertsDir, tmpEtcdDataDir)
+			oldcfg, err := getConfig("v1.3.0", tempCertsDir, tmpEtcdDataDir)
 			if err != nil {
 				t.Fatalf("couldn't create config: %v", err)
 			}

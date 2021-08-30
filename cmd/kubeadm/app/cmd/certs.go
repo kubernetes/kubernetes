@@ -21,6 +21,13 @@ import (
 	"io"
 	"text/tabwriter"
 
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/util/duration"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -33,13 +40,6 @@ import (
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
-
-	"k8s.io/apimachinery/pkg/util/duration"
-
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 var (

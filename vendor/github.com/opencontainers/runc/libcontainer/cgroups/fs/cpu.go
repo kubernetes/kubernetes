@@ -4,6 +4,7 @@ package fs
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"golang.org/x/sys/unix"
 )
 
 type CpuGroup struct{}
@@ -71,14 +73,32 @@ func (s *CpuGroup) Set(path string, r *configs.Resources) error {
 			return fmt.Errorf("the minimum allowed cpu-shares is %d", sharesRead)
 		}
 	}
+
+	var period string
 	if r.CpuPeriod != 0 {
-		if err := cgroups.WriteFile(path, "cpu.cfs_period_us", strconv.FormatUint(r.CpuPeriod, 10)); err != nil {
-			return err
+		period = strconv.FormatUint(r.CpuPeriod, 10)
+		if err := cgroups.WriteFile(path, "cpu.cfs_period_us", period); err != nil {
+			// Sometimes when the period to be set is smaller
+			// than the current one, it is rejected by the kernel
+			// (EINVAL) as old_quota/new_period exceeds the parent
+			// cgroup quota limit. If this happens and the quota is
+			// going to be set, ignore the error for now and retry
+			// after setting the quota.
+			if !errors.Is(err, unix.EINVAL) || r.CpuQuota == 0 {
+				return err
+			}
+		} else {
+			period = ""
 		}
 	}
 	if r.CpuQuota != 0 {
 		if err := cgroups.WriteFile(path, "cpu.cfs_quota_us", strconv.FormatInt(r.CpuQuota, 10)); err != nil {
 			return err
+		}
+		if period != "" {
+			if err := cgroups.WriteFile(path, "cpu.cfs_period_us", period); err != nil {
+				return err
+			}
 		}
 	}
 	return s.SetRtSched(path, r)

@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 /*
@@ -39,6 +40,7 @@ import (
 
 	"github.com/blang/semver"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 var (
@@ -307,7 +309,7 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 func parseIPList(ips []string) []net.IP {
 	var netIPs []net.IP
 	for _, ip := range ips {
-		netIPs = append(netIPs, net.ParseIP(ip))
+		netIPs = append(netIPs, netutils.ParseIPSloppy(ip))
 	}
 	return netIPs
 }
@@ -335,7 +337,7 @@ func generateSelfSignedCertKey(host string, alternateIPs []net.IP, alternateDNS 
 		IsCA:                  true,
 	}
 
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := netutils.ParseIPSloppy(host); ip != nil {
 		template.IPAddresses = append(template.IPAddresses, ip)
 	} else {
 		template.DNSNames = append(template.DNSNames, host)

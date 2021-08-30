@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -27,8 +28,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
@@ -58,6 +61,9 @@ type dbusInhibiter interface {
 
 // Manager has functions that can be used to interact with the Node Shutdown Manager.
 type Manager struct {
+	recorder record.EventRecorder
+	nodeRef  *v1.ObjectReference
+
 	shutdownGracePeriodRequested    time.Duration
 	shutdownGracePeriodCriticalPods time.Duration
 
@@ -75,8 +81,10 @@ type Manager struct {
 }
 
 // NewManager returns a new node shutdown manager.
-func NewManager(getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, syncNodeStatus func(), shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) (*Manager, lifecycle.PodAdmitHandler) {
+func NewManager(recorder record.EventRecorder, nodeRef *v1.ObjectReference, getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, syncNodeStatus func(), shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) (*Manager, lifecycle.PodAdmitHandler) {
 	manager := &Manager{
+		recorder:                        recorder,
+		nodeRef:                         nodeRef,
 		getPods:                         getPodsFunc,
 		killPodFunc:                     killPodFunc,
 		syncNodeStatus:                  syncNodeStatus,
@@ -157,7 +165,7 @@ func (m *Manager) start() (chan struct{}, error) {
 			return nil, err
 		}
 
-		if updatedInhibitDelay != m.shutdownGracePeriodRequested {
+		if m.shutdownGracePeriodRequested > updatedInhibitDelay {
 			return nil, fmt.Errorf("node shutdown manager was unable to update logind InhibitDelayMaxSec to %v (ShutdownGracePeriod), current value of InhibitDelayMaxSec (%v) is less than requested ShutdownGracePeriod", m.shutdownGracePeriodRequested, updatedInhibitDelay)
 		}
 	}
@@ -191,6 +199,19 @@ func (m *Manager) start() (chan struct{}, error) {
 					return
 				}
 				klog.V(1).InfoS("Shutdown manager detected new shutdown event, isNodeShuttingDownNow", "event", isShuttingDown)
+
+				var shutdownType string
+				if isShuttingDown {
+					shutdownType = "shutdown"
+				} else {
+					shutdownType = "cancelled"
+				}
+				klog.V(1).InfoS("Shutdown manager detected new shutdown event", "event", shutdownType)
+				if isShuttingDown {
+					m.recorder.Event(m.nodeRef, v1.EventTypeNormal, kubeletevents.NodeShutdown, "Shutdown manager detected shutdown event")
+				} else {
+					m.recorder.Event(m.nodeRef, v1.EventTypeNormal, kubeletevents.NodeShutdown, "Shutdown manager detected shutdown cancellation")
+				}
 
 				m.nodeShuttingDownMutex.Lock()
 				m.nodeShuttingDownNow = isShuttingDown

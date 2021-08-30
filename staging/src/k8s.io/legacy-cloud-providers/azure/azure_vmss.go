@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -241,6 +242,30 @@ func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, er
 	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
 	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
 	return vmPowerStateStopped, nil
+}
+
+// GetProvisioningStateByNodeName returns the provisioningState for the specified node.
+func (ss *scaleSet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name, azcache.CacheReadTypeUnsafe)
+	if err != nil {
+		klog.Errorf("Failed to check isNodeManagedByAvailabilitySet: %v", err)
+		return "", err
+	}
+	if managedByAS {
+		// vm is managed by availability set.
+		return ss.availabilitySet.GetProvisioningStateByNodeName(name)
+	}
+
+	_, _, vm, err := ss.getVmssVM(name, azcache.CacheReadTypeDefault)
+	if err != nil {
+		return provisioningState, err
+	}
+
+	if vm.VirtualMachineScaleSetVMProperties == nil || vm.VirtualMachineScaleSetVMProperties.ProvisioningState == nil {
+		return provisioningState, nil
+	}
+
+	return to.String(vm.VirtualMachineScaleSetVMProperties.ProvisioningState), nil
 }
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.

@@ -46,6 +46,24 @@ func AllPtrFieldsNil(obj interface{}) bool {
 	return true
 }
 
+// Int returns a pointer to an int
+func Int(i int) *int {
+	return &i
+}
+
+var IntPtr = Int // for back-compat
+
+// IntDeref dereferences the int ptr and returns it if not nil, or else
+// returns def.
+func IntDeref(ptr *int, def int) int {
+	if ptr != nil {
+		return *ptr
+	}
+	return def
+}
+
+var IntPtrDerefOr = IntDeref // for back-compat
+
 // Int32 returns a pointer to an int32.
 func Int32(i int32) *int32 {
 	return &i

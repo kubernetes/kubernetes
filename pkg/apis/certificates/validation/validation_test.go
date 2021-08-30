@@ -24,17 +24,16 @@ import (
 	"encoding/pem"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/client-go/util/certificate/csr"
 	capi "k8s.io/kubernetes/pkg/apis/certificates"
-	capiv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/utils/pointer"
 )
@@ -54,7 +53,6 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 	maxLengthSignerName := fmt.Sprintf("%s/%s.%s", maxLengthFQDN, repeatString("a", 63), repeatString("a", 253))
 	tests := map[string]struct {
 		csr  capi.CertificateSigningRequest
-		gv   schema.GroupVersion
 		errs field.ErrorList
 	}{
 		"CSR with empty request data should fail": {
@@ -342,19 +340,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				field.Required(specPath.Child("usages"), "usages must be provided"),
 			},
 		},
-		"unknown and duplicate usages - v1beta1": {
-			gv: schema.GroupVersion{Group: capi.SchemeGroupVersion.Group, Version: "v1beta1"},
-			csr: capi.CertificateSigningRequest{
-				ObjectMeta: validObjectMeta,
-				Spec: capi.CertificateSigningRequestSpec{
-					Usages:     []capi.KeyUsage{"unknown", "unknown"},
-					Request:    newCSRPEM(t),
-					SignerName: validSignerName,
-				},
-			},
-		},
-		"unknown and duplicate usages - v1": {
-			gv: schema.GroupVersion{Group: capi.SchemeGroupVersion.Group, Version: "v1"},
+		"unknown and duplicate usages": {
 			csr: capi.CertificateSigningRequest{
 				ObjectMeta: validObjectMeta,
 				Spec: capi.CertificateSigningRequestSpec{
@@ -372,7 +358,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			el := ValidateCertificateSigningRequestCreate(&test.csr, test.gv)
+			el := ValidateCertificateSigningRequestCreate(&test.csr)
 			if !reflect.DeepEqual(el, test.errs) {
 				t.Errorf("returned and expected errors did not match - expected\n%v\nbut got\n%v", test.errs.ToAggregate(), el.ToAggregate())
 			}
@@ -420,59 +406,23 @@ func newCSRPEM(t *testing.T) []byte {
 
 func Test_getValidationOptions(t *testing.T) {
 	tests := []struct {
-		name    string
-		version schema.GroupVersion
-		newCSR  *capi.CertificateSigningRequest
-		oldCSR  *capi.CertificateSigningRequest
-		want    certificateValidationOptions
+		name   string
+		newCSR *capi.CertificateSigningRequest
+		oldCSR *capi.CertificateSigningRequest
+		want   certificateValidationOptions
 	}{
 		{
-			name:    "v1beta1 compatible create",
-			version: capiv1beta1.SchemeGroupVersion,
-			oldCSR:  nil,
-			want: certificateValidationOptions{
-				allowResettingCertificate:    true,
-				allowBothApprovedAndDenied:   false,
-				allowLegacySignerName:        true,
-				allowDuplicateConditionTypes: true,
-				allowEmptyConditionType:      true,
-				allowArbitraryCertificate:    true,
-				allowUnknownUsages:           true,
-				allowDuplicateUsages:         true,
-			},
+			name:   "strict create",
+			oldCSR: nil,
+			want:   certificateValidationOptions{},
 		},
 		{
-			name:    "v1 strict create",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
-			oldCSR:  nil,
-			want:    certificateValidationOptions{},
+			name:   "strict update",
+			oldCSR: &capi.CertificateSigningRequest{},
+			want:   certificateValidationOptions{},
 		},
 		{
-			name:    "v1beta1 compatible update",
-			version: capiv1beta1.SchemeGroupVersion,
-			oldCSR: &capi.CertificateSigningRequest{Status: capi.CertificateSigningRequestStatus{
-				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved}, {Type: capi.CertificateDenied}},
-			}},
-			want: certificateValidationOptions{
-				allowResettingCertificate:    true,
-				allowBothApprovedAndDenied:   true, // existing object has both approved and denied
-				allowLegacySignerName:        true,
-				allowDuplicateConditionTypes: true,
-				allowEmptyConditionType:      true,
-				allowArbitraryCertificate:    true,
-				allowUnknownUsages:           true,
-				allowDuplicateUsages:         true,
-			},
-		},
-		{
-			name:    "v1 strict update",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
-			oldCSR:  &capi.CertificateSigningRequest{},
-			want:    certificateValidationOptions{},
-		},
-		{
-			name:    "v1 compatible update, approved+denied",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
+			name: "compatible update, approved+denied",
 			oldCSR: &capi.CertificateSigningRequest{Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved}, {Type: capi.CertificateDenied}},
 			}},
@@ -481,16 +431,14 @@ func Test_getValidationOptions(t *testing.T) {
 			},
 		},
 		{
-			name:    "v1 compatible update, legacy signerName",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
-			oldCSR:  &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{SignerName: capi.LegacyUnknownSignerName}},
+			name:   "compatible update, legacy signerName",
+			oldCSR: &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{SignerName: capi.LegacyUnknownSignerName}},
 			want: certificateValidationOptions{
 				allowLegacySignerName: true,
 			},
 		},
 		{
-			name:    "v1 compatible update, duplicate condition types",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
+			name: "compatible update, duplicate condition types",
 			oldCSR: &capi.CertificateSigningRequest{Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved}, {Type: capi.CertificateApproved}},
 			}},
@@ -499,8 +447,7 @@ func Test_getValidationOptions(t *testing.T) {
 			},
 		},
 		{
-			name:    "v1 compatible update, empty condition types",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
+			name: "compatible update, empty condition types",
 			oldCSR: &capi.CertificateSigningRequest{Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{}},
 			}},
@@ -509,8 +456,7 @@ func Test_getValidationOptions(t *testing.T) {
 			},
 		},
 		{
-			name:    "v1 compatible update, no diff to certificate",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
+			name: "compatible update, no diff to certificate",
 			newCSR: &capi.CertificateSigningRequest{Status: capi.CertificateSigningRequestStatus{
 				Certificate: validCertificate,
 			}},
@@ -522,8 +468,7 @@ func Test_getValidationOptions(t *testing.T) {
 			},
 		},
 		{
-			name:    "v1 compatible update, existing invalid certificate",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
+			name: "compatible update, existing invalid certificate",
 			newCSR: &capi.CertificateSigningRequest{Status: capi.CertificateSigningRequestStatus{
 				Certificate: []byte(`new - no PEM blocks`),
 			}},
@@ -535,17 +480,15 @@ func Test_getValidationOptions(t *testing.T) {
 			},
 		},
 		{
-			name:    "v1 compatible update, existing unknown usages",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
-			oldCSR:  &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{Usages: []capi.KeyUsage{"unknown"}}},
+			name:   "compatible update, existing unknown usages",
+			oldCSR: &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{Usages: []capi.KeyUsage{"unknown"}}},
 			want: certificateValidationOptions{
 				allowUnknownUsages: true,
 			},
 		},
 		{
-			name:    "v1 compatible update, existing duplicate usages",
-			version: schema.GroupVersion{Group: "certificates.k8s.io", Version: "v1"},
-			oldCSR:  &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{Usages: []capi.KeyUsage{"any", "any"}}},
+			name:   "compatible update, existing duplicate usages",
+			oldCSR: &capi.CertificateSigningRequest{Spec: capi.CertificateSigningRequestSpec{Usages: []capi.KeyUsage{"any", "any"}}},
 			want: certificateValidationOptions{
 				allowDuplicateUsages: true,
 			},
@@ -553,7 +496,7 @@ func Test_getValidationOptions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := getValidationOptions(tt.version, tt.newCSR, tt.oldCSR); !reflect.DeepEqual(got, tt.want) {
+			if got := getValidationOptions(tt.newCSR, tt.oldCSR); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got  %#v\nwant %#v", got, tt.want)
 			}
 		})
@@ -574,10 +517,10 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		newCSR      *capi.CertificateSigningRequest
-		oldCSR      *capi.CertificateSigningRequest
-		versionErrs map[string][]string
+		name   string
+		newCSR *capi.CertificateSigningRequest
+		oldCSR *capi.CertificateSigningRequest
+		errs   []string
 	}{
 		{
 			name:   "no-op",
@@ -595,9 +538,8 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 			}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not add a condition of type "Approved"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not add a condition of type "Approved"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not add a condition of type "Approved"`,
 			},
 		},
 		{
@@ -606,9 +548,8 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`,
 			},
 		},
 		{
@@ -617,9 +558,8 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 			}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not add a condition of type "Denied"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not add a condition of type "Denied"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not add a condition of type "Denied"`,
 			},
 		},
 		{
@@ -628,9 +568,8 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`,
 			},
 		},
 		{
@@ -638,8 +577,8 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 			}},
-			oldCSR:      &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{},
+			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
+			errs:   []string{},
 		},
 		{
 			name:   "remove Failed condition",
@@ -647,9 +586,8 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`,
 			},
 		},
 		{
@@ -658,29 +596,26 @@ func TestValidateCertificateSigningRequestUpdate(t *testing.T) {
 				Certificate: validCertificate,
 			}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{
-				"v1":      {`status.certificate: Forbidden: updates may not set certificate content`},
-				"v1beta1": {`status.certificate: Forbidden: updates may not set certificate content`},
+			errs: []string{
+				`status.certificate: Forbidden: updates may not set certificate content`,
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		for _, version := range []string{"v1", "v1beta1"} {
-			t.Run(tt.name+"_"+version, func(t *testing.T) {
-				gotErrs := sets.NewString()
-				for _, err := range ValidateCertificateSigningRequestUpdate(tt.newCSR, tt.oldCSR, schema.GroupVersion{Group: capi.GroupName, Version: version}) {
-					gotErrs.Insert(err.Error())
-				}
-				wantErrs := sets.NewString(tt.versionErrs[version]...)
-				for _, missing := range wantErrs.Difference(gotErrs).List() {
-					t.Errorf("missing expected error: %s", missing)
-				}
-				for _, unexpected := range gotErrs.Difference(wantErrs).List() {
-					t.Errorf("unexpected error: %s", unexpected)
-				}
-			})
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			gotErrs := sets.NewString()
+			for _, err := range ValidateCertificateSigningRequestUpdate(tt.newCSR, tt.oldCSR) {
+				gotErrs.Insert(err.Error())
+			}
+			wantErrs := sets.NewString(tt.errs...)
+			for _, missing := range wantErrs.Difference(gotErrs).List() {
+				t.Errorf("missing expected error: %s", missing)
+			}
+			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
+				t.Errorf("unexpected error: %s", unexpected)
+			}
+		})
 	}
 }
 
@@ -698,10 +633,10 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		newCSR      *capi.CertificateSigningRequest
-		oldCSR      *capi.CertificateSigningRequest
-		versionErrs map[string][]string
+		name   string
+		newCSR *capi.CertificateSigningRequest
+		oldCSR *capi.CertificateSigningRequest
+		errs   []string
 	}{
 		{
 			name:   "no-op",
@@ -732,9 +667,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 			}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not add a condition of type "Approved"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not add a condition of type "Approved"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not add a condition of type "Approved"`,
 			},
 		},
 		{
@@ -743,9 +677,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`,
 			},
 		},
 		{
@@ -754,9 +687,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 			}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not add a condition of type "Denied"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not add a condition of type "Denied"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not add a condition of type "Denied"`,
 			},
 		},
 		{
@@ -765,9 +697,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`,
 			},
 		},
 		{
@@ -775,8 +706,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 			newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 			}},
-			oldCSR:      &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{},
+			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
+			errs:   []string{},
 		},
 		{
 			name:   "remove Failed condition",
@@ -784,9 +715,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`,
 			},
 		},
 		{
@@ -794,8 +724,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 			newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Certificate: validCertificate,
 			}},
-			oldCSR:      &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{},
+			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
+			errs:   []string{},
 		},
 		{
 			name: "set invalid certificate",
@@ -803,8 +733,8 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 				Certificate: invalidCertificateNoPEM,
 			}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{
-				"v1": {`status.certificate: Invalid value: "<certificate data>": must contain at least one CERTIFICATE PEM block`},
+			errs: []string{
+				`status.certificate: Invalid value: "<certificate data>": must contain at least one CERTIFICATE PEM block`,
 			},
 		},
 		{
@@ -815,28 +745,26 @@ func TestValidateCertificateSigningRequestStatusUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Certificate: invalidCertificateNoPEM,
 			}},
-			versionErrs: map[string][]string{
-				"v1": {`status.certificate: Forbidden: updates may not modify existing certificate content`},
+			errs: []string{
+				`status.certificate: Forbidden: updates may not modify existing certificate content`,
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		for _, version := range []string{"v1", "v1beta1"} {
-			t.Run(tt.name+"_"+version, func(t *testing.T) {
-				gotErrs := sets.NewString()
-				for _, err := range ValidateCertificateSigningRequestStatusUpdate(tt.newCSR, tt.oldCSR, schema.GroupVersion{Group: capi.GroupName, Version: version}) {
-					gotErrs.Insert(err.Error())
-				}
-				wantErrs := sets.NewString(tt.versionErrs[version]...)
-				for _, missing := range wantErrs.Difference(gotErrs).List() {
-					t.Errorf("missing expected error: %s", missing)
-				}
-				for _, unexpected := range gotErrs.Difference(wantErrs).List() {
-					t.Errorf("unexpected error: %s", unexpected)
-				}
-			})
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			gotErrs := sets.NewString()
+			for _, err := range ValidateCertificateSigningRequestStatusUpdate(tt.newCSR, tt.oldCSR) {
+				gotErrs.Insert(err.Error())
+			}
+			wantErrs := sets.NewString(tt.errs...)
+			for _, missing := range wantErrs.Difference(gotErrs).List() {
+				t.Errorf("missing expected error: %s", missing)
+			}
+			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
+				t.Errorf("unexpected error: %s", unexpected)
+			}
+		})
 	}
 }
 
@@ -854,10 +782,10 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		newCSR      *capi.CertificateSigningRequest
-		oldCSR      *capi.CertificateSigningRequest
-		versionErrs map[string][]string
+		name   string
+		newCSR *capi.CertificateSigningRequest
+		oldCSR *capi.CertificateSigningRequest
+		errs   []string
 	}{
 		{
 			name:   "no-op",
@@ -882,9 +810,8 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateApproved, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Approved"`,
 			},
 		},
 		{
@@ -900,9 +827,8 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateDenied, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Denied"`,
 			},
 		},
 		{
@@ -910,8 +836,8 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 			newCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMeta, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 			}},
-			oldCSR:      &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{},
+			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
+			errs:   []string{},
 		},
 		{
 			name:   "remove Failed condition",
@@ -919,9 +845,8 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec, Status: capi.CertificateSigningRequestStatus{
 				Conditions: []capi.CertificateSigningRequestCondition{{Type: capi.CertificateFailed, Status: core.ConditionTrue}},
 			}},
-			versionErrs: map[string][]string{
-				"v1":      {`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`},
-				"v1beta1": {`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`},
+			errs: []string{
+				`status.conditions: Forbidden: updates may not remove a condition of type "Failed"`,
 			},
 		},
 		{
@@ -930,29 +855,26 @@ func TestValidateCertificateSigningRequestApprovalUpdate(t *testing.T) {
 				Certificate: validCertificate,
 			}},
 			oldCSR: &capi.CertificateSigningRequest{ObjectMeta: validUpdateMetaWithFinalizers, Spec: validSpec},
-			versionErrs: map[string][]string{
-				"v1":      {`status.certificate: Forbidden: updates may not set certificate content`},
-				"v1beta1": {`status.certificate: Forbidden: updates may not set certificate content`},
+			errs: []string{
+				`status.certificate: Forbidden: updates may not set certificate content`,
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		for _, version := range []string{"v1", "v1beta1"} {
-			t.Run(tt.name+"_"+version, func(t *testing.T) {
-				gotErrs := sets.NewString()
-				for _, err := range ValidateCertificateSigningRequestApprovalUpdate(tt.newCSR, tt.oldCSR, schema.GroupVersion{Group: capi.GroupName, Version: version}) {
-					gotErrs.Insert(err.Error())
-				}
-				wantErrs := sets.NewString(tt.versionErrs[version]...)
-				for _, missing := range wantErrs.Difference(gotErrs).List() {
-					t.Errorf("missing expected error: %s", missing)
-				}
-				for _, unexpected := range gotErrs.Difference(wantErrs).List() {
-					t.Errorf("unexpected error: %s", unexpected)
-				}
-			})
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			gotErrs := sets.NewString()
+			for _, err := range ValidateCertificateSigningRequestApprovalUpdate(tt.newCSR, tt.oldCSR) {
+				gotErrs.Insert(err.Error())
+			}
+			wantErrs := sets.NewString(tt.errs...)
+			for _, missing := range wantErrs.Difference(gotErrs).List() {
+				t.Errorf("missing expected error: %s", missing)
+			}
+			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
+				t.Errorf("unexpected error: %s", unexpected)
+			}
+		})
 	}
 }
 
@@ -974,7 +896,10 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 		// options that allow the csr to pass validation
 		lenientOpts certificateValidationOptions
 
-		// expected errors when validating strictly
+		// regexes matching expected errors when validating strictly
+		strictRegexes []regexp.Regexp
+
+		// expected errors (after filtering out errors matched by strictRegexes) when validating strictly
 		strictErrs []string
 	}{
 		// valid strict cases
@@ -1127,8 +1052,8 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 					Certificate: invalidCertificateNonASN1Data,
 				},
 			},
-			lenientOpts: certificateValidationOptions{allowArbitraryCertificate: true},
-			strictErrs:  []string{`status.certificate: Invalid value: "<certificate data>": asn1: structure error: sequence tag mismatch`},
+			lenientOpts:   certificateValidationOptions{allowArbitraryCertificate: true},
+			strictRegexes: []regexp.Regexp{*regexp.MustCompile(`status.certificate: Invalid value: "\<certificate data\>": (asn1: structure error: sequence tag mismatch|x509: invalid RDNSequence)`)},
 		},
 	}
 
@@ -1144,12 +1069,27 @@ func Test_validateCertificateSigningRequestOptions(t *testing.T) {
 			for _, err := range validateCertificateSigningRequest(tt.csr, certificateValidationOptions{}) {
 				gotErrs.Insert(err.Error())
 			}
+
+			// filter errors matching strictRegexes and ensure every strictRegex matches at least one error
+			for _, expectedRegex := range tt.strictRegexes {
+				matched := false
+				for _, err := range gotErrs.List() {
+					if expectedRegex.MatchString(err) {
+						gotErrs.Delete(err)
+						matched = true
+					}
+				}
+				if !matched {
+					t.Errorf("missing expected error matching: %s", expectedRegex.String())
+				}
+			}
+
 			wantErrs := sets.NewString(tt.strictErrs...)
 			for _, missing := range wantErrs.Difference(gotErrs).List() {
 				t.Errorf("missing expected strict error: %s", missing)
 			}
 			for _, unexpected := range gotErrs.Difference(wantErrs).List() {
-				t.Errorf("unexpected strict error: %s", unexpected)
+				t.Errorf("unexpected errors: %s", unexpected)
 			}
 		})
 	}

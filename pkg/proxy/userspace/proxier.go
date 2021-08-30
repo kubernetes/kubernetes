@@ -527,7 +527,7 @@ func (proxier *Proxier) mergeService(service *v1.Service) sets.String {
 			continue
 		}
 
-		serviceIP := net.ParseIP(service.Spec.ClusterIP)
+		serviceIP := netutils.ParseIPSloppy(service.Spec.ClusterIP)
 		klog.V(1).InfoS("Adding new service", "serviceName", serviceName, "addr", net.JoinHostPort(serviceIP.String(), strconv.Itoa(int(servicePort.Port))), "protocol", servicePort.Protocol)
 		info, err = proxier.addServiceOnPortInternal(serviceName, servicePort.Protocol, proxyPort, proxier.udpIdleTimeout)
 		if err != nil {
@@ -711,7 +711,7 @@ func sameConfig(info *ServiceInfo, service *v1.Service, port *v1.ServicePort) bo
 	if info.protocol != port.Protocol || info.portal.port != int(port.Port) || info.nodePort != int(port.NodePort) {
 		return false
 	}
-	if !info.portal.ip.Equal(net.ParseIP(service.Spec.ClusterIP)) {
+	if !info.portal.ip.Equal(netutils.ParseIPSloppy(service.Spec.ClusterIP)) {
 		return false
 	}
 	if !ipsEqual(info.externalIPs, service.Spec.ExternalIPs) {
@@ -744,14 +744,14 @@ func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceI
 		return err
 	}
 	for _, publicIP := range info.externalIPs {
-		err = proxier.openOnePortal(portal{net.ParseIP(publicIP), info.portal.port, true}, info.protocol, proxier.listenIP, info.proxyPort, service)
+		err = proxier.openOnePortal(portal{netutils.ParseIPSloppy(publicIP), info.portal.port, true}, info.protocol, proxier.listenIP, info.proxyPort, service)
 		if err != nil {
 			return err
 		}
 	}
 	for _, ingress := range info.loadBalancerStatus.Ingress {
 		if ingress.IP != "" {
-			err = proxier.openOnePortal(portal{net.ParseIP(ingress.IP), info.portal.port, false}, info.protocol, proxier.listenIP, info.proxyPort, service)
+			err = proxier.openOnePortal(portal{netutils.ParseIPSloppy(ingress.IP), info.portal.port, false}, info.protocol, proxier.listenIP, info.proxyPort, service)
 			if err != nil {
 				return err
 			}
@@ -923,11 +923,11 @@ func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *Service
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portal, info.protocol, proxier.listenIP, info.proxyPort, service)
 	for _, publicIP := range info.externalIPs {
-		el = append(el, proxier.closeOnePortal(portal{net.ParseIP(publicIP), info.portal.port, true}, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+		el = append(el, proxier.closeOnePortal(portal{netutils.ParseIPSloppy(publicIP), info.portal.port, true}, info.protocol, proxier.listenIP, info.proxyPort, service)...)
 	}
 	for _, ingress := range info.loadBalancerStatus.Ingress {
 		if ingress.IP != "" {
-			el = append(el, proxier.closeOnePortal(portal{net.ParseIP(ingress.IP), info.portal.port, false}, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+			el = append(el, proxier.closeOnePortal(portal{netutils.ParseIPSloppy(ingress.IP), info.portal.port, false}, info.protocol, proxier.listenIP, info.proxyPort, service)...)
 		}
 	}
 	if info.nodePort != 0 {
@@ -1116,11 +1116,11 @@ func iptablesFlush(ipt iptables.Interface) error {
 }
 
 // Used below.
-var zeroIPv4 = net.ParseIP("0.0.0.0")
-var localhostIPv4 = net.ParseIP("127.0.0.1")
+var zeroIPv4 = netutils.ParseIPSloppy("0.0.0.0")
+var localhostIPv4 = netutils.ParseIPSloppy("127.0.0.1")
 
-var zeroIPv6 = net.ParseIP("::")
-var localhostIPv6 = net.ParseIP("::1")
+var zeroIPv6 = netutils.ParseIPSloppy("::")
+var localhostIPv6 = netutils.ParseIPSloppy("::1")
 
 // Build a slice of iptables args that are common to from-container and from-host portal rules.
 func iptablesCommonPortalArgs(destIP net.IP, addPhysicalInterfaceMatch bool, addDstLocalMatch bool, destPort int, protocol v1.Protocol, service proxy.ServicePortName) []string {

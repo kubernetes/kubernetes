@@ -45,7 +45,7 @@ import (
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	netutil "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -108,7 +108,7 @@ func NewREST(
 	// detect this cluster default Service IPFamily (ipfamily of --service-cluster-ip-range[0])
 	serviceIPFamily := api.IPv4Protocol
 	cidr := serviceIPs.CIDR()
-	if netutil.IsIPv6CIDR(&cidr) {
+	if netutils.IsIPv6CIDR(&cidr) {
 		serviceIPFamily = api.IPv6Protocol
 	}
 
@@ -189,6 +189,9 @@ func (rs *REST) Watch(ctx context.Context, options *metainternalversion.ListOpti
 }
 
 func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	// DeepCopy to prevent writes here propagating back to tests.
+	obj = obj.DeepCopyObject()
+
 	service := obj.(*api.Service)
 
 	// bag of clusterIPs allocated in the process of creation
@@ -612,7 +615,7 @@ func (rs *REST) allocClusterIPs(service *api.Service, toAlloc map[api.IPFamily]s
 			}
 			allocated[family] = allocatedIP.String()
 		} else {
-			parsedIP := net.ParseIP(ip)
+			parsedIP := netutils.ParseIPSloppy(ip)
 			if err := allocator.Allocate(parsedIP); err != nil {
 				el := field.ErrorList{field.Invalid(field.NewPath("spec", "clusterIPs"), service.Spec.ClusterIPs, fmt.Sprintf("failed to allocate IP %v: %v", ip, err))}
 				return allocated, errors.NewInvalid(api.Kind("Service"), service.Name, el)
@@ -638,7 +641,7 @@ func (rs *REST) releaseClusterIPs(toRelease map[api.IPFamily]string) (map[api.IP
 			continue
 		}
 
-		parsedIP := net.ParseIP(ip)
+		parsedIP := netutils.ParseIPSloppy(ip)
 		if err := allocator.Release(parsedIP); err != nil {
 			return released, err
 		}
@@ -825,7 +828,7 @@ func (rs *REST) releaseServiceClusterIP(service *api.Service) (released map[api.
 
 	// we need to do that to handle cases where allocator is no longer configured on
 	// cluster
-	if netutil.IsIPv6String(service.Spec.ClusterIP) {
+	if netutils.IsIPv6String(service.Spec.ClusterIP) {
 		toRelease[api.IPv6Protocol] = service.Spec.ClusterIP
 	} else {
 		toRelease[api.IPv4Protocol] = service.Spec.ClusterIP
@@ -852,7 +855,7 @@ func (rs *REST) releaseServiceClusterIPs(service *api.Service) (released map[api
 
 	toRelease := make(map[api.IPFamily]string)
 	for _, ip := range service.Spec.ClusterIPs {
-		if netutil.IsIPv6String(ip) {
+		if netutils.IsIPv6String(ip) {
 			toRelease[api.IPv6Protocol] = ip
 		} else {
 			toRelease[api.IPv4Protocol] = ip
@@ -974,7 +977,7 @@ func (rs *REST) tryDefaultValidateServiceClusterIPFields(oldService, service *ap
 
 		// we have previously validated for ip correctness and if family exist it will match ip family
 		// so the following is safe to do
-		isIPv6 := netutil.IsIPv6String(ip)
+		isIPv6 := netutils.IsIPv6String(ip)
 
 		// Family is not specified yet.
 		if i >= len(service.Spec.IPFamilies) {

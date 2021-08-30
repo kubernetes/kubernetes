@@ -15,7 +15,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.28.0
 	github.com/prometheus/procfs v0.6.0
-	github.com/spf13/cobra v1.1.3
+	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0
@@ -24,13 +24,12 @@ require (
 	go.opentelemetry.io/otel/sdk v0.20.0
 	go.opentelemetry.io/otel/trace v0.20.0
 	go.uber.org/zap v1.17.0
-	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
-	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c // indirect
+	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
 	gotest.tools/v3 v3.0.3 // indirect
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/klog/v2 v2.9.0
-	k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
+	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 )
 
 replace (

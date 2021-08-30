@@ -17,6 +17,7 @@ limitations under the License.
 package genericclioptions
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -102,4 +103,53 @@ func buildCommandChain(commands []*cobra.Command) *cobra.Command {
 		currCmd = cmd
 	}
 	return currCmd
+}
+
+// Tests that the CancelRequest function is propogated to the wrapped Delegate
+// RoundTripper; but only if the Delegate implements the CancelRequest function.
+func TestCancelRequest(t *testing.T) {
+	tests := map[string]struct {
+		delegate  http.RoundTripper
+		cancelled bool
+	}{
+		"CancelRequest propagated to delegate": {
+			delegate:  &cancellableRoundTripper{},
+			cancelled: true,
+		},
+		"CancelRequest not propagated to delegate": {
+			delegate:  &nonCancellableRoundTripper{},
+			cancelled: false,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			rt := &CommandHeaderRoundTripper{
+				Delegate: tc.delegate,
+			}
+			req := http.Request{}
+			rt.CancelRequest(&req)
+			if tc.cancelled != req.Close {
+				t.Errorf("expected RoundTripper cancel (%v), got (%v)", tc.cancelled, req.Close)
+			}
+		})
+	}
+}
+
+// Test RoundTripper with CancelRequest function.
+type cancellableRoundTripper struct{}
+
+func (rtc *cancellableRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, nil
+}
+
+func (rtc *cancellableRoundTripper) CancelRequest(req *http.Request) {
+	req.Close = true
+}
+
+// Test RoundTripper without CancelRequest function.
+type nonCancellableRoundTripper struct{}
+
+func (rtc *nonCancellableRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	return nil, nil
 }

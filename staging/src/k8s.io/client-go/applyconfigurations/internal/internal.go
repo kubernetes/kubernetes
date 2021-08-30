@@ -482,8 +482,8 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: atomic
       map:
         elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.apiserverinternal.v1alpha1.StorageVersionStatus
   map:
     fields:
@@ -10647,8 +10647,8 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: atomic
       map:
         elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
   map:
     fields:
@@ -10821,8 +10821,8 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: atomic
       map:
         elementType:
-          namedType: __untyped_atomic_
-        elementRelationship: atomic
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.apimachinery.pkg.util.intstr.IntOrString
   scalar: untyped
 - name: __untyped_atomic_

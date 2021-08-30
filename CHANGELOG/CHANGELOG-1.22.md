@@ -1,11 +1,26 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.22.0](#v1220)
-  - [Downloads for v1.22.0](#downloads-for-v1220)
+- [v1.22.1](#v1221)
+  - [Downloads for v1.22.1](#downloads-for-v1221)
     - [Source Code](#source-code)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
+  - [Changelog since v1.22.0](#changelog-since-v1220)
+  - [Changes by Kind](#changes-by-kind)
+    - [Feature](#feature)
+    - [Bug or Regression](#bug-or-regression)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
+  - [Dependencies](#dependencies)
+    - [Added](#added)
+    - [Changed](#changed)
+    - [Removed](#removed)
+- [v1.22.0](#v1220)
+  - [Downloads for v1.22.0](#downloads-for-v1220)
+    - [Source Code](#source-code-1)
+    - [Client Binaries](#client-binaries-1)
+    - [Server Binaries](#server-binaries-1)
+    - [Node Binaries](#node-binaries-1)
   - [Changelog since v1.21.0](#changelog-since-v1210)
   - [What's New (Major Themes)](#whats-new-major-themes)
     - [Removal of several beta Kubernetes APIs](#removal-of-several-beta-kubernetes-apis)
@@ -25,147 +40,226 @@
     - [<code>CSIMigrationvSphere</code> feature gate has not migrated to new CRD APIs](#-feature-gate-has-not-migrated-to-new-crd-apis)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
-  - [Changes by Kind](#changes-by-kind)
+  - [Changes by Kind](#changes-by-kind-1)
     - [Deprecation](#deprecation)
     - [API Change](#api-change)
-    - [Feature](#feature)
+    - [Feature](#feature-1)
     - [Documentation](#documentation)
     - [Failing Test](#failing-test)
-    - [Bug or Regression](#bug-or-regression)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
-  - [Dependencies](#dependencies)
-    - [Added](#added)
-    - [Changed](#changed)
-    - [Removed](#removed)
+    - [Bug or Regression](#bug-or-regression-1)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
+  - [Dependencies](#dependencies-1)
+    - [Added](#added-1)
+    - [Changed](#changed-1)
+    - [Removed](#removed-1)
 - [v1.22.0-rc.0](#v1220-rc0)
   - [Downloads for v1.22.0-rc.0](#downloads-for-v1220-rc0)
-    - [Source Code](#source-code-1)
-    - [Client Binaries](#client-binaries-1)
-    - [Server Binaries](#server-binaries-1)
-    - [Node Binaries](#node-binaries-1)
+    - [Source Code](#source-code-2)
+    - [Client Binaries](#client-binaries-2)
+    - [Server Binaries](#server-binaries-2)
+    - [Node Binaries](#node-binaries-2)
   - [Changelog since v1.22.0-beta.2](#changelog-since-v1220-beta2)
-  - [Changes by Kind](#changes-by-kind-1)
+  - [Changes by Kind](#changes-by-kind-2)
     - [API Change](#api-change-1)
-    - [Bug or Regression](#bug-or-regression-1)
-  - [Dependencies](#dependencies-1)
+    - [Bug or Regression](#bug-or-regression-2)
+  - [Dependencies](#dependencies-2)
     - [Added](#added-2)
     - [Changed](#changed-2)
     - [Removed](#removed-2)
 - [v1.22.0-beta.2](#v1220-beta2)
   - [Downloads for v1.22.0-beta.2](#downloads-for-v1220-beta2)
-    - [Source Code](#source-code-2)
-    - [Client Binaries](#client-binaries-2)
-    - [Server Binaries](#server-binaries-2)
-    - [Node Binaries](#node-binaries-2)
+    - [Source Code](#source-code-3)
+    - [Client Binaries](#client-binaries-3)
+    - [Server Binaries](#server-binaries-3)
+    - [Node Binaries](#node-binaries-3)
   - [Changelog since v1.22.0-beta.1](#changelog-since-v1220-beta1)
-  - [Changes by Kind](#changes-by-kind-2)
+  - [Changes by Kind](#changes-by-kind-3)
     - [API Change](#api-change-2)
-    - [Feature](#feature-1)
-    - [Bug or Regression](#bug-or-regression-2)
-  - [Dependencies](#dependencies-2)
+    - [Feature](#feature-2)
+    - [Bug or Regression](#bug-or-regression-3)
+  - [Dependencies](#dependencies-3)
     - [Added](#added-3)
     - [Changed](#changed-3)
     - [Removed](#removed-3)
 - [v1.22.0-beta.1](#v1220-beta1)
   - [Downloads for v1.22.0-beta.1](#downloads-for-v1220-beta1)
-    - [Source Code](#source-code-3)
-    - [Client Binaries](#client-binaries-3)
-    - [Server Binaries](#server-binaries-3)
-    - [Node Binaries](#node-binaries-3)
+    - [Source Code](#source-code-4)
+    - [Client Binaries](#client-binaries-4)
+    - [Server Binaries](#server-binaries-4)
+    - [Node Binaries](#node-binaries-4)
   - [Changelog since v1.22.0-beta.0](#changelog-since-v1220-beta0)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
-  - [Changes by Kind](#changes-by-kind-3)
+  - [Changes by Kind](#changes-by-kind-4)
     - [Deprecation](#deprecation-1)
     - [API Change](#api-change-3)
-    - [Feature](#feature-2)
+    - [Feature](#feature-3)
     - [Documentation](#documentation-1)
-    - [Bug or Regression](#bug-or-regression-3)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
-  - [Dependencies](#dependencies-3)
+    - [Bug or Regression](#bug-or-regression-4)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
+  - [Dependencies](#dependencies-4)
     - [Added](#added-4)
     - [Changed](#changed-4)
     - [Removed](#removed-4)
 - [v1.22.0-beta.0](#v1220-beta0)
   - [Downloads for v1.22.0-beta.0](#downloads-for-v1220-beta0)
-    - [Source Code](#source-code-4)
-    - [Client Binaries](#client-binaries-4)
-    - [Server Binaries](#server-binaries-4)
-    - [Node Binaries](#node-binaries-4)
+    - [Source Code](#source-code-5)
+    - [Client Binaries](#client-binaries-5)
+    - [Server Binaries](#server-binaries-5)
+    - [Node Binaries](#node-binaries-5)
   - [Changelog since v1.22.0-alpha.3](#changelog-since-v1220-alpha3)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
-  - [Changes by Kind](#changes-by-kind-4)
+  - [Changes by Kind](#changes-by-kind-5)
     - [Deprecation](#deprecation-2)
     - [API Change](#api-change-4)
-    - [Feature](#feature-3)
-    - [Bug or Regression](#bug-or-regression-4)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
-  - [Dependencies](#dependencies-4)
+    - [Feature](#feature-4)
+    - [Bug or Regression](#bug-or-regression-5)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
+  - [Dependencies](#dependencies-5)
     - [Added](#added-5)
     - [Changed](#changed-5)
     - [Removed](#removed-5)
 - [v1.22.0-alpha.3](#v1220-alpha3)
   - [Downloads for v1.22.0-alpha.3](#downloads-for-v1220-alpha3)
-    - [Source Code](#source-code-5)
-    - [Client Binaries](#client-binaries-5)
-    - [Server Binaries](#server-binaries-5)
-    - [Node Binaries](#node-binaries-5)
+    - [Source Code](#source-code-6)
+    - [Client Binaries](#client-binaries-6)
+    - [Server Binaries](#server-binaries-6)
+    - [Node Binaries](#node-binaries-6)
   - [Changelog since v1.22.0-alpha.2](#changelog-since-v1220-alpha2)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
-  - [Changes by Kind](#changes-by-kind-5)
+  - [Changes by Kind](#changes-by-kind-6)
     - [Deprecation](#deprecation-3)
     - [API Change](#api-change-5)
-    - [Feature](#feature-4)
-    - [Bug or Regression](#bug-or-regression-5)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
-  - [Dependencies](#dependencies-5)
+    - [Feature](#feature-5)
+    - [Bug or Regression](#bug-or-regression-6)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
+  - [Dependencies](#dependencies-6)
     - [Added](#added-6)
     - [Changed](#changed-6)
     - [Removed](#removed-6)
 - [v1.22.0-alpha.2](#v1220-alpha2)
   - [Downloads for v1.22.0-alpha.2](#downloads-for-v1220-alpha2)
-    - [Source Code](#source-code-6)
-    - [Client Binaries](#client-binaries-6)
-    - [Server Binaries](#server-binaries-6)
-    - [Node Binaries](#node-binaries-6)
+    - [Source Code](#source-code-7)
+    - [Client Binaries](#client-binaries-7)
+    - [Server Binaries](#server-binaries-7)
+    - [Node Binaries](#node-binaries-7)
   - [Changelog since v1.22.0-alpha.1](#changelog-since-v1220-alpha1)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-4)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-4)
-  - [Changes by Kind](#changes-by-kind-6)
+  - [Changes by Kind](#changes-by-kind-7)
     - [Deprecation](#deprecation-4)
     - [API Change](#api-change-6)
-    - [Feature](#feature-5)
+    - [Feature](#feature-6)
     - [Failing Test](#failing-test-1)
-    - [Bug or Regression](#bug-or-regression-6)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
-  - [Dependencies](#dependencies-6)
+    - [Bug or Regression](#bug-or-regression-7)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-5)
+  - [Dependencies](#dependencies-7)
     - [Added](#added-7)
     - [Changed](#changed-7)
     - [Removed](#removed-7)
 - [v1.22.0-alpha.1](#v1220-alpha1)
   - [Downloads for v1.22.0-alpha.1](#downloads-for-v1220-alpha1)
-    - [Source Code](#source-code-7)
-    - [Client binaries](#client-binaries-7)
-    - [Server binaries](#server-binaries-7)
-    - [Node binaries](#node-binaries-7)
+    - [Source Code](#source-code-8)
+    - [Client binaries](#client-binaries-8)
+    - [Server binaries](#server-binaries-8)
+    - [Node binaries](#node-binaries-8)
   - [Changelog since v1.21.0](#changelog-since-v1210-1)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-5)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-5)
-  - [Changes by Kind](#changes-by-kind-7)
+  - [Changes by Kind](#changes-by-kind-8)
     - [Deprecation](#deprecation-5)
     - [API Change](#api-change-7)
-    - [Feature](#feature-6)
+    - [Feature](#feature-7)
     - [Failing Test](#failing-test-2)
-    - [Bug or Regression](#bug-or-regression-7)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-5)
-  - [Dependencies](#dependencies-7)
+    - [Bug or Regression](#bug-or-regression-8)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-6)
+  - [Dependencies](#dependencies-8)
     - [Added](#added-8)
     - [Changed](#changed-8)
     - [Removed](#removed-8)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+# v1.22.1
+
+
+## Downloads for v1.22.1
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes.tar.gz) | 4ba0d63665c5959cec560264a260bb1341d09a28f6651e9814982af1ec47aff144e9ad7e6c4273867c864cdf3d12f1e7cbb4bfa44301cf5b9e81f98a345acdfb
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-src.tar.gz) | eac27ada62bf719f8d31655fadbb74c2c13793c57fe866e768c86dfbbe90c8ca1c2c07d093f1874c198e49a125968de5951ec8f07d90f8b236a1a1bcb1640b03
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-darwin-amd64.tar.gz) | 41dcfff40498335c92d872eb6aa6215d9d84908f79bdf61777d52243a446fffb114313fb586ec6a58908684eaf86fae6b2fbaa70a2a3f06f78470a20ca4d9727
+[kubernetes-client-darwin-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-darwin-arm64.tar.gz) | 810b6db31fa9c277044b1b0e39a72430f3ff728722f1fd9cc85143835147314b3fd7a6374d963eeff96cf572d2a0b034e3cab4bc0294a219832d58c40f0c1302
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-386.tar.gz) | d215c81c9a5274ced217fe09d2111f4073ed225c24c3daa71f91a4f75e38817dea504ff9b9558dcee7bd1a0c26d936c2e2bbe66e30736879fd0fba4aa0438f03
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-amd64.tar.gz) | 064bd1eaf468c9b4a00e31bec3f9c80850c52cd1e06edfd86f307236acbdba7c89dbe663cbfefdc5ead72f1cb93ba9d21d828558508f0b29f8c814d9085846ca
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-arm.tar.gz) | 07754877a5f486efb97ddb4a5d0edc8389a59bc7dba2927c73829f1aa77e36593dec6d0ba5386582221c9cf33497ebc68181d8cef4144185cf2817a5d85064c8
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-arm64.tar.gz) | 0b2265f27baad42425f6d815182261542efba2e5defccdb92668a50ff0f49c831f3af4ea6c38f351004ab1eafc270871e443e673188f37463ee3012da20cfc27
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-ppc64le.tar.gz) | a689eaef1c0788eb734fd5e70899f4cd0bc4ad6dd9f56827e7d55cab4acb2b1b0035226e69e1230fe74ac45accbbafbcc616c00fabe8dc55b9d8f94519cde253
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-linux-s390x.tar.gz) | a76300dbd915b232826d022e1fd5b8a336e7de2089d897aed594381ad571396619609498687eba75f2dcb7fe2fb2bfe50fe6a199eda53af8513d9b3b2967b7ec
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-windows-386.tar.gz) | 46c62a9dd3d5753bf8111a32b19f41babf7c06a10f8931fede339da1605d45f020850bc568cdc9b78300d0d7a5deb4c8602092f8b6667b73bea18eadf758a14c
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-client-windows-amd64.tar.gz) | 88e30aee1103ab6b4f3c2bd5570b4f739cbc01b4755bfaee915dcb717ae4d8b0b99457e2bb44cc60f47b77822ce6119fbe77bdfbaaf4afa4220b78b40b1c9b2c
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-amd64.tar.gz) | 66c596577d19c1a609b554e1e61b0bc2c8ba691b2101f481dfc616799e37347edc62956b7684370dec5b16388d48a665ba78c942de4aaf5df1f78cf0667df545
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-arm.tar.gz) | b2f6d2ef240a2cf829823ef599aad5590f531c6873ace7a682d9f74954f90b9c48d3f5f33460bd050bee87736e37c331a99ed599146cebd5ade36459d41a0842
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-arm64.tar.gz) | bf7d8978b72409f02c1b7ad5f44a908f31287ee715966e47726c3f9f85c349a14f457cd84160cfe78d4e39233a119afd152528ed79db5eef6558a25098825438
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-ppc64le.tar.gz) | 9546df4488665af35a7289e77f8b194f12e5939199411fb8f4b2f15db5e669eef9dfba950315205d39f4d89c135fbccd37e8ad9c554a482bb09977234d7d7185
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-server-linux-s390x.tar.gz) | e1eb0868e613e27ea7f71df5875c5d0b107a7fc38525151dffd22826c7a47111ece7d3948badb28b1a1c9d8cabca70af54cdc1501e5aadf5c842bf09bd26f1c2
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-amd64.tar.gz) | 53b44fbf58308c18b478ced5629a82d01c67dd6ae5be9559a2d65edae339983bff4d143b1bde062f5d8202ec8241e45da3b087af1fb0aea35afb1812a26450d1
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-arm.tar.gz) | c3855f27d4001dde9f89f41dc15ddab66a9bd5fa2cc058b65fc47e6c487ac12ef3e2d94ed72e9560a88696a86ef893a548eef3ef78d4528b2903f0f3d487e9df
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-arm64.tar.gz) | eb6a5cb5270a662a79302472a347a5486b3e0689c0c8ea0ceb62e83f72c043dc3b15ee3d5ec40790a1754748950208d8b5818b3f1d64e44a881720a78f50cc7e
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-ppc64le.tar.gz) | 45038ed6ee110d04ea7fb18e8f3c5f33aff2cc291a169d7a2f5f37ae1780b534ff5cd2895b7c2a9fb675a8490c9da7518e09f4ca9e2af4d57238557e1021d255
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-linux-s390x.tar.gz) | 14a286eb32ae450e1afb9bfcf4fd84be259613b1be4d81a4433000c507427f137ff79a6da9f457ade4b668a01c1de76488b134a895d36673531cde372f3ee884
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.22.1/kubernetes-node-windows-amd64.tar.gz) | a38016acc743eb87d4803d2d06c24fc3315a4db6eacbd3f2060f28355ca96f1b3294b30483b74ecea18fe220a9d1319509f26fe02615fbaa7f1ecd11f76b1f6b
+
+## Changelog since v1.22.0
+
+## Changes by Kind
+
+### Feature
+
+- Kubernetes is now built with Golang 1.16.7 ([#104200](https://github.com/kubernetes/kubernetes/pull/104200), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
+
+### Bug or Regression
+
+- Fix kube-apiserver metric reporting for the deprecated watch path of /api/<version>/watch/... ([#104188](https://github.com/kubernetes/kubernetes/pull/104188), [@wojtek-t](https://github.com/wojtek-t)) [SIG API Machinery and Instrumentation]
+- Kube-proxy: delete stale conntrack UDP entries for loadbalancer ingress IP. ([#104009](https://github.com/kubernetes/kubernetes/pull/104009), [@aojea](https://github.com/aojea)) [SIG Network]
+- Pass additional flags to subpath mount to avoid flakes in certain conditions ([#104346](https://github.com/kubernetes/kubernetes/pull/104346), [@mauriciopoppe](https://github.com/mauriciopoppe)) [SIG Storage]
+
+### Other (Cleanup or Flake)
+
+- Kube-apiserver: sets an upper-bound on the lifetime of idle keep-alive connections and time to read the headers of incoming requests ([#103958](https://github.com/kubernetes/kubernetes/pull/103958), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Node]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+_Nothing has changed._
+
+### Removed
+_Nothing has changed._
+
+
 
 # v1.22.0
 
@@ -329,7 +423,7 @@ If CSIMigrationvSphere feature gate is enabled, user should not upgrade to Kuber
 - Deprecate `--record` flag in `kubectl`. The `--record` flag is being replaced with the [mechanism](https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers) which annotates HTTP requests with kubectl command details. ([#102873](https://github.com/kubernetes/kubernetes/pull/102873), [@soltysh](https://github.com/soltysh))
 - E2e.test: removed the  `--viper-config` flag. If you were previously using this to pass flags to `e2e.test` via a file, you will need to pass them directly on the command line, e.g. `e2e.test --e2e-output-dir`. ([#102598](https://github.com/kubernetes/kubernetes/pull/102598), [@dims](https://github.com/dims))
 - For `kubeadm`: remove the ClusterStatus API from v1beta3 and its management in the kube-system/kubeadm-config ConfigMap. This method of keeping track of what API endpoints exists in the cluster was replaced (in a prior release) by a method to annotate the etcd Pods that `kubeadm` creates in "stacked etcd" clusters. The following CLI sub-phases are deprecated and are now a NO-OP: for `kubeadm join`: "control-plane-join/update-status", for `kubeadm reset`: "update-cluster-status". Unless you are using these phases explicitly, you should not be affected. ([#101915](https://github.com/kubernetes/kubernetes/pull/101915), [@neolit123](https://github.com/neolit123))
-- Kubead: remove the deprecated `--csr-only` and `--csr-dir` flags from `kubeadm init phase certs`. Deprecate the same flags under `kubeadm certs renew`. In both the cases the command `kubeadm certs generate-csr` should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123))
+- Kubeadm: remove the deprecated `--csr-only` and `--csr-dir` flags from `kubeadm init phase certs`. Deprecate the same flags under `kubeadm certs renew`. In both the cases the command `kubeadm certs generate-csr` should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123))
 - Kubeadm: Remove the deprecated command `kubeadm alpha kubeconfig`. Please use `kubeadm kubeconfig` instead. ([#101938](https://github.com/kubernetes/kubernetes/pull/101938), [@knight42](https://github.com/knight42))
 - Kubeadm: Remove the deprecated hyperkube image support in `v1beta3`. This implies removal of `ClusterConfiguration.UseHyperKubeImage.` ([#101537](https://github.com/kubernetes/kubernetes/pull/101537), [@neolit123](https://github.com/neolit123))
 - Kubeadm: Remove the field `ClusterConfiguration.DNS.Type` in v1beta3 since CoreDNS is the only supported DNS type. ([#101547](https://github.com/kubernetes/kubernetes/pull/101547), [@neolit123](https://github.com/neolit123))
@@ -722,7 +816,7 @@ If CSIMigrationvSphere feature gate is enabled, user should not upgrade to Kuber
 - Replace `go-bindata` with `//go:embed`. ([#99829](https://github.com/kubernetes/kubernetes/pull/99829), [@palnabarun](https://github.com/palnabarun))
 - The `DynamicFakeClient` now exposes its tracker via a `Tracker()` function. ([#100085](https://github.com/kubernetes/kubernetes/pull/100085), [@markusthoemmes](https://github.com/markusthoemmes))
 - The `VolumeSnapshotDataSource` feature gate that is GA since v1.20 is unconditionally enabled, and can no longer be specified via the `--feature-gates` argument. ([#101531](https://github.com/kubernetes/kubernetes/pull/101531), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG Storage]
-- The deprecated `CRIContainerLogRotation` feature-gate has been removed, since the `CRIContainerLogRotatio`n feature graduated to GA in 1.21 and was unconditionally enabled. ([#101578](https://github.com/kubernetes/kubernetes/pull/101578), [@carlory](https://github.com/carlory))
+- The deprecated `CRIContainerLogRotation` feature-gate has been removed, since the `CRIContainerLogRotation` feature graduated to GA in 1.21 and was unconditionally enabled. ([#101578](https://github.com/kubernetes/kubernetes/pull/101578), [@carlory](https://github.com/carlory))
 - The deprecated `RootCAConfigMap` feature-gate has been removed, since the `RootCAConfigMap` feature graduated to GA in 1.21 and is unconditionally enabled. ([#101579](https://github.com/kubernetes/kubernetes/pull/101579), [@carlory](https://github.com/carlory))
 - The deprecated `runAsGroup` feature-gate has been removed, since the `runAsGroup` feature graduated to GA in 1.21. ([#101581](https://github.com/kubernetes/kubernetes/pull/101581), [@carlory](https://github.com/carlory))
 - The etcd client has been updated to 3.5.0; `github.com/golang/protobuf`, `google.golang.org/protobuf`, and `google.golang.org/grpc` have been updated to current versions. ([#100488](https://github.com/kubernetes/kubernetes/pull/100488), [@liggitt](https://github.com/liggitt))
@@ -1860,7 +1954,7 @@ filename | sha512 hash
   - liveness/readiness probes to controller-manager MUST use HTTPS now, and the default port has been changed to 10257.
   - Applications that fetch metrics from controller-manager should use a dedicated service account which is allowed to access nonResourceURLs `/metrics`. ([#96216](https://github.com/kubernetes/kubernetes/pull/96216), [@knight42](https://github.com/knight42)) [SIG API Machinery, Cloud Provider, Instrumentation and Testing]
 - Ingress v1beta1 has been deprecated ([#102030](https://github.com/kubernetes/kubernetes/pull/102030), [@aojea](https://github.com/aojea)) [SIG CLI, Network and Testing]
-- Kubead: remove the deprecated `--csr-only` and `--csr-dir` flags from "kubeadm init phase certs". Deprecate the same flags under "kubeadm certs renew". In both cases the command "kubeadm certs generate-csr" should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
+- Kubeadm: remove the deprecated `--csr-only` and `--csr-dir` flags from "kubeadm init phase certs". Deprecate the same flags under "kubeadm certs renew". In both cases the command "kubeadm certs generate-csr" should be used instead. ([#102108](https://github.com/kubernetes/kubernetes/pull/102108), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
 - Kubeadm: remove the ClusterStatus API from v1beta3 and its management in the kube-system/kubeadm-config ConfigMap. This method of keeping track of what API endpoints exists in the cluster was replaced (in a prior release) by a method to annotate the etcd Pods that kubeadm creates in "stacked etcd" clusters. The following CLI sub-phases are deprecated and are now a NO-OP: for " kubeadm join": "control-plane-join/update-status", for "kubeadm reset": "update-cluster-status". Unless you are using these phases explicitly, you should not be affected. ([#101915](https://github.com/kubernetes/kubernetes/pull/101915), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
 - Kubeadm: remove the deprecated command "kubeadm alpha kubeconfig". Please use "kubeadm kubeconfig" instead. ([#101938](https://github.com/kubernetes/kubernetes/pull/101938), [@knight42](https://github.com/knight42)) [SIG Cluster Lifecycle]
 - Kubeadm: remove the deprecated command 'kubeadm config view'. A replacement for this command is 'kubectl get cm -n kube-system kubeadm-config -o=jsonpath="{.data.ClusterConfiguration}"' ([#102071](https://github.com/kubernetes/kubernetes/pull/102071), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]

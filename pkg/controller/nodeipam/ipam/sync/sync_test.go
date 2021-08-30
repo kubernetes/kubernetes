@@ -28,12 +28,13 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/test"
+	netutils "k8s.io/utils/net"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 var (
-	_, clusterCIDRRange, _ = net.ParseCIDR("10.1.0.0/16")
+	_, clusterCIDRRange, _ = netutils.ParseCIDRSloppy("10.1.0.0/16")
 )
 
 type fakeEvent struct {

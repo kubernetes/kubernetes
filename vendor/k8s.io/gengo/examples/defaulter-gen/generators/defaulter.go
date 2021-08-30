@@ -318,9 +318,18 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		}
 		if len(inputTags) == 1 {
 			var err error
-			typesPkg, err = context.AddDirectory(filepath.Join(pkg.Path, inputTags[0]))
+
+			inputPath := inputTags[0]
+			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
+				// this is a relative dir, which will not work under gomodules.
+				// join with the local package path, but warn
+				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
+				inputPath = filepath.Join(pkg.Path, inputTags[0])
+			}
+
+			typesPkg, err = context.AddDirectory(inputPath)
 			if err != nil {
-				klog.Fatalf("cannot import package %s", inputTags[0])
+				klog.Fatalf("cannot import package %s", inputPath)
 			}
 			// update context.Order to the latest context.Universe
 			orderer := namer.Orderer{Namer: namer.NewPublicNamer(1)}

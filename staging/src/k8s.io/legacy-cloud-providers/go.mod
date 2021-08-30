@@ -20,13 +20,13 @@ require (
 	github.com/golang/mock v1.5.0
 	github.com/google/go-cmp v0.5.5
 	github.com/gophercloud/gophercloud v0.1.0
-	github.com/mitchellh/mapstructure v1.1.2
+	github.com/mitchellh/mapstructure v1.4.1
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
 	github.com/vmware/govmomi v0.20.3
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
-	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
 	google.golang.org/api v0.46.0
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/warnings.v0 v0.1.1 // indirect
@@ -39,7 +39,7 @@ require (
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/klog/v2 v2.9.0
 	k8s.io/mount-utils v0.0.0
-	k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
+	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	sigs.k8s.io/yaml v1.2.0
 )
 

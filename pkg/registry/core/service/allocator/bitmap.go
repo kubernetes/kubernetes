@@ -72,18 +72,6 @@ func NewAllocationMap(max int, rangeSpec string) *AllocationBitmap {
 	return &a
 }
 
-// NewContiguousAllocationMap creates an allocation bitmap using the contiguous scan strategy.
-func NewContiguousAllocationMap(max int, rangeSpec string) *AllocationBitmap {
-	a := AllocationBitmap{
-		strategy:  contiguousScanStrategy{},
-		allocated: big.NewInt(0),
-		count:     0,
-		max:       max,
-		rangeSpec: rangeSpec,
-	}
-	return &a
-}
-
 // Allocate attempts to reserve the provided item.
 // Returns true if it was allocated, false if it was already in use
 func (r *AllocationBitmap) Allocate(offset int) (bool, error) {
@@ -217,20 +205,3 @@ func (rss randomScanStrategy) AllocateBit(allocated *big.Int, max, count int) (i
 }
 
 var _ bitAllocator = randomScanStrategy{}
-
-// contiguousScanStrategy tries to allocate starting at 0 and filling in any gaps
-type contiguousScanStrategy struct{}
-
-func (contiguousScanStrategy) AllocateBit(allocated *big.Int, max, count int) (int, bool) {
-	if count >= max {
-		return 0, false
-	}
-	for i := 0; i < max; i++ {
-		if allocated.Bit(i) == 0 {
-			return i, true
-		}
-	}
-	return 0, false
-}
-
-var _ bitAllocator = contiguousScanStrategy{}

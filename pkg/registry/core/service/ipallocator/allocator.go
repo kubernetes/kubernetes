@@ -24,7 +24,7 @@ import (
 
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // Interface manages the allocation of IP addresses out of a range. Interface
@@ -81,14 +81,16 @@ type Range struct {
 	alloc allocator.Interface
 }
 
-// NewAllocatorCIDRRange creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
-func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, error) {
-	max := utilnet.RangeSize(cidr)
-	base := utilnet.BigForIP(cidr.IP)
+// New creates a Range over a net.IPNet, calling allocatorFactory to construct the backing store.
+func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, error) {
+	registerMetrics()
+
+	max := netutils.RangeSize(cidr)
+	base := netutils.BigForIP(cidr.IP)
 	rangeSpec := cidr.String()
 	var family api.IPFamily
 
-	if utilnet.IsIPv6CIDR(cidr) {
+	if netutils.IsIPv6CIDR(cidr) {
 		family = api.IPv6Protocol
 		// Limit the max size, since the allocator keeps a bitmap of that size.
 		if max > 65536 {
@@ -115,20 +117,20 @@ func NewAllocatorCIDRRange(cidr *net.IPNet, allocatorFactory allocator.Allocator
 	return &r, err
 }
 
-// Helper that wraps NewAllocatorCIDRRange, for creating a range backed by an in-memory store.
-func NewCIDRRange(cidr *net.IPNet) (*Range, error) {
-	return NewAllocatorCIDRRange(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
+// NewInMemory creates an in-memory allocator.
+func NewInMemory(cidr *net.IPNet) (*Range, error) {
+	return New(cidr, func(max int, rangeSpec string) (allocator.Interface, error) {
 		return allocator.NewAllocationMap(max, rangeSpec), nil
 	})
 }
 
 // NewFromSnapshot allocates a Range and initializes it from a snapshot.
 func NewFromSnapshot(snap *api.RangeAllocation) (*Range, error) {
-	_, ipnet, err := net.ParseCIDR(snap.Range)
+	_, ipnet, err := netutils.ParseCIDRSloppy(snap.Range)
 	if err != nil {
 		return nil, err
 	}
-	r, err := NewCIDRRange(ipnet)
+	r, err := NewInMemory(ipnet)
 	if err != nil {
 		return nil, err
 	}
@@ -165,32 +167,59 @@ func (r *Range) CIDR() net.IPNet {
 // or has already been reserved.  ErrFull will be returned if there
 // are no addresses left.
 func (r *Range) Allocate(ip net.IP) error {
+	label := r.CIDR()
 	ok, offset := r.contains(ip)
 	if !ok {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return &ErrNotInRange{r.net.String()}
 	}
 
 	allocated, err := r.alloc.Allocate(offset)
 	if err != nil {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return err
 	}
 	if !allocated {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return ErrAllocated
 	}
+	// update metrics
+	clusterIPAllocations.WithLabelValues(label.String()).Inc()
+	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
+	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+
 	return nil
 }
 
 // AllocateNext reserves one of the IPs from the pool. ErrFull may
 // be returned if there are no addresses left.
 func (r *Range) AllocateNext() (net.IP, error) {
+	label := r.CIDR()
 	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return nil, err
 	}
 	if !ok {
+		// update metrics
+		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
+
 		return nil, ErrFull
 	}
-	return utilnet.AddIPOffset(r.base, offset), nil
+	// update metrics
+	clusterIPAllocations.WithLabelValues(label.String()).Inc()
+	clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
+	clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+
+	return netutils.AddIPOffset(r.base, offset), nil
 }
 
 // Release releases the IP back to the pool. Releasing an
@@ -202,13 +231,20 @@ func (r *Range) Release(ip net.IP) error {
 		return nil
 	}
 
-	return r.alloc.Release(offset)
+	err := r.alloc.Release(offset)
+	if err == nil {
+		// update metrics
+		label := r.CIDR()
+		clusterIPAllocated.WithLabelValues(label.String()).Set(float64(r.Used()))
+		clusterIPAvailable.WithLabelValues(label.String()).Set(float64(r.Free()))
+	}
+	return err
 }
 
 // ForEach calls the provided function for each allocated IP.
 func (r *Range) ForEach(fn func(net.IP)) {
 	r.alloc.ForEach(func(offset int) {
-		ip, _ := utilnet.GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
+		ip, _ := netutils.GetIndexedIP(r.net, offset+1) // +1 because Range doesn't store IP 0
 		fn(ip)
 	})
 }
@@ -274,5 +310,5 @@ func (r *Range) contains(ip net.IP) (bool, int) {
 // calculateIPOffset calculates the integer offset of ip from base such that
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
-	return int(big.NewInt(0).Sub(utilnet.BigForIP(ip), base).Int64())
+	return int(big.NewInt(0).Sub(netutils.BigForIP(ip), base).Int64())
 }

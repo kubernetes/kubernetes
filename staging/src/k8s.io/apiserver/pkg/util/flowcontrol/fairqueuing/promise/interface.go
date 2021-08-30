@@ -19,16 +19,11 @@ package promise
 // WriteOnce represents a variable that is initially not set and can
 // be set once and is readable.  This is the common meaning for
 // "promise".
-// The implementations of this interface are NOT thread-safe.
 type WriteOnce interface {
-	// Get reads the current value of this variable.  If this variable
-	// is not set yet then this call blocks until this variable gets a
-	// value.
+	// Get reads the current value of this variable.  If this
+	// variable is not set yet then this call blocks until this
+	// variable gets a value.
 	Get() interface{}
-
-	// IsSet returns immediately with an indication of whether this
-	// variable has been set.
-	IsSet() bool
 
 	// Set normally writes a value into this variable, unblocks every
 	// goroutine waiting for this variable to have a value, and

@@ -19,7 +19,7 @@ package clusterinfo
 import (
 	"fmt"
 
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
+	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -31,7 +31,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/klog/v2"
 
-	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
 const (

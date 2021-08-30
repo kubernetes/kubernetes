@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
-
-	"github.com/pkg/errors"
 )
 
 // NewControlPlane creates a kubeadm workflow phase that implements handling of control-plane upgrade.
@@ -40,8 +40,6 @@ func NewControlPlane() workflow.Phase {
 			options.CertificateRenewal,
 			options.EtcdUpgrade,
 			options.Patches,
-			// TODO: https://github.com/kubernetes/kubeadm/issues/2046 remove in 1.23
-			options.ExperimentalPatches,
 		},
 	}
 	return phase

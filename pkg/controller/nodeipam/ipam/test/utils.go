@@ -18,12 +18,14 @@ package test
 
 import (
 	"net"
+
+	netutils "k8s.io/utils/net"
 )
 
 // MustParseCIDR returns the CIDR range parsed from s or panics if the string
 // cannot be parsed.
 func MustParseCIDR(s string) *net.IPNet {
-	_, ret, err := net.ParseCIDR(s)
+	_, ret, err := netutils.ParseCIDRSloppy(s)
 	if err != nil {
 		panic(err)
 	}

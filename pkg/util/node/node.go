@@ -37,7 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/features"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -103,7 +103,7 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	allIPs := make([]net.IP, 0, len(node.Status.Addresses))
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
-			ip := net.ParseIP(addr.Address)
+			ip := netutils.ParseIPSloppy(addr.Address)
 			if ip != nil {
 				allIPs = append(allIPs, ip)
 			}
@@ -111,7 +111,7 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	}
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeExternalIP {
-			ip := net.ParseIP(addr.Address)
+			ip := netutils.ParseIPSloppy(addr.Address)
 			if ip != nil {
 				allIPs = append(allIPs, ip)
 			}
@@ -124,7 +124,7 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	nodeIPs := []net.IP{allIPs[0]}
 	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		for _, ip := range allIPs {
-			if utilnet.IsIPv6(ip) != utilnet.IsIPv6(nodeIPs[0]) {
+			if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
 				nodeIPs = append(nodeIPs, ip)
 				break
 			}

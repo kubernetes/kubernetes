@@ -27,17 +27,18 @@ import (
 	"strings"
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+	"github.com/lithammer/dedent"
+	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 
-	"github.com/lithammer/dedent"
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 var (
@@ -786,19 +787,22 @@ func restoreEnv(e map[string]string) {
 }
 
 func TestKubeletVersionCheck(t *testing.T) {
+	minimumKubeletVersion := version.MustParseSemantic("v1.3.0")
+	minimumControlPlaneVersion := version.MustParseSemantic("v1.3.0")
+	currentKubernetesVersion := version.MustParseSemantic("v1.4.0")
 	cases := []struct {
 		kubeletVersion string
 		k8sVersion     string
 		expectErrors   bool
 		expectWarnings bool
 	}{
-		{"v" + constants.CurrentKubernetesVersion.WithPatch(2).String(), "", false, false},                                                                     // check minimally supported version when there is no information about control plane
-		{"v1.11.3", "v1.11.8", true, false},                                                                                                                    // too old kubelet (older than kubeadmconstants.MinimumKubeletVersion), should fail.
-		{"v" + constants.MinimumKubeletVersion.String(), constants.MinimumControlPlaneVersion.WithPatch(5).String(), false, false},                             // kubelet within same major.minor as control plane
-		{"v" + constants.MinimumKubeletVersion.WithPatch(5).String(), constants.MinimumControlPlaneVersion.WithPatch(1).String(), false, false},                // kubelet is newer, but still within same major.minor as control plane
-		{"v" + constants.MinimumKubeletVersion.String(), constants.CurrentKubernetesVersion.WithPatch(1).String(), false, false},                               // kubelet is lower than control plane, but newer than minimally supported
-		{"v" + constants.CurrentKubernetesVersion.WithPreRelease("alpha.1").String(), constants.MinimumControlPlaneVersion.WithPatch(1).String(), true, false}, // kubelet is newer (development build) than control plane, should fail.
-		{"v" + constants.CurrentKubernetesVersion.String(), constants.MinimumControlPlaneVersion.WithPatch(5).String(), true, false},                           // kubelet is newer (release) than control plane, should fail.
+		{"v" + currentKubernetesVersion.WithPatch(2).String(), "", false, false},                                                           // check minimally supported version when there is no information about control plane
+		{"v1.1.0", "v1.11.8", true, false},                                                                                                 // too old kubelet, should fail.
+		{"v" + minimumKubeletVersion.String(), minimumControlPlaneVersion.WithPatch(5).String(), false, false},                             // kubelet within same major.minor as control plane
+		{"v" + minimumKubeletVersion.WithPatch(5).String(), minimumControlPlaneVersion.WithPatch(1).String(), false, false},                // kubelet is newer, but still within same major.minor as control plane
+		{"v" + minimumKubeletVersion.String(), currentKubernetesVersion.WithPatch(1).String(), false, false},                               // kubelet is lower than control plane, but newer than minimally supported
+		{"v" + currentKubernetesVersion.WithPreRelease("alpha.1").String(), minimumControlPlaneVersion.WithPatch(1).String(), true, false}, // kubelet is newer (development build) than control plane, should fail.
+		{"v" + currentKubernetesVersion.String(), minimumControlPlaneVersion.WithPatch(5).String(), true, false},                           // kubelet is newer (release) than control plane, should fail.
 	}
 
 	for _, tc := range cases {
@@ -814,7 +818,7 @@ func TestKubeletVersionCheck(t *testing.T) {
 				},
 			}
 
-			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec}
+			check := KubeletVersionCheck{KubernetesVersion: tc.k8sVersion, exec: fexec, minKubeletVersion: minimumKubeletVersion}
 			warnings, errors := check.Check()
 
 			switch {

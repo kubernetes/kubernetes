@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/configz"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics/legacyregistry"
 	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
 )
@@ -63,6 +64,7 @@ func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, checks ...hea
 		if c.EnableContentionProfiling {
 			goruntime.SetBlockProfileRate(1)
 		}
+		routes.DebugFlags{}.Install(mux, "v", routes.StringFlagPutHandler(logs.GlogSetter))
 	}
 	configz.InstallHandler(mux)
 	//lint:ignore SA1019 See the Metrics Stability Migration KEP

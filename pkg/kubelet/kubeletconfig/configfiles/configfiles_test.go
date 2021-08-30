@@ -17,11 +17,10 @@ limitations under the License.
 package configfiles
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
-
-	"github.com/pkg/errors"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -166,7 +165,7 @@ foo: bar`),
 			}
 			kc, err := loader.Load()
 
-			if c.strictErr && !runtime.IsStrictDecodingError(errors.Cause(err)) {
+			if c.strictErr && !runtime.IsStrictDecodingError(errors.Unwrap(err)) {
 				t.Fatalf("got error: %v, want strict decoding error", err)
 			}
 			if utiltest.SkipRest(t, c.desc, err, c.err) {

@@ -17,10 +17,10 @@ limitations under the License.
 package v1beta2
 
 import (
-	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-
 	corev1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
+
+	kubeadm "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
 
 func Convert_kubeadm_InitConfiguration_To_v1beta2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {

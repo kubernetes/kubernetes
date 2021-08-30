@@ -563,18 +563,15 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 
 // GetSchedulableClusterZones returns the values of zone label collected from all nodes which are schedulable.
 func GetSchedulableClusterZones(c clientset.Interface) (sets.String, error) {
-	nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+	// GetReadySchedulableNodes already filters our tainted and unschedulable nodes.
+	nodes, err := GetReadySchedulableNodes(c)
 	if err != nil {
-		return nil, fmt.Errorf("Error getting nodes while attempting to list cluster zones: %v", err)
+		return nil, fmt.Errorf("error getting nodes while attempting to list cluster zones: %v", err)
 	}
 
 	// collect values of zone label from all nodes
 	zones := sets.NewString()
 	for _, node := range nodes.Items {
-		// We should have at least 1 node in the zone which is schedulable.
-		if !IsNodeSchedulable(&node) {
-			continue
-		}
 		if zone, found := node.Labels[v1.LabelFailureDomainBetaZone]; found {
 			zones.Insert(zone)
 		}

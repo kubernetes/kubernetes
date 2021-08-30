@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.5.0
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -62,7 +62,7 @@ endif
 # This option is for running docker manifest command
 export DOCKER_CLI_EXPERIMENTAL := enabled
 # golang version should match the golang version of the official build from https://github.com/etcd-io/etcd/releases.
-GOLANG_VERSION?=1.12.17
+GOLANG_VERSION?=1.16.7
 GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -84,6 +84,8 @@ endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
 
+QEMUVERSION?=5.2.0-2
+
 build:
 	# Explicitly copy files to the temp directory
 	$(BIN_INSTALL) migrate-if-needed.sh $(TEMP_DIR)
@@ -92,10 +94,10 @@ build:
 	# Compile migrate
 	migrate_tmp_dir=$(shell mktemp -d); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/migrate k8s.io/kubernetes/cluster/images/etcd/migrate"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/migrate $(TEMP_DIR); \
 	docker run --rm --interactive -v $(shell pwd)/../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
-		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
+		/bin/bash -c "CGO_ENABLED=0 GO111MODULE=off go build -o /build/cp k8s.io/kubernetes/cluster/images/etcd/cp"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
@@ -143,13 +145,20 @@ else
 	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> Dockerfile
 endif
 
+	docker run --rm --privileged multiarch/qemu-user-static:$(QEMUVERSION) --reset -p yes
+	docker buildx version
+	BUILDER=$(shell docker buildx create --use)
+
 	# And build the image
-	docker build \
+	docker buildx build \
 		--pull \
+		--load \
+		--platform linux/$(ARCH) \
 		-t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) \
 		--build-arg BASEIMAGE=$(BASEIMAGE) \
 		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
 		$(TEMP_DIR)
+	docker buildx rm $$BUILDER
 
 push: build
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)

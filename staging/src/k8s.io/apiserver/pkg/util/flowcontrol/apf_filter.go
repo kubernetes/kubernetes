@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/server/mux"
-	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
@@ -54,7 +53,7 @@ type Interface interface {
 	// ctx is cancelled or times out.
 	Handle(ctx context.Context,
 		requestDigest RequestDigest,
-		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
 	)
@@ -83,7 +82,6 @@ func New(
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 ) Interface {
-	grc := counter.NoOp{}
 	clk := eventclock.Real{}
 	return NewTestable(TestableConfig{
 		Name:                   "Controller",
@@ -95,7 +93,7 @@ func New(
 		ServerConcurrencyLimit: serverConcurrencyLimit,
 		RequestWaitLimit:       requestWaitLimit,
 		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		QueueSetFactory:        fqs.NewQueueSetFactory(clk, grc),
+		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	})
 }
 
@@ -146,12 +144,12 @@ func NewTestable(config TestableConfig) Interface {
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
-	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 	queueNoteFn fq.QueueNoteFn,
 	execFn func()) {
-	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
+	fs, pl, isExempt, req, startWaitingTime, flowDistinguisher := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
 	queued := startWaitingTime != time.Time{}
-	noteFn(fs, pl)
+	noteFn(fs, pl, flowDistinguisher)
 	if req == nil {
 		if queued {
 			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))

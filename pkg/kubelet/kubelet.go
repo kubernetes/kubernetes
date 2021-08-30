@@ -38,6 +38,7 @@ import (
 	libcontaineruserns "github.com/opencontainers/runc/libcontainer/userns"
 	"k8s.io/mount-utils"
 	"k8s.io/utils/integer"
+	netutils "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -505,7 +506,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	clusterDNS := make([]net.IP, 0, len(kubeCfg.ClusterDNS))
 	for _, ipEntry := range kubeCfg.ClusterDNS {
-		ip := net.ParseIP(ipEntry)
+		ip := netutils.ParseIPSloppy(ipEntry)
 		if ip == nil {
 			klog.InfoS("Invalid clusterDNS IP", "IP", ipEntry)
 		} else {
@@ -867,7 +868,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		util.SetNodeOwnerFunc(klet.heartbeatClient, string(klet.nodeName)))
 
 	// setup node shutdown manager
-	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.syncNodeStatus, kubeCfg.ShutdownGracePeriod.Duration, kubeCfg.ShutdownGracePeriodCriticalPods.Duration)
+	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(kubeDeps.Recorder, nodeRef, klet.GetActivePods, killPodNow(klet.podWorkers, kubeDeps.Recorder), klet.syncNodeStatus, kubeCfg.ShutdownGracePeriod.Duration, kubeCfg.ShutdownGracePeriodCriticalPods.Duration)
 
 	klet.shutdownManager = shutdownManager
 	klet.admitHandlers.AddPodAdmitHandler(shutdownAdmitHandler)

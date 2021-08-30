@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"golang.org/x/oauth2"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -23,6 +22,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 type awsSecurityCredentials struct {
@@ -341,6 +342,9 @@ func (cs awsCredentialSource) subjectToken() (string, error) {
 
 func (cs *awsCredentialSource) getRegion() (string, error) {
 	if envAwsRegion := getenv("AWS_REGION"); envAwsRegion != "" {
+		return envAwsRegion, nil
+	}
+	if envAwsRegion := getenv("AWS_DEFAULT_REGION"); envAwsRegion != "" {
 		return envAwsRegion, nil
 	}
 

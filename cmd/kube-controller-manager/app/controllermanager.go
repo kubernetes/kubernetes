@@ -59,6 +59,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/clientbuilder"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
@@ -262,7 +263,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 		// Wrap saTokenControllerInitFunc to signal readiness for migration after starting
 		//  the controller.
-		startSATokenController = func(ctx ControllerContext) (http.Handler, bool, error) {
+		startSATokenController = func(ctx ControllerContext) (controller.Interface, bool, error) {
 			defer close(leaderMigrator.MigrationReady)
 			return saTokenControllerInitFunc(ctx)
 		}
@@ -367,10 +368,14 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 	return genericcontrollermanager.IsControllerEnabled(name, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
 
-// InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
+// InitFunc is used to launch a particular controller. It returns a controller
+// that can optionally implement other interfaces so that the controller manager
+// can support the requested features.
+// The returned controller may be nil, which will be considered an anonymous controller
+// that requests no additional features from the controller manager.
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
-type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
+type InitFunc func(ctx ControllerContext) (controller controller.Interface, enabled bool, err error)
 
 // ControllerInitializersFunc is used to create a collection of initializers
 //  given the loopMode.
@@ -560,7 +565,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 		time.Sleep(wait.Jitter(ctx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		klog.V(1).Infof("Starting %q", controllerName)
-		debugHandler, started, err := initFn(ctx)
+		ctrl, started, err := initFn(ctx)
 		if err != nil {
 			klog.Errorf("Error starting %q", controllerName)
 			return err
@@ -569,10 +574,16 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			klog.Warningf("Skipping %q", controllerName)
 			continue
 		}
-		if debugHandler != nil && unsecuredMux != nil {
-			basePath := "/debug/controllers/" + controllerName
-			unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
-			unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+		if ctrl != nil {
+			// check if the controller supports and requests a debugHandler
+			// and it needs the unsecuredMux to mount the handler onto.
+			if debuggable, ok := ctrl.(controller.Debuggable); ok && unsecuredMux != nil {
+				if debugHandler := debuggable.DebuggingHandler(); debugHandler != nil {
+					basePath := "/debug/controllers/" + controllerName
+					unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
+					unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+				}
+			}
 		}
 		klog.Infof("Started %q", controllerName)
 	}
@@ -587,7 +598,7 @@ type serviceAccountTokenControllerStarter struct {
 	rootClientBuilder clientbuilder.ControllerClientBuilder
 }
 
-func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {
+func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (controller.Interface, bool, error) {
 	if !ctx.IsControllerEnabled(saTokenControllerName) {
 		klog.Warningf("%q is disabled", saTokenControllerName)
 		return nil, false, nil

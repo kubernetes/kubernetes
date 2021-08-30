@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"time"
@@ -32,6 +33,13 @@ import (
 )
 
 func main() {
+	if err := runSchedulerCmd(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+}
+
+func runSchedulerCmd() error {
 	rand.Seed(time.Now().UnixNano())
 
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
@@ -42,6 +50,8 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		os.Exit(1)
+		return err
 	}
+
+	return nil
 }

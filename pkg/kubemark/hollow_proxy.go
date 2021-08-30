@@ -18,7 +18,6 @@ package kubemark
 
 import (
 	"fmt"
-	"net"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +34,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 
 	"k8s.io/klog/v2"
@@ -83,7 +83,7 @@ func NewHollowProxyOrDie(
 		nodeIP := utilnode.GetNodeIP(client, nodeName)
 		if nodeIP == nil {
 			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1")
-			nodeIP = net.ParseIP("127.0.0.1")
+			nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -21,10 +22,11 @@ package winkernel
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/Microsoft/hcsshim"
 	"k8s.io/klog/v2"
-	"net"
-	"strings"
+	netutils "k8s.io/utils/net"
 )
 
 type HostNetworkService interface {
@@ -113,7 +115,7 @@ func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 	}
 	hnsEndpoint := &hcsshim.HNSEndpoint{
 		MacAddress: ep.macAddress,
-		IPAddress:  net.ParseIP(ep.ip),
+		IPAddress:  netutils.ParseIPSloppy(ep.ip),
 	}
 
 	var createdEndpoint *hcsshim.HNSEndpoint

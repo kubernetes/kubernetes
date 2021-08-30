@@ -30,12 +30,12 @@ import (
 
 func TestFailedAuthnAudit(t *testing.T) {
 	sink := &fakeAuditSink{}
-	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
-		sink, policyChecker)
+		sink, fakeRuleEvaluator)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
@@ -62,12 +62,12 @@ func TestFailedAuthnAudit(t *testing.T) {
 
 func TestFailedMultipleAuthnAudit(t *testing.T) {
 	sink := &fakeAuditSink{}
-	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
-		sink, policyChecker)
+		sink, fakeRuleEvaluator)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
@@ -95,12 +95,12 @@ func TestFailedMultipleAuthnAudit(t *testing.T) {
 
 func TestFailedAuthnAuditWithoutAuthorization(t *testing.T) {
 	sink := &fakeAuditSink{}
-	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, nil)
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
-		sink, policyChecker)
+		sink, fakeRuleEvaluator)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)
@@ -126,12 +126,12 @@ func TestFailedAuthnAuditWithoutAuthorization(t *testing.T) {
 
 func TestFailedAuthnAuditOmitted(t *testing.T) {
 	sink := &fakeAuditSink{}
-	policyChecker := policy.FakeChecker(auditinternal.LevelRequestResponse, []auditinternal.Stage{auditinternal.StageResponseStarted})
+	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, []auditinternal.Stage{auditinternal.StageResponseStarted})
 	handler := WithFailedAuthenticationAudit(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "", http.StatusUnauthorized)
 		}),
-		sink, policyChecker)
+		sink, fakeRuleEvaluator)
 	req, _ := http.NewRequest("GET", "/api/v1/namespaces/default/pods", nil)
 	req.RemoteAddr = "127.0.0.1"
 	req = withTestContext(req, nil, nil)

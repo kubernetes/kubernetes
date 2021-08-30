@@ -28,6 +28,7 @@ import (
 type ErrCallingWebhook struct {
 	WebhookName string
 	Reason      error
+	Status      *apierrors.StatusError
 }
 
 func (e *ErrCallingWebhook) Error() string {

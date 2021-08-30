@@ -278,3 +278,86 @@ func TestEventCorrelator(t *testing.T) {
 		}
 	}
 }
+
+func TestEventSpamFilter(t *testing.T) {
+	spamKeyFuncBasedOnObjectsAndReason := func(e *v1.Event) string {
+		return strings.Join([]string{
+			e.Source.Component,
+			e.Source.Host,
+			e.InvolvedObject.Kind,
+			e.InvolvedObject.Namespace,
+			e.InvolvedObject.Name,
+			string(e.InvolvedObject.UID),
+			e.InvolvedObject.APIVersion,
+			e.Reason,
+		},
+			"")
+	}
+	burstSize := 1
+	eventInterval := time.Duration(1) * time.Second
+	originalEvent := makeEvent("original", "i am first", makeObjectReference("Pod", "my-pod", "my-ns"))
+	differentReasonEvent := makeEvent("duplicate", "me again", makeObjectReference("Pod", "my-pod", "my-ns"))
+	spamEvent := makeEvent("original", "me again", makeObjectReference("Pod", "my-pod", "my-ns"))
+	testCases := map[string]struct {
+		newEvent      v1.Event
+		expectedEvent v1.Event
+		expectedSkip  bool
+		spamKeyFunc   EventSpamKeyFunc
+	}{
+		"event should be reported as spam if object reference is the same for default spam filter": {
+			newEvent:     differentReasonEvent,
+			expectedSkip: true,
+		},
+		"event should not be reported as spam if object reference is the same, but reason is different for custom spam filter": {
+			newEvent:      differentReasonEvent,
+			expectedEvent: differentReasonEvent,
+			expectedSkip:  false,
+			spamKeyFunc:   spamKeyFuncBasedOnObjectsAndReason,
+		},
+		"event should  be reported as spam if object reference and reason is the same, but message is different for custom spam filter": {
+			newEvent:     spamEvent,
+			expectedSkip: true,
+			spamKeyFunc:  spamKeyFuncBasedOnObjectsAndReason,
+		},
+	}
+	for testDescription, testInput := range testCases {
+
+		c := clock.IntervalClock{Time: time.Now(), Duration: eventInterval}
+		correlator := NewEventCorrelatorWithOptions(CorrelatorOptions{
+			Clock:       &c,
+			SpamKeyFunc: testInput.spamKeyFunc,
+			BurstSize:   burstSize,
+		})
+		// emitting original event
+		result, err := correlator.EventCorrelate(&originalEvent)
+		if err != nil {
+			t.Errorf("scenario %v: unexpected error correlating originalEvent %v", testDescription, err)
+		}
+		// if we are skipping the event, we can avoid updating state
+		if !result.Skip {
+			correlator.UpdateState(result.Event)
+		}
+
+		result, err = correlator.EventCorrelate(&testInput.newEvent)
+		if err != nil {
+			t.Errorf("scenario %v: unexpected error correlating input event %v", testDescription, err)
+		}
+
+		// verify we did not get skip from filter function unexpectedly...
+		if result.Skip != testInput.expectedSkip {
+			t.Errorf("scenario %v: expected skip %v, but got %v", testDescription, testInput.expectedSkip, result.Skip)
+			continue
+		}
+
+		// we wanted to actually skip, so no event is needed to validate
+		if testInput.expectedSkip {
+			continue
+		}
+
+		// validate event
+		_, err = validateEvent(testDescription, result.Event, &testInput.expectedEvent, t)
+		if err != nil {
+			t.Errorf("scenario %v: unexpected error validating result %v", testDescription, err)
+		}
+	}
+}

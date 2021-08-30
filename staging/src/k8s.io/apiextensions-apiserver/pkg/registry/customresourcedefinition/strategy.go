@@ -27,9 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -111,12 +109,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 
 // Validate validates a new CustomResourceDefinition.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	var groupVersion schema.GroupVersion
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-	}
-
-	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition), groupVersion)
+	return validation.ValidateCustomResourceDefinition(obj.(*apiextensions.CustomResourceDefinition))
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -139,12 +132,7 @@ func (strategy) Canonicalize(obj runtime.Object) {
 
 // ValidateUpdate is the default update validation for an end user updating status.
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	var groupVersion schema.GroupVersion
-	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
-		groupVersion = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-	}
-
-	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition), groupVersion)
+	return validation.ValidateCustomResourceDefinitionUpdate(obj.(*apiextensions.CustomResourceDefinition), old.(*apiextensions.CustomResourceDefinition))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

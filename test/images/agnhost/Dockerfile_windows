@@ -21,12 +21,15 @@ FROM --platform=linux/amd64 alpine:3.6 as prep
 
 ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_windows_amd64.tgz /coredns.tgz
 ADD https://iperf.fr/download/windows/iperf-2.0.9-win64.zip /iperf.zip
+ADD https://download.savannah.nongnu.org/releases/coreutils/windows-64bit-unsupported/coreutils-8.31-28-windows-64bit.zip /coreutils.zip
 
 # we're also creating an empty /uploads folder, which we're copying over to Windows  because
 # we can't RUN commands on a Windows image.
 RUN tar -xzvf /coredns.tgz &&\
     unzip iperf.zip &&\
     mv iperf-2.0.9-win64 iperf &&\
+    unzip coreutils.zip &&\
+    mv coreutils-8.31-28-windows-64bit wincoreutils &&\
     mkdir /uploads
 
 FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
@@ -44,6 +47,7 @@ FROM $BASEIMAGE
 COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
 COPY --from=prep /coredns.exe /coredns.exe
 COPY --from=prep /iperf /iperf
+COPY --from=prep /wincoreutils/sync.exe /bin/sync.exe
 
 # NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
 ENV PATH="C:\dig\;C:\bin\;C:\curl\;C:\Windows\system32;C:\Windows;C:\Program Files\PowerShell;"

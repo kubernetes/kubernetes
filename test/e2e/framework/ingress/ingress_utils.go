@@ -38,6 +38,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -332,7 +333,7 @@ func GenerateRSACerts(host string, isCA bool) ([]byte, []byte, error) {
 
 	hosts := strings.Split(host, ",")
 	for _, h := range hosts {
-		if ip := net.ParseIP(h); ip != nil {
+		if ip := netutils.ParseIPSloppy(h); ip != nil {
 			template.IPAddresses = append(template.IPAddresses, ip)
 		} else {
 			template.DNSNames = append(template.DNSNames, h)

@@ -24,17 +24,17 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
-	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
-	golang.org/x/oauth2 v0.0.0-20210514164344-f6687ab2804c
-	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect
+	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
+	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	google.golang.org/protobuf v1.26.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.9.0
-	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
-	k8s.io/utils v0.0.0-20210707171843-4b05e18ac7d9
+	k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8
+	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2
 	sigs.k8s.io/yaml v1.2.0
 )

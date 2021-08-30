@@ -34,24 +34,26 @@ import (
 	"strings"
 	"time"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/images"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
-	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/version"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	kubeadmversion "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	system "k8s.io/system-validators/validators"
 	utilsexec "k8s.io/utils/exec"
-	utilsnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 
-	"github.com/pkg/errors"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/images"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
+	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
 
 const (
@@ -430,7 +432,7 @@ func (hst HTTPProxyCheck) Name() string {
 func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
 	u := &url.URL{Scheme: hst.Proto, Host: hst.Host}
-	if utilsnet.IsIPv6String(hst.Host) {
+	if netutils.IsIPv6String(hst.Host) {
 		u.Host = net.JoinHostPort(hst.Host, "1234")
 	}
 
@@ -472,12 +474,12 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 		return nil, nil
 	}
 
-	_, cidr, err := net.ParseCIDR(subnet.CIDR)
+	_, cidr, err := netutils.ParseCIDRSloppy(subnet.CIDR)
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "error parsing CIDR %q", subnet.CIDR)}
 	}
 
-	testIP, err := utilsnet.GetIndexedIP(cidr, 1)
+	testIP, err := netutils.GetIndexedIP(cidr, 1)
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", cidr.String())}
 	}
@@ -604,6 +606,7 @@ func (kubever KubernetesVersionCheck) Check() (warnings, errorList []error) {
 // KubeletVersionCheck validates installed kubelet version
 type KubeletVersionCheck struct {
 	KubernetesVersion string
+	minKubeletVersion *version.Version
 	exec              utilsexec.Interface
 }
 
@@ -619,7 +622,10 @@ func (kubever KubeletVersionCheck) Check() (warnings, errorList []error) {
 	if err != nil {
 		return nil, []error{errors.Wrap(err, "couldn't get kubelet version")}
 	}
-	if kubeletVersion.LessThan(kubeadmconstants.MinimumKubeletVersion) {
+	if kubever.minKubeletVersion == nil {
+		kubever.minKubeletVersion = constants.MinimumKubeletVersion
+	}
+	if kubeletVersion.LessThan(kubever.minKubeletVersion) {
 		return nil, []error{errors.Errorf("Kubelet version %q is lower than kubeadm can support. Please upgrade kubelet", kubeletVersion)}
 	}
 
@@ -935,8 +941,8 @@ func RunInitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfigura
 		checks = addCommonChecks(execer, cfg.KubernetesVersion, &cfg.NodeRegistration, checks)
 
 		// Check if Bridge-netfilter and IPv6 relevant flags are set
-		if ip := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
-			if utilsnet.IsIPv6(ip) {
+		if ip := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress); ip != nil {
+			if netutils.IsIPv6(ip) {
 				checks = append(checks,
 					FileContentCheck{Path: bridgenf6, Content: []byte{'1'}},
 					FileContentCheck{Path: ipv6DefaultForwarding, Content: []byte{'1'}},
@@ -1000,8 +1006,8 @@ func RunJoinNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.JoinConfigura
 			checks = append(checks,
 				HTTPProxyCheck{Proto: "https", Host: ipstr},
 			)
-			if ip := net.ParseIP(ipstr); ip != nil {
-				if utilsnet.IsIPv6(ip) {
+			if ip := netutils.ParseIPSloppy(ipstr); ip != nil {
+				if netutils.IsIPv6(ip) {
 					addIPv6Checks = true
 				}
 			}

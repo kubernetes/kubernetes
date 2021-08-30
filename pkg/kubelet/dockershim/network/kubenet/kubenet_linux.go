@@ -1,3 +1,4 @@
+//go:build linux && !dockerless
 // +build linux,!dockerless
 
 /*
@@ -259,7 +260,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	}
 
 	for idx, currentPodCIDR := range podCIDRs {
-		_, cidr, err := net.ParseCIDR(currentPodCIDR)
+		_, cidr, err := netutils.ParseCIDRSloppy(currentPodCIDR)
 		if nil != err {
 			klog.InfoS("Failed to generate CNI network config with cidr at the index", "podCIDR", currentPodCIDR, "index", idx, "err", err)
 			return
@@ -451,7 +452,7 @@ func (plugin *kubenetNetworkPlugin) addPortMapping(id kubecontainer.ContainerID,
 			Namespace:    namespace,
 			Name:         name,
 			PortMappings: portMappings,
-			IP:           net.ParseIP(ip),
+			IP:           netutils.ParseIPSloppy(ip),
 			HostNetwork:  false,
 		}
 		if netutils.IsIPv6(pm.IP) {
@@ -635,7 +636,7 @@ func (plugin *kubenetNetworkPlugin) getNetworkStatus(id kubecontainer.ContainerI
 
 	ips := make([]net.IP, 0, len(iplist))
 	for _, ip := range iplist {
-		ips = append(ips, net.ParseIP(ip))
+		ips = append(ips, netutils.ParseIPSloppy(ip))
 	}
 
 	return &network.PodNetworkStatus{

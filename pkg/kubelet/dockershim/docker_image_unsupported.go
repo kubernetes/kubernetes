@@ -1,3 +1,4 @@
+//go:build !linux && !windows && !dockerless
 // +build !linux,!windows,!dockerless
 
 /*

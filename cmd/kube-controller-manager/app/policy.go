@@ -21,18 +21,17 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
-
 	"k8s.io/klog/v2"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
-func startDisruptionController(ctx ControllerContext) (http.Handler, bool, error) {
+func startDisruptionController(ctx ControllerContext) (controller.Interface, bool, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
 		klog.InfoS("Refusing to start disruption because the PodDisruptionBudget feature is disabled")
 		return nil, false, nil

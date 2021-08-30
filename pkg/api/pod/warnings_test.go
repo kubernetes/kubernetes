@@ -423,8 +423,8 @@ func TestWarnings(t *testing.T) {
 			},
 			expected: []string{
 				`metadata.annotations[scheduler.alpha.kubernetes.io/critical-pod]: non-functional in v1.16+; use the "priorityClassName" field instead`,
-				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: deprecated since v1.19; use the "seccompProfile" field instead`,
-				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: deprecated since v1.19; use the "seccompProfile" field instead`,
+				`metadata.annotations[seccomp.security.alpha.kubernetes.io/pod]: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`,
+				`metadata.annotations[container.seccomp.security.alpha.kubernetes.io/foo]: deprecated since v1.19, non-functional in v1.25+; use the "seccompProfile" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 				`metadata.annotations[security.alpha.kubernetes.io/unsafe-sysctls]: non-functional in v1.11+; use the "sysctls" field instead`,
 			},

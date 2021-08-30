@@ -19,14 +19,14 @@ package componentconfigs
 import (
 	"testing"
 
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"github.com/lithammer/dedent"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/lithammer/dedent"
+	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 func testClusterCfg() *kubeadmapi.ClusterConfiguration {

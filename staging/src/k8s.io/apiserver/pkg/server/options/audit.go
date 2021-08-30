@@ -289,8 +289,8 @@ func (o *AuditOptions) ApplyTo(
 		return fmt.Errorf("server config must be non-nil")
 	}
 
-	// 1. Build policy checker
-	checker, err := o.newPolicyChecker()
+	// 1. Build policy evaluator
+	evaluator, err := o.newPolicyRuleEvaluator()
 	if err != nil {
 		return err
 	}
@@ -302,7 +302,7 @@ func (o *AuditOptions) ApplyTo(
 		return err
 	}
 	if w != nil {
-		if checker == nil {
+		if evaluator == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for log backend")
 		} else {
 			logBackend = o.LogOptions.newBackend(w)
@@ -312,7 +312,7 @@ func (o *AuditOptions) ApplyTo(
 	// 3. Build webhook backend
 	var webhookBackend audit.Backend
 	if o.WebhookOptions.enabled() {
-		if checker == nil {
+		if evaluator == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for webhook backend")
 		} else {
 			if c.EgressSelector != nil {
@@ -343,8 +343,8 @@ func (o *AuditOptions) ApplyTo(
 		dynamicBackend = o.WebhookOptions.TruncateOptions.wrapBackend(webhookBackend, groupVersion)
 	}
 
-	// 5. Set the policy checker
-	c.AuditPolicyChecker = checker
+	// 5. Set the policy rule evaluator
+	c.AuditPolicyRuleEvaluator = evaluator
 
 	// 6. Join the log backend with the webhooks
 	c.AuditBackend = appendBackend(logBackend, dynamicBackend)
@@ -355,7 +355,7 @@ func (o *AuditOptions) ApplyTo(
 	return nil
 }
 
-func (o *AuditOptions) newPolicyChecker() (policy.Checker, error) {
+func (o *AuditOptions) newPolicyRuleEvaluator() (audit.PolicyRuleEvaluator, error) {
 	if o.PolicyFile == "" {
 		return nil, nil
 	}
@@ -364,7 +364,7 @@ func (o *AuditOptions) newPolicyChecker() (policy.Checker, error) {
 	if err != nil {
 		return nil, fmt.Errorf("loading audit policy file: %v", err)
 	}
-	return policy.NewChecker(p), nil
+	return policy.NewPolicyRuleEvaluator(p), nil
 }
 
 func (o *AuditBatchOptions) AddFlags(pluginName string, fs *pflag.FlagSet) {

@@ -29,7 +29,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -58,7 +57,7 @@ type stateData struct {
 	// podVolumesByNode holds the pod's volume information found in the Filter
 	// phase for each node
 	// it's initialized in the PreFilter phase
-	podVolumesByNode map[string]*scheduling.PodVolumes
+	podVolumesByNode map[string]*PodVolumes
 	sync.Mutex
 }
 
@@ -70,7 +69,7 @@ func (d *stateData) Clone() framework.StateData {
 // In the Filter phase, pod binding cache is created for the pod and used in
 // Reserve and PreBind phases.
 type VolumeBinding struct {
-	Binder                               scheduling.SchedulerVolumeBinder
+	Binder                               SchedulerVolumeBinder
 	PVCLister                            corelisters.PersistentVolumeClaimLister
 	GenericEphemeralVolumeFeatureEnabled bool
 	scorer                               volumeCapacityScorer
@@ -179,7 +178,7 @@ func (pl *VolumeBinding) PreFilter(ctx context.Context, state *framework.CycleSt
 		status.AppendReason("pod has unbound immediate PersistentVolumeClaims")
 		return status
 	}
-	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*scheduling.PodVolumes)})
+	state.Write(stateKey, &stateData{boundClaims: boundClaims, claimsToBind: claimsToBind, podVolumesByNode: make(map[string]*PodVolumes)})
 	return nil
 }
 
@@ -270,7 +269,7 @@ func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, po
 		class := staticBinding.StorageClassName()
 		storageResource := staticBinding.StorageResource()
 		if _, ok := classResources[class]; !ok {
-			classResources[class] = &scheduling.StorageResource{
+			classResources[class] = &StorageResource{
 				Requested: 0,
 				Capacity:  0,
 			}
@@ -367,14 +366,14 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	pvInformer := fh.SharedInformerFactory().Core().V1().PersistentVolumes()
 	storageClassInformer := fh.SharedInformerFactory().Storage().V1().StorageClasses()
 	csiNodeInformer := fh.SharedInformerFactory().Storage().V1().CSINodes()
-	var capacityCheck *scheduling.CapacityCheck
+	var capacityCheck *CapacityCheck
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
-		capacityCheck = &scheduling.CapacityCheck{
+		capacityCheck = &CapacityCheck{
 			CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
 			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1beta1().CSIStorageCapacities(),
 		}
 	}
-	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+	binder := NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
 
 	// build score function
 	var scorer volumeCapacityScorer

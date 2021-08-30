@@ -275,17 +275,17 @@ func setupSuite() {
 
 // logClusterImageSources writes out cluster image sources.
 func logClusterImageSources() {
-	masterImg, nodeImg, err := lookupClusterImageSources()
+	controlPlaneNodeImg, workerNodeImg, err := lookupClusterImageSources()
 	if err != nil {
 		framework.Logf("Cluster image sources lookup failed: %v\n", err)
 		return
 	}
-	framework.Logf("cluster-master-image: %s", masterImg)
-	framework.Logf("cluster-node-image: %s", nodeImg)
+	framework.Logf("cluster-control-plane-node-image: %s", controlPlaneNodeImg)
+	framework.Logf("cluster-worker-node-image: %s", workerNodeImg)
 
 	images := map[string]string{
-		"master_os_image": masterImg,
-		"node_os_image":   nodeImg,
+		"control_plane_node_os_image": controlPlaneNodeImg,
+		"worker_node_os_image":        workerNodeImg,
 	}
 
 	outputBytes, _ := json.MarshalIndent(images, "", "  ")
@@ -298,7 +298,7 @@ func logClusterImageSources() {
 // TODO: These should really just use the GCE API client library or at least use
 // better formatted output from the --format flag.
 
-// Returns master & node image string, or error
+// Returns control plane node & worker node image string, or error
 func lookupClusterImageSources() (string, string, error) {
 	// Given args for a gcloud compute command, run it with other args, and return the values,
 	// whether separated by newlines, commas or semicolons.
@@ -347,35 +347,35 @@ func lookupClusterImageSources() (string, string, error) {
 	}
 
 	// gcloud compute instance-groups list-instances {GROUPNAME} --format="get(instance)"
-	nodeName := ""
+	workerNodeName := ""
 	instGroupName := strings.Split(framework.TestContext.CloudConfig.NodeInstanceGroup, ",")[0]
 	if lines, err := gcloudf("instance-groups", "list-instances", instGroupName, "--format=get(instance)"); err != nil {
 		return "", "", err
 	} else if len(lines) == 0 {
 		return "", "", fmt.Errorf("no instances inside instance-group %q", instGroupName)
 	} else {
-		nodeName = lines[0]
+		workerNodeName = lines[0]
 	}
 
-	nodeImg, err := host2image(nodeName)
+	workerNodeImg, err := host2image(workerNodeName)
 	if err != nil {
 		return "", "", err
 	}
-	frags := strings.Split(nodeImg, "/")
-	nodeImg = frags[len(frags)-1]
+	frags := strings.Split(workerNodeImg, "/")
+	workerNodeImg = frags[len(frags)-1]
 
-	// For GKE clusters, MasterName will not be defined; we just leave masterImg blank.
-	masterImg := ""
-	if masterName := framework.TestContext.CloudConfig.MasterName; masterName != "" {
-		img, err := host2image(masterName)
+	// For GKE clusters, controlPlaneNodeName will not be defined; we just leave controlPlaneNodeImg blank.
+	controlPlaneNodeImg := ""
+	if controlPlaneNodeName := framework.TestContext.CloudConfig.MasterName; controlPlaneNodeName != "" {
+		img, err := host2image(controlPlaneNodeName)
 		if err != nil {
 			return "", "", err
 		}
 		frags = strings.Split(img, "/")
-		masterImg = frags[len(frags)-1]
+		controlPlaneNodeImg = frags[len(frags)-1]
 	}
 
-	return masterImg, nodeImg, nil
+	return controlPlaneNodeImg, workerNodeImg, nil
 }
 
 // setupSuitePerGinkgoNode is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.

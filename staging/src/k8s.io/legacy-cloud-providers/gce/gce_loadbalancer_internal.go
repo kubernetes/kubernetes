@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -55,14 +56,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && existingFwdRule == nil {
 		// When ILBSubsets is enabled, new ILB services will not be processed here.
 		// Services that have existing GCE resources created by this controller will continue to update.
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
-			"Skipped ensureInternalLoadBalancer since %s feature is enabled.", AlphaFeatureILBSubsets)
+		klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, since %s feature is enabled.", svc.Namespace, svc.Name, AlphaFeatureILBSubsets)
 		return nil, cloudprovider.ImplementedElsewhere
 	}
 	if hasFinalizer(svc, ILBFinalizerV2) {
 		// Another controller is handling the resources for this service.
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingEnsureInternalLoadBalancer",
-			"Skipped ensureInternalLoadBalancer as service contains '%s' finalizer.", ILBFinalizerV2)
+		klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, as service contains %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV2)
 		return nil, cloudprovider.ImplementedElsewhere
 	}
 
@@ -275,8 +274,7 @@ func (g *Cloud) clearPreviousInternalResources(svc *v1.Service, loadBalancerName
 // and possibly the backend service need to be updated.
 func (g *Cloud) updateInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, nodes []*v1.Node) error {
 	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && !hasFinalizer(svc, ILBFinalizerV1) {
-		g.eventRecorder.Eventf(svc, v1.EventTypeNormal, "SkippingUpdateInternalLoadBalancer",
-			"Skipped updateInternalLoadBalancer as service does not contain '%s' finalizer.", ILBFinalizerV1)
+		klog.V(2).Infof("Skipped updateInternalLoadBalancer for service %s/%s since it does not contain %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV1)
 		return cloudprovider.ImplementedElsewhere
 	}
 	g.sharedResourceLock.Lock()
