@@ -540,8 +540,10 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 				result, status := fwk.RunPostFilterPlugins(ctx, state, pod, fitError.Diagnosis.NodeToStatusMap)
 				if status.Code() == framework.Error {
 					klog.ErrorS(nil, "Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
+				} else if status.Code() == framework.Success {
+					klog.V(5).InfoS("Succeeded running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
 				} else {
-					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "status", status)
+					klog.V(5).InfoS("Status after running PostFilter plugins for pod", "pod", klog.KObj(pod), "reason", status.Reasons())
 				}
 				if status.IsSuccess() && result != nil {
 					nominatedNode = result.NominatedNodeName

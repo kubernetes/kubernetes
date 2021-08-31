@@ -356,6 +356,7 @@ func nodesWherePreemptionMightHelp(nodes []*framework.NodeInfo, m framework.Node
 		// to determine whether preemption may help or not on the node.
 		if m[name].Code() == framework.UnschedulableAndUnresolvable {
 			nodeStatuses[node.Node().Name] = framework.NewStatus(framework.UnschedulableAndUnresolvable, "Preemption is not helpful for scheduling")
+			klog.V(6).InfoS("Preemption is not helpful for scheduling", "node", name, "failed plugin", m[name].FailedPlugin())
 			continue
 		}
 		potentialNodes = append(potentialNodes, node)
