@@ -130,6 +130,14 @@ type PodWorkers interface {
 	// true.
 	SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkType
 
+	// IsPodKnownTerminated returns true if the provided pod UID is known by the pod
+	// worker to be terminated. If the pod has been force deleted and the pod worker
+	// has completed termination this method will return false, so this method should
+	// only be used to filter out pods from the desired set such as in admission.
+	//
+	// Intended for use by the kubelet config loops, but not subsystems, which should
+	// use ShouldPod*().
+	IsPodKnownTerminated(uid types.UID) bool
 	// CouldHaveRunningContainers returns true before the pod workers have synced,
 	// once the pod workers see the pod (syncPod could be called), and returns false
 	// after the pod has been terminated (running containers guaranteed stopped).
@@ -392,6 +400,16 @@ func newPodWorkers(
 		backOffPeriod:                 backOffPeriod,
 		podCache:                      podCache,
 	}
+}
+
+func (p *podWorkers) IsPodKnownTerminated(uid types.UID) bool {
+	p.podLock.Lock()
+	defer p.podLock.Unlock()
+	if status, ok := p.podSyncStatuses[uid]; ok {
+		return status.IsTerminated()
+	}
+	// if the pod is not known, we return false (pod worker is not aware of it)
+	return false
 }
 
 func (p *podWorkers) CouldHaveRunningContainers(uid types.UID) bool {

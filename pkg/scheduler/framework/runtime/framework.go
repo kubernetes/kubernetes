@@ -1004,8 +1004,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 		status, timeout := f.runPermitPlugin(ctx, pl, state, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
-				msg := fmt.Sprintf("rejected pod %q by permit plugin %q: %v", pod.Name, pl.Name(), status.Message())
-				klog.V(4).Infof(msg)
+				klog.V(4).InfoS("Pod rejected by permit plugin", "pod", klog.KObj(pod), "plugin", pl.Name(), "status", status.Message())
 				status.SetFailedPlugin(pl.Name())
 				return status
 			}
@@ -1027,7 +1026,7 @@ func (f *frameworkImpl) RunPermitPlugins(ctx context.Context, state *framework.C
 		waitingPod := newWaitingPod(pod, pluginsWaitTime)
 		f.waitingPods.add(waitingPod)
 		msg := fmt.Sprintf("one or more plugins asked to wait and no plugin rejected pod %q", pod.Name)
-		klog.V(4).Infof(msg)
+		klog.V(4).InfoS("One or more plugins asked to wait and no plugin rejected pod", "pod", klog.KObj(pod))
 		return framework.NewStatus(framework.Wait, msg)
 	}
 	return nil
@@ -1050,7 +1049,7 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 		return nil
 	}
 	defer f.waitingPods.remove(pod.UID)
-	klog.V(4).Infof("pod %q waiting on permit", pod.Name)
+	klog.V(4).InfoS("Pod waiting on permit", "pod", klog.KObj(pod))
 
 	startTime := time.Now()
 	s := <-waitingPod.s
@@ -1058,8 +1057,7 @@ func (f *frameworkImpl) WaitOnPermit(ctx context.Context, pod *v1.Pod) *framewor
 
 	if !s.IsSuccess() {
 		if s.IsUnschedulable() {
-			msg := fmt.Sprintf("pod %q rejected while waiting on permit: %v", pod.Name, s.Message())
-			klog.V(4).Infof(msg)
+			klog.V(4).InfoS("Pod rejected while waiting on permit", "pod", klog.KObj(pod), "status", s.Message())
 			s.SetFailedPlugin(s.FailedPlugin())
 			return s
 		}

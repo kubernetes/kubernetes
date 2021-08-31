@@ -668,6 +668,7 @@ const (
 	// owner: @maplain @andrewsykim
 	// kep: http://kep.k8s.io/2086
 	// alpha: v1.21
+	// beta: v1.22
 	//
 	// Enables node-local routing for Service internal traffic
 	ServiceInternalTrafficPolicy featuregate.Feature = "ServiceInternalTrafficPolicy"
