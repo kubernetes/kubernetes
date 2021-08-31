@@ -132,9 +132,6 @@ func (j *JSONPath) FindResults(data interface{}) ([][]reflect.Value, error) {
 			}
 			continue
 		}
-		if len(results) == 0 {
-			break
-		}
 		fullResult = append(fullResult, results)
 	}
 	return fullResult, nil
