@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -41,11 +40,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -1207,209 +1204,154 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 	ipv6 := v1.IPv6Protocol
 
 	testCases := []struct {
-		name string
-
-		enableDualStack bool
-		ipFamilies      []v1.IPFamily
-
-		service v1.Service
-
+		name                   string
+		ipFamilies             []v1.IPFamily
+		service                v1.Service
 		expectedEndpointFamily v1.IPFamily
 		expectError            bool
 	}{
 		{
-			name: "v4 service, in a single stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4only,
-
+			name:       "v4 service, in a single stack cluster",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 service, in a dual stack cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v4 service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 service, in a dual stack ipv6-primary cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv6ipv4,
-
+			name:       "v4 service, in a dual stack ipv6-primary cluster",
+			ipFamilies: ipv6ipv4,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 headless service, in a single stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4only,
-
+			name:       "v4 headless service, in a single stack cluster",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 headless service, in a dual stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v4 headless service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP:  v1.ClusterIPNone,
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 legacy headless service, in a dual stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v4 legacy headless service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 legacy headless service, in a dual stack ipv6-primary cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv6ipv4,
-
+			name:       "v4 legacy headless service, in a dual stack ipv6-primary cluster",
+			ipFamilies: ipv6ipv4,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 service, in a dual stack cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v6 service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a single stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv6only,
-
+			name:       "v6 headless service, in a single stack cluster",
+			ipFamilies: ipv6only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a dual stack cluster (connected to a new api-server)",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v6 headless service, in a dual stack cluster (connected to a new api-server)",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP:  v1.ClusterIPNone,
 					IPFamilies: []v1.IPFamily{v1.IPv6Protocol}, // <- set by a api-server defaulting logic
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone, // <- families are not set by api-server
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
-
 		// in reality this is a misconfigured cluster
 		// i.e user is not using dual stack and have PodIP == v4 and ServiceIP==v6
-		// we are testing that we will keep producing the expected behavior
+		// previously controller could assign wrong ip to endpoint address
+		// with gate removed. this is no longer the case. this is *not* behavior change
+		// because previously things would have failed in kube-proxy anyway (due to editing wrong iptables).
 		{
-			name: "v6 service, in a v4 only cluster. dual stack disabled",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4only,
-
+			name:       "v6 service, in a v4 only cluster.",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
-
+			expectError:            true,
 			expectedEndpointFamily: ipv4,
 		},
 		// but this will actually give an error
 		{
-			name: "v6 service, in a v4 only cluster - dual stack enabled",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4only,
-
+			name:       "v6 service, in a v4 only cluster",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
-
 			expectError: true,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 			ns := "test"
 			addPods(podStore, ns, 1, 1, 0, tc.ipFamilies)
