@@ -892,7 +892,14 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// node to be unhealthy unless it was created more than 15m
 		// ago. Within that 15m window, it'll assume node is just
 		// starting and not unhealthy.
-		time.Sleep(15 * time.Minute)
+		//
+		// However, waiting for 15m would allow scale down to kick in
+		// and remove recently added nodes, so here we just wait 2m for
+		// nodes to come up (1m should be enough, another 1m added as
+		// an extra buffer. Then, we break connectivity to a subset of
+		// nodes and only after that we wait for 15m, since scale down
+		// shouldn't happen when the cluster is unhealthy.
+		time.Sleep(2 * time.Minute)
 
 		ginkgo.By("Block network connectivity to some nodes to simulate unhealthy cluster")
 		nodesToBreakCount := int(math.Ceil(math.Max(float64(unhealthyClusterThreshold), 0.5*float64(clusterSize))))
@@ -915,7 +922,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			} else {
 				ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb, false, defaultTimeout)
 				defer e2erc.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "memory-reservation")
-				time.Sleep(scaleUpTimeout)
+				// Wait for 15m to ensure Cluster Autoscaler won't consider broken nodes as still starting.
+				time.Sleep(15 * time.Minute)
 				currentNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 				framework.ExpectNoError(err)
 				framework.Logf("Currently available nodes: %v, nodes available at the start of test: %v, disabled nodes: %v", len(currentNodes.Items), len(nodes.Items), nodesToBreakCount)
