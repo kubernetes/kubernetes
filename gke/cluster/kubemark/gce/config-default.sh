@@ -21,7 +21,7 @@
 
 # shellcheck disable=SC2034 # Variables sourced in other scripts.
 
-source "${KUBE_ROOT}/gke/cluster/gce/config-common.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../gce/config-common.sh"
 
 CLEANUP_KUBEMARK_IMAGE=${CLEANUP_KUBEMARK_IMAGE:-true}
 TEST_CLUSTER_LOG_LEVEL="${TEST_CLUSTER_LOG_LEVEL:-"--v=4"}"

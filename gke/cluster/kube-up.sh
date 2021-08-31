@@ -24,13 +24,20 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
-
-if [ -f "${KUBE_ROOT}/gke/cluster/env.sh" ]; then
-    source "${KUBE_ROOT}/gke/cluster/env.sh"
+# TODO(b/197113765): Remove this script and use binary directly.
+if [[ -e "$(dirname "${BASH_SOURCE[0]}")/../../hack/lib/util.sh" ]]; then
+  # When kubectl.sh is used directly from the repo, it's under gke/cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+else
+  # When kubectl.sh is used from unpacked tarball, it's under cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 fi
 
-source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/env.sh" ]; then
+    source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
+fi
+
+source "$(dirname "${BASH_SOURCE[0]}")/kube-util.sh"
 
 if [ -z "${ZONE-}" ]; then
   echo "... Starting cluster using provider: ${KUBERNETES_PROVIDER}" >&2
@@ -73,7 +80,7 @@ if [[ "${ENABLE_PROXY:-}" == "true" ]]; then
 fi
 
 echo -e "Done, listing cluster services:\n" >&2
-"${KUBE_ROOT}/gke/cluster/kubectl.sh" cluster-info
+"$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" cluster-info
 echo
 
 exit 0

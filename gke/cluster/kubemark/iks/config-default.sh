@@ -14,12 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+CURRENT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
 # Cloud information
 RANDGEN=$(dd if=/dev/urandom bs=64 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=16 count=1 2>/dev/null | sed 's/[A-Z]//g')
 # shellcheck disable=2034 # Variable sourced in other scripts.
 KUBE_NAMESPACE="kubemark_${RANDGEN}"
 KUBEMARK_IMAGE_TAG="${KUBEMARK_IMAGE_TAG:-2}"
-KUBEMARK_IMAGE_LOCATION="${KUBEMARK_IMAGE_LOCATION:-${KUBE_ROOT}/gke/cluster/images/kubemark}"
+KUBEMARK_IMAGE_LOCATION="${KUBEMARK_IMAGE_LOCATION:-${CURRENT_DIR}/../../images/kubemark}"
 KUBEMARK_INIT_TAG="${KUBEMARK_INIT_TAG:-${PROJECT}:${KUBEMARK_IMAGE_TAG}}"
 CLUSTER_LOCATION="${CLUSTER_LOCATION:-wdc06}"
 REGISTRY_LOGIN_URL="${REGISTRY_LOGIN_URL:-https://api.ng.bluemix.net}"

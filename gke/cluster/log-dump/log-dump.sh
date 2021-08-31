@@ -590,7 +590,7 @@ function dump_nodes_with_logexporter() {
   local -r tmp="${KUBE_TEMP}/logexporter"
   local -r manifest_yaml="${tmp}/logexporter-daemonset.yaml"
   mkdir -p "${tmp}"
-  cp "${KUBE_ROOT}/gke/cluster/log-dump/logexporter-daemonset.yaml" "${manifest_yaml}"
+  cp "$(dirname "${BASH_SOURCE[0]}")/logexporter-daemonset.yaml" "${manifest_yaml}"
 
   sed -i'' -e "s@{{.NodeSelector}}@${node_selector:-}@g" "${manifest_yaml}"
   sed -i'' -e "s@{{.LogexporterNamespace}}@${logexporter_namespace}@g" "${manifest_yaml}"
@@ -603,7 +603,7 @@ function dump_nodes_with_logexporter() {
   sed -i'' -e "s@{{.ExtraSystemdServices}}@${extra_systemd_services}@g" "${manifest_yaml}"
 
   # Create the logexporter namespace, service-account secret and the logexporter daemonset within that namespace.
-  KUBECTL="${KUBE_ROOT}/gke/cluster/kubectl.sh"
+  KUBECTL="$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh"
   if ! "${KUBECTL}" create -f "${manifest_yaml}"; then
     echo 'Failed to create logexporter daemonset.. falling back to logdump through SSH'
     "${KUBECTL}" delete namespace "${logexporter_namespace}" || true

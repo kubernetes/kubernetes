@@ -27,9 +27,16 @@ if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
   exit 1
 fi
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
+# TODO(b/197113765): Remove this script and use binary directly.
+if [[ -e "$(dirname "${BASH_SOURCE[0]}")/../../../hack/lib/util.sh" ]]; then
+  # When kubectl.sh is used directly from the repo, it's under gke/cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
+else
+  # When kubectl.sh is used from unpacked tarball, it's under cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+fi
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../kube-util.sh"
 
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
@@ -73,7 +80,7 @@ function usage() {
 
 function print-node-version-info() {
   echo "== $1 Node OS and Kubelet Versions =="
-  "${KUBE_ROOT}/gke/cluster/kubectl.sh" get nodes -o=jsonpath='{range .items[*]}name: "{.metadata.name}", osImage: "{.status.nodeInfo.osImage}", kubeletVersion: "{.status.nodeInfo.kubeletVersion}"{"\n"}{end}'
+  "$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" get nodes -o=jsonpath='{range .items[*]}name: "{.metadata.name}", osImage: "{.status.nodeInfo.osImage}", kubeletVersion: "{.status.nodeInfo.kubeletVersion}"{"\n"}{end}'
 }
 
 function upgrade-master() {
@@ -212,7 +219,7 @@ function setup-base-image() {
         NODE_OS_DISTRIBUTION="gci"
     fi
 
-    source "${KUBE_ROOT}/gke/cluster/gce/${NODE_OS_DISTRIBUTION}/node-helper.sh"
+    source "$(dirname "${BASH_SOURCE[0]}")/${NODE_OS_DISTRIBUTION}/node-helper.sh"
     # Reset the node image based on current os distro
     set-linux-node-image
   fi
@@ -303,7 +310,7 @@ function do-single-node-upgrade() {
   local -r instance="$1"
   local kubectl_rc
   local boot_id
-  boot_id=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+  boot_id=$("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
   if [[ "${kubectl_rc}" != 0 ]]; then
     echo "== FAILED to get bootID ${instance} =="
     echo "${boot_id}"
@@ -313,7 +320,7 @@ function do-single-node-upgrade() {
   # Drain node
   echo "== Draining ${instance}. == " >&2
   local drain_rc
-  "${KUBE_ROOT}/gke/cluster/kubectl.sh" drain --delete-emptydir-data --force --ignore-daemonsets "${instance}" \
+  "$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" drain --delete-emptydir-data --force --ignore-daemonsets "${instance}" \
     && drain_rc=$? || drain_rc=$?
   if [[ "${drain_rc}" != 0 ]]; then
     echo "== FAILED to drain ${instance} =="
@@ -341,7 +348,7 @@ function do-single-node-upgrade() {
   echo "== Waiting for new node to be added to k8s.  ==" >&2
   while true; do
     local new_boot_id
-    new_boot_id=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
+    new_boot_id=$("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" get node "${instance}" --output=jsonpath='{.status.nodeInfo.bootID}' 2>&1) && kubectl_rc=$? || kubectl_rc=$?
     if [[ "${kubectl_rc}" != 0 ]]; then
       echo "== FAILED to get node ${instance} =="
       echo "${boot_id}"
@@ -359,7 +366,7 @@ function do-single-node-upgrade() {
   echo "== Waiting for ${instance} to become ready. ==" >&2
   while true; do
     local ready
-    ready=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
+    ready=$("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" get node "${instance}" --output='jsonpath={.status.conditions[?(@.type == "Ready")].status}')
     if [[ "${ready}" != 'True' ]]; then
       echo "Node ${instance} is still not ready: Ready=${ready}"
     else
@@ -372,7 +379,7 @@ function do-single-node-upgrade() {
   # Uncordon the node.
   echo "== Uncordon ${instance}. == " >&2
   local uncordon_rc
-  "${KUBE_ROOT}/gke/cluster/kubectl.sh" uncordon "${instance}" \
+  "$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" uncordon "${instance}" \
     && uncordon_rc=$? || uncordon_rc=$?
   if [[ "${uncordon_rc}" != 0 ]]; then
     echo "== FAILED to uncordon ${instance} =="
@@ -471,16 +478,16 @@ function update-coredns-config() {
   # Get the new installed CoreDNS version
   echo "== Waiting for CoreDNS to update =="
   local -r endtime=$(date -ud "3 minute" +%s)
-  until [[ $("${KUBE_ROOT}"/gke/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]] || [[ $(date -u +%s) -gt $endtime ]]; do
+  until [[ $("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]] || [[ $(date -u +%s) -gt $endtime ]]; do
      sleep 1
   done
 
-  if [[ $("${KUBE_ROOT}"/gke/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; then
+  if [[ $("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; then
     echo "== CoreDNS ResourceVersion changed =="
   fi
 
   echo "== Fetching the latest installed CoreDNS version =="
-  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/gke/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
+  NEW_COREDNS_VERSION=$("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
 
   case "$(uname -m)" in
       x86_64*)
@@ -534,26 +541,26 @@ function update-coredns-config() {
   chmod +x "${download_dir}/corefile-tool-${host_arch}"
 
   # Migrate the CoreDNS ConfigMap depending on whether it is being downgraded or upgraded.
-  "${KUBE_ROOT}/gke/cluster/kubectl.sh" -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' > "${download_dir}/Corefile-old"
+  "$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' > "${download_dir}/Corefile-old"
 
   if test "$(printf '%s\n' "${CURRENT_COREDNS_VERSION}" "${NEW_COREDNS_VERSION}" | sort -V | head -n 1)" != "${NEW_COREDNS_VERSION}"; then
      echo "== Upgrading the CoreDNS ConfigMap =="
      "${download_dir}/corefile-tool-${host_arch}" migrate --from "${CURRENT_COREDNS_VERSION}" --to "${NEW_COREDNS_VERSION}" --corefile "${download_dir}/Corefile-old" > "${download_dir}/Corefile"
-     "${KUBE_ROOT}/gke/cluster/kubectl.sh" -n kube-system create configmap coredns --from-file "${download_dir}/Corefile" -o yaml --dry-run=client | "${KUBE_ROOT}/gke/cluster/kubectl.sh" apply -f -
+     "$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" -n kube-system create configmap coredns --from-file "${download_dir}/Corefile" -o yaml --dry-run=client | "$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" apply -f -
   else
      # In case of a downgrade, a custom CoreDNS Corefile will be overwritten by a default Corefile. In that case,
      # the user will need to manually modify the resulting (default) Corefile after the downgrade is complete.
      echo "== Applying the latest default CoreDNS configuration =="
      gcloud compute --project "${PROJECT}"  scp --zone "${ZONE}" "${MASTER_NAME}:${coredns_addon_path}/coredns.yaml" "${download_dir}/coredns-manifest.yaml" > /dev/null
-     "${KUBE_ROOT}/gke/cluster/kubectl.sh" apply -f "${download_dir}/coredns-manifest.yaml"
+     "$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" apply -f "${download_dir}/coredns-manifest.yaml"
   fi
 
   echo "== The CoreDNS Config has been updated =="
 }
 
 echo "Fetching the previously installed CoreDNS version"
-CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
-COREDNS_DEPLOY_RESOURCE_VERSION=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}')
+CURRENT_COREDNS_VERSION=$("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
+COREDNS_DEPLOY_RESOURCE_VERSION=$("$(dirname "${BASH_SOURCE[0]}")/../kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}')
 
 master_upgrade=true
 node_upgrade=true
@@ -701,6 +708,6 @@ if [[ "${CLUSTER_DNS_CORE_DNS:-}" == "true" ]]; then
 fi
 
 echo "== Validating cluster post-upgrade =="
-"${KUBE_ROOT}/gke/cluster/validate-cluster.sh"
+"$(dirname "${BASH_SOURCE[0]}")/../validate-cluster.sh"
 
 print-node-version-info "Post-Upgrade"

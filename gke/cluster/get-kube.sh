@@ -99,10 +99,10 @@ function set_binary_version() {
 function download_kube_binaries {
   (
     cd kubernetes
-    if [[ -x ./gke/cluster/get-kube-binaries.sh ]]; then
+    if [[ -x $(dirname "${BASH_SOURCE[0]}")/get-kube-binaries.sh ]]; then
       # Make sure to use the same download URL in get-kube-binaries.sh
       KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL}" \
-        ./gke/cluster/get-kube-binaries.sh
+        $(dirname "${BASH_SOURCE[0]}")/get-kube-binaries.sh
     fi
   )
 }
@@ -114,7 +114,7 @@ function create_cluster {
   echo "Creating a kubernetes on ${KUBERNETES_PROVIDER:-gce}..."
   (
     cd kubernetes
-    ./gke/cluster/kube-up.sh
+    $(dirname "${BASH_SOURCE[0]}")/kube-up.sh
     echo "Kubernetes binaries at ${PWD}/gke/cluster/"
     if [[ ":$PATH:" != *":${PWD}/gke/cluster:"* ]]; then
       echo "You may want to add this directory to your PATH in \$HOME/.profile"

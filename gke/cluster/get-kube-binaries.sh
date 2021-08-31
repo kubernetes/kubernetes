@@ -54,7 +54,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+# TODO(b/197113765): Remove this script and use binary directly.
+if [[ -e "$(dirname "${BASH_SOURCE[0]}")/../../hack/lib/util.sh" ]]; then
+  # When kubectl.sh is used directly from the repo, it's under gke/cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+else
+  # When kubectl.sh is used from unpacked tarball, it's under cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+fi
 
 KUBERNETES_RELEASE_URL="${KUBERNETES_RELEASE_URL:-https://dl.k8s.io}"
 

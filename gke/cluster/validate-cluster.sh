@@ -24,19 +24,26 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+# TODO(b/197113765): Remove this script and use binary directly.
+if [[ -e "$(dirname "${BASH_SOURCE[0]}")/../../hack/lib/util.sh" ]]; then
+  # When kubectl.sh is used directly from the repo, it's under gke/cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+else
+  # When kubectl.sh is used from unpacked tarball, it's under cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+fi
 
-if [ -f "${KUBE_ROOT}/gke/cluster/env.sh" ]; then
-  source "${KUBE_ROOT}/gke/cluster/env.sh"
+if [ -f "$(dirname "${BASH_SOURCE[0]}")/env.sh" ]; then
+  source "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 fi
 
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/kube-util.sh"
 
 # Run kubectl and retry upon failure.
 function kubectl_retry() {
   tries=3
-  while ! "${KUBE_ROOT}/gke/cluster/kubectl.sh" "$@"; do
+  while ! "$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" "$@"; do
     tries=$((tries-1))
     if [[ ${tries} -le 0 ]]; then
       echo "('kubectl $*' failed, giving up)" >&2

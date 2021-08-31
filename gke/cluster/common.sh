@@ -20,7 +20,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+# TODO(b/197113765): Remove this script and use binary directly.
+if [[ -e "$(dirname "${BASH_SOURCE[0]}")/../../hack/lib/util.sh" ]]; then
+  # When kubectl.sh is used directly from the repo, it's under gke/cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+else
+  # When kubectl.sh is used from unpacked tarball, it's under cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
+fi
 
 DEFAULT_KUBECONFIG="${HOME:-.}/.kube/config"
 
@@ -67,7 +74,7 @@ export KUBE_CI_VERSION_DASHED_REGEX="^v(0|[1-9][0-9]*)-(0|[1-9][0-9]*)-(0|[1-9][
 #   CA_CERT
 function create-kubeconfig() {
   KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
-  local kubectl="${KUBE_ROOT}/gke/cluster/kubectl.sh"
+  local kubectl="$(dirname "${BASH_SOURCE[0]}")/kubectl.sh"
   SECONDARY_KUBECONFIG=${SECONDARY_KUBECONFIG:-}
   OVERRIDE_CONTEXT=${OVERRIDE_CONTEXT:-}
 
@@ -151,7 +158,7 @@ function clear-kubeconfig() {
       CONTEXT=$OVERRIDE_CONTEXT
   fi
 
-  local kubectl="${KUBE_ROOT}/gke/cluster/kubectl.sh"
+  local kubectl="$(dirname "${BASH_SOURCE[0]}")/kubectl.sh"
   # Unset the current-context before we delete it, as otherwise kubectl errors.
   local cc
   cc=$("${kubectl}" config view -o jsonpath='{.current-context}')
@@ -181,12 +188,12 @@ function get-kubeconfig-basicauth() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
   local cc
-  cc=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+  cc=$("$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" config view -o jsonpath="{.current-context}")
   if [[ -n "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
   local user
-  user=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  user=$("$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
   get-kubeconfig-user-basicauth "${user}"
 
   if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
@@ -210,8 +217,8 @@ function get-kubeconfig-basicauth() {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-kubeconfig-user-basicauth() {
-  KUBE_USER=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.username}")
-  KUBE_PASSWORD=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.password}")
+  KUBE_USER=$("$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.username}")
+  KUBE_PASSWORD=$("$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"$1\")].user.password}")
 }
 
 # Generate basic auth user and password.
@@ -238,13 +245,13 @@ function get-kubeconfig-bearertoken() {
   export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
 
   local cc
-  cc=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" config view -o jsonpath="{.current-context}")
+  cc=$("$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" config view -o jsonpath="{.current-context}")
   if [[ -n "${KUBE_CONTEXT:-}" ]]; then
     cc="${KUBE_CONTEXT}"
   fi
   local user
-  user=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
-  KUBE_BEARER_TOKEN=$("${KUBE_ROOT}/gke/cluster/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.token}")
+  user=$("$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" config view -o jsonpath="{.contexts[?(@.name == \"${cc}\")].context.user}")
+  KUBE_BEARER_TOKEN=$("$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" config view -o jsonpath="{.users[?(@.name == \"${user}\")].user.token}")
 }
 
 # Generate bearer token.
@@ -505,7 +512,7 @@ EOF
 # If KUBERNETES_SKIP_CONFIRM is set to y, we'll automatically download binaries
 # without prompting.
 function verify-kube-binaries() {
-  if ! "${KUBE_ROOT}/gke/cluster/kubectl.sh" version --client >&/dev/null; then
+  if ! "$(dirname "${BASH_SOURCE[0]}")/kubectl.sh" version --client >&/dev/null; then
     echo "!!! kubectl appears to be broken or missing"
     download-release-binaries
   fi
@@ -523,7 +530,7 @@ function verify-release-tars() {
 
 # Download release artifacts.
 function download-release-binaries() {
-  get_binaries_script="${KUBE_ROOT}/gke/cluster/get-kube-binaries.sh"
+  get_binaries_script="$(dirname "${BASH_SOURCE[0]}")/get-kube-binaries.sh"
   local resp="y"
   if [[ ! "${KUBERNETES_SKIP_CONFIRM:-n}" =~ ^[yY]$ ]]; then
     echo "Required release artifacts appear to be missing. Do you wish to download them? [Y/n]"

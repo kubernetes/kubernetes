@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # A library of helper functions and constant for GCI distro
-source "${KUBE_ROOT}/gke/cluster/gce/gci/helper.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../gci/helper.sh"
 
 # shellcheck disable=SC2120
 function get-node-instance-metadata-from-file {
@@ -23,14 +23,14 @@ function get-node-instance-metadata-from-file {
   local metadata=""
   metadata+="kube-env=${KUBE_TEMP}/${kube_env}.yaml,"
   metadata+="kubelet-config=${KUBE_TEMP}/node-kubelet-config.yaml,"
-  metadata+="user-data=${KUBE_ROOT}/gke/cluster/gce/gci/node.yaml,"
-  metadata+="configure-sh=${KUBE_ROOT}/gke/cluster/gce/gci/configure.sh,"
+  metadata+="user-data=$(dirname "${BASH_SOURCE[0]}")/../gci/node.yaml,"
+  metadata+="configure-sh=$(dirname "${BASH_SOURCE[0]}")/../gci/configure.sh,"
   metadata+="cluster-location=${KUBE_TEMP}/cluster-location.txt,"
   metadata+="cluster-name=${KUBE_TEMP}/cluster-name.txt,"
   metadata+="gci-update-strategy=${KUBE_TEMP}/gci-update.txt,"
   metadata+="gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,"
   metadata+="gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt,"
-  metadata+="shutdown-script=${KUBE_ROOT}/gke/cluster/gce/gci/shutdown.sh,"
+  metadata+="shutdown-script=$(dirname "${BASH_SOURCE[0]}")/../gci/shutdown.sh,"
   metadata+="${NODE_EXTRA_METADATA}"
   echo "${metadata}"
 }

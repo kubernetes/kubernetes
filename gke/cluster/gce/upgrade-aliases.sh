@@ -26,9 +26,16 @@ if [[ "${KUBERNETES_PROVIDER:-gce}" != "gce" ]]; then
   exit 1
 fi
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
+# TODO(b/197113765): Remove this script and use binary directly.
+if [[ -e "$(dirname "${BASH_SOURCE[0]}")/../../../hack/lib/util.sh" ]]; then
+  # When kubectl.sh is used directly from the repo, it's under gke/cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../../..
+else
+  # When kubectl.sh is used from unpacked tarball, it's under cluster.
+  KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
+fi
 source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/gke/cluster/kube-util.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../kube-util.sh"
 
 # Print the number of routes used for K8s cluster node connectivity.
 #
@@ -174,7 +181,7 @@ export ETCD_IMAGE=3.5.0-0
 export ETCD_VERSION=3.5.0
 
 # Upgrade master with updated kube envs
-"${KUBE_ROOT}/gke/cluster/gce/upgrade.sh" -M -l
+"$(dirname "${BASH_SOURCE[0]}")/upgrade.sh" -M -l
 
 delete-k8s-node-routes
 set-allow-subnet-cidr-routes-overlap false
