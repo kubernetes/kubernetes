@@ -43,7 +43,7 @@ func RawAttachProgram(opts RawAttachProgramOptions) error {
 	}
 
 	if err := internal.BPFProgAttach(&attr); err != nil {
-		return fmt.Errorf("can't attach program: %s", err)
+		return fmt.Errorf("can't attach program: %w", err)
 	}
 	return nil
 }
@@ -69,7 +69,7 @@ func RawDetachProgram(opts RawDetachProgramOptions) error {
 		AttachType:  uint32(opts.Attach),
 	}
 	if err := internal.BPFProgDetach(&attr); err != nil {
-		return fmt.Errorf("can't detach program: %s", err)
+		return fmt.Errorf("can't detach program: %w", err)
 	}
 
 	return nil

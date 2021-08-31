@@ -208,9 +208,11 @@ type Config struct {
 	RootlessCgroups bool `json:"rootless_cgroups,omitempty"`
 }
 
-type HookName string
-type HookList []Hook
-type Hooks map[HookName]HookList
+type (
+	HookName string
+	HookList []Hook
+	Hooks    map[HookName]HookList
+)
 
 const (
 	// Prestart commands are executed after the container namespaces are created,
@@ -387,7 +389,7 @@ func (c Command) Run(s *specs.State) error {
 	case err := <-errC:
 		return err
 	case <-timerCh:
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 		<-errC
 		return fmt.Errorf("hook ran past specified timeout of %.1fs", c.Timeout.Seconds())
 	}

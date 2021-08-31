@@ -2,10 +2,9 @@
 
 *Go language library to map between non-negative integers and boolean values*
 
-[![Test](https://github.com/willf/bitset/workflows/Test/badge.svg)](https://github.com/willf/bitset/actions?query=workflow%3ATest)
-[![Master Coverage Status](https://coveralls.io/repos/willf/bitset/badge.svg?branch=master&service=github)](https://coveralls.io/github/willf/bitset?branch=master)
+[![Test](https://github.com/bits-and-blooms/bitset/workflows/Test/badge.svg)](https://github.com/willf/bitset/actions?query=workflow%3ATest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/willf/bitset)](https://goreportcard.com/report/github.com/willf/bitset)
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/willf/bitset?tab=doc)](https://pkg.go.dev/github.com/willf/bitset?tab=doc)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/bits-and-blooms/bitset?tab=doc)](https://pkg.go.dev/github.com/bits-and-blooms/bitset?tab=doc)
 
 
 ## Description
@@ -30,7 +29,7 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/willf/bitset"
+	"github.com/bits-and-blooms/bitset"
 )
 
 func main() {
@@ -63,7 +62,7 @@ func main() {
 
 As an alternative to BitSets, one should check out the 'big' package, which provides a (less set-theoretical) view of bitsets.
 
-Package documentation is at: https://pkg.go.dev/github.com/willf/bitset?tab=doc
+Package documentation is at: https://pkg.go.dev/github.com/bits-and-blooms/bitset?tab=doc
 
 ## Memory Usage
 
@@ -78,7 +77,7 @@ It is possible that a later version will match the `math/bits` return signature 
 ## Installation
 
 ```bash
-go get github.com/willf/bitset
+go get github.com/bits-and-blooms/bitset
 ```
 
 ## Contributing

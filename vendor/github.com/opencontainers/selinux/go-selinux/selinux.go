@@ -11,9 +11,10 @@ const (
 	Permissive = 0
 	// Disabled constant to indicate SELinux is disabled
 	Disabled = -1
-
+	// maxCategory is the maximum number of categories used within containers
+	maxCategory = 1024
 	// DefaultCategoryRange is the upper bound on the category range
-	DefaultCategoryRange = uint32(1024)
+	DefaultCategoryRange = uint32(maxCategory)
 )
 
 var (
@@ -275,4 +276,9 @@ func DisableSecOpt() []string {
 // file.
 func GetDefaultContextWithLevel(user, level, scon string) (string, error) {
 	return getDefaultContextWithLevel(user, level, scon)
+}
+
+// PrivContainerMountLabel returns mount label for privileged containers
+func PrivContainerMountLabel() string {
+	return privContainerMountLabel
 }

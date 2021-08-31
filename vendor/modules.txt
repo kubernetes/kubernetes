@@ -182,6 +182,9 @@ github.com/aws/aws-sdk-go/service/sts/stsiface
 github.com/beorn7/perks/quantile
 # github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
 # github.com/bifurcation/mint => github.com/bifurcation/mint v0.0.0-20180715133206-93c51c6ce115
+# github.com/bits-and-blooms/bitset v1.2.0 => github.com/bits-and-blooms/bitset v1.2.0
+github.com/bits-and-blooms/bitset
+# github.com/bits-and-blooms/bitset => github.com/bits-and-blooms/bitset v1.2.0
 # github.com/bketelsen/crypt => github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c
 # github.com/blang/semver v3.5.1+incompatible => github.com/blang/semver v3.5.1+incompatible
 ## explicit
@@ -212,9 +215,9 @@ github.com/checkpoint-restore/go-criu/v5/rpc
 # github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 # github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 # github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
-# github.com/cilium/ebpf v0.5.0 => github.com/cilium/ebpf v0.5.0
+# github.com/cilium/ebpf v0.6.2 => github.com/cilium/ebpf v0.6.2
 github.com/cilium/ebpf
-# github.com/cilium/ebpf => github.com/cilium/ebpf v0.5.0
+# github.com/cilium/ebpf => github.com/cilium/ebpf v0.6.2
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
@@ -286,8 +289,8 @@ github.com/coreos/go-semver/semver
 github.com/coreos/go-systemd/daemon
 github.com/coreos/go-systemd/journal
 github.com/coreos/go-systemd/util
-# github.com/coreos/go-systemd/v22 v22.3.1 => github.com/coreos/go-systemd/v22 v22.3.1
-# github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.1
+# github.com/coreos/go-systemd/v22 v22.3.2 => github.com/coreos/go-systemd/v22 v22.3.2
+# github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.2
 github.com/coreos/go-systemd/v22/dbus
 # github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 ## explicit
@@ -480,9 +483,9 @@ github.com/golang/groupcache/lru
 ## explicit
 # github.com/golang/mock => github.com/golang/mock v1.4.4
 github.com/golang/mock/gomock
-# github.com/golang/protobuf v1.4.3 => github.com/golang/protobuf v1.4.3
+# github.com/golang/protobuf v1.5.0 => github.com/golang/protobuf v1.5.0
 ## explicit
-# github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
+# github.com/golang/protobuf => github.com/golang/protobuf v1.5.0
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
@@ -545,9 +548,9 @@ github.com/google/cadvisor/utils/sysinfo
 github.com/google/cadvisor/version
 github.com/google/cadvisor/watcher
 github.com/google/cadvisor/zfs
-# github.com/google/go-cmp v0.5.4 => github.com/google/go-cmp v0.5.4
+# github.com/google/go-cmp v0.5.5 => github.com/google/go-cmp v0.5.5
 ## explicit
-# github.com/google/go-cmp => github.com/google/go-cmp v0.5.4
+# github.com/google/go-cmp => github.com/google/go-cmp v0.5.5
 github.com/google/go-cmp/cmp
 github.com/google/go-cmp/cmp/cmpopts
 github.com/google/go-cmp/cmp/internal/diff
@@ -883,9 +886,9 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc95 => github.com/opencontainers/runc v1.0.0-rc95
+# github.com/opencontainers/runc v1.0.2 => github.com/opencontainers/runc v1.0.2
 ## explicit
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc95
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.2
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
 github.com/opencontainers/runc/libcontainer/capabilities
@@ -914,9 +917,9 @@ github.com/opencontainers/runc/types
 # github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 github.com/opencontainers/runtime-spec/specs-go
-# github.com/opencontainers/selinux v1.8.0 => github.com/opencontainers/selinux v1.8.0
+# github.com/opencontainers/selinux v1.8.2 => github.com/opencontainers/selinux v1.8.2
 ## explicit
-# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
+# github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.2
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
@@ -994,9 +997,9 @@ github.com/seccomp/libseccomp-golang
 # github.com/shurcooL/sanitized_anchor_name v1.0.0 => github.com/shurcooL/sanitized_anchor_name v1.0.0
 github.com/shurcooL/sanitized_anchor_name
 # github.com/shurcooL/sanitized_anchor_name => github.com/shurcooL/sanitized_anchor_name v1.0.0
-# github.com/sirupsen/logrus v1.7.0 => github.com/sirupsen/logrus v1.7.0
+# github.com/sirupsen/logrus v1.8.1 => github.com/sirupsen/logrus v1.8.1
 github.com/sirupsen/logrus
-# github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.7.0
+# github.com/sirupsen/logrus => github.com/sirupsen/logrus v1.8.1
 # github.com/smartystreets/assertions => github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d
 # github.com/smartystreets/goconvey => github.com/smartystreets/goconvey v1.6.4
 # github.com/soheilhy/cmux v0.1.4 => github.com/soheilhy/cmux v0.1.4
@@ -1107,9 +1110,6 @@ github.com/vmware/govmomi/vim25/progress
 github.com/vmware/govmomi/vim25/soap
 github.com/vmware/govmomi/vim25/types
 github.com/vmware/govmomi/vim25/xml
-# github.com/willf/bitset v1.1.11 => github.com/willf/bitset v1.1.11
-github.com/willf/bitset
-# github.com/willf/bitset => github.com/willf/bitset v1.1.11
 # github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2 => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
 github.com/xiang90/probing
 # github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
@@ -1495,8 +1495,9 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.25.0 => google.golang.org/protobuf v1.25.0
-# google.golang.org/protobuf => google.golang.org/protobuf v1.25.0
+# google.golang.org/protobuf v1.26.0 => google.golang.org/protobuf v1.26.0
+## explicit
+# google.golang.org/protobuf => google.golang.org/protobuf v1.26.0
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -1509,18 +1510,18 @@ google.golang.org/protobuf/internal/encoding/messageset
 google.golang.org/protobuf/internal/encoding/tag
 google.golang.org/protobuf/internal/encoding/text
 google.golang.org/protobuf/internal/errors
-google.golang.org/protobuf/internal/fieldsort
 google.golang.org/protobuf/internal/filedesc
 google.golang.org/protobuf/internal/filetype
 google.golang.org/protobuf/internal/flags
 google.golang.org/protobuf/internal/genid
 google.golang.org/protobuf/internal/impl
-google.golang.org/protobuf/internal/mapsort
+google.golang.org/protobuf/internal/order
 google.golang.org/protobuf/internal/pragma
 google.golang.org/protobuf/internal/set
 google.golang.org/protobuf/internal/strs
 google.golang.org/protobuf/internal/version
 google.golang.org/protobuf/proto
+google.golang.org/protobuf/reflect/protodesc
 google.golang.org/protobuf/reflect/protoreflect
 google.golang.org/protobuf/reflect/protoregistry
 google.golang.org/protobuf/runtime/protoiface

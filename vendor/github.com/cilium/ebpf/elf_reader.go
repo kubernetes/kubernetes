@@ -96,7 +96,7 @@ func LoadCollectionSpecFromReader(rd io.ReaderAt) (*CollectionSpec, error) {
 	}
 
 	btfSpec, err := btf.LoadSpecFromReader(rd)
-	if err != nil {
+	if err != nil && !errors.Is(err, btf.ErrNotFound) {
 		return nil, fmt.Errorf("load BTF: %w", err)
 	}
 
@@ -159,7 +159,7 @@ func LoadCollectionSpecFromReader(rd io.ReaderAt) (*CollectionSpec, error) {
 			}
 
 			if target.Flags&elf.SHF_STRINGS > 0 {
-				return nil, fmt.Errorf("section %q: string %q is not stack allocated: %w", section.Name, rel.Name, ErrNotSupported)
+				return nil, fmt.Errorf("section %q: string is not stack allocated: %w", section.Name, ErrNotSupported)
 			}
 
 			target.references++
@@ -374,16 +374,24 @@ func (ec *elfCode) relocateInstruction(ins *asm.Instruction, rel elf.Symbol) err
 		}
 
 	case dataSection:
+		var offset uint32
 		switch typ {
 		case elf.STT_SECTION:
 			if bind != elf.STB_LOCAL {
 				return fmt.Errorf("direct load: %s: unsupported relocation %s", name, bind)
 			}
 
+			// This is really a reference to a static symbol, which clang doesn't
+			// emit a symbol table entry for. Instead it encodes the offset in
+			// the instruction itself.
+			offset = uint32(uint64(ins.Constant))
+
 		case elf.STT_OBJECT:
 			if bind != elf.STB_GLOBAL {
 				return fmt.Errorf("direct load: %s: unsupported relocation %s", name, bind)
 			}
+
+			offset = uint32(rel.Value)
 
 		default:
 			return fmt.Errorf("incorrect relocation type %v for direct map load", typ)
@@ -394,10 +402,8 @@ func (ec *elfCode) relocateInstruction(ins *asm.Instruction, rel elf.Symbol) err
 		// it's not clear how to encode that into Instruction.
 		name = target.Name
 
-		// For some reason, clang encodes the offset of the symbol its
-		// section in the first basic BPF instruction, while the kernel
-		// expects it in the second one.
-		ins.Constant <<= 32
+		// The kernel expects the offset in the second basic BPF instruction.
+		ins.Constant = int64(uint64(offset) << 32)
 		ins.Src = asm.PseudoMapValue
 
 		// Mark the instruction as needing an update when creating the
@@ -491,33 +497,38 @@ func (ec *elfCode) loadMaps(maps map[string]*MapSpec) error {
 				return fmt.Errorf("section %s: missing symbol for map at offset %d", sec.Name, offset)
 			}
 
-			if maps[mapSym.Name] != nil {
+			mapName := mapSym.Name
+			if maps[mapName] != nil {
 				return fmt.Errorf("section %v: map %v already exists", sec.Name, mapSym)
 			}
 
 			lr := io.LimitReader(r, int64(size))
 
 			spec := MapSpec{
-				Name: SanitizeName(mapSym.Name, -1),
+				Name: SanitizeName(mapName, -1),
 			}
 			switch {
 			case binary.Read(lr, ec.ByteOrder, &spec.Type) != nil:
-				return fmt.Errorf("map %v: missing type", mapSym)
+				return fmt.Errorf("map %s: missing type", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.KeySize) != nil:
-				return fmt.Errorf("map %v: missing key size", mapSym)
+				return fmt.Errorf("map %s: missing key size", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.ValueSize) != nil:
-				return fmt.Errorf("map %v: missing value size", mapSym)
+				return fmt.Errorf("map %s: missing value size", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.MaxEntries) != nil:
-				return fmt.Errorf("map %v: missing max entries", mapSym)
+				return fmt.Errorf("map %s: missing max entries", mapName)
 			case binary.Read(lr, ec.ByteOrder, &spec.Flags) != nil:
-				return fmt.Errorf("map %v: missing flags", mapSym)
+				return fmt.Errorf("map %s: missing flags", mapName)
 			}
 
 			if _, err := io.Copy(internal.DiscardZeroes{}, lr); err != nil {
-				return fmt.Errorf("map %v: unknown and non-zero fields in definition", mapSym)
+				return fmt.Errorf("map %s: unknown and non-zero fields in definition", mapName)
 			}
 
-			maps[mapSym.Name] = &spec
+			if err := spec.clampPerfEventArraySize(); err != nil {
+				return fmt.Errorf("map %s: %w", mapName, err)
+			}
+
+			maps[mapName] = &spec
 		}
 	}
 
@@ -562,6 +573,10 @@ func (ec *elfCode) loadBTFMaps(maps map[string]*MapSpec) error {
 
 			mapSpec, err := mapSpecFromBTF(name, mapStruct, false, ec.btf)
 			if err != nil {
+				return fmt.Errorf("map %v: %w", name, err)
+			}
+
+			if err := mapSpec.clampPerfEventArraySize(); err != nil {
 				return fmt.Errorf("map %v: %w", name, err)
 			}
 
@@ -847,6 +862,8 @@ func getProgType(sectionName string) (ProgramType, AttachType, uint32, string) {
 		"uretprobe/":            {Kprobe, AttachNone, 0},
 		"tracepoint/":           {TracePoint, AttachNone, 0},
 		"raw_tracepoint/":       {RawTracepoint, AttachNone, 0},
+		"raw_tp/":               {RawTracepoint, AttachNone, 0},
+		"tp_btf/":               {Tracing, AttachTraceRawTp, 0},
 		"xdp":                   {XDP, AttachNone, 0},
 		"perf_event":            {PerfEvent, AttachNone, 0},
 		"lwt_in":                {LWTIn, AttachNone, 0},
@@ -860,6 +877,9 @@ func getProgType(sectionName string) (ProgramType, AttachType, uint32, string) {
 		"lirc_mode2":            {LircMode2, AttachLircMode2, 0},
 		"flow_dissector":        {FlowDissector, AttachFlowDissector, 0},
 		"iter/":                 {Tracing, AttachTraceIter, 0},
+		"fentry/":               {Tracing, AttachTraceFEntry, 0},
+		"fmod_ret/":             {Tracing, AttachModifyReturn, 0},
+		"fexit/":                {Tracing, AttachTraceFExit, 0},
 		"fentry.s/":             {Tracing, AttachTraceFEntry, unix.BPF_F_SLEEPABLE},
 		"fmod_ret.s/":           {Tracing, AttachModifyReturn, unix.BPF_F_SLEEPABLE},
 		"fexit.s/":              {Tracing, AttachTraceFExit, unix.BPF_F_SLEEPABLE},
