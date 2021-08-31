@@ -26,13 +26,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/component-helpers/storage/ephemeral"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -288,7 +288,7 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes 
 		}
 
 		pvcName := ""
-		ephemeral := false
+		isEphemeral := false
 		switch {
 		case vol.PersistentVolumeClaim != nil:
 			pvcName = vol.PersistentVolumeClaim.ClaimName
@@ -303,8 +303,8 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes 
 			// just with a computed name and certain ownership.
 			// That is checked below once the pvc object is
 			// retrieved.
-			pvcName = pod.Name + "-" + vol.Name
-			ephemeral = true
+			pvcName = ephemeral.VolumeClaimName(pod, vol)
+			isEphemeral = true
 		default:
 			continue
 		}
@@ -332,8 +332,10 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes 
 		}
 
 		// The PVC for an ephemeral volume must be owned by the pod.
-		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
-			return fmt.Errorf("PVC %s/%s is not owned by pod", pod.Namespace, pvcName)
+		if isEphemeral {
+			if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+				return err
+			}
 		}
 
 		pvName := pvc.Spec.VolumeName

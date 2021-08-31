@@ -40,6 +40,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
+	"k8s.io/component-helpers/storage/ephemeral"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
@@ -686,7 +687,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 
 func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, pvc *v1.PersistentVolumeClaim, err error) {
 	pvcName := ""
-	ephemeral := false
+	isEphemeral := false
 	switch {
 	case vol.PersistentVolumeClaim != nil:
 		pvcName = vol.PersistentVolumeClaim.ClaimName
@@ -699,16 +700,18 @@ func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, p
 		}
 		// Generic ephemeral inline volumes also use a PVC,
 		// just with a computed name, and...
-		pvcName = pod.Name + "-" + vol.Name
-		ephemeral = true
+		pvcName = ephemeral.VolumeClaimName(pod, vol)
+		isEphemeral = true
 	default:
 		return true, nil, nil
 	}
 
 	bound, pvc, err = b.isPVCBound(pod.Namespace, pvcName)
 	// ... the PVC must be owned by the pod.
-	if ephemeral && err == nil && pvc != nil && !metav1.IsControlledBy(pvc, pod) {
-		return false, nil, fmt.Errorf("PVC %s/%s is not owned by pod", pod.Namespace, pvcName)
+	if isEphemeral && err == nil && pvc != nil {
+		if err := ephemeral.VolumeIsForPod(pod, pvc); err != nil {
+			return false, nil, err
+		}
 	}
 	return
 }
