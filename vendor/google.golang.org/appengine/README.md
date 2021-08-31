@@ -72,7 +72,7 @@ A few APIs were cleaned up, and there are some differences:
 * `appengine/socket` is not required on App Engine flexible environment / Managed VMs.
   Use the standard `net` package instead.
 
-## Key Encode/Decode compatibiltiy to help with datastore library migrations
+## Key Encode/Decode compatibility to help with datastore library migrations
 
 Key compatibility updates have been added to help customers transition from google.golang.org/appengine/datastore to cloud.google.com/go/datastore.
 The `EnableKeyConversion` enables automatic conversion from a key encoded with cloud.google.com/go/datastore to google.golang.org/appengine/datastore key type.

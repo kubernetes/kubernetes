@@ -27,7 +27,7 @@ func (r ConnectivityResult) IsOK() bool {
 	return len(r.Error) == 0
 }
 
-// ConnectivityResults is a collection of connectivty reports.
+// ConnectivityResults is a collection of connectivity reports.
 type ConnectivityResults []ConnectivityResult
 
 // IsOK returns true iff no error in any result.

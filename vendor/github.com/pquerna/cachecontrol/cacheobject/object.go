@@ -232,7 +232,7 @@ func ExpirationObject(obj *Object, rv *ObjectResults) {
 			println("Expiration: ", expiresTime.String())
 		}
 	} else {
-		// TODO(pquerna): what should the default behavoir be for expiration time?
+		// TODO(pquerna): what should the default behavior be for expiration time?
 	}
 
 	rv.OutExpirationTime = expiresTime

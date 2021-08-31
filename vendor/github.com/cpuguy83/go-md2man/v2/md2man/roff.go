@@ -233,7 +233,7 @@ func (r *roffRenderer) handleItem(w io.Writer, node *blackfriday.Node, entering 
 		} else if node.ListFlags&blackfriday.ListTypeDefinition != 0 {
 			// state machine for handling terms and following definitions
 			// since blackfriday does not distinguish them properly, nor
-			// does it seperate them into separate lists as it should
+			// does it separatee them into separate lists as it should
 			if !r.defineTerm {
 				out(w, arglistTag)
 				r.defineTerm = true

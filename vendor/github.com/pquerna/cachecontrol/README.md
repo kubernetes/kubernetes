@@ -98,7 +98,7 @@ Please [open issues in Github](https://github.com/pquerna/cachecontrol/issues) f
 
 # Credits
 
-`cachecontrol` has recieved significant contributions from:
+`cachecontrol` has received significant contributions from:
 
 * [Paul Querna](https://github.com/pquerna) 
 

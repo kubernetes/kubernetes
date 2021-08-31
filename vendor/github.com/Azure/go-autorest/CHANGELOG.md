@@ -159,7 +159,7 @@ To hook up a tracer simply call `tracing.Register()` passing in a type that sati
 - Support for multi-tenant via x-ms-authorization-auxiliary header has been added for client credentials with
   secret scenario; this basically bundles multiple OAuthConfig and ServicePrincipalToken types into corresponding
   MultiTenant* types along with a new authorizer that adds the primary and auxiliary token headers to the reqest.
-  The authenticaion helpers have been updated to support this scenario; if environment var AZURE_AUXILIARY_TENANT_IDS
+  The authentication helpers have been updated to support this scenario; if environment var AZURE_AUXILIARY_TENANT_IDS
   is set with a semicolon delimited list of tenants the multi-tenant codepath will kick in to create the appropriate authorizer.
   See `adal.NewMultiTenantOAuthConfig`, `adal.NewMultiTenantServicePrincipalToken` and `autorest.NewMultiTenantServicePrincipalTokenAuthorizer`
   along with their supporting types and methods.
@@ -785,7 +785,7 @@ longer work with golint.
 
 ## v9.0.0
 
-> **IMPORTANT:** This release was intially labeled incorrectly as `v8.4.0`. From the time it was released, it should have been marked `v9.0.0` because it contains breaking changes to the MSI packages. We appologize for any inconvenience this causes.
+> **IMPORTANT:** This release was initially labeled incorrectly as `v8.4.0`. From the time it was released, it should have been marked `v9.0.0` because it contains breaking changes to the MSI packages. We appologize for any inconvenience this causes.
 
 Adding MSI Endpoint Support and CLI token rehydration.
 
@@ -972,7 +972,7 @@ and `azure.DoPollForAsynchronous` for examples.
 
 ## v2.1.0
 
-- Added `StatusCode` to `Error` for more easily obtaining the HTTP Reponse StatusCode (if any)
+- Added `StatusCode` to `Error` for more easily obtaining the HTTP Response StatusCode (if any)
 
 ## v2.0.0
 

@@ -12,7 +12,7 @@ var (
 	ErrLoginFailed = errors.New("failed to get token from API endpoint")
 )
 
-// Login attemps to get a token from the API
+// Login attempts to get a token from the API
 func (c *Client) Login() (token string, err error) {
 	resp, err := c.do("POST", LoginAPIPrefix, doOptions{data: struct {
 		User string `json:"username"`
