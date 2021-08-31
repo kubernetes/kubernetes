@@ -63,21 +63,31 @@ type ServerRunOptions struct {
 	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
 	// rejected with a 429 status code and a 'Retry-After' response.
 	ShutdownSendRetryAfter bool
+
+	// StartupSendRetryAfterUntilReady once set will reject incoming requests with
+	// a 429 status code and a 'Retry-After' response header until the apiserver
+	// hasn't fully initialized.
+	// This option ensures that the system stays consistent even when requests
+	// are received before the server has been initialized.
+	// In particular, it prevents child deletion in case of GC or/and orphaned
+	// content in case of the namespaces controller.
+	StartupSendRetryAfterUntilReady bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
 	defaults := server.NewConfig(serializer.CodecFactory{})
 	return &ServerRunOptions{
-		MaxRequestsInFlight:         defaults.MaxRequestsInFlight,
-		MaxMutatingRequestsInFlight: defaults.MaxMutatingRequestsInFlight,
-		RequestTimeout:              defaults.RequestTimeout,
-		LivezGracePeriod:            defaults.LivezGracePeriod,
-		MinRequestTimeout:           defaults.MinRequestTimeout,
-		ShutdownDelayDuration:       defaults.ShutdownDelayDuration,
-		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
-		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
-		EnablePriorityAndFairness:   true,
-		ShutdownSendRetryAfter:      false,
+		MaxRequestsInFlight:             defaults.MaxRequestsInFlight,
+		MaxMutatingRequestsInFlight:     defaults.MaxMutatingRequestsInFlight,
+		RequestTimeout:                  defaults.RequestTimeout,
+		LivezGracePeriod:                defaults.LivezGracePeriod,
+		MinRequestTimeout:               defaults.MinRequestTimeout,
+		ShutdownDelayDuration:           defaults.ShutdownDelayDuration,
+		JSONPatchMaxCopyBytes:           defaults.JSONPatchMaxCopyBytes,
+		MaxRequestBodyBytes:             defaults.MaxRequestBodyBytes,
+		EnablePriorityAndFairness:       true,
+		ShutdownSendRetryAfter:          false,
+		StartupSendRetryAfterUntilReady: false,
 	}
 }
 
@@ -97,6 +107,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
 	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
+	c.StartupSendRetryAfterUntilReady = s.StartupSendRetryAfterUntilReady
 
 	return nil
 }
@@ -260,6 +271,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"If true the HTTP Server will continue listening until all non long running request(s) in flight have been drained, "+
 		"during this window all incoming requests will be rejected with a status code 429 and a 'Retry-After' response header, "+
 		"in addition 'Connection: close' response header is set in order to tear down the TCP connection when idle.")
+
+	fs.BoolVar(&s.StartupSendRetryAfterUntilReady, "startup-send-retry-after-until-ready", s.ShutdownSendRetryAfter, ""+
+		"If true, incoming request(s) will be rejected with a '429' status code and a 'Retry-After' response header "+
+		"until the apiserver has initialized. This option ensures that the system stays consistent even when requests "+
+		"arrive at the server before it has been initialized.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }
