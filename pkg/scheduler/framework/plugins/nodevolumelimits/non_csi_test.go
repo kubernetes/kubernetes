@@ -102,7 +102,7 @@ func TestEphemeralLimits(t *testing.T) {
 			ephemeralEnabled: true,
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			test:             "volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz is not owned by pod"),
+			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
 		},
 		{
 			newPod:           ephemeralVolumePod,

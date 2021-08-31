@@ -568,7 +568,7 @@ func TestCSILimits(t *testing.T) {
 			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
 			driverNames:      []string{ebsCSIDriverName},
 			test:             "ephemeral volume not owned",
-			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz is not owned by pod"),
+			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz was not created for pod test/abc (pod is not owner)"),
 		},
 		{
 			newPod:           ephemeralVolumePod,
