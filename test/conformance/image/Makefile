@@ -33,14 +33,13 @@ CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
 # This is defined in root Makefile, but some build contexts do not refer to them
 KUBE_BASE_IMAGE_REGISTRY?=k8s.gcr.io
+BASE_IMAGE_VERSION?=buster-v1.9.0
+BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:${BASE_IMAGE_VERSION}
 
-ifeq ($(ARCH),amd64)
-    BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base:v2.1.3
-else
-    BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:v2.1.3
-endif
-
-RUNNERIMAGE?=gcr.io/distroless/base:latest
+# Keep debian releases (e.g. debian 10 == buster) consistent 
+# between BASE_IMAGE_VERSION and DISTROLESS_IMAGE images
+DISTROLESS_IMAGE?=base-debian10
+RUNNERIMAGE?=gcr.io/distroless/${DISTROLESS_IMAGE}:latest
 
 TEMP_DIR:=$(shell mktemp -d -t conformance-XXXXXX)
 
