@@ -64,7 +64,7 @@ func TestErrorNew(t *testing.T) {
 	}
 
 	if !IsConflict(NewConflict(resource("tests"), "2", errors.New("message"))) {
-		t.Errorf("expected to be conflict")
+		t.Errorf("expected to be %s", metav1.StatusReasonAlreadyExists)
 	}
 	if !IsNotFound(NewNotFound(resource("tests"), "3")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonNotFound)
@@ -86,6 +86,13 @@ func TestErrorNew(t *testing.T) {
 	}
 	if !IsMethodNotSupported(NewMethodNotSupported(resource("foos"), "delete")) {
 		t.Errorf("expected to be %s", metav1.StatusReasonMethodNotAllowed)
+	}
+
+	if !IsAlreadyExists(NewGenerateNameConflict(resource("tests"), "3", 1)) {
+		t.Errorf("expected to be %s", metav1.StatusReasonAlreadyExists)
+	}
+	if time, ok := SuggestsClientDelay(NewGenerateNameConflict(resource("tests"), "3", 1)); time != 1 || !ok {
+		t.Errorf("unexpected %d", time)
 	}
 
 	if time, ok := SuggestsClientDelay(NewServerTimeout(resource("tests"), "doing something", 10)); time != 10 || !ok {
