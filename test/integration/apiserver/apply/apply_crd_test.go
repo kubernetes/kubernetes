@@ -49,6 +49,164 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+func TestMergePatchDisallowUnknownFields(t *testing.T) {
+	//var testcases = []struct {
+	//	name        string
+	//	patchType   string
+	//	body        string
+	//	params      map[string]string
+	//	errContains string
+	//}{
+	//	{
+	//		name:        "mergePatchStrictValidation",
+	//		patchType:   "mergePatch",
+	//		body:        `yaml`,
+	//		params:      map[string]string{"key", "val"},
+	//		errContains: "bad err",
+	//	},
+	//}
+	//for _, tc := range testcases {
+	//	t.Run(tc.name, func(t *testing.T) {
+
+	//	})
+
+	//}
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
+	var c apiextensionsv1.CustomResourceValidation
+	err = json.Unmarshal([]byte(`{
+		"openAPIV3Schema": {
+			"type": "object",
+			"properties": {
+				"spec": {
+					"type": "object",
+					"x-kubernetes-preserve-unknown-fields": true,
+					"properties": {
+						"cronSpec": {
+							"type": "string",
+							"pattern": "^(\\d+|\\*)(/\\d+)?(\\s+(\\d+|\\*)(/\\d+)?){4}$"
+						},
+						"ports": {
+							"type": "array",
+							"x-kubernetes-list-map-keys": [
+								"containerPort",
+								"protocol"
+							],
+							"x-kubernetes-list-type": "map",
+							"items": {
+								"properties": {
+									"containerPort": {
+										"format": "int32",
+										"type": "integer"
+									},
+									"hostIP": {
+										"type": "string"
+									},
+									"hostPort": {
+										"format": "int32",
+										"type": "integer"
+									},
+									"name": {
+										"type": "string"
+									},
+									"protocol": {
+										"type": "string"
+									}
+								},
+								"required": [
+									"containerPort",
+									"protocol"
+								],
+								"type": "object"
+							}
+						}
+					}
+				}
+			}
+		}
+	}`), &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuDefinition.Spec.PreserveUnknownFields = false
+	for i := range noxuDefinition.Spec.Versions {
+		noxuDefinition.Spec.Versions[i].Schema = &c
+		fmt.Printf("noxuDefiniton.Spec.Versions[i].Schema = %+v\n", noxuDefinition.Spec.Versions[i].Schema)
+	}
+	noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kind := noxuDefinition.Spec.Names.Kind
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Versions[0].Name
+	name := "mytest"
+
+	rest := apiExtensionClient.Discovery().RESTClient()
+	yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+  finalizers:
+  - test-finalizer
+spec:
+  cronSpec: "* * * * */5"
+  replicas: 1
+  ports:
+  - name: x
+    containerPort: 80
+    protocol: TCP`, apiVersion, kind, name))
+	result, err := rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw(context.TODO())
+	if err != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+	}
+	fmt.Println("apply succeeded")
+	fmt.Printf("result = %+v\n", string(result))
+	verifyNumFinalizers(t, result, 1)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyReplicas(t, result, 1)
+	verifyNumPorts(t, result, 1)
+	fmt.Println("apply verified")
+
+	result, err = rest.Patch(types.MergePatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Versions[0].Name, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("validate", "strict").
+		Body([]byte(`{"metadata":{"finalizers":["test-finalizer","another-one"]}, "spec":{"foo": "bar"}}`)).
+		DoRaw(context.TODO())
+	if err != nil {
+		t.Fatalf("failed to add finalizer with merge patch: %v:\n%v", err, string(result))
+	}
+	fmt.Println("patch succeeded")
+	fmt.Printf("result = %+v\n", string(result))
+	verifyNumFinalizers(t, result, 2)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyFinalizersIncludes(t, result, "another-one")
+	fmt.Println("patch verified")
+
+}
+
 // TestApplyCRDStructuralSchema tests that when a CRD has a structural schema in its validation field,
 // it will be used to construct the CR schema used by apply.
 func TestApplyCRDStructuralSchema(t *testing.T) {
