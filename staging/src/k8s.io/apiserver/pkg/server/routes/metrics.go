@@ -19,6 +19,7 @@ package routes
 import (
 	apimetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/server/mux"
+	cachermetrics "k8s.io/apiserver/pkg/storage/cacher/metrics"
 	etcd3metrics "k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	flowcontrolmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -46,6 +47,7 @@ func (m MetricsWithReset) Install(c *mux.PathRecorderMux) {
 // register apiserver and etcd metrics
 func register() {
 	apimetrics.Register()
+	cachermetrics.Register()
 	etcd3metrics.Register()
 	flowcontrolmetrics.Register()
 }

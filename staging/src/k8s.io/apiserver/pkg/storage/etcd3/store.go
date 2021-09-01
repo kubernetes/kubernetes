@@ -65,15 +65,16 @@ func (d authenticatedDataString) AuthenticatedData() []byte {
 var _ value.Context = authenticatedDataString("")
 
 type store struct {
-	client        *clientv3.Client
-	codec         runtime.Codec
-	versioner     storage.Versioner
-	transformer   value.Transformer
-	pathPrefix    string
-	groupResource schema.GroupResource
-	watcher       *watcher
-	pagingEnabled bool
-	leaseManager  *leaseManager
+	client              *clientv3.Client
+	codec               runtime.Codec
+	versioner           storage.Versioner
+	transformer         value.Transformer
+	pathPrefix          string
+	groupResource       schema.GroupResource
+	groupResourceString string
+	watcher             *watcher
+	pagingEnabled       bool
+	leaseManager        *leaseManager
 }
 
 type objState struct {
@@ -100,10 +101,11 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-		pathPrefix:    path.Join("/", prefix),
-		groupResource: groupResource,
-		watcher:       newWatcher(c, codec, newFunc, versioner, transformer),
-		leaseManager:  newDefaultLeaseManager(c, leaseManagerConfig),
+		pathPrefix:          path.Join("/", prefix),
+		groupResource:       groupResource,
+		groupResourceString: groupResource.String(),
+		watcher:             newWatcher(c, codec, newFunc, versioner, transformer),
+		leaseManager:        newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
 }
@@ -727,6 +729,14 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 	var lastKey []byte
 	var hasMore bool
 	var getResp *clientv3.GetResponse
+	var numFetched int
+	var numEvald int
+	// Because these metrics are for understanding the costs of handling LIST requests,
+	// get them recorded even in error cases.
+	defer func() {
+		numReturn := v.Len()
+		metrics.RecordStorageListMetrics(s.groupResourceString, numFetched, numEvald, numReturn)
+	}()
 	for {
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
@@ -734,6 +744,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
+		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
@@ -767,6 +778,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				return err
 			}
+			numEvald++
 		}
 
 		// indicate to the client which resource version was returned
