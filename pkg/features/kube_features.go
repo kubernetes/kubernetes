@@ -235,6 +235,7 @@ const (
 
 	// owner: @janetkuo
 	// alpha: v1.12
+	// beta:  v1.21
 	//
 	// Allow TTL controller to clean up Pods and Jobs after they finish.
 	TTLAfterFinished featuregate.Feature = "TTLAfterFinished"
