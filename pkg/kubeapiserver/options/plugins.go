@@ -75,8 +75,8 @@ var AllOrderedPlugins = []string{
 	nodetaint.PluginName,                    // TaintNodesByCondition
 	alwayspullimages.PluginName,             // AlwaysPullImages
 	imagepolicy.PluginName,                  // ImagePolicyWebhook
+	podsecurity.PluginName,                  // PodSecurity - before PodSecurityPolicy so audit/warn get exercised even if PodSecurityPolicy denies
 	podsecuritypolicy.PluginName,            // PodSecurityPolicy
-	podsecurity.PluginName,                  // PodSecurity
 	podnodeselector.PluginName,              // PodNodeSelector
 	podpriority.PluginName,                  // Priority
 	defaulttolerationseconds.PluginName,     // DefaultTolerationSeconds
@@ -104,8 +104,8 @@ var AllOrderedPlugins = []string{
 	deny.PluginName,              // AlwaysDeny
 }
 
-// RegisterAllAdmissionPlugins registers all admission plugins and
-// sets the recommended plugins order.
+// RegisterAllAdmissionPlugins registers all admission plugins.
+// The order of registration is irrelevant, see AllOrderedPlugins for execution order.
 func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	admit.Register(plugins) // DEPRECATED as no real meaning
 	alwayspullimages.Register(plugins)
@@ -128,7 +128,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	podtolerationrestriction.Register(plugins)
 	runtimeclass.Register(plugins)
 	resourcequota.Register(plugins)
-	podsecurity.Register(plugins) // before PodSecurityPolicy so audit/warn get exercised even if PodSecurityPolicy denies
+	podsecurity.Register(plugins)
 	podsecuritypolicy.Register(plugins)
 	podpriority.Register(plugins)
 	scdeny.Register(plugins)
