@@ -196,9 +196,10 @@ func (t *templater) rootCmd(c *cobra.Command) *cobra.Command {
 }
 
 func (t *templater) optionsCmdFor(c *cobra.Command) string {
-	if !c.Runnable() {
+	if !c.HasFlags() {
 		return ""
 	}
+
 	rootCmdStructure := t.parents(c)
 	for i := len(rootCmdStructure) - 1; i >= 0; i-- {
 		cmd := rootCmdStructure[i]
