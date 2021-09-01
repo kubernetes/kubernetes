@@ -1461,7 +1461,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				pods = append(pods, buildPod().uid("b").phase(v1.PodFailed).trackingFinalizer().Pod)
 				return pods
 			}(),
-			wantRmFinalizers: 501,
+			wantRmFinalizers: 499,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
@@ -1478,16 +1478,10 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				},
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Succeeded: []types.UID{"499"},
-						Failed:    []types.UID{"b"},
+						Failed: []types.UID{"b"},
 					},
 					Succeeded: 499,
 					Failed:    1,
-				},
-				{
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					Succeeded:               500,
-					Failed:                  2,
 				},
 			},
 		},
@@ -1505,17 +1499,12 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				}
 				return pods
 			}(),
-			wantRmFinalizers: 501,
+			wantRmFinalizers: 500,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 					CompletedIndexes:        "0-499",
 					Succeeded:               500,
-				},
-				{
-					CompletedIndexes:        "0-500",
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					Succeeded:               501,
 				},
 			},
 		},
