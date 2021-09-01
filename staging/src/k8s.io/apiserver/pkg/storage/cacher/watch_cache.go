@@ -449,12 +449,13 @@ func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utilt
 	return nil
 }
 
-// WaitUntilFreshAndList returns list of pointers to <storeElement> objects.
-func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, error) {
+// WaitUntilFreshAndList returns list of pointers to `storeElement` objects along
+// with their ResourceVersion and the name of the index, if any, that was used.
+func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues []storage.MatchValue, trace *utiltrace.Trace) ([]interface{}, uint64, string, error) {
 	err := w.waitUntilFreshAndBlock(resourceVersion, trace)
 	defer w.RUnlock()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 
 	// This isn't the place where we do "final filtering" - only some "prefiltering" is happening here. So the only
@@ -463,10 +464,10 @@ func (w *watchCache) WaitUntilFreshAndList(resourceVersion uint64, matchValues [
 	// TODO: if multiple indexes match, return the one with the fewest items, so as to do as much filtering as possible.
 	for _, matchValue := range matchValues {
 		if result, err := w.store.ByIndex(matchValue.IndexName, matchValue.Value); err == nil {
-			return result, w.resourceVersion, nil
+			return result, w.resourceVersion, matchValue.IndexName, nil
 		}
 	}
-	return w.store.List(), w.resourceVersion, nil
+	return w.store.List(), w.resourceVersion, "", nil
 }
 
 // WaitUntilFreshAndGet returns a pointers to <storeElement> object.

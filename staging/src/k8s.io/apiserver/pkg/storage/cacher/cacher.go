@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
@@ -191,7 +192,7 @@ func (t *watcherBookmarkTimeBuckets) addWatcher(w *cacheWatcher) bool {
 	if bucketID < t.startBucketID {
 		bucketID = t.startBucketID
 	}
-	watchers, _ := t.watchersBuckets[bucketID]
+	watchers := t.watchersBuckets[bucketID]
 	t.watchersBuckets[bucketID] = append(watchers, w)
 	return true
 }
@@ -230,6 +231,8 @@ type Cacher struct {
 	incomingHWM storage.HighWaterMark
 	// Incoming events that should be dispatched to watchers.
 	incoming chan watchCacheEvent
+
+	resourcePrefix string
 
 	sync.RWMutex
 
@@ -329,6 +332,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 	objType := reflect.TypeOf(obj)
 	cacher := &Cacher{
+		resourcePrefix: config.ResourcePrefix,
 		ready:          newReady(),
 		storage:        config.Storage,
 		objectType:     objType,
@@ -718,7 +722,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
+	objs, readResourceVersion, indexUsed, err := c.watchCache.WaitUntilFreshAndList(listRV, pred.MatcherIndex(), trace)
 	if err != nil {
 		return err
 	}
@@ -744,6 +748,7 @@ func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions,
 			return err
 		}
 	}
+	metrics.RecordListCacheMetrics(c.resourcePrefix, indexUsed, len(objs), listVal.Len())
 	return nil
 }
 
