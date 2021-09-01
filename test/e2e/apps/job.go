@@ -25,6 +25,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -67,7 +68,47 @@ var _ = SIGDescribe("Job", func() {
 				successes++
 			}
 		}
-		framework.ExpectEqual(successes, completions, "epected %d successful job pods, but got  %d", completions, successes)
+		framework.ExpectEqual(successes, completions, "expected %d successful job pods, but got  %d", completions, successes)
+	})
+
+	// Simplest case: N pods succeed with memory requirements
+	ginkgo.It("should run a job to completion when tasks succeed with memory reservations", func() {
+		ginkgo.By("Calculate memory reserve")
+		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		firstNode := nodeList.Items[0]
+		mem, ok := firstNode.Status.Allocatable[v1.ResourceMemory]
+		if !ok {
+			framework.Failf("Unable to get node's %q memory", firstNode.Name)
+		}
+		memoryRequest := fmt.Sprint(int64(0.5 * float64(mem.Value())))
+
+		ginkgo.By("Creating a job")
+		job := e2ejob.NewTestJob("succeed", "all-succeed", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
+		for i := range job.Spec.Template.Spec.Containers {
+			job.Spec.Template.Spec.Containers[i].Resources = v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse(memoryRequest),
+				},
+			}
+		}
+		job, err = e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
+		framework.ExpectNoError(err, "failed to create job in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring job reaches completions")
+		err = e2ejob.WaitForJobComplete(f.ClientSet, f.Namespace.Name, job.Name, completions)
+		framework.ExpectNoError(err, "failed to ensure job completion in namespace: %s", f.Namespace.Name)
+
+		ginkgo.By("Ensuring pods for job exist")
+		pods, err := e2ejob.GetJobPods(f.ClientSet, f.Namespace.Name, job.Name)
+		framework.ExpectNoError(err, "failed to get pod list for job in namespace: %s", f.Namespace.Name)
+		successes := int32(0)
+		for _, pod := range pods.Items {
+			if pod.Status.Phase == v1.PodSucceeded {
+				successes++
+			}
+		}
+		framework.ExpectEqual(successes, completions, "expected %d successful job pods, but got  %d", completions, successes)
 	})
 
 	ginkgo.It("should not create pods when created in suspend state", func() {
