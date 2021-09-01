@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
@@ -85,6 +86,46 @@ var (
 		},
 		[]string{},
 	)
+	listStorageCount = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_list_storage_count",
+			Help:           "Number of LIST requests served from storage, split by resource and predicate complexity",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource", "predicate_complexity"},
+	)
+	listStorageQueries = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_list_storage_queries",
+			Help:           "Number of storage range queries used to satisfy a LIST request, split by resource",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumFetched = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_list_storage_num_fetched",
+			Help:           "Number of objects read from storage in the course of serving a LIST request, split by resource",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_list_storage_num_selector_evals",
+			Help:           "Number of objects tested in the course of serving a LIST request from storage, split by resource and predicate complexity",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource", "predicate_complexity"},
+	)
+	listStorageNumReturned = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_list_storage_num_returned",
+			Help:           "Number of objects returned for a LIST request from storage, split by resource",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -99,6 +140,11 @@ func Register() {
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
+		legacyregistry.MustRegister(listStorageCount)
+		legacyregistry.MustRegister(listStorageQueries)
+		legacyregistry.MustRegister(listStorageNumFetched)
+		legacyregistry.MustRegister(listStorageNumSelectorEvals)
+		legacyregistry.MustRegister(listStorageNumReturned)
 	})
 }
 
@@ -138,4 +184,14 @@ func UpdateLeaseObjectCount(count int64) {
 	// Currently we only store one previous lease, since all the events have the same ttl.
 	// See pkg/storage/etcd3/lease_manager.go
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
+}
+
+// RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
+func RecordListEtcd3Metrics(resource string, numQueries, numFetched, predicateComplexity, numEvald, numReturned int) {
+	pcStr := strconv.FormatInt(int64(predicateComplexity), 10)
+	listStorageCount.WithLabelValues(resource, pcStr).Inc()
+	listStorageQueries.WithLabelValues(resource).Add(float64(numQueries))
+	listStorageNumFetched.WithLabelValues(resource).Add(float64(numFetched))
+	listStorageNumSelectorEvals.WithLabelValues(resource, pcStr).Add(float64(numEvald))
+	listStorageNumReturned.WithLabelValues(resource).Add(float64(numReturned))
 }

@@ -69,6 +69,7 @@ type store struct {
 	versioner     storage.Versioner
 	transformer   value.Transformer
 	pathPrefix    string
+	groupResource string
 	watcher       *watcher
 	pagingEnabled bool
 	leaseManager  *leaseManager
@@ -83,11 +84,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, prefix, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix, groupResource string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, codec, newFunc, prefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix, groupResource string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -98,9 +99,10 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-		pathPrefix:   path.Join("/", prefix),
-		watcher:      newWatcher(c, codec, newFunc, versioner, transformer),
-		leaseManager: newDefaultLeaseManager(c, leaseManagerConfig),
+		pathPrefix:    path.Join("/", prefix),
+		groupResource: groupResource,
+		watcher:       newWatcher(c, codec, newFunc, versioner, transformer),
+		leaseManager:  newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
 }
@@ -724,13 +726,22 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 	var lastKey []byte
 	var hasMore bool
 	var getResp *clientv3.GetResponse
+	var numRangeQueries int
+	var numFetched int
+	var numEvald int
+	defer func() {
+		numReturn := v.Len()
+		metrics.RecordListEtcd3Metrics(s.groupResource, numRangeQueries, numFetched, predicateComplexity(pred), numEvald, numReturn)
+	}()
 	for {
+		numRangeQueries++
 		startTime := time.Now()
 		getResp, err = s.client.KV.Get(ctx, key, options...)
 		metrics.RecordEtcdRequestLatency("list", getTypeName(listPtr), startTime)
 		if err != nil {
 			return interpretListError(err, len(pred.Continue) > 0, continueKey, keyPrefix)
 		}
+		numFetched += len(getResp.Kvs)
 		if err = s.validateMinimumResourceVersion(resourceVersion, uint64(getResp.Header.Revision)); err != nil {
 			return err
 		}
@@ -764,6 +775,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
 				return err
 			}
+			numEvald++
 		}
 
 		// indicate to the client which resource version was returned
@@ -809,6 +821,17 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 
 	// no continuation
 	return s.versioner.UpdateList(listObj, uint64(returnedRV), "", nil)
+}
+
+func predicateComplexity(pred storage.SelectionPredicate) int {
+	var complexity int
+	if !(pred.Label == nil || pred.Label.Empty()) {
+		complexity += 1
+	}
+	if !(pred.Field == nil || pred.Field.Empty()) {
+		complexity += 2
+	}
+	return complexity
 }
 
 // growSlice takes a slice value and grows its capacity up
