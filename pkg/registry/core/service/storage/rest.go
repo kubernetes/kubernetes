@@ -247,7 +247,7 @@ func (rs *REST) Create(ctx context.Context, obj runtime.Object, createValidation
 
 	out, err := rs.services.Create(ctx, service, createValidation, options)
 	if err != nil {
-		err = rest.CheckGeneratedNameError(rs.strategy, err, service)
+		err = rest.CheckGeneratedNameError(ctx, rs.strategy, err, service)
 	}
 
 	if err == nil {

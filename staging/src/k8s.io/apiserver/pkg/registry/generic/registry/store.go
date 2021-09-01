@@ -404,7 +404,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
-		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
+		err = rest.CheckGeneratedNameError(ctx, e.CreateStrategy, err, obj)
 		if !apierrors.IsAlreadyExists(err) {
 			return nil, err
 		}
@@ -659,7 +659,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, qualifiedResource, name)
-			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, creatingObj)
+			err = rest.CheckGeneratedNameError(ctx, e.CreateStrategy, err, creatingObj)
 		} else {
 			err = storeerr.InterpretUpdateError(err, qualifiedResource, name)
 		}
