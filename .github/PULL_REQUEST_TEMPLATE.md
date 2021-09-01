@@ -24,6 +24,7 @@ Optionally add one or more of the following kinds if applicable:
 /kind failing-test
 /kind flake
 /kind regression
+/kind support
 -->
 
 #### What this PR does / why we need it:
