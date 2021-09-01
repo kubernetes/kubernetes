@@ -269,10 +269,6 @@ func GetHistogramVecFromGatherer(gatherer metrics.Gatherer, metricName string, l
 		return nil, fmt.Errorf("metric %q not found", metricName)
 	}
 
-	if metricFamily.GetMetric() == nil {
-		return nil, fmt.Errorf("metric %q is empty", metricName)
-	}
-
 	if len(metricFamily.GetMetric()) == 0 {
 		return nil, fmt.Errorf("metric %q is empty", metricName)
 	}

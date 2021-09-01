@@ -177,9 +177,15 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 	return ioutil.WriteFile(destFile, b, 0644)
 }
 
+type labelValues struct {
+	label  string
+	values []string
+}
+
 // metricsCollectorConfig is the config to be marshalled to YAML config file.
+// NOTE: The mapping here means only one filter is supported, either value in the list of `values` is able to be collected.
 type metricsCollectorConfig struct {
-	Metrics []string
+	Metrics map[string]*labelValues
 }
 
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
@@ -202,17 +208,29 @@ func (*metricsCollector) run(ctx context.Context) {
 
 func (pc *metricsCollector) collect() []DataItem {
 	var dataItems []DataItem
-	for _, metric := range pc.Metrics {
-		dataItem := collectHistogramVec(metric, pc.labels)
-		if dataItem != nil {
-			dataItems = append(dataItems, *dataItem)
+	for metric, labelVals := range pc.Metrics {
+		// no filter is specified, aggregate all the metrics within the same metricFamily.
+		if labelVals == nil {
+			dataItem := collectHistogramVec(metric, pc.labels, nil)
+			if dataItem != nil {
+				dataItems = append(dataItems, *dataItem)
+			}
+		} else {
+			// fetch the metric from metricFamily which match each of the lvMap.
+			for _, value := range labelVals.values {
+				lvMap := map[string]string{labelVals.label: value}
+				dataItem := collectHistogramVec(metric, pc.labels, lvMap)
+				if dataItem != nil {
+					dataItems = append(dataItems, *dataItem)
+				}
+			}
 		}
 	}
 	return dataItems
 }
 
-func collectHistogramVec(metric string, labels map[string]string) *DataItem {
-	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, nil)
+func collectHistogramVec(metric string, labels map[string]string, lvMap map[string]string) *DataItem {
+	vec, err := testutil.GetHistogramVecFromGatherer(legacyregistry.DefaultGatherer, metric, lvMap)
 	if err != nil {
 		klog.Error(err)
 		return nil
@@ -234,6 +252,9 @@ func collectHistogramVec(metric string, labels map[string]string) *DataItem {
 	// Copy labels and add "Metric" label for this metric.
 	labelMap := map[string]string{"Metric": metric}
 	for k, v := range labels {
+		labelMap[k] = v
+	}
+	for k, v := range lvMap {
 		labelMap[k] = v
 	}
 	return &DataItem{
