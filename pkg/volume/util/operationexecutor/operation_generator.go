@@ -80,11 +80,6 @@ type operationGenerator struct {
 	// recorder is used to record events in the API server
 	recorder record.EventRecorder
 
-	// checkNodeCapabilitiesBeforeMount, if set, enables the CanMount check,
-	// which verifies that the components (binaries, etc.) required to mount
-	// the volume are available on the underlying node before attempting mount.
-	checkNodeCapabilitiesBeforeMount bool
-
 	// blkUtil provides volume path related operations for block volume
 	blkUtil volumepathhandler.BlockVolumePathHandler
 
@@ -95,16 +90,14 @@ type operationGenerator struct {
 func NewOperationGenerator(kubeClient clientset.Interface,
 	volumePluginMgr *volume.VolumePluginMgr,
 	recorder record.EventRecorder,
-	checkNodeCapabilitiesBeforeMount bool,
 	blkUtil volumepathhandler.BlockVolumePathHandler) OperationGenerator {
 
 	return &operationGenerator{
-		kubeClient:                       kubeClient,
-		volumePluginMgr:                  volumePluginMgr,
-		recorder:                         recorder,
-		checkNodeCapabilitiesBeforeMount: checkNodeCapabilitiesBeforeMount,
-		blkUtil:                          blkUtil,
-		translator:                       csitrans.New(),
+		kubeClient:      kubeClient,
+		volumePluginMgr: volumePluginMgr,
+		recorder:        recorder,
+		blkUtil:         blkUtil,
+		translator:      csitrans.New(),
 	}
 }
 
@@ -708,16 +701,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 						markDeviceUncertainErr.Error()), "pod", klog.KObj(volumeToMount.Pod))
 				}
 				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MountDevice failed while expanding volume", resizeError)
-				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
-			}
-		}
-
-		if og.checkNodeCapabilitiesBeforeMount {
-			if canMountErr := volumeMounter.CanMount(); canMountErr != nil {
-				err = fmt.Errorf(
-					"verify that your node machine has the required components before attempting to mount this volume type. %s",
-					canMountErr)
-				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.CanMount failed", err)
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
 		}

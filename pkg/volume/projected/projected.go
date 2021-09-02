@@ -175,13 +175,6 @@ func (sv *projectedVolume) GetAttributes() volume.Attributes {
 
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (s *projectedVolumeMounter) CanMount() error {
-	return nil
-}
-
 func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return s.SetUpAt(s.GetPath(), mounterArgs)
 }

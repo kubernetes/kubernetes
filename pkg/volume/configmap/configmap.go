@@ -173,13 +173,6 @@ func wrappedVolumeSpec() volume.Spec {
 	}
 }
 
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (b *configMapVolumeMounter) CanMount() error {
-	return nil
-}
-
 func (b *configMapVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return b.SetUpAt(b.GetPath(), mounterArgs)
 }

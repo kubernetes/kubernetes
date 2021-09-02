@@ -62,10 +62,6 @@ func (m *azureDiskMounter) GetAttributes() volume.Attributes {
 	}
 }
 
-func (m *azureDiskMounter) CanMount() error {
-	return nil
-}
-
 func (m *azureDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return m.SetUpAt(m.GetPath(), mounterArgs)
 }

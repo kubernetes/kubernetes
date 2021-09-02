@@ -76,7 +76,6 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler,
 	))
 	reconciler := NewReconciler(
@@ -121,7 +120,6 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -212,7 +210,6 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -292,7 +289,6 @@ func Test_Run_Negative_VolumeMountControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -371,7 +367,6 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -474,7 +469,6 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -598,7 +592,6 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -714,7 +707,6 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -812,7 +804,6 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -937,7 +928,6 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,
@@ -1014,8 +1004,7 @@ func Test_GenerateMapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
 				volumePluginMgr,
-				nil,   /* fakeRecorder */
-				false, /* checkNodeCapabilitiesBeforeMount */
+				nil, /* fakeRecorder */
 				nil))
 
 			pod := &v1.Pod{
@@ -1065,8 +1054,7 @@ func Test_GenerateUnmapVolumeFunc_Plugin_Not_Found(t *testing.T) {
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
 				volumePluginMgr,
-				nil,   /* fakeRecorder */
-				false, /* checkNodeCapabilitiesBeforeMount */
+				nil, /* fakeRecorder */
 				nil))
 			volumeMode := v1.PersistentVolumeBlock
 			tmpSpec := &volume.Spec{PersistentVolume: &v1.PersistentVolume{Spec: v1.PersistentVolumeSpec{VolumeMode: &volumeMode}}}
@@ -1108,8 +1096,7 @@ func Test_GenerateUnmapDeviceFunc_Plugin_Not_Found(t *testing.T) {
 			oex := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 				nil, /* kubeClient */
 				volumePluginMgr,
-				nil,   /* fakeRecorder */
-				false, /* checkNodeCapabilitiesBeforeMount */
+				nil, /* fakeRecorder */
 				nil))
 			var hostutil hostutil.HostUtils
 			volumeMode := v1.PersistentVolumeBlock
@@ -1259,7 +1246,6 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				kubeClient,
 				volumePluginMgr,
 				fakeRecorder,
-				false, /* checkNodeCapabilitiesBeforeMount */
 				fakeHandler))
 
 			reconciler := NewReconciler(
@@ -1450,7 +1436,6 @@ func Test_UncertainDeviceGlobalMounts(t *testing.T) {
 					kubeClient,
 					volumePluginMgr,
 					fakeRecorder,
-					false, /* checkNodeCapabilitiesBeforeMount */
 					fakeHandler))
 
 				reconciler := NewReconciler(
@@ -1673,7 +1658,6 @@ func Test_UncertainVolumeMountState(t *testing.T) {
 					kubeClient,
 					volumePluginMgr,
 					fakeRecorder,
-					false, /* checkNodeCapabilitiesBeforeMount */
 					fakeHandler))
 
 				reconciler := NewReconciler(
@@ -1985,7 +1969,6 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		kubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false, /* checkNodeCapabilitiesBeforeMount */
 		fakeHandler))
 	reconciler := NewReconciler(
 		kubeClient,

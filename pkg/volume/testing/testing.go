@@ -692,10 +692,6 @@ func (_ *FakeVolume) GetAttributes() Attributes {
 	}
 }
 
-func (fv *FakeVolume) CanMount() error {
-	return nil
-}
-
 func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {
 	fv.Lock()
 	defer fv.Unlock()

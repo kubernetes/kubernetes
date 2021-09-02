@@ -363,7 +363,6 @@ func newTestKubeletWithImageList(
 		kubelet.hostutil,
 		kubelet.getPodsDir(),
 		kubelet.recorder,
-		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
 		false, /* keepTerminatedPodVolumes */
 		volumetest.NewBlockVolumePathHandler())
 

@@ -96,10 +96,6 @@ func getTargetPath(uid types.UID, specVolumeID string, host volume.VolumeHost) s
 // volume.Mounter methods
 var _ volume.Mounter = &csiMountMgr{}
 
-func (c *csiMountMgr) CanMount() error {
-	return nil
-}
-
 func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 	return c.SetUpAt(c.GetPath(), mounterArgs)
 }

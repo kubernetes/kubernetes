@@ -419,7 +419,6 @@ func getTestOperationGenerator(volumePluginMgr *volume.VolumePluginMgr, objects 
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
-		false,
 		fakeHandler)
 	return operationGenerator
 }

@@ -50,7 +50,3 @@ func (f *mounterDefaults) GetAttributes() volume.Attributes {
 		SupportsSELinux: f.flexVolume.plugin.capabilities.SELinuxRelabel,
 	}
 }
-
-func (f *mounterDefaults) CanMount() error {
-	return nil
-}

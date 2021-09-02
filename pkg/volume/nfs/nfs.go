@@ -20,7 +20,6 @@ import (
 	"fmt"
 	netutil "k8s.io/utils/net"
 	"os"
-	"runtime"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -196,28 +195,6 @@ type nfs struct {
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
 	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.pod.UID, utilstrings.EscapeQualifiedName(name), nfsVolume.volName)
-}
-
-// Checks prior to mount operations to verify that the required components (binaries, etc.)
-// to mount the volume are available on the underlying node.
-// If not, it returns an error
-func (nfsMounter *nfsMounter) CanMount() error {
-	exec := nfsMounter.plugin.host.GetExec(nfsMounter.plugin.GetPluginName())
-	switch runtime.GOOS {
-	case "linux":
-		if _, err := exec.Command("test", "-x", "/sbin/mount.nfs").CombinedOutput(); err != nil {
-			return fmt.Errorf("required binary /sbin/mount.nfs is missing")
-		}
-		if _, err := exec.Command("test", "-x", "/sbin/mount.nfs4").CombinedOutput(); err != nil {
-			return fmt.Errorf("required binary /sbin/mount.nfs4 is missing")
-		}
-		return nil
-	case "darwin":
-		if _, err := exec.Command("test", "-x", "/sbin/mount_nfs").CombinedOutput(); err != nil {
-			return fmt.Errorf("required binary /sbin/mount_nfs is missing")
-		}
-	}
-	return nil
 }
 
 type nfsMounter struct {
