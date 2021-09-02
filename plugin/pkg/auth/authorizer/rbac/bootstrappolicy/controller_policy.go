@@ -107,7 +107,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("daemonsets/status").RuleOrDie(),
 			rbacv1helpers.NewRule("update").Groups(extensionsGroup, appsGroup).Resources("daemonsets/finalizers").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-			rbacv1helpers.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "watch", "create", "delete", "patch", "update").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbacv1helpers.NewRule("create").Groups(legacyGroup).Resources("pods/binding").RuleOrDie(),
 			rbacv1helpers.NewRule("get", "list", "watch", "create", "delete", "update", "patch").Groups(appsGroup).Resources("controllerrevisions").RuleOrDie(),
 			eventsRule(),
