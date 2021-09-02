@@ -402,6 +402,7 @@ func (a *HorizontalController) computeStatusForObjectMetric(specReplicas, status
 		*status = autoscalingv2.MetricStatus{
 			Type: autoscalingv2.ObjectMetricSourceType,
 			Object: &autoscalingv2.ObjectMetricStatus{
+				DescribedObject: metricSpec.Object.DescribedObject,
 				Metric: autoscalingv2.MetricIdentifier{
 					Name:     metricSpec.Object.Metric.Name,
 					Selector: metricSpec.Object.Metric.Selector,
