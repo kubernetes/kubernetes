@@ -44,18 +44,18 @@ func New(authorizationHandlers ...authorizer.Authorizer) authorizer.Authorizer {
 // Authorizes against a chain of authorizer.Authorizer objects and returns nil if successful and returns error if unsuccessful
 func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	var (
-		errlist    []error
-		reasonlist []string
+		errList    []error
+		reasonList []string
 	)
 
 	for _, currAuthzHandler := range authzHandler {
 		decision, reason, err := currAuthzHandler.Authorize(ctx, a)
 
 		if err != nil {
-			errlist = append(errlist, err)
+			errList = append(errList, err)
 		}
 		if len(reason) != 0 {
-			reasonlist = append(reasonlist, reason)
+			reasonList = append(reasonList, reason)
 		}
 		switch decision {
 		case authorizer.DecisionAllow, authorizer.DecisionDeny:
@@ -65,7 +65,7 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 		}
 	}
 
-	return authorizer.DecisionNoOpinion, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
+	return authorizer.DecisionNoOpinion, strings.Join(reasonList, "\n"), utilerrors.NewAggregate(errList)
 }
 
 // unionAuthzRulesHandler authorizer against a chain of authorizer.RuleResolver
