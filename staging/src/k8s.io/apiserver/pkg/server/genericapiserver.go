@@ -271,14 +271,20 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 }
 
 type emptyDelegate struct {
+	handler http.Handler
 }
 
 func NewEmptyDelegate() DelegationTarget {
 	return emptyDelegate{}
 }
 
+// NewEmptyDelegateWithCustomHandler allows for registering a custom handler usually for special handling of 404 requests
+func NewEmptyDelegateWithCustomHandler(handler http.Handler) DelegationTarget {
+	return emptyDelegate{handler}
+}
+
 func (s emptyDelegate) UnprotectedHandler() http.Handler {
-	return nil
+	return s.handler
 }
 func (s emptyDelegate) PostStartHooks() map[string]postStartHookEntry {
 	return map[string]postStartHookEntry{}
