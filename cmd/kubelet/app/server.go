@@ -1183,7 +1183,6 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.RegisterSchedulable,
 		kubeServer.KeepTerminatedPodVolumes,
 		kubeServer.NodeLabels,
-		kubeServer.SeccompProfileRoot,
 		kubeServer.NodeStatusMaxImages,
 		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault,
 	)
@@ -1259,7 +1258,6 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	registerSchedulable bool,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
-	seccompProfileRoot string,
 	nodeStatusMaxImages int32,
 	seccompDefault bool,
 ) (k kubelet.Bootstrap, err error) {
@@ -1294,7 +1292,6 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerSchedulable,
 		keepTerminatedPodVolumes,
 		nodeLabels,
-		seccompProfileRoot,
 		nodeStatusMaxImages,
 		seccompDefault,
 	)
