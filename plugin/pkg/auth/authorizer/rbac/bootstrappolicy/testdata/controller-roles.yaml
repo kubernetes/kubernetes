@@ -265,6 +265,7 @@ items:
     - list
     - patch
     - watch
+    - update
   - apiGroups:
     - ""
     resources:
