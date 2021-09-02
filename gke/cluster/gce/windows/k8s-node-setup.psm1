@@ -1581,7 +1581,15 @@ function Setup-ContainerRuntime {
 }
 
 function Test-ContainersFeatureInstalled {
-  return (Get-WindowsFeature Containers).Installed
+  try {
+    return (Get-WindowsFeature Containers).Installed
+  } catch {
+    # If Get-WindowsFeature failed, ignore and return false.
+    # Subsequent call to 'Install-WindowsFeature Containers' will succeed if feature is already installed.
+    $message = $_.Exception.ToString()
+    Log-Output "Failed while calling Get-WindowsFeature Containers. Error: ${message}"
+    return $false
+  }
 }
 
 # After this function returns, the computer must be restarted to complete
