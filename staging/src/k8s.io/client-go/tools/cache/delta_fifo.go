@@ -458,8 +458,8 @@ func (f *DeltaFIFO) listLocked() []interface{} {
 func (f *DeltaFIFO) ListKeys() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	list := make([]string, 0, len(f.items))
-	for key := range f.items {
+	list := make([]string, 0, len(f.queue))
+	for _, key := range f.queue {
 		list = append(list, key)
 	}
 	return list
