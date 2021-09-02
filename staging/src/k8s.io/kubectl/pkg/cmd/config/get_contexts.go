@@ -80,7 +80,7 @@ func NewCmdConfigGetContexts(streams genericclioptions.IOStreams, configAccess c
 	}
 
 	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers (default print headers).")
-	cmd.Flags().StringP("output", "o", "", "Output format. One of: name")
+	cmd.Flags().StringP("output", "o", "", `Output format. One of: (name).`)
 	return cmd
 }
 
