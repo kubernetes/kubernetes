@@ -139,8 +139,10 @@ func (m *kubeGenericRuntimeManager) getImageUser(image string) (*int64, string, 
 	return new(int64), "", nil
 }
 
-// isInitContainerFailed returns true if container has exited and exitcode is not zero
-// or is in unknown state.
+// isInitContainerFailed returns true under the following conditions:
+// 1. container has exited and exitcode is not zero.
+// 2. container in unknown state.
+// 3. container occurs OOMKilled.
 func isInitContainerFailed(status *kubecontainer.Status) bool {
 	// When oomkilled occurs, init container should be considered as a failure.
 	if status.Reason == "OOMKilled" {

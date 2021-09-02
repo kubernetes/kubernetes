@@ -41,51 +41,59 @@ func seccompLocalhostPath(profileName string) string {
 
 func TestIsInitContainerFailed(t *testing.T) {
 	tests := []struct {
-		status   *kubecontainer.Status
-		isFailed bool
+		status      *kubecontainer.Status
+		isFailed    bool
+		description string
 	}{
 		{
 			status: &kubecontainer.Status{
 				State:    kubecontainer.ContainerStateExited,
 				ExitCode: 1,
 			},
-			isFailed: true,
+			isFailed:    true,
+			description: "Init container which state is exited and exitcode is non-zero shoud return true",
 		},
 		{
 			status: &kubecontainer.Status{
 				State: kubecontainer.ContainerStateUnknown,
 			},
-			isFailed: true,
+			isFailed:    true,
+			description: "Init container which state is unknown should return true",
 		},
 		{
 			status: &kubecontainer.Status{
-				Reason: "OOMKilled",
+				Reason:   "OOMKilled",
+				ExitCode: 0,
 			},
-			isFailed: true,
+			isFailed:    true,
+			description: "Init container which state is exited and exitcode is zero shoud return true",
 		},
 		{
 			status: &kubecontainer.Status{
 				State:    kubecontainer.ContainerStateExited,
 				ExitCode: 0,
 			},
-			isFailed: false,
+			isFailed:    false,
+			description: "Init container which state is exited and exitcode is zero shoud return false",
 		},
 		{
 			status: &kubecontainer.Status{
 				State: kubecontainer.ContainerStateRunning,
 			},
-			isFailed: false,
+			isFailed:    false,
+			description: "Init container which state is running should return false",
 		},
 		{
 			status: &kubecontainer.Status{
 				State: kubecontainer.ContainerStateCreated,
 			},
-			isFailed: false,
+			isFailed:    false,
+			description: "Init container which state is created should return false",
 		},
 	}
 	for i, test := range tests {
 		isFailed := isInitContainerFailed(test.status)
-		assert.Equal(t, test.isFailed, isFailed, "TestCase[%d]", i)
+		assert.Equal(t, test.isFailed, isFailed, "TestCase[%d]: %s", i, test.description)
 	}
 }
 
