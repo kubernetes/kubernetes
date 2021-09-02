@@ -11815,10 +11815,8 @@ func TestFeatureInternalTrafficPolicy(t *testing.T) {
 	helpTestCreateUpdateDelete(t, testCases)
 }
 
-// FIXME: externalIPs, lbip,
-// lbsourceranges, externalname, PublishNotReadyAddresses,
-// ipfamilypolicy and list,
-// AllocateLoadBalancerNodePorts, LoadBalancerClass, status
+// TODO(thockin): We need to look at feature-tests for:
+//   externalIPs, lbip, lbsourceranges, externalname, PublishNotReadyAddresses, AllocateLoadBalancerNodePorts, LoadBalancerClass, status
 
 // this is local because it's not fully fleshed out enough for general use.
 func makePod(name string, ips ...string) api.Pod {
