@@ -971,7 +971,7 @@ func (LocalObjectReference) SwaggerDoc() map[string]string {
 var map_LocalVolumeSource = map[string]string{
 	"":       "Local represents directly-attached storage with node affinity (Beta feature)",
 	"path":   "The full path to the volume on the node. It can be either a directory or block device (disk, partition, ...).",
-	"fsType": "Filesystem type to mount. It applies only when the Path is a block device. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default value is to auto-select a fileystem if unspecified.",
+	"fsType": "Filesystem type to mount. It applies only when the Path is a block device. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default value is to auto-select a filesystem if unspecified.",
 }
 
 func (LocalVolumeSource) SwaggerDoc() map[string]string {
