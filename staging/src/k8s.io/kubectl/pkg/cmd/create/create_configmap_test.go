@@ -21,6 +21,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -441,21 +443,18 @@ func TestCreateConfigMap(t *testing.T) {
 				}
 			}
 			err := configMapOptions.Validate()
+
 			if err == nil {
 				configMap, err = configMapOptions.createConfigMap()
 			}
-
-			if test.expectErr == "" && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if test.expectErr != "" && err == nil {
-				t.Errorf("was expecting an error but no error occurred")
-			}
-			if test.expectErr != "" && test.expectErr != err.Error() {
-				t.Errorf("\nexpected error:\n%s\ngot error:\n%s", test.expectErr, err.Error())
-			}
-			if !apiequality.Semantic.DeepEqual(configMap, test.expected) {
-				t.Errorf("\nexpected:\n%#v\ngot:\n%#v", test.expected, configMap)
+			if test.expectErr == "" {
+				require.NoError(t, err)
+				if !apiequality.Semantic.DeepEqual(configMap, test.expected) {
+					t.Errorf("\nexpected:\n%#v\ngot:\n%#v", test.expected, configMap)
+				}
+			} else {
+				require.Error(t, err)
+				require.EqualError(t, err, test.expectErr)
 			}
 		})
 	}
