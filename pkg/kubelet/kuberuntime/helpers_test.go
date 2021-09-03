@@ -66,7 +66,7 @@ func TestIsInitContainerFailed(t *testing.T) {
 				ExitCode: 0,
 			},
 			isFailed:    true,
-			description: "Init container which state is exited and exitcode is zero shoud return true",
+			description: "Init container which reason is OOMKilled shoud return true",
 		},
 		{
 			status: &kubecontainer.Status{
