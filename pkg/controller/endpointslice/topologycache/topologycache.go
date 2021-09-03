@@ -170,9 +170,15 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 	totalCPU := resource.Quantity{}
 
 	for _, node := range nodes {
-		if !NodeReady(node.Status) {
+		if hasExcludedLabels(node.Labels) {
+			klog.V(2).Infof("Ignoring node %s because it has an excluded label", node.Name)
 			continue
 		}
+		if !NodeReady(node.Status) {
+			klog.V(2).Infof("Ignoring node %s because it is not ready: %v", node.Name, node.Status.Conditions)
+			continue
+		}
+
 		nodeCPU := node.Status.Allocatable.Cpu()
 		zone, ok := node.Labels[v1.LabelTopologyZone]
 
@@ -253,4 +259,19 @@ func (t *TopologyCache) getAllocations(numEndpoints int) map[string]Allocation {
 	}
 
 	return allocations
+}
+
+// Nodes with any of these labels set to any value will be excluded from
+// topology capacity calculations.
+func hasExcludedLabels(labels map[string]string) bool {
+	if len(labels) == 0 {
+		return false
+	}
+	if _, ok := labels["node-role.kubernetes.io/control-plane"]; ok {
+		return true
+	}
+	if _, ok := labels["node-role.kubernetes.io/master"]; ok {
+		return true
+	}
+	return false
 }
