@@ -476,9 +476,7 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 
 	onExecuteFunc := func() {
 		firstRunning.Done()
-		firstRunning.Wait()
 
-		sendSignals()
 		fakeFilter.wait()
 
 		allRunning.Done()
@@ -502,9 +500,10 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 	}
 
 	firstRunning.Wait()
+	sendSignals()
 	fakeFilter.wait()
-
 	firstRunning.Add(concurrentRequests)
+
 	for i := 0; i < concurrentRequests; i++ {
 		go func() {
 			defer wg.Done()
@@ -513,6 +512,8 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 			}
 		}()
 	}
+	firstRunning.Wait()
+	sendSignals()
 	wg.Wait()
 }
 

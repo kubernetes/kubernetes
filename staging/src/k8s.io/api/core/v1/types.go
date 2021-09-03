@@ -3384,8 +3384,7 @@ const (
 	// SeccompProfileTypeRuntimeDefault represents the default container runtime seccomp profile.
 	SeccompProfileTypeRuntimeDefault SeccompProfileType = "RuntimeDefault"
 	// SeccompProfileTypeLocalhost indicates a profile defined in a file on the node should be used.
-	// The file's location is based off the kubelet's deprecated flag --seccomp-profile-root.
-	// Once the flag support is removed the location will be <kubelet-root-dir>/seccomp.
+	// The file's location relative to <kubelet-root-dir>/seccomp.
 	SeccompProfileTypeLocalhost SeccompProfileType = "Localhost"
 )
 

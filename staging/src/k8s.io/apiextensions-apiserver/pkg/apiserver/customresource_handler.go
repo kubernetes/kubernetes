@@ -1147,7 +1147,7 @@ type CRDRESTOptionsGetter struct {
 
 func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
-		StorageConfig:             &t.StorageConfig,
+		StorageConfig:             t.StorageConfig.ForResource(resource),
 		Decorator:                 generic.UndecoratedStorage,
 		EnableGarbageCollection:   t.EnableGarbageCollection,
 		DeleteCollectionWorkers:   t.DeleteCollectionWorkers,
