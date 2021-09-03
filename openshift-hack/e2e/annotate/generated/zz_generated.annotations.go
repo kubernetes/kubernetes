@@ -12241,7 +12241,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] Mounted volume expand Should verify mounted devices can be resized": "Should verify mounted devices can be resized [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs": "should schedule pods in the same zones as statically provisioned PVs [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs": "should schedule pods in the same zones as statically provisioned PVs [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] NFSPersistentVolumes[Disruptive][Flaky] when kube-controller-manager restarts should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash": "should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash [Serial] [Suite:k8s]",
 
