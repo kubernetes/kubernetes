@@ -49,7 +49,7 @@ func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 			policySettings := hcn.RemoteSubnetRoutePolicySetting{}
 			err = json.Unmarshal(policy.Settings, &policySettings)
 			if err != nil {
-				return nil, fmt.Errorf("Failed to unmarshal Remote Subnet policy settings")
+				return nil, fmt.Errorf("failed to unmarshal Remote Subnet policy settings")
 			}
 			rs := &remoteSubnetInfo{
 				destinationPrefix: policySettings.DestinationPrefix,
@@ -90,7 +90,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 
 	endpoints, err := hcn.ListEndpoints()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list endpoints: %v", err)
+		return nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
 	for _, endpoint := range endpoints {
 		equal := false
