@@ -459,6 +459,7 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 	if exponent == 0 {
 		return base
 	}
+
 	return base * math.Pow10(exponent)
 }
 

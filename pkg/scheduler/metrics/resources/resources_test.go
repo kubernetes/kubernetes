@@ -71,7 +71,7 @@ func Test_podResourceCollector_Handler(t *testing.T) {
 							"custom": resource.MustParse("0"),
 						},
 						Limits: v1.ResourceList{
-							"memory": resource.MustParse("2G"),
+							"memory": resource.MustParse("2.5Gi"),
 							"custom": resource.MustParse("6"),
 						},
 					}},
@@ -95,7 +95,7 @@ func Test_podResourceCollector_Handler(t *testing.T) {
 	expected := `# HELP kube_pod_resource_limit [ALPHA] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 # TYPE kube_pod_resource_limit gauge
 kube_pod_resource_limit{namespace="test",node="node-one",pod="foo",priority="",resource="custom",scheduler="",unit=""} 6
-kube_pod_resource_limit{namespace="test",node="node-one",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 2e+09
+kube_pod_resource_limit{namespace="test",node="node-one",pod="foo",priority="",resource="memory",scheduler="",unit="bytes"} 2.68435456e+09
 # HELP kube_pod_resource_request [ALPHA] Resources requested by workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 # TYPE kube_pod_resource_request gauge
 kube_pod_resource_request{namespace="test",node="node-one",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 2
