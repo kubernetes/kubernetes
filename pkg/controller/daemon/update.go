@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -367,12 +368,23 @@ func (dsc *DaemonSetsController) dedupCurHistories(ctx context.Context, ds *apps
 		}
 		for _, pod := range pods {
 			if pod.Labels[apps.DefaultDaemonSetUniqueLabelKey] != keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey] {
-				toUpdate := pod.DeepCopy()
-				if toUpdate.Labels == nil {
-					toUpdate.Labels = make(map[string]string)
+				patchRaw := map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"labels": map[string]interface{}{
+							apps.DefaultDaemonSetUniqueLabelKey: keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey],
+						},
+					},
 				}
+<<<<<<< HEAD
 				toUpdate.Labels[apps.DefaultDaemonSetUniqueLabelKey] = keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
 				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Update(ctx, toUpdate, metav1.UpdateOptions{})
+=======
+				patchJson, err := json.Marshal(patchRaw)
+				if err != nil {
+					return nil, err
+				}
+				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Patch(context, pod.Name, types.MergePatchType, patchJson, metav1.PatchOptions{})
+>>>>>>> fix_dsc_rbac_pod_update
 				if err != nil {
 					return nil, err
 				}
