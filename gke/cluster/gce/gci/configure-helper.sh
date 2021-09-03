@@ -3213,6 +3213,22 @@ function detect_host_info() {
   esac
 }
 
+# Calls the local HTTP healthcheck container on this VM.
+function healthcheck-master {
+  # HTTP_HEALTHCHECK_PORT is set in kube-env. Setting it enables the local healthcheck step.
+  local port="${HTTP_HEALTHCHECK_PORT:-}"
+  if [ -n "${port}" ]; then
+    echo 'Starting local VM healthcheck'
+    until curl ${CURL_FLAGS} "http://localhost:${port}"; do
+      echo 'VM did not healthcheck successfully, retrying in 1 second'
+      sleep 1
+    done
+    echo 'VM healthchecked successfully'
+  else
+    echo 'Local VM healthcheck disabled'
+  fi
+}
+
 # Initializes variables used by the log-* functions.
 #
 # get-metadata-value must be defined before calling this function.
@@ -3545,6 +3561,10 @@ function main() {
   fi
   log-wrap 'ResetMotd' reset-motd
   log-wrap 'PrepareMounterRootfs' prepare-mounter-rootfs
+
+  if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+    log-wrap 'HealthcheckMaster' healthcheck-master
+  fi
 
   # Wait for all background jobs to finish.
   wait
