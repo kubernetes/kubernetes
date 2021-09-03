@@ -1260,6 +1260,40 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 	}
 }
 
+func TestStringQuantityAsApproximateFloat64(t *testing.T) {
+	table := []struct {
+		in  string
+		out float64
+	}{
+		{"2Ki", 2048},
+		{"1.1Ki", 1126.4e+0},
+		{"1Mi", 1.048576e+06},
+		{"2Gi", 2.147483648e+09},
+	}
+
+	for _, item := range table {
+		t.Run(item.in, func(t *testing.T) {
+			in, err := ParseQuantity(item.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := in.AsApproximateFloat64()
+			if out != item.out {
+				t.Fatalf("expected %v, got %v", item.out, out)
+			}
+			if in.d.Dec != nil {
+				if i, ok := in.AsInt64(); ok {
+					q := intQuantity(i, 0, in.Format)
+					out := q.AsApproximateFloat64()
+					if out != item.out {
+						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
+					}
+				}
+			}
+		})
+	}
+}
+
 func benchmarkQuantities() []Quantity {
 	return []Quantity{
 		intQuantity(1024*1024*1024, 0, BinarySI),
