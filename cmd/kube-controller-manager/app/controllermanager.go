@@ -126,27 +126,28 @@ controller, and serviceaccounts controller.`,
 			restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
 			return nil
 		},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
 			err := checkNonZeroInsecurePort(cmd.Flags())
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return err
 			}
 
 			c, err := s.Config(KnownControllers(), ControllersDisabledByDefault.List())
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return err
 			}
 
 			if err := Run(c.Complete(), wait.NeverStop); err != nil {
-				fmt.Fprintf(os.Stderr, "%v\n", err)
-				os.Exit(1)
+				return err
 			}
+
+			return nil
 		},
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
 				if len(arg) > 0 {
