@@ -162,6 +162,12 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
+	//
+	// Question(caesarxuchao): if the req contains upgrade
+	// header,maybeWrapForConnectionUpgrades will create transport by calling
+	// spdy.NewRoundTripper. But why do we need a spdy roundtripper? The rt is
+	// then passed to NewUpgradeAwareHandler as a regular roundtripper, its spdy
+	// specific method are never used.
 	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req)
 	if err != nil {
 		proxyError(w, req, err.Error(), http.StatusInternalServerError)
@@ -225,6 +231,9 @@ func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.Round
 	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
 	requireSameHostRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
 	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects, requireSameHostRedirects)
+	if restConfig.Dial != nil {
+		upgradeRoundTripper.DialFn = restConfig.Dial
+	}
 	wrappedRT, err := restclient.HTTPWrappersForConfig(restConfig, upgradeRoundTripper)
 	if err != nil {
 		return nil, true, err
