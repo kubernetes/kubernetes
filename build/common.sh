@@ -395,6 +395,8 @@ function kube::build::build_image() {
 # $3 is the value to set the --pull flag for docker build; true by default
 # $4 is the set of --build-args for docker.
 function kube::build::docker_build() {
+  kube::util::ensure-docker-buildx
+
   local -r image=$1
   local -r context_dir=$2
   local -r pull="${3:-true}"
