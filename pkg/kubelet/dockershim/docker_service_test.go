@@ -40,12 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 )
 
-// newTestNetworkPlugin returns a mock plugin that implements network.NetworkPlugin
-func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
-	ctrl := gomock.NewController(t)
-	return nettest.NewMockNetworkPlugin(ctrl)
-}
-
 type mockCheckpointManager struct {
 	checkpoint map[string]*PodSandboxCheckpoint
 }
@@ -139,9 +133,10 @@ func TestStatus(t *testing.T) {
 	}, statusResp.Status)
 
 	// Should not report ready status is network plugin returns error.
-	mockPlugin := newTestNetworkPlugin(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockPlugin := nettest.NewMockNetworkPlugin(ctrl)
 	ds.network = network.NewPluginManager(mockPlugin)
-	defer mockPlugin.Finish()
 	mockPlugin.EXPECT().Status().Return(errors.New("network error"))
 	statusResp, err = ds.Status(getTestCTX(), &runtimeapi.StatusRequest{})
 	assert.NoError(t, err)
