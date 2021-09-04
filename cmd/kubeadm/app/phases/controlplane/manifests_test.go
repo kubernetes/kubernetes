@@ -541,33 +541,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		expected []string
 	}{
 		{
-			name: "custom cluster name for " + cpVersion,
-			cfg: &kubeadmapi.ClusterConfiguration{
-				KubernetesVersion: cpVersion,
-				CertificatesDir:   testCertsDir,
-				ClusterName:       "some-other-cluster-name",
-				FeatureGates:      map[string]bool{features.IPv6DualStack: false},
-			},
-			expected: []string{
-				"kube-controller-manager",
-				"--bind-address=127.0.0.1",
-				"--leader-elect=true",
-				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
-				"--root-ca-file=" + testCertsDir + "/ca.crt",
-				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
-				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
-				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
-				"--use-service-account-credentials=true",
-				"--controllers=*,bootstrapsigner,tokencleaner",
-				"--authentication-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
-				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
-				"--client-ca-file=" + testCertsDir + "/ca.crt",
-				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
-				"--feature-gates=IPv6DualStack=false",
-				"--cluster-name=some-other-cluster-name",
-			},
-		},
-		{
 			name: "custom certs dir for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir:   testCertsDir,
@@ -626,7 +599,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
-				FeatureGates:      map[string]bool{features.IPv6DualStack: false},
+				FeatureGates:      map[string]bool{features.IPv6DualStack: true},
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -643,7 +616,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
-				"--feature-gates=IPv6DualStack=false",
+				"--feature-gates=IPv6DualStack=true",
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=10.0.1.15/16",
 				"--service-cluster-ip-range=172.20.0.0/24",

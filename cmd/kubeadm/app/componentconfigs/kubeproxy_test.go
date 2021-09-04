@@ -124,26 +124,6 @@ func TestKubeProxyDefault(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "IPv6DualStack feature gate set to false",
-			clusterCfg: kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					features.IPv6DualStack: false,
-				},
-			},
-			endpoint: kubeadmapi.APIEndpoint{},
-			expected: kubeProxyConfig{
-				config: kubeproxyconfig.KubeProxyConfiguration{
-					FeatureGates: map[string]bool{
-						features.IPv6DualStack: false,
-					},
-					BindAddress: kubeadmapiv1.DefaultProxyBindAddressv6,
-					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-						Kubeconfig: kubeproxyKubeConfigFileName,
-					},
-				},
-			},
-		},
 	}
 
 	for _, test := range tests {
