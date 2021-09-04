@@ -319,7 +319,12 @@ func (cache *EndpointSliceCache) esInfoChanged(serviceKey types.NamespacedName, 
 		// If there's already a pending value, return whether or not this would
 		// change that.
 		if pendingOk {
-			return !reflect.DeepEqual(esInfo, pendingInfo)
+			pendingChanged := !reflect.DeepEqual(esInfo, pendingInfo)
+			// A->B->A
+			if pendingChanged && appliedOk {
+				return !reflect.DeepEqual(esInfo, appliedInfo)
+			}
+			return pendingChanged
 		}
 
 		// If there's already an applied value, return whether or not this would
