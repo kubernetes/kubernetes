@@ -28,7 +28,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 )
 
@@ -117,12 +116,6 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		kc.config.FeatureGates = map[string]bool{}
 	}
 
-	// TODO: The following code should be removed after dual-stack is GA.
-	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
-	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {
-		kc.config.FeatureGates[features.IPv6DualStack] = enabled
-	}
-
 	if kc.config.StaticPodPath == "" {
 		kc.config.StaticPodPath = kubeadmapiv1.DefaultManifestsDir
 	} else if kc.config.StaticPodPath != kubeadmapiv1.DefaultManifestsDir {
@@ -130,7 +123,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	}
 
 	clusterDNS := ""
-	dnsIP, err := constants.GetDNSIP(cfg.Networking.ServiceSubnet, features.Enabled(cfg.FeatureGates, features.IPv6DualStack))
+	dnsIP, err := constants.GetDNSIP(cfg.Networking.ServiceSubnet)
 	if err != nil {
 		clusterDNS = kubeadmapiv1.DefaultClusterDNSIP
 	} else {
