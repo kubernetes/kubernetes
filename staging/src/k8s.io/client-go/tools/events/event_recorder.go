@@ -49,13 +49,11 @@ func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.O
 		return
 	}
 
-	var refRelated *v1.ObjectReference
-	if related != nil {
-		refRelated, err = reference.GetReference(recorder.scheme, related)
-		if err != nil {
-			klog.V(9).Infof("Could not construct reference to: '%#v' due to: '%v'.", related, err)
-		}
+	refRelated, err := reference.GetReference(recorder.scheme, related)
+	if err != nil && err != reference.ErrNilObject {
+		klog.V(9).Infof("Could not construct reference to: '%#v' due to: '%v'.", related, err)
 	}
+
 	if !util.ValidateEventType(eventtype) {
 		klog.Errorf("Unsupported event type: '%v'", eventtype)
 		return
