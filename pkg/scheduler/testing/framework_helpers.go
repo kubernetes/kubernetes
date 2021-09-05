@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -106,8 +105,7 @@ func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, plugi
 			ps.Enabled = append(ps.Enabled, schedulerapi.Plugin{Name: pluginName, Weight: weight})
 		}
 		// Use defaults from latest config API version.
-		var gvk schema.GroupVersionKind
-		gvk = v1beta2.SchemeGroupVersion.WithKind(pluginName + "Args")
+		gvk := v1beta2.SchemeGroupVersion.WithKind(pluginName + "Args")
 		if args, _, err := configDecoder.Decode(nil, &gvk, nil); err == nil {
 			profile.PluginConfig = append(profile.PluginConfig, schedulerapi.PluginConfig{
 				Name: pluginName,

@@ -169,10 +169,7 @@ func getVSpherePersistentVolumeSpec(volumePath string, persistentVolumeReclaimPo
 
 // function to get vsphere persistent volume spec with given selector labels.
 func getVSpherePersistentVolumeClaimSpec(namespace string, labels map[string]string) *v1.PersistentVolumeClaim {
-	var (
-		pvc *v1.PersistentVolumeClaim
-	)
-	pvc = &v1.PersistentVolumeClaim{
+	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    namespace,
@@ -208,9 +205,7 @@ func verifyContentOfVSpherePV(client clientset.Interface, timeouts *framework.Ti
 }
 
 func getVSphereStorageClassSpec(name string, scParameters map[string]string, zones []string, volumeBindingMode storagev1.VolumeBindingMode) *storagev1.StorageClass {
-	var sc *storagev1.StorageClass
-
-	sc = &storagev1.StorageClass{
+	sc := &storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -321,7 +316,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 		volumes[index].VolumeSource.VsphereVolume = vsphereVolume
 	}
 
-	if commands == nil || len(commands) == 0 {
+	if len(commands) == 0 {
 		commands = []string{
 			"/bin/sh",
 			"-c",

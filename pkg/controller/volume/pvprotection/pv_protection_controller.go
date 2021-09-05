@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -187,12 +187,7 @@ func (c *Controller) removeFinalizer(pv *v1.PersistentVolume) error {
 func (c *Controller) isBeingUsed(pv *v1.PersistentVolume) bool {
 	// check if PV is being bound to a PVC by its status
 	// the status will be updated by PV controller
-	if pv.Status.Phase == v1.VolumeBound {
-		// the PV is being used now
-		return true
-	}
-
-	return false
+	return pv.Status.Phase == v1.VolumeBound
 }
 
 // pvAddedUpdated reacts to pv added/updated events

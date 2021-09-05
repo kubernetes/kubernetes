@@ -135,10 +135,7 @@ func waitForStateFileCleanedUp() {
 		restoredState, err := cpumanagerstate.NewCheckpointState("/var/lib/kubelet", "cpu_manager_state", "static", nil)
 		framework.ExpectNoError(err, "failed to create testing cpumanager state instance")
 		assignments := restoredState.GetCPUAssignments()
-		if len(assignments) == 0 {
-			return true
-		}
-		return false
+		return len(assignments) == 0
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 }
 

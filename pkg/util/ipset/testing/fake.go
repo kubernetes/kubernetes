@@ -54,7 +54,7 @@ func (f *FakeIPSet) FlushSet(set string) error {
 	}
 
 	// delete all entry elements
-	for true {
+	for {
 		if _, has := f.Entries[set].PopAny(); has {
 			continue
 		}

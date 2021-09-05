@@ -81,10 +81,7 @@ func (v *validator) Validate(pod *v1.Pod) error {
 	var retErr error
 	podutil.VisitContainers(&pod.Spec, podutil.AllContainers, func(container *v1.Container, containerType podutil.ContainerType) bool {
 		retErr = validateProfile(GetProfileName(pod, container.Name), loadedProfiles)
-		if retErr != nil {
-			return false
-		}
-		return true
+		return retErr == nil
 	})
 
 	return retErr

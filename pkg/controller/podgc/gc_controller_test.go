@@ -49,15 +49,8 @@ func NewFromClient(kubeClient clientset.Interface, terminatedPodThreshold int) (
 }
 
 func compareStringSetToList(set sets.String, list []string) bool {
-	for _, item := range list {
-		if !set.Has(item) {
-			return false
-		}
-	}
-	if len(list) != len(set) {
-		return false
-	}
-	return true
+	listSet := sets.NewString(list...)
+	return set.Equal(listSet)
 }
 
 func TestGCTerminated(t *testing.T) {
