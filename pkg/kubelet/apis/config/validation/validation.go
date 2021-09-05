@@ -103,6 +103,9 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.MaxPods < 0 {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: maxPods (--max-pods) %v must not be a negative number", kc.MaxPods))
 	}
+	if kc.HousekeepingPeriod.Seconds() <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("invalid configuration: housekeepingPeriod must be greater than 0"))
+	}
 	if utilvalidation.IsInRange(int(kc.OOMScoreAdj), -1000, 1000) != nil {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: oomScoreAdj (--oom-score-adj) %v must be between -1000 and 1000, inclusive", kc.OOMScoreAdj))
 	}

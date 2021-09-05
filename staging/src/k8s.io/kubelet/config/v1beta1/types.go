@@ -436,6 +436,14 @@ type KubeletConfiguration struct {
 	// Default: "1m"
 	// +optional
 	VolumeStatsAggPeriod metav1.Duration `json:"volumeStatsAggPeriod,omitempty"`
+	// HousekeepingPeriod is a Period for performing global cleanup tasks.
+	// The value must be a positive time duration.
+	// If DynamicKubeletConfig (deprecated; default off) is on, when
+	// dynamically updating this field, consider that
+	// it may impact the ability of the Kubelet to interact with the node's filesystem.
+	// Default: "2s"
+	// +optional
+	HousekeepingPeriod metav1.Duration `json:"housekeepingPeriod,omitempty"`
 	// kubeletCgroups is the absolute name of cgroups to isolate the kubelet in
 	// Dynamic Kubelet Config (deprecated): This field should not be updated without a full node
 	// reboot. It is safest to keep this value the same as the local config.

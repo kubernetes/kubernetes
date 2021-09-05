@@ -43,6 +43,7 @@ fileCheckFrequency: 20s
 hairpinMode: promiscuous-bridge
 healthzBindAddress: 127.0.0.1
 healthzPort: 10248
+housekeepingPeriod: 2s
 httpCheckFrequency: 20s
 imageGCHighThresholdPercent: 85
 imageGCLowThresholdPercent: 80

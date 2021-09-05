@@ -48,6 +48,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.Authorization.Webhook.CacheUnauthorizedTTL = metav1.Duration{Duration: 30 * time.Second}
 			obj.Address = "0.0.0.0"
 			obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
+			obj.HousekeepingPeriod = metav1.Duration{Duration: 2 * time.Second}
 			obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
 			obj.CPUCFSQuota = true
 			obj.EventBurst = 10

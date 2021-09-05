@@ -240,6 +240,8 @@ type KubeletConfiguration struct {
 	// Default: "container"
 	// +optional
 	TopologyManagerScope string
+
+	HousekeepingPeriod metav1.Duration
 	// Map of QoS resource reservation percentages (memory only for now).
 	// Requires the QOSReserved feature gate to be enabled.
 	QOSReserved map[string]string

@@ -297,6 +297,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 		return err
 	}
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	out.HousekeepingPeriod = in.HousekeepingPeriod
 	out.KubeletCgroups = in.KubeletCgroups
 	out.SystemCgroups = in.SystemCgroups
 	out.CgroupRoot = in.CgroupRoot
@@ -488,6 +489,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.MemoryManagerPolicy = in.MemoryManagerPolicy
 	out.TopologyManagerPolicy = in.TopologyManagerPolicy
 	out.TopologyManagerScope = in.TopologyManagerScope
+	out.HousekeepingPeriod = in.HousekeepingPeriod
 	out.QOSReserved = *(*map[string]string)(unsafe.Pointer(&in.QOSReserved))
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 	out.HairpinMode = in.HairpinMode

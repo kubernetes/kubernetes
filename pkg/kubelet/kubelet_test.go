@@ -298,6 +298,8 @@ func newTestKubeletWithImageList(
 	assert.NoError(t, err)
 	kubelet.containerGC = containerGC
 
+	kubelet.housekeepingPeriod = 2 * time.Second
+
 	fakeClock := testingclock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock

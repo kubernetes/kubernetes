@@ -59,6 +59,7 @@ var (
 		CPUCFSQuotaPeriod:               metav1.Duration{Duration: 25 * time.Millisecond},
 		TopologyManagerScope:            kubeletconfig.PodTopologyManagerScope,
 		TopologyManagerPolicy:           kubeletconfig.SingleNumaNodeTopologyManagerPolicy,
+		HousekeepingPeriod:              metav1.Duration{Duration: 2 * time.Second},
 		ShutdownGracePeriod:             metav1.Duration{Duration: 30 * time.Second},
 		ShutdownGracePeriodCriticalPods: metav1.Duration{Duration: 10 * time.Second},
 		MemoryThrottlingFactor:          utilpointer.Float64Ptr(0.8),
@@ -316,6 +317,14 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 				return conf
 			},
 			errMsg: "invalid configuration: topologyManagerPolicy (--topology-manager-policy) \"invalid-policy\" must be one of: [\"none\" \"best-effort\" \"restricted\" \"single-numa-node\"]",
+		},
+		{
+			name: "invalid HousekeepingPeriod",
+			configure: func(conf *kubeletconfig.KubeletConfiguration) *kubeletconfig.KubeletConfiguration {
+				conf.HousekeepingPeriod = metav1.Duration{Duration: -1 * time.Second}
+				return conf
+			},
+			errMsg: "invalid configuration: housekeepingPeriod must be greater than 0",
 		},
 		{
 			name: "use PodTopologyManagerScope without enabling TopologyManager",

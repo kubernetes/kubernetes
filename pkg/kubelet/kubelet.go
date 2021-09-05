@@ -132,9 +132,6 @@ const (
 	// MaxContainerBackOff is the max backoff period, exported for the e2e test
 	MaxContainerBackOff = 300 * time.Second
 
-	// Period for performing global cleanup tasks.
-	housekeepingPeriod = time.Second * 2
-
 	// Duration at which housekeeping failed to satisfy the invariant that
 	// housekeeping should be fast to avoid blocking pod config (while
 	// housekeeping is running no new pods are started or deleted).
@@ -551,6 +548,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
 		lastContainerStartedTime:                newTimeCache(),
+		housekeepingPeriod:                      kubeCfg.HousekeepingPeriod.Duration,
 	}
 
 	if klet.cloud != nil {
@@ -1203,6 +1201,8 @@ type Kubelet struct {
 
 	// Handles node shutdown events for the Node.
 	shutdownManager nodeshutdown.Manager
+
+	housekeepingPeriod time.Duration
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1961,7 +1961,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	// sync interval is defaulted to 10s.
 	syncTicker := time.NewTicker(time.Second)
 	defer syncTicker.Stop()
-	housekeepingTicker := time.NewTicker(housekeepingPeriod)
+	housekeepingTicker := time.NewTicker(kl.housekeepingPeriod)
 	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	const (

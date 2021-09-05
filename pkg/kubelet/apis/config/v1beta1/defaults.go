@@ -244,6 +244,9 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 	if obj.VolumePluginDir == "" {
 		obj.VolumePluginDir = DefaultVolumePluginDir
 	}
+	if obj.HousekeepingPeriod == zeroDuration {
+		obj.HousekeepingPeriod = metav1.Duration{Duration: 2 * time.Second}
+	}
 	// Use the Default LoggingConfiguration option
 	componentbaseconfigv1alpha1.RecommendedLoggingConfiguration(&obj.Logging)
 	if obj.EnableSystemLogHandler == nil {

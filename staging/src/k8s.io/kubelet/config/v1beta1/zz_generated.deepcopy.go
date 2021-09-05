@@ -163,6 +163,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		**out = **in
 	}
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
+	out.HousekeepingPeriod = in.HousekeepingPeriod
 	if in.CgroupsPerQOS != nil {
 		in, out := &in.CgroupsPerQOS, &out.CgroupsPerQOS
 		*out = new(bool)
