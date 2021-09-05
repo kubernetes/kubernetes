@@ -17,6 +17,7 @@ limitations under the License.
 package transport
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -117,6 +118,14 @@ func (c *tlsTransportCache) get(config *Config) (http.RoundTripper, error) {
 		DialContext:         dial,
 		DisableCompression:  config.DisableCompression,
 	})
+
+	if config.Proxy != nil {
+		// DialTLSContext provides an optional dial function for non-proxied HTTPS requests.
+		// The function will be used for connections to the proxy if the proxy itself is using HTTPS.
+		// In this case TLSClientConfig and TLSHandshakeTimeout will be ignored for connections to the proxy.
+		// We do this because we don't want options such as tls-server-name to be applied to the proxy connection.
+		transport.DialTLSContext = (&tls.Dialer{}).DialContext
+	}
 
 	if canCache {
 		// Cache a single transport for these options

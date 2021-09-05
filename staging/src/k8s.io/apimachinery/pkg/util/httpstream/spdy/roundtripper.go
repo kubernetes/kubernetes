@@ -244,20 +244,27 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 		}
 	}
 
+	// dialWithoutProxy either connects directly to the host specified by url or to a proxy.
+	// In the latter case we don't want cluster-specific TLS options such as tls-server-name to be applied.
+	tlsConfig := s.tlsConfig
+	if s.proxier != nil {
+		tlsConfig = &tls.Config{}
+	}
+
 	// TODO validate the TLSClientConfig is set up?
 	var conn *tls.Conn
 	var err error
 	if s.Dialer == nil {
-		conn, err = tls.Dial("tcp", dialAddr, s.tlsConfig)
+		conn, err = tls.Dial("tcp", dialAddr, tlsConfig)
 	} else {
-		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, s.tlsConfig)
+		conn, err = tls.DialWithDialer(s.Dialer, "tcp", dialAddr, tlsConfig)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	// Return if we were configured to skip validation
-	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+	if tlsConfig != nil && tlsConfig.InsecureSkipVerify {
 		return conn, nil
 	}
 
@@ -265,8 +272,8 @@ func (s *SpdyRoundTripper) dialWithoutProxy(ctx context.Context, url *url.URL) (
 	if err != nil {
 		return nil, err
 	}
-	if s.tlsConfig != nil && len(s.tlsConfig.ServerName) > 0 {
-		host = s.tlsConfig.ServerName
+	if tlsConfig != nil && len(tlsConfig.ServerName) > 0 {
+		host = tlsConfig.ServerName
 	}
 	err = conn.VerifyHostname(host)
 	if err != nil {
