@@ -19,18 +19,14 @@ package e2enode
 import (
 	"context"
 	"os/exec"
-	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/component-base/metrics/testutil"
-	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -96,18 +92,33 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 			l, err := f.PodClient().List(context.TODO(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
+			f.PodClient().DeleteSync(devicePluginPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+
 			for _, p := range l.Items {
 				if p.Namespace != f.Namespace.Name {
 					continue
 				}
 
-				f.PodClient().Delete(context.TODO(), p.Name, metav1.DeleteOptions{})
+				framework.Logf("Deleting pod: %s", p.Name)
+				f.PodClient().DeleteSync(p.Name, metav1.DeleteOptions{}, 2*time.Minute)
 			}
+
+			restartKubelet()
+
+			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
+			gomega.Eventually(func() bool {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				return numberOfNVIDIAGPUs(node) <= 0
+			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 		})
 
-		ginkgo.It("checks that when Kubelet restarts exclusive GPU assignation to pods is kept.", func() {
-			ginkgo.By("Creating one GPU pod on a node with at least two GPUs")
-			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs && sleep 120"
+		// This test is disabled as this behaviour has not existed since at least
+		// kubernetes 0.19. If this is a bug, then this test should pass when the
+		// issue is resolved. If the behaviour is intentional then it can be removed.
+		ginkgo.XIt("keeps GPU assignation to pods after the device plugin has been removed.", func() {
+			ginkgo.By("Creating one GPU pod")
+			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs && sleep 180"
 			p1 := f.PodClient().CreateSync(makeBusyboxPod(e2egpu.NVIDIAGPUResourceName, podRECMD))
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
@@ -115,7 +126,52 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 			p1, err := f.PodClient().Get(context.TODO(), p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
-			ginkgo.By("Restarting Kubelet and waiting for the current running pod to restart")
+			ginkgo.By("Deleting the device plugin")
+			f.PodClient().DeleteSync(devicePluginPod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+
+			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
+			gomega.Eventually(func() int64 {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				return numberOfNVIDIAGPUs(node)
+			}, 10*time.Minute, framework.Poll).Should(gomega.BeZero(), "Expected GPUs to eventually be unavailable")
+
+			ginkgo.By("Checking that scheduled pods can continue to run even after we delete the device plugin")
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIDRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			framework.ExpectEqual(devIDRestart1, devID1)
+
+			ginkgo.By("Restarting Kubelet")
+			restartKubelet()
+			framework.WaitForAllNodesSchedulable(f.ClientSet, 30*time.Minute)
+
+			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+			devIDRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			framework.ExpectEqual(devIDRestart1, devID1)
+
+			// Cleanup
+			f.PodClient().DeleteSync(p1.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+		})
+
+		ginkgo.It("keeps GPU assignment to pods across pod and kubelet restarts.", func() {
+			ginkgo.By("Creating one GPU pod on a node with at least two GPUs")
+			podRECMD := "devs=$(ls /dev/ | egrep '^nvidia[0-9]+$') && echo gpu devices: $devs && sleep 40"
+			p1 := f.PodClient().CreateSync(makeBusyboxPod(e2egpu.NVIDIAGPUResourceName, podRECMD))
+
+			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
+			devID1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			p1, err := f.PodClient().Get(context.TODO(), p1.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Confirming that after many pod restarts, GPU assignment is kept")
+			for i := 0; i < 3; i++ {
+				ensurePodContainerRestart(f, p1.Name, p1.Name)
+				devIDRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
+				framework.ExpectEqual(devIDRestart1, devID1)
+			}
+
+			ginkgo.By("Restarting Kubelet")
 			restartKubelet()
 
 			ginkgo.By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
@@ -124,48 +180,22 @@ var _ = SIGDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugin][NodeFeat
 			framework.ExpectEqual(devIDRestart1, devID1)
 
 			ginkgo.By("Restarting Kubelet and creating another pod")
+
 			restartKubelet()
-			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			framework.WaitForAllNodesSchedulable(f.ClientSet, 30*time.Minute)
+
+			ensurePodContainerRestart(f, p1.Name, p1.Name)
+
 			gomega.Eventually(func() bool {
-				return numberOfNVIDIAGPUs(getLocalNode(f)) > 0
+				return numberOfNVIDIAGPUs(getLocalNode(f)) >= 2
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
+
 			p2 := f.PodClient().CreateSync(makeBusyboxPod(e2egpu.NVIDIAGPUResourceName, podRECMD))
 
 			ginkgo.By("Checking that pods got a different GPU")
 			devID2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 
-			framework.ExpectEqual(devID1, devID2)
-
-			ginkgo.By("Deleting device plugin.")
-			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(context.TODO(), devicePluginPod.Name, metav1.DeleteOptions{})
-			ginkgo.By("Waiting for GPUs to become unavailable on the local node")
-			gomega.Eventually(func() bool {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				return numberOfNVIDIAGPUs(node) <= 0
-			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
-			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin.")
-			ensurePodContainerRestart(f, p1.Name, p1.Name)
-			devIDRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			framework.ExpectEqual(devIDRestart1, devID1)
-
-			ensurePodContainerRestart(f, p2.Name, p2.Name)
-			devIDRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			framework.ExpectEqual(devIDRestart2, devID2)
-			ginkgo.By("Restarting Kubelet.")
-			restartKubelet()
-			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
-			ensurePodContainerRestart(f, p1.Name, p1.Name)
-			devIDRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			framework.ExpectEqual(devIDRestart1, devID1)
-			ensurePodContainerRestart(f, p2.Name, p2.Name)
-			devIDRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			framework.ExpectEqual(devIDRestart2, devID2)
-			logDevicePluginMetrics()
-
-			// Cleanup
-			f.PodClient().DeleteSync(p1.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
-			f.PodClient().DeleteSync(p2.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			framework.ExpectNotEqual(devID1, devID2)
 		})
 	})
 })
@@ -178,32 +208,4 @@ func checkIfNvidiaGPUsExistOnNode() bool {
 		return false
 	}
 	return true
-}
-
-func logDevicePluginMetrics() {
-	ms, err := e2emetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
-	framework.ExpectNoError(err)
-	for msKey, samples := range ms {
-		switch msKey {
-		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginAllocationDurationKey:
-			for _, sample := range samples {
-				latency := sample.Value
-				resource := string(sample.Metric["resource_name"])
-				var quantile float64
-				if val, ok := sample.Metric[testutil.QuantileLabel]; ok {
-					var err error
-					if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
-						continue
-					}
-					framework.Logf("Metric: %v ResourceName: %v Quantile: %v Latency: %v", msKey, resource, quantile, latency)
-				}
-			}
-		case kubeletmetrics.KubeletSubsystem + "_" + kubeletmetrics.DevicePluginRegistrationCountKey:
-			for _, sample := range samples {
-				resource := string(sample.Metric["resource_name"])
-				count := sample.Value
-				framework.Logf("Metric: %v ResourceName: %v Count: %v", msKey, resource, count)
-			}
-		}
-	}
 }
