@@ -2883,7 +2883,6 @@ COMMIT
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.OnServiceSynced()
-	fp.OnEndpointsSynced()
 	fp.OnEndpointSlicesSynced()
 
 	serviceName := "svc1"
@@ -2992,7 +2991,6 @@ COMMIT
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.OnServiceSynced()
-	fp.OnEndpointsSynced()
 	fp.OnEndpointSlicesSynced()
 
 	serviceName := "svc1"
@@ -3056,7 +3054,6 @@ func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	fp := NewFakeProxier(ipt)
 	fp.OnServiceSynced()
-	fp.OnEndpointsSynced()
 	fp.OnEndpointSlicesSynced()
 
 	serviceName := "svc1"
@@ -3551,7 +3548,6 @@ COMMIT
 		ipt := iptablestest.NewFake()
 		fp := NewFakeProxier(ipt)
 		fp.OnServiceSynced()
-		fp.OnEndpointsSynced()
 		fp.OnEndpointSlicesSynced()
 
 		serviceName := "svc1"
@@ -4139,7 +4135,6 @@ COMMIT
 			ipt := iptablestest.NewFake()
 			fp := NewFakeProxier(ipt)
 			fp.OnServiceSynced()
-			fp.OnEndpointsSynced()
 			fp.OnEndpointSlicesSynced()
 
 			fp.OnServiceAdd(testcase.service)
