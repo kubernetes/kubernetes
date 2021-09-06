@@ -1308,7 +1308,16 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Du
 	return heartbeatTime, true
 }
 
-func getEventObject(object runtime.Object) runtime.Object {
+// getSafeFanoutObject returns an object that can be sent into fan-out
+// and its metadata can be safely mutated in every watcher in parallel.
+// We assume that  every watcher will mutate the object in the same way.
+//
+// Two cases:
+// 1. the CacheableObject object has thread-safe metadata changes. Equal mutations
+//    don't harm performance. Different mutations would harm performance, but we
+//    know they don't happen.
+// 2. a non-CacheableObject is deep-copied and hence every mutation is safe.
+func getSafeFanoutObject(object runtime.Object) runtime.Object {
 	if _, ok := object.(runtime.CacheableObject); ok {
 		// It is safe to return without deep-copy, because the underlying
 		// object was already deep-copied during construction.
@@ -1344,12 +1353,12 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: getEventObject(event.Object)}
+		return &watch.Event{Type: watch.Added, Object: getSafeFanoutObject(event.Object)}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: getEventObject(event.Object)}
+		return &watch.Event{Type: watch.Modified, Object: getSafeFanoutObject(event.Object)}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
-		oldObj := getEventObject(event.PrevObject)
+		oldObj := getSafeFanoutObject(event.PrevObject)
 		updateResourceVersionIfNeeded(oldObj, c.versioner, event.ResourceVersion)
 		return &watch.Event{Type: watch.Deleted, Object: oldObj}
 	}
