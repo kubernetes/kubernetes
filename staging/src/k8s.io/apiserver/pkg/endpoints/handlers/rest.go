@@ -370,12 +370,6 @@ func dedupOwnerReferencesAndAddWarning(obj runtime.Object, requestContext contex
 //   interfaces
 func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Request, namer ScopeNamer) error {
 	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
-		// Ensure that for empty lists we don't return <nil> items.
-		if meta.IsListType(obj) && meta.LenList(obj) == 0 {
-			if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-				return err
-			}
-		}
 		return nil
 	}
 
@@ -402,17 +396,9 @@ func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Reques
 		return fmt.Errorf("missing requestInfo")
 	}
 
-	count := 0
 	err = meta.EachListItem(obj, func(obj runtime.Object) error {
-		count++
 		return setSelfLink(obj, requestInfo, namer)
 	})
-
-	if count == 0 {
-		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
-			return err
-		}
-	}
 
 	return err
 }
