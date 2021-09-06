@@ -47,7 +47,7 @@ const (
 func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, level auditinternal.Level, attribs authorizer.Attributes) (*auditinternal.Event, error) {
 	ev := &auditinternal.Event{
 		RequestReceivedTimestamp: metav1.NewMicroTime(requestReceivedTimestamp),
-		Verb:                     attribs.GetVerb(),
+		Verb:                     maybeReplaceVerb(attribs, req),
 		RequestURI:               req.URL.RequestURI(),
 		UserAgent:                maybeTruncateUserAgent(req),
 		Level:                    level,
@@ -91,6 +91,14 @@ func NewEventFromRequest(req *http.Request, requestReceivedTimestamp time.Time, 
 	}
 
 	return ev, nil
+}
+
+func maybeReplaceVerb(attributes authorizer.Attributes, req *http.Request) string {
+	verbFromTheAttributes := attributes.GetVerb()
+	if len(verbFromTheAttributes) == 0 {
+		return fmt.Sprintf("unrecognized(%v)", req.Method)
+	}
+	return verbFromTheAttributes
 }
 
 // LogImpersonatedUser fills in the impersonated user attributes into an audit event.

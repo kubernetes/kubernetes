@@ -44,6 +44,7 @@ import (
 	auditv1beta1 "k8s.io/apiserver/pkg/apis/audit/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils"
@@ -101,9 +102,14 @@ rules:
     resources:
       - group: "apps"
         resources: ["deployments/scale"]
-
+  - level: RequestResponse
+    namespaces: ["raw-http-requests"]
+    resources:
+      - group: "" # core
+        resources: ["configmaps"]
 `
 	nonAdmissionWebhookNamespace       = "no-webhook-namespace"
+	rawHttpNamespace                   = "raw-http-requests"
 	watchTestTimeout             int64 = 1
 	watchOptions                       = metav1.ListOptions{TimeoutSeconds: &watchTestTimeout}
 	patch, _                           = json.Marshal(jsonpatch.Patch{})
@@ -380,6 +386,51 @@ func runTestWithVersion(t *testing.T, version string) {
 		},
 	}
 
+	rawHttpRequestGroupTestCases := []struct {
+		auditLevel auditinternal.Level
+		expEvents  []utils.AuditEvent
+		namespace  string
+	}{
+		{
+			auditLevel: auditinternal.LevelRequest,
+			namespace:  rawHttpNamespace,
+			expEvents: []utils.AuditEvent{
+				{
+					Level:             auditinternal.LevelRequestResponse,
+					Stage:             auditinternal.StageResponseComplete,
+					RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap?timeout=32s", rawHttpNamespace),
+					Verb:              "get",
+					Code:              404,
+					User:              auditTestUser,
+					Resource:          "configmaps",
+					Namespace:         "raw-http-requests",
+					RequestObject:     false,
+					ResponseObject:    true,
+					AuthorizeDecision: "allow",
+				},
+			},
+		},
+		{
+			auditLevel: auditinternal.LevelRequestResponse,
+			namespace:  rawHttpNamespace,
+			expEvents: []utils.AuditEvent{
+				{
+					Level:             auditinternal.LevelRequestResponse,
+					Stage:             auditinternal.StageResponseComplete,
+					RequestURI:        fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap?timeout=32s", rawHttpNamespace),
+					Verb:              "unrecognized(OPTIONS)",
+					Code:              405, // The API Server should respond with Not Allowed
+					User:              auditTestUser,
+					Resource:          "configmaps",
+					Namespace:         "raw-http-requests",
+					RequestObject:     false,
+					ResponseObject:    true,
+					AuthorizeDecision: "allow",
+				},
+			},
+		},
+	}
+
 	for _, tc := range tcs {
 		t.Run(fmt.Sprintf("%s.%s.%t", version, tc.auditLevel, tc.enableMutatingWebhook), func(t *testing.T) {
 			testAudit(t, version, tc.auditLevel, tc.enableMutatingWebhook, tc.namespace, kubeclient, logFile)
@@ -391,6 +442,46 @@ func runTestWithVersion(t *testing.T, version string) {
 		t.Run(fmt.Sprintf("cross-group-%s.%s.%s", version, tc.auditLevel, tc.namespace), func(t *testing.T) {
 			testAuditCrossGroupSubResource(t, version, tc.expEvents, tc.namespace, kubeclient, logFile)
 		})
+	}
+
+	for _, tc := range rawHttpRequestGroupTestCases {
+		t.Run(fmt.Sprintf("raw-http-request-%s.%s.%s", version, tc.auditLevel, tc.namespace), func(t *testing.T) {
+			testAuditRawHttpRequest(t, version, tc.expEvents, tc.namespace, kubeclient, logFile)
+		})
+	}
+}
+
+func testAuditRawHttpRequest(t *testing.T, version string, expEvents []utils.AuditEvent, namespace string, kubeclient *clientset.Clientset, logFile *os.File) {
+	var lastMissingReport string
+	sendHttpRequest(t, kubeclient, "GET", fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace))
+	sendHttpRequest(t, kubeclient, "OPTIONS", fmt.Sprintf("/api/v1/namespaces/%s/configmaps/audit-configmap", namespace))
+
+	if err := wait.Poll(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		// check for corresponding audit logs
+		stream, err := os.Open(logFile.Name())
+		if err != nil {
+			return false, fmt.Errorf("unexpected error: %v", err)
+		}
+		defer stream.Close()
+		missingReport, err := utils.CheckAuditLines(stream, expEvents, versions[version])
+		if err != nil {
+			return false, fmt.Errorf("unexpected error: %v", err)
+		}
+		if len(missingReport.MissingEvents) > 0 {
+			lastMissingReport = missingReport.String()
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("failed to get expected events -- missingReport: %s, error: %v", lastMissingReport, err)
+	}
+}
+
+func sendHttpRequest(t *testing.T, kubeclient *clientset.Clientset, httpVerb string, url string) {
+	// We don't care about emitter errors here. However, if the tests get broken, you might want to check them out.
+	err := kubeclient.RESTClient().Verb(httpVerb).Timeout(32 * time.Second).RequestURI(url).Do(context.TODO()).Error()
+	if err != nil {
+		t.Logf("Received an error: %v for url: %s", err, url)
 	}
 }
 
