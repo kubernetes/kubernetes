@@ -444,7 +444,6 @@ func addAllEventHandlers(
 			dynInformer.AddEventHandler(
 				buildEvtResHandler(at, gvk, strings.Title(gvr.Resource)),
 			)
-			go dynInformer.Run(sched.StopEverything)
 		}
 	}
 }
