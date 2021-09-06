@@ -837,7 +837,7 @@ func (p *staticPolicy) updatePodReusableMemory(pod *v1.Pod, container *v1.Contai
 	// If pod entries to m.initContainersReusableMemory other than the current pod exist, delete them.
 	for uid := range p.initContainersReusableMemory {
 		if podUID != uid {
-			delete(p.initContainersReusableMemory, podUID)
+			delete(p.initContainersReusableMemory, uid)
 		}
 	}
 
