@@ -221,7 +221,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	}
 
 	newVolumes := make(sets.String)
-	if err := pl.filterVolumes(pod, newVolumes); err != nil {
+	if err := pl.filterVolumes(pod, true /* new pod */, newVolumes); err != nil {
 		return framework.AsStatus(err)
 	}
 
@@ -254,7 +254,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	// count unique volumes
 	existingVolumes := make(sets.String)
 	for _, existingPod := range nodeInfo.Pods {
-		if err := pl.filterVolumes(existingPod.Pod, existingVolumes); err != nil {
+		if err := pl.filterVolumes(existingPod.Pod, false /* existing pod */, existingVolumes); err != nil {
 			return framework.AsStatus(err)
 		}
 	}
@@ -278,7 +278,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 	return nil
 }
 
-func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, filteredVolumes sets.String) error {
+func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes sets.String) error {
 	volumes := pod.Spec.Volumes
 	for i := range volumes {
 		vol := &volumes[i]
@@ -319,6 +319,12 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, filteredVolumes sets.String) 
 
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if err != nil {
+			if newPod {
+				// The PVC is required to proceed with
+				// scheduling of a new pod because it cannot
+				// run without it. Bail out immediately.
+				return fmt.Errorf("looking up PVC %s/%s: %v", pod.Namespace, pvcName, err)
+			}
 			// If the PVC is invalid, we don't count the volume because
 			// there's no guarantee that it belongs to the running predicate.
 			klog.V(4).InfoS("Unable to look up PVC info, assuming PVC doesn't match predicate when counting limits", "PVC", fmt.Sprintf("%s/%s", pod.Namespace, pvcName), "err", err)

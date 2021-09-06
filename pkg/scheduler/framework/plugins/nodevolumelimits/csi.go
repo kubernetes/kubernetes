@@ -180,6 +180,14 @@ func (pl *CSILimits) filterAttachableVolumes(
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 
 		if err != nil {
+			if newPod {
+				// The PVC is required to proceed with
+				// scheduling of a new pod because it cannot
+				// run without it. Bail out immediately.
+				return fmt.Errorf("looking up PVC %s/%s: %v", pod.Namespace, pvcName, err)
+			}
+			// If the PVC is invalid, we don't count the volume because
+			// there's no guarantee that it belongs to the running predicate.
 			klog.V(5).InfoS("Unable to look up PVC info", "PVC", fmt.Sprintf("%s/%s", pod.Namespace, pvcName))
 			continue
 		}

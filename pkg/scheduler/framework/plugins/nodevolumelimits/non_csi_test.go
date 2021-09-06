@@ -95,6 +95,7 @@ func TestEphemeralLimits(t *testing.T) {
 			newPod:           ephemeralVolumePod,
 			ephemeralEnabled: true,
 			test:             "volume missing",
+			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
 		},
 		{
 			newPod:           ephemeralVolumePod,

@@ -559,6 +559,7 @@ func TestCSILimits(t *testing.T) {
 			ephemeralEnabled: true,
 			driverNames:      []string{ebsCSIDriverName},
 			test:             "ephemeral volume missing",
+			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
 		},
 		{
 			newPod:           ephemeralVolumePod,
