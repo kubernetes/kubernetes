@@ -63,6 +63,13 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 		return nil, err
 	}
 
+	// Ensure that for empty lists we don't return <nil> items.
+	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
+		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
+			return nil, err
+		}
+	}
+
 	switch target := mediaType.Convert; {
 	case target == nil:
 		return obj, nil
