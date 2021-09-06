@@ -2,7 +2,7 @@
 
 [![GoPkg Widget]][GoPkg] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
 
-<img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
+<a href="https://kubernetes.io" target="_blank" ><img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100"></a>
 
 ----
 
