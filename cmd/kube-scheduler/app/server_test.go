@@ -29,9 +29,19 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/client-go/kubernetes/fake"
+	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
+	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
+)
+
+const (
+	pprofPath = "/debug/pprof"
+	logPath   = "/debug/flags"
 )
 
 func TestSetup(t *testing.T) {
@@ -281,5 +291,54 @@ profiles:
 				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 			}
 		})
+	}
+}
+
+func TestNewHealthzAndMetricsHandler(t *testing.T) {
+	// Setup any healthz checks we will want to use.
+	var checks []healthz.HealthChecker
+
+	// Test EnableProfiling
+	tests := []struct {
+		enableProfiling           bool
+		enableContentionProfiling bool
+		status                    int
+	}{
+		{
+			enableProfiling:           true,
+			enableContentionProfiling: true,
+			status:                    200,
+		},
+		{
+			enableProfiling:           false,
+			enableContentionProfiling: false,
+			status:                    404,
+		},
+	}
+
+	for _, test := range tests {
+		c := &config.KubeSchedulerConfiguration{
+			DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+				EnableProfiling:           test.enableProfiling,
+				EnableContentionProfiling: test.enableContentionProfiling,
+			},
+		}
+
+		client := fake.NewSimpleClientset()
+		informers := scheduler.NewInformerFactory(client, 0)
+
+		isLeader := func() bool {
+			return true
+		}
+
+		mux := newHealthzAndMetricsHandler(c, informers, isLeader, checks...)
+
+		s := httptest.NewServer(mux)
+		defer s.Close()
+		resp, _ := http.Get(s.URL + pprofPath)
+		assert.Equal(t, test.status, resp.StatusCode)
+
+		resp, _ = http.Get(s.URL + logPath)
+		assert.Equal(t, test.status, resp.StatusCode)
 	}
 }
