@@ -160,7 +160,8 @@ func TestCacheableObject(t *testing.T) {
 					Namer:          &mockNamer{},
 					TableConvertor: tableConvertor,
 				},
-				nil)
+				nil,
+				false)
 
 			if err != test.expectedErr {
 				t.Errorf("unexpected error: %v, expected: %v", err, test.expectedErr)

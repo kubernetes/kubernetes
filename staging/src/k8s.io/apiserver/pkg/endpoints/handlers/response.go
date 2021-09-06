@@ -38,8 +38,8 @@ import (
 
 // transformObject takes the object as returned by storage and ensures it is in
 // the client's desired form, as well as ensuring any API level fields like self-link
-// are properly set.
-func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
+// are properly set. If cloneOnMutation is true, before the first mutation the object is deep-copied.
+func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request, cloneOnMutation bool) (runtime.Object, error) {
 	if co, ok := obj.(runtime.CacheableObject); ok {
 		if mediaType.Convert != nil {
 			// Non-nil mediaType.Convert means that some conversion of the object
@@ -51,18 +51,24 @@ func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, 
 			//
 			// TODO: Long-term, transformObject should be changed so that it
 			// implements runtime.Encoder interface.
-			return doTransformObject(ctx, co.GetObject(), opts, mediaType, scope, req)
+			return doTransformObject(ctx, co.GetObject(), opts, mediaType, scope, req, cloneOnMutation)
 		}
 	}
-	return doTransformObject(ctx, obj, opts, mediaType, scope, req)
+	return doTransformObject(ctx, obj, opts, mediaType, scope, req, cloneOnMutation)
 }
 
-func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request) (runtime.Object, error) {
+func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}, mediaType negotiation.MediaTypeOptions, scope *RequestScope, req *http.Request, cloneOnMutation bool) (runtime.Object, error) {
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
 
+	cloned := false
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		if cloneOnMutation && !cloned {
+			obj = obj.DeepCopyObject()
+			cloned = true
+		}
 		if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
 			return nil, err
 		}
@@ -70,6 +76,10 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 
 	// Ensure that for empty lists we don't return <nil> items.
 	if meta.IsListType(obj) && meta.LenList(obj) == 0 {
+		if cloneOnMutation && !cloned {
+			obj = obj.DeepCopyObject()
+			cloned = true
+		}
 		if err := meta.SetList(obj, []runtime.Object{}); err != nil {
 			return nil, err
 		}
@@ -140,7 +150,7 @@ func transformResponseObject(ctx context.Context, scope *RequestScope, trace *ut
 		scope.err(err, w, req)
 		return
 	}
-	obj, err := transformObject(ctx, result, options, mediaType, scope, req)
+	obj, err := transformObject(ctx, result, options, mediaType, scope, req, false)
 	if err != nil {
 		scope.err(err, w, req)
 		return
