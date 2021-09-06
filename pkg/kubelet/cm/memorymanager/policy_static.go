@@ -936,13 +936,13 @@ func isInitContainer(pod *v1.Pod, container *v1.Container) bool {
 func isNUMAAffinitiesEqual(numaAffinity1, numaAffinity2 []int) bool {
 	bitMask1, err := bitmask.NewBitMask(numaAffinity1...)
 	if err != nil {
-		klog.ErrorS(err, "failed to create bit mask", numaAffinity1)
+		klog.ErrorS(err, "failed to create bit mask", "numaAffinity1", numaAffinity1)
 		return false
 	}
 
 	bitMask2, err := bitmask.NewBitMask(numaAffinity2...)
 	if err != nil {
-		klog.ErrorS(err, "failed to create bit mask", numaAffinity2)
+		klog.ErrorS(err, "failed to create bit mask", "numaAffinity2", numaAffinity2)
 		return false
 	}
 
