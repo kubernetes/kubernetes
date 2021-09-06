@@ -228,11 +228,13 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 		trace.Step("Object stored in database")
 
-		if err := setObjectSelfLink(ctx, result, req, scope.Namer); err != nil {
-			scope.err(err, w, req)
-			return
+		if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+			if err := setObjectSelfLink(ctx, result, req, scope.Namer); err != nil {
+				scope.err(err, w, req)
+				return
+			}
+			trace.Step("Self-link added")
 		}
-		trace.Step("Self-link added")
 
 		status := http.StatusOK
 		if wasCreated {

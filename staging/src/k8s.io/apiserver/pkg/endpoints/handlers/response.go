@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -59,8 +61,11 @@ func doTransformObject(ctx context.Context, obj runtime.Object, opts interface{}
 	if _, ok := obj.(*metav1.Status); ok {
 		return obj, nil
 	}
-	if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
-		return nil, err
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) {
+		if err := setObjectSelfLink(ctx, obj, req, scope.Namer); err != nil {
+			return nil, err
+		}
 	}
 
 	// Ensure that for empty lists we don't return <nil> items.
