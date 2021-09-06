@@ -84,6 +84,11 @@ type ExtraConfig struct {
 	ServiceResolver webhook.ServiceResolver
 	// AuthResolverWrapper is used in CR webhook converters
 	AuthResolverWrapper webhook.AuthenticationInfoResolverWrapper
+	// AssumePrunedObjectMetaInStorage set to true optimizes the read code-path for CRs
+	// assuming that ObjectMeta has been pruned when writing the objects. This can be
+	// assumed for every cluster installed with or after 1.11 when ObjectMeta pruning
+	// was added.
+	AssumePrunedObjectMetaInStorage bool
 }
 
 type Config struct {
@@ -194,6 +199,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		time.Duration(c.GenericConfig.MinRequestTimeout)*time.Second,
 		apiGroupInfo.StaticOpenAPISpec,
 		c.GenericConfig.MaxRequestBodyBytes,
+		c.ExtraConfig.AssumePrunedObjectMetaInStorage,
 	)
 	if err != nil {
 		return nil, err

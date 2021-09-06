@@ -135,6 +135,12 @@ type crdHandler struct {
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
 	maxRequestBodyBytes int64
+
+	// assumePrunedObjectMetaInStorage set to true optimizes the read code-path for CRs
+	// assuming that ObjectMeta has been pruned when writing the objects. This can be
+	// assumed for every cluster installed with or after 1.11 when ObjectMeta pruning
+	// was added.
+	assumePrunedObjectMetaInStorage bool
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -186,23 +192,25 @@ func NewCustomResourceDefinitionHandler(
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
 	staticOpenAPISpec *spec.Swagger,
-	maxRequestBodyBytes int64) (*crdHandler, error) {
+	maxRequestBodyBytes int64,
+	assumePrunedObjectMetaInStorage bool) (*crdHandler, error) {
 	ret := &crdHandler{
-		versionDiscoveryHandler: versionDiscoveryHandler,
-		groupDiscoveryHandler:   groupDiscoveryHandler,
-		customStorage:           atomic.Value{},
-		crdLister:               crdInformer.Lister(),
-		hasSynced:               crdInformer.Informer().HasSynced,
-		delegate:                delegate,
-		restOptionsGetter:       restOptionsGetter,
-		admission:               admission,
-		establishingController:  establishingController,
-		masterCount:             masterCount,
-		authorizer:              authorizer,
-		requestTimeout:          requestTimeout,
-		minRequestTimeout:       minRequestTimeout,
-		staticOpenAPISpec:       staticOpenAPISpec,
-		maxRequestBodyBytes:     maxRequestBodyBytes,
+		versionDiscoveryHandler:         versionDiscoveryHandler,
+		groupDiscoveryHandler:           groupDiscoveryHandler,
+		customStorage:                   atomic.Value{},
+		crdLister:                       crdInformer.Lister(),
+		hasSynced:                       crdInformer.Informer().HasSynced,
+		delegate:                        delegate,
+		restOptionsGetter:               restOptionsGetter,
+		admission:                       admission,
+		establishingController:          establishingController,
+		masterCount:                     masterCount,
+		authorizer:                      authorizer,
+		requestTimeout:                  requestTimeout,
+		minRequestTimeout:               minRequestTimeout,
+		staticOpenAPISpec:               staticOpenAPISpec,
+		maxRequestBodyBytes:             maxRequestBodyBytes,
+		assumePrunedObjectMetaInStorage: assumePrunedObjectMetaInStorage,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    ret.createCustomResourceDefinition,
@@ -816,13 +824,14 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 				scaleSpec,
 			),
 			crdConversionRESTOptionsGetter{
-				RESTOptionsGetter:     r.restOptionsGetter,
-				converter:             safeConverter,
-				decoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
-				encoderVersion:        schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
-				structuralSchemas:     structuralSchemas,
-				structuralSchemaGK:    kind.GroupKind(),
-				preserveUnknownFields: crd.Spec.PreserveUnknownFields,
+				RESTOptionsGetter:               r.restOptionsGetter,
+				converter:                       safeConverter,
+				decoderVersion:                  schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name},
+				encoderVersion:                  schema.GroupVersion{Group: crd.Spec.Group, Version: storageVersion},
+				structuralSchemas:               structuralSchemas,
+				structuralSchemaGK:              kind.GroupKind(),
+				preserveUnknownFields:           crd.Spec.PreserveUnknownFields,
+				assumePrunedObjectMetaInStorage: r.assumePrunedObjectMetaInStorage,
 			},
 			crd.Status.AcceptedNames.Categories,
 			table,
@@ -1189,15 +1198,30 @@ type crdConversionRESTOptionsGetter struct {
 	structuralSchemas     map[string]*structuralschema.Structural // by version
 	structuralSchemaGK    schema.GroupKind
 	preserveUnknownFields bool
+
+	// assumePrunedObjectMetaInStorage set to true will mean to avoid the expensive unmarshal+marshal
+	// of schemaobjectmeta.GetObjectMeta+SetObjectMeta called on the unstructured object:
+	//
+	// - marshal obj[metadata] back into a json string
+	// - unmarshal into metadata := ObjectMeta{}
+	// - marshal to JSON string
+	// - unmarshal into metadata := map[string]interface{}{}
+	// - obj[metadata] = metadata.
+	//
+	// ObjectMeta pruning was added in 2018 in 1.11. Cluster installed with 1.11 or later will have
+	// all ObjectMeta pruned and hence we can avoid the expensive marshalling+unmarshalling orgy.
+	assumePrunedObjectMetaInStorage bool
 }
 
 func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret, err := t.RESTOptionsGetter.GetRESTOptions(resource)
 	if err == nil {
+		metadataModeFromStorage := metadataCoercePruneAndDropInvalid
+		if t.assumePrunedObjectMetaInStorage {
+			metadataModeFromStorage = metadataCoerceNone
+		}
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
-			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
-			metadataMode: metadataCoercePruneAndDropInvalid,
-
+			metadataMode:          metadataModeFromStorage,
 			repairGeneration:      true,
 			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,

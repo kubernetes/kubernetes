@@ -87,10 +87,11 @@ func createAPIExtensionsConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: apiextensionsapiserver.ExtraConfig{
-			CRDRESTOptionsGetter: apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions),
-			MasterCount:          masterCount,
-			AuthResolverWrapper:  authResolverWrapper,
-			ServiceResolver:      serviceResolver,
+			CRDRESTOptionsGetter:            apiextensionsoptions.NewCRDRESTOptionsGetter(etcdOptions),
+			MasterCount:                     masterCount,
+			AuthResolverWrapper:             authResolverWrapper,
+			ServiceResolver:                 serviceResolver,
+			AssumePrunedObjectMetaInStorage: commandOptions.AssumePrunedCustomResourceMetaDataInStorage,
 		},
 	}
 

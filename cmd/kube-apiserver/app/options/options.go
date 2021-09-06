@@ -93,6 +93,12 @@ type ServerRunOptions struct {
 	ServiceAccountTokenMaxExpiration time.Duration
 
 	ShowHiddenMetricsForVersion string
+
+	// AssumePrunedCustomResourceMetaDataInStorage set to true optimizes the read code-path for CRs
+	// assuming that ObjectMeta has been pruned when writing the objects. This can be
+	// assumed for every cluster installed with or after 1.11 when ObjectMeta pruning
+	// was added.
+	AssumePrunedCustomResourceMetaDataInStorage bool
 }
 
 // NewServerRunOptions creates a new ServerRunOptions object with default parameters
@@ -270,6 +276,10 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.StringVar(&s.ServiceAccountSigningKeyFile, "service-account-signing-key-file", s.ServiceAccountSigningKeyFile, ""+
 		"Path to the file that contains the current private key of the service account token issuer. The issuer will sign issued ID tokens with this private key.")
+
+	fs.BoolVar(&s.AssumePrunedCustomResourceMetaDataInStorage, "assume-pruned-custom-resource-metadata-in-storage", s.AssumePrunedCustomResourceMetaDataInStorage, ""+
+		"Optimizes the read code-path for CustomResources assuming that metadata has been pruned when writing the objects. "+
+		"This can be  assumed for every cluster installed with or after Kubernetes 1.11 when metadata pruning was added.")
 
 	return fss
 }
