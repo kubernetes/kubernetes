@@ -316,6 +316,11 @@ func New(client clientset.Interface,
 	}
 
 	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
+
+	if dynInformerFactory != nil {
+		dynInformerFactory.Start(stopEverything)
+	}
+
 	return sched, nil
 }
 
