@@ -645,8 +645,8 @@ func TestWatchHTTPErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		FixupNonMutating: func(obj runtime.Object) runtime.Object { return obj },
+		TimeoutFactory:   &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
@@ -710,8 +710,8 @@ func TestWatchHTTPErrorsBeforeServe(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		FixupNonMutating: func(obj runtime.Object) runtime.Object { return obj },
+		TimeoutFactory:   &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	errStatus := errors.NewInternalError(fmt.Errorf("we got an error"))
@@ -769,8 +769,8 @@ func TestWatchHTTPDynamicClientErrors(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		FixupNonMutating: func(obj runtime.Object) runtime.Object { return obj },
+		TimeoutFactory:   &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))
@@ -812,8 +812,8 @@ func TestWatchHTTPTimeout(t *testing.T) {
 		Encoder:         newCodec,
 		EmbeddedEncoder: newCodec,
 
-		Fixup:          func(obj runtime.Object) runtime.Object { return obj },
-		TimeoutFactory: &fakeTimeoutFactory{timeoutCh, done},
+		FixupNonMutating: func(obj runtime.Object) runtime.Object { return obj },
+		TimeoutFactory:   &fakeTimeoutFactory{timeoutCh, done},
 	}
 
 	s := httptest.NewServer(serveWatch(watcher, watchServer, nil))

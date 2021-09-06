@@ -117,7 +117,7 @@ func serveWatch(watcher watch.Interface, scope *RequestScope, mediaTypeOptions n
 		Encoder:         encoder,
 		EmbeddedEncoder: embeddedEncoder,
 
-		Fixup: func(obj runtime.Object) runtime.Object {
+		FixupNonMutating: func(obj runtime.Object) runtime.Object {
 			result, err := transformObject(ctx, obj, options, mediaTypeOptions, scope, req, true)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to transform object %v: %v", reflect.TypeOf(obj), err))
@@ -153,8 +153,8 @@ type WatchServer struct {
 	Encoder runtime.Encoder
 	// used to encode the nested object in the watch stream
 	EmbeddedEncoder runtime.Encoder
-	// used to correct the object before we send it to the serializer
-	Fixup func(runtime.Object) runtime.Object
+	// used to correct the object before we send it to the serializer, without mutating the input
+	FixupNonMutating func(runtime.Object) runtime.Object
 
 	TimeoutFactory TimeoutFactory
 }
@@ -222,7 +222,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 
-			obj := s.Fixup(event.Object)
+			obj := s.FixupNonMutating(event.Object)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
@@ -290,7 +290,7 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 				// End of results.
 				return
 			}
-			obj := s.Fixup(event.Object)
+			obj := s.FixupNonMutating(event.Object)
 			if err := s.EmbeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object %T: %v", obj, err))
