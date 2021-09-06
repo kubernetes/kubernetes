@@ -1303,7 +1303,7 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time, bookmarkFrequency time.Du
 	return heartbeatTime, true
 }
 
-func getEventObject(object runtime.Object) runtime.Object {
+func getMutableEventObject(object runtime.Object) runtime.Object {
 	if _, ok := object.(runtime.CacheableObject); ok {
 		// It is safe to return without deep-copy, because the underlying
 		// object was already deep-copied during construction.
@@ -1339,12 +1339,12 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: getEventObject(event.Object)}
+		return &watch.Event{Type: watch.Added, Object: getMutableEventObject(event.Object)}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: getEventObject(event.Object)}
+		return &watch.Event{Type: watch.Modified, Object: getMutableEventObject(event.Object)}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
-		oldObj := getEventObject(event.PrevObject)
+		oldObj := getMutableEventObject(event.PrevObject)
 		updateResourceVersionIfNeeded(oldObj, c.versioner, event.ResourceVersion)
 		return &watch.Event{Type: watch.Deleted, Object: oldObj}
 	}
