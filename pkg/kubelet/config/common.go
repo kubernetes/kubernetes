@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -53,7 +54,7 @@ func generatePodName(name string, nodeName types.NodeName) string {
 	return fmt.Sprintf("%s-%s", name, strings.ToLower(string(nodeName)))
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
+func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName, lastWriteTime time.Time) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		hash.DeepHashObject(hasher, pod)
@@ -62,6 +63,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 		if isFile {
 			fmt.Fprintf(hasher, "host:%s", nodeName)
 			fmt.Fprintf(hasher, "file:%s", source)
+			fmt.Fprintf(hasher, "lastWriteTime:%v", lastWriteTime.UTC())
 		} else {
 			fmt.Fprintf(hasher, "url:%s", source)
 		}

@@ -114,8 +114,8 @@ func (s *sourceFile) run() {
 	s.startWatch()
 }
 
-func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
-	return applyDefaults(pod, source, true, s.nodeName)
+func (s *sourceFile) applyDefaults(pod *api.Pod, source string, lastWriteTime time.Time) error {
+	return applyDefaults(pod, source, true, s.nodeName, lastWriteTime)
 }
 
 func (s *sourceFile) listConfig() error {
@@ -216,13 +216,18 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 	}
 	defer file.Close()
 
+	stat, err := file.Stat()
+	if err != nil {
+		return pod, err
+	}
+
 	data, err := utilio.ReadAtMost(file, maxConfigLength)
 	if err != nil {
 		return pod, err
 	}
 
 	defaultFn := func(pod *api.Pod) error {
-		return s.applyDefaults(pod, filename)
+		return s.applyDefaults(pod, filename, stat.ModTime())
 	}
 
 	parsed, pod, podErr := tryDecodeSinglePod(data, defaultFn)

@@ -79,7 +79,7 @@ func (s *sourceURL) run() {
 }
 
 func (s *sourceURL) applyDefaults(pod *api.Pod) error {
-	return applyDefaults(pod, s.url, false, s.nodeName)
+	return applyDefaults(pod, s.url, false, s.nodeName, time.Time{})
 }
 
 func (s *sourceURL) extractFromURL() error {
