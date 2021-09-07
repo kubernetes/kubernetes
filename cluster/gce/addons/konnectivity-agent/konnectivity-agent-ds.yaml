@@ -33,12 +33,14 @@ spec:
           args: [
                   "--logtostderr=true",
                   "--ca-cert=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+__EXTRA_PARAMS__
                   "--proxy-server-host=__APISERVER_IP__",
                   "--proxy-server-port=8132",
                   "--sync-interval=5s",
                   "--sync-interval-cap=30s",
                   "--probe-interval=5s",
-                  "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token"
+                  "--service-account-token-path=/var/run/secrets/tokens/konnectivity-agent-token",
+                  "--agent-identifiers=ipv4=$(HOST_IP)"
                   ]
           env:
             - name: POD_NAME
@@ -49,11 +51,16 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
           resources:
             limits:
               cpu: 50m
               memory: 30Mi
           volumeMounts:
+__EXTRA_VOL_MNTS__
             - mountPath: /var/run/secrets/tokens
               name: konnectivity-agent-token
           livenessProbe:
@@ -64,6 +71,7 @@ spec:
             timeoutSeconds: 15
       serviceAccountName: konnectivity-agent
       volumes:
+__EXTRA_VOLS__
         - name: konnectivity-agent-token
           projected:
             sources:
