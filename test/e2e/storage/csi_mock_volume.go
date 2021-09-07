@@ -1540,7 +1540,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				// sleep to make sure RequiresRepublish triggers more than 1 NodePublishVolume
 				numNodePublishVolume := 1
 				if test.deployCSIDriverObject && csiServiceAccountTokenEnabled {
-					time.Sleep(time.Second)
+					time.Sleep(5 * time.Second)
 					numNodePublishVolume = 2
 				}
 
