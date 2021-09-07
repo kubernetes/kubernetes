@@ -22,4 +22,7 @@ type ServiceControllerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive service
 	// management, but more CPU (and network) load.
 	ConcurrentServiceSyncs int32
+
+	// EnableDirectConnect is whether to enable loadbalancer connect to pod directly
+	EnableDirectConnect bool
 }

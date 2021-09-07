@@ -33,6 +33,7 @@ func (o *ServiceControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 
 	fs.Int32Var(&o.ConcurrentServiceSyncs, "concurrent-service-syncs", o.ConcurrentServiceSyncs, "The number of services that are allowed to sync concurrently. Larger number = more responsive service management, but more CPU (and network) load")
+	fs.BoolVar(&o.EnableDirectConnect, "enable-direct-connect", false, "Whether to enable loadbalancer connect to pods directly.")
 }
 
 // ApplyTo fills up ServiceController config with options.

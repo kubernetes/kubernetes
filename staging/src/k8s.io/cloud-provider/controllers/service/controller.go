@@ -103,6 +103,8 @@ func New(
 	kubeClient clientset.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	nodeInformer coreinformers.NodeInformer,
+	endpointsInformer coreinformers.EndpointsInformer,
+	enableDirectConnect bool,
 	clusterName string,
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
@@ -186,6 +188,20 @@ func New(
 		},
 		time.Duration(0),
 	)
+
+	if enableDirectConnect {
+		endpointsInformer.Informer().AddEventHandlerWithResyncPeriod(
+			cache.ResourceEventHandlerFuncs{
+				AddFunc: func(cur interface{}) {
+					s.enqueueService(cur)
+				},
+				UpdateFunc: func(old, cur interface{}) {
+					s.enqueueService(cur)
+				},
+			},
+			time.Duration(0),
+		)
+	}
 
 	if err := s.init(); err != nil {
 		return nil, err
