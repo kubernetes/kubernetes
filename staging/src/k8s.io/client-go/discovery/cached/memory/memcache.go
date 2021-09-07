@@ -25,6 +25,7 @@ import (
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/version"
@@ -71,6 +72,11 @@ func isTransientConnectionError(err error) bool {
 
 func isTransientError(err error) bool {
 	if isTransientConnectionError(err) {
+		return true
+	}
+
+	if meta.IsNoMatchError(err) {
+		// Kind not found, API / CRD for it may be registered later.
 		return true
 	}
 

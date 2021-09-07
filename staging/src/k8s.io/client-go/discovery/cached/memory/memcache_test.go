@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	errorsutil "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery/fake"
 )
@@ -321,6 +322,99 @@ func TestPartialRetryableFailure(t *testing.T) {
 						Reason:  metav1.StatusReasonServiceUnavailable,
 					},
 				},
+			},
+			"astronomy2/v8beta1": {
+				list: &metav1.APIResourceList{
+					GroupVersion: "astronomy2/v8beta1",
+					APIResources: []metav1.APIResource{{
+						Name:         "dwarfplanets",
+						SingularName: "dwarfplanet",
+						Namespaced:   true,
+						Kind:         "DwarfPlanet",
+						ShortNames:   []string{"dp"},
+					}},
+				},
+			},
+		},
+	}
+
+	c := NewMemCacheClient(fake)
+	if c.Fresh() {
+		t.Errorf("Expected not fresh.")
+	}
+	r, err := c.ServerResourcesForGroupVersion("astronomy2/v8beta1")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if e, a := fake.resourceMap["astronomy2/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+	_, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
+
+	fake.lock.Lock()
+	fake.resourceMap["astronomy/v8beta1"] = &resourceMapEntry{
+		list: &metav1.APIResourceList{
+			GroupVersion: "astronomy/v8beta1",
+			APIResources: []metav1.APIResource{{
+				Name:         "dwarfplanets",
+				SingularName: "dwarfplanet",
+				Namespaced:   true,
+				Kind:         "DwarfPlanet",
+				ShortNames:   []string{"dp"},
+			}},
+		},
+		err: nil,
+	}
+	fake.lock.Unlock()
+	// We should retry retryable error even without Invalidate() being called,
+	// so no error is expected.
+	r, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if e, a := fake.resourceMap["astronomy/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+
+	// Check that the last result was cached and we don't retry further.
+	fake.lock.Lock()
+	fake.resourceMap["astronomy/v8beta1"].err = errors.New("some permanent error")
+	fake.lock.Unlock()
+	r, err = c.ServerResourcesForGroupVersion("astronomy/v8beta1")
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if e, a := fake.resourceMap["astronomy/v8beta1"].list, r; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+func TestMissingAPIFailure(t *testing.T) {
+	fake := &fakeDiscovery{
+		groupList: &metav1.APIGroupList{
+			Groups: []metav1.APIGroup{
+				{
+					Name: "astronomy",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy/v8beta1",
+						Version:      "v8beta1",
+					}},
+				},
+				{
+					Name: "astronomy2",
+					Versions: []metav1.GroupVersionForDiscovery{{
+						GroupVersion: "astronomy2/v8beta1",
+						Version:      "v8beta1",
+					}},
+				},
+			},
+		},
+		resourceMap: map[string]*resourceMapEntry{
+			"astronomy/v8beta1": {
+				err: &meta.NoResourceMatchError{},
 			},
 			"astronomy2/v8beta1": {
 				list: &metav1.APIResourceList{
