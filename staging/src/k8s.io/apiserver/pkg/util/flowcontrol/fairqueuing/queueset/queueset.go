@@ -76,9 +76,9 @@ type queueSetCompleter struct {
 // not end in "Locked" either acquires the lock or does not care about
 // locking.
 type queueSet struct {
-	clock                eventclock.Interface
-	estimatedServiceTime float64
-	obsPair              metrics.TimedObserverPair
+	clock                   eventclock.Interface
+	estimatedServiceSeconds float64
+	obsPair                 metrics.TimedObserverPair
 
 	promiseFactory promiseFactory
 
@@ -170,12 +170,12 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 	qs := qsc.theSet
 	if qs == nil {
 		qs = &queueSet{
-			clock:                qsc.factory.clock,
-			estimatedServiceTime: 60,
-			obsPair:              qsc.obsPair,
-			qCfg:                 qsc.qCfg,
-			virtualTime:          0,
-			lastRealTime:         qsc.factory.clock.Now(),
+			clock:                   qsc.factory.clock,
+			estimatedServiceSeconds: 0.003,
+			obsPair:                 qsc.obsPair,
+			qCfg:                    qsc.qCfg,
+			virtualTime:             0,
+			lastRealTime:            qsc.factory.clock.Now(),
 		}
 		qs.promiseFactory = qsc.factory.promiseFactoryFactory(qs)
 	}
@@ -642,8 +642,8 @@ func (qs *queueSet) dispatchLocked() bool {
 			qs.qCfg.Name, request.startTime.Format(nsTimeFmt), qs.virtualTime, request.descr1, request.descr2,
 			request.workEstimate, queue.index, queue.virtualStart, queue.requests.Length(), queue.requestsExecuting, queue.seatsInUse, qs.totSeatsInUse)
 	}
-	// When a request is dequeued for service -> qs.virtualStart += G
-	queue.virtualStart += qs.estimatedServiceTime * float64(request.Seats())
+	// When a request is dequeued for service -> qs.virtualStart += G * width
+	queue.virtualStart += qs.estimatedServiceSeconds * float64(request.Seats())
 	request.decision.Set(decisionExecute)
 	return ok
 }
@@ -686,29 +686,14 @@ func (qs *queueSet) selectQueueLocked() *queue {
 	for range qs.queues {
 		qs.robinIndex = (qs.robinIndex + 1) % nq
 		queue := qs.queues[qs.robinIndex]
-		if queue.requests.Length() != 0 {
+		oldestWaiting, _ := queue.requests.Peek()
+		if oldestWaiting != nil {
 			sMin = math.Min(sMin, queue.virtualStart)
 			sMax = math.Max(sMax, queue.virtualStart)
-			estimatedWorkInProgress := qs.estimatedServiceTime * float64(queue.seatsInUse)
+			estimatedWorkInProgress := qs.estimatedServiceSeconds * float64(queue.seatsInUse)
 			dsMin = math.Min(dsMin, queue.virtualStart-estimatedWorkInProgress)
 			dsMax = math.Max(dsMax, queue.virtualStart-estimatedWorkInProgress)
-			// the finish R of the oldest request is:
-			//   start R + G
-			// we are not taking the width of the request into account when
-			// we calculate the virtual finish time of the request because
-			// it can starve requests with smaller wdith in other queues.
-			//
-			// so let's draw an example of the starving scenario:
-			//  - G=60 (estimated service time in seconds)
-			//  - concurrency limit=2
-			//  - we have two queues, q1 and q2
-			//  - q1 has an infinite supply of requests with width W=1
-			//  - q2 has one request waiting in the queue with width W=2
-			//  - start R for both q1 and q2 are at t0
-			//  - requests complete really fast, S=1ms on q1
-			// in this scenario we will execute roughly 60,000 requests
-			// from q1 before we pick the request from q2.
-			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceTime
+			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceSeconds*float64(oldestWaiting.Seats())
 			klog.V(11).InfoS("Considering queue to dispatch", "queueSet", qs.qCfg.Name, "queue", qs.robinIndex, "finishR", currentVirtualFinish)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
@@ -718,12 +703,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 		}
 	}
 
-	// TODO: add a method to fifo that lets us peek at the oldest request
-	var oldestReqFromMinQueue *request
-	minQueue.requests.Walk(func(r *request) bool {
-		oldestReqFromMinQueue = r
-		return false
-	})
+	oldestReqFromMinQueue, _ := minQueue.requests.Peek()
 	if oldestReqFromMinQueue == nil {
 		// This cannot happen
 		klog.ErrorS(errors.New("selected queue is empty"), "Impossible", "queueSet", qs.qCfg.Name)
@@ -755,7 +735,7 @@ func (qs *queueSet) selectQueueLocked() *queue {
 	// queue here. if the last start R (excluded estimated cost)
 	// falls behind the global virtual time, we update the latest virtual
 	// start by: <latest global virtual time> + <previously estimated cost>
-	previouslyEstimatedServiceTime := float64(minQueue.seatsInUse) * qs.estimatedServiceTime
+	previouslyEstimatedServiceTime := float64(minQueue.seatsInUse) * qs.estimatedServiceSeconds
 	if qs.virtualTime > minQueue.virtualStart-previouslyEstimatedServiceTime {
 		// per-queue virtual time should not fall behind the global
 		minQueue.virtualStart = qs.virtualTime + previouslyEstimatedServiceTime
@@ -853,7 +833,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 
 		// When a request finishes being served, and the actual service time was S,
 		// the queue’s start R is decremented by (G - S)*width.
-		r.queue.virtualStart -= (qs.estimatedServiceTime - S) * float64(r.Seats())
+		r.queue.virtualStart -= (qs.estimatedServiceSeconds - S) * float64(r.Seats())
 	}
 }
 
