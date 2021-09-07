@@ -1137,8 +1137,24 @@ function Configure-GcePdTools {
   Import-Module -Name $modulePath'.replace('K8S_DIR', ${env:K8S_DIR})
 }
 
-# Setup cni network. This function supports both Docker and containerd.
+# Prepare cni network. It prepares the interface, set hostdns.conf and
+# download antrea binaries. It handles both antrea and winbridge as cni
+# provider.
 function Prepare-CniNetworking {
+  if (Is-Antrea-Enabled $kube_env) {
+    # Use the original ethernet name to configure hostdns.conf
+    Configure-HostDnsConf -AdapterName Ethernet
+    DownloadAndInstall-AntreaBinaries
+    Cleanup-StaleAntreaNetwork
+  } else {
+    Configure-HostNetworkingService
+    Prepare-CniBridgeNetworking
+    Configure-HostDnsConf
+  }
+}
+
+# Setup cni bridge. This function supports both Docker and containerd.
+function Prepare-CniBridgeNetworking {
   if (${env:CONTAINER_RUNTIME} -eq "containerd") {
     # For containerd the CNI binaries have already been installed along with
     # the runtime.
@@ -1345,11 +1361,24 @@ function Get_L4ProxyPolicyForWorkloadIdentity {
 # The value of DNS server is ignored right now because the pod will
 # always only use cluster DNS service, but for consistency, we still
 # parsed them here in the same format as Linux resolv.conf.
-# This function must be called after Configure-HostNetworkingService.
+# This function must be called after Configure-HostNetworkingService
+# when AdapterName is not specified.
+#
+# Parameter [$AdapterName]: adapter name to get dns config from. Leaving
+#                           it unspecified, the function will automatically
+#                           discover the adapter name by looking at virtual
+#                           adapter name like 'vEthernet (Ethernet*'.
 function Configure-HostDnsConf {
-  $net_adapter = Get_MgmtNetAdapter
+  param (
+    [parameter(Mandatory=$false)] [string]$AdapterName = ""
+  )
+
+  if ($AdapterName -eq "") {
+    $AdapterName = (Get_MgmtNetAdapter).Name
+  }
+
   $server_ips = (Get-DnsClientServerAddress `
-          -InterfaceAlias ${net_adapter}.Name).ServerAddresses
+          -InterfaceAlias ${AdapterName}).ServerAddresses
   $search_list = (Get-DnsClient).ConnectionSpecificSuffixSearchList
   $conf = ""
   ForEach ($ip in $server_ips)  {
@@ -1417,6 +1446,11 @@ function Start-WorkerServices {
   $kubeproxy_args_str = ${kube_env}['KUBEPROXY_ARGS']
   $kubeproxy_args = $kubeproxy_args_str.Split(" ")
   Log-Output "kubeproxy_args from metadata: ${kubeproxy_args}"
+
+  # Prepare for kube-proxy interface for antrea
+  if (Is-Antrea-Enabled ${kube_env}) {
+    Prepare-KubeProxyInterfaceForAntrea
+  }
 
   # kubeproxy is started on Linux nodes using
   # kube-manifests/kubernetes/gci-trusty/kube-proxy.manifest, which is
@@ -2742,6 +2776,227 @@ $FLUENTD_CONFIG = @'
   </record>
 </filter>
 '@
+
+# Download and install antrea binaries: antrea-agent and antrea-cni. If
+# ANTREA_BINARY_STORAGE_PATH exists in kube_env, it will download both
+# antrea binaries under that path. Otherwise, it will check antrea-controller's
+# version and determine which antrea biniares version to download from release
+# bucket.
+#
+# Optional ${kube_env} keys:
+#   ANTREA_BINARY_STORAGE_PATH
+function DownloadAndInstall-AntreaBinaries {
+  if (${kube_env}.ContainsKey('ANTREA_BINARY_STORAGE_PATH')) {
+    Log-Output "Found ANTREA_BINARY_STORAGE_PATH in kube_env, using it to download antrea binaries"
+    $antrea_release_url = ${kube_env}['ANTREA_BINARY_STORAGE_PATH']
+  } else {
+    $output = $(& "${env:NODE_DIR}\kubectl.exe" -n kube-system -l component=antrea-controller get pods -o yaml | Select-String -Pattern image: | Out-String)
+    Log-Output $output
+    if ($output -match "v\d*\.\d*\.\d*-gke\.\d*") {
+      $version = $Matches[0]
+      Log-Output "Found antrea-controller version $version"
+      $antrea_release_url = "https://storage.googleapis.com/gke-release/antrea/$version"
+    } else {
+      Log-Output "Cannot find antrea-controller version" -Fatal
+    }
+  }
+
+  Log-Output "Use antrea release url $antrea_release_url"
+  $agent_url = "$antrea_release_url/antrea-agent.exe"
+  $cni_url = "$antrea_release_url/antrea-cni.exe"
+
+  $tmp_dir = 'C:\k8s_tmp'
+  New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+  $cni_filename = 'antrea.exe'
+  MustDownload-File -OutFile $tmp_dir\$cni_filename -URLs $cni_url
+  $agent_filename = 'antrea-agent.exe'
+  MustDownload-File -OutFile $tmp_dir\$agent_filename -URLs $agent_url
+
+  Move-Item -Force $tmp_dir\$cni_filename ${env:CNI_DIR}\$cni_filename
+  Move-Item -Force $tmp_dir\$agent_filename ${env:NODE_DIR}\$agent_filename
+}
+
+# Cleanup Antrea network if it's stale. It needs to be done before
+# starting antrea-agent
+function Cleanup-StaleAntreaNetwork {
+  param (
+    [parameter(Mandatory=$false)] [string]$NetworkName = "antrea-hnsnetwork"
+  )
+
+  $NeedCleanNetwork = $true
+  $AntreaHnsNetwork = Get-HnsNetwork | Where-Object {$_.Name -eq $NetworkName}
+  if ($AntreaHnsNetwork) {
+      $OVSExtension = $AntreaHnsNetwork.Extensions | Where-Object {$_.Name -eq "Open vSwitch Extension"}
+      if ($OVSExtension.IsEnabled) {
+          $NeedCleanNetwork = $false
+      }
+  }
+  if ($NeedCleanNetwork) {
+      Log-Output "Cleaning stale Antrea network resources if they exist..."
+      CleanupAntreaNetwork $NetworkName
+  }
+}
+
+function GetHnsnetworkId {
+  param (
+    [parameter(Mandatory=$true)] [string]$NetName
+  )
+
+  $NetList= $(Get-HnsNetwork -ErrorAction SilentlyContinue)
+  if ($NetList -eq $null) {
+    return $null
+  }
+  foreach ($Net in $NetList) {
+    if ($Net.Name -eq $NetName) {
+      return $Net.Id
+    }
+  }
+  return $null
+}
+
+function CleanupAntreaNetwork {
+  param (
+    [parameter(Mandatory=$true)] [string]$NetworkName
+  )
+
+  Log-Output "Delete OVS bridge: br-int"
+  ovs-vsctl.exe --no-wait --if-exists del-br br-int
+  $MaxRetryCount = 10
+  $RetryCountRange = 1..$MaxRetryCount
+  $BrIntDeleted = $false
+  foreach ($RetryCount in $RetryCountRange) {
+    Log-Output "Waiting for OVS bridge deletion complete ($RetryCount/$MaxRetryCount)..."
+    $BrIntAdapter = $(Get-NetAdapter br-int -ErrorAction SilentlyContinue)
+    if ($BrIntAdapter -eq $null) {
+      $BrIntDeleted = $true
+      break
+    }
+    if ($RetryCount -eq $MaxRetryCount) {
+      break
+    }
+    Start-Sleep -Seconds 5
+  }
+
+  if (!$BrIntDeleted) {
+    Log-Output "Failed to delete OVS Bridge" -Fatal
+  }
+
+  $NetId = GetHnsnetworkId($NetworkName)
+  if ($NetId -ne $null) {
+    Log-Output "Remove HnsNetwork: $NetworkName"
+    Get-HnsNetwork -Id $NetId | Remove-HnsNetwork
+  }
+}
+
+# Setup antrea config file and add firewall for 10250 (for kubectl exec)
+function Configure-Antrea {
+  $antrea_config = 'trafficEncapMode: noEncap
+featureGates:
+  AntreaPolicy: false
+  Traceflow: false
+clientConnection:
+  kubeconfig: KUBELET_KUBECONFIG
+antreaClientConnection:
+  kubeconfig: KUBELET_KUBECONFIG
+#serviceCIDR:  SERVICE_CIDR
+'.replace('KUBELET_KUBECONFIG', ${env:KUBECONFIG})
+
+  Set-Content ${env:K8S_DIR}\antrea.conf $antrea_config
+  Log-Output ("Antrea config:`n" +
+             "$(Get-Content -Raw ${env:K8S_DIR}\antrea.conf)")
+
+  # Configure Firewall for kubelet
+  if (!(Get-NetFirewallRule -Name antrea-kubelet -ErrorAction:Ignore)) {
+    New-Netfirewallrule -Name antrea-kubelet -DisplayName 'Antrea Kubelet' -Enabled true -Direction Inbound -Protocol TCP -Action Allow -LocalPort 10250
+  }
+}
+
+# Sets up antrea service.
+#
+# Required ${kube_env} keys:
+#   K8S_DIR
+function Start-AntreaService {
+  Configure-Antrea
+
+  # antrea-agent requires NODE_NAME in env
+  [Environment]::SetEnvironmentVariable("NODE_NAME", (hostname).ToLower())
+  $antrea_args = @(`
+    "--log_file=\etc\kubernetes\logs\antrea.log",
+    "--log_file_max_size=100",
+    "--log_file_max_num=4",
+    "--logtostderr=false"
+  )
+
+  Log-Output ("Start antrea-agent")
+  & sc.exe create antrea-agent binPath= "${env:NODE_DIR}\antrea-agent.exe --service --gke --config ${env:K8S_DIR}\antrea.conf ${antrea_args}" start= demand
+  & sc.exe failure antrea-agent reset= 0 actions= restart/10000
+  & sc.exe start antrea-agent
+}
+
+# Configure Antrea's CNI config file
+#
+# Once this 10-antrea.conflist is written to CNI_CONFIG_DIR, kubelet
+# will mark the node as network ready, which means schedule can schedule
+# pods on the node. When a pod starts, antrea-cni.exe will call API exposed
+# by antrea-agent.exe to connect pod networking interface to ovs bridge and
+# to insert necessary openflows rules.
+function Configure-AntreaCniNetworking {
+  $antrea_conf = "${env:CNI_CONFIG_DIR}\10-antrea.conflist"
+  if (-not (ShouldWrite-File ${antrea_conf})) {
+    return
+  }
+  New-Item -Force -ItemType file ${antrea_conf} | Out-Null
+  Set-Content ${antrea_conf} `
+'{
+    "cniVersion":"0.3.0",
+    "name": "antrea",
+    "plugins": [
+        {
+            "type": "antrea",
+            "ipam": {
+                "type": "host-local"
+            },
+            "capabilities": {"dns": true}
+        }
+    ]
+}'
+
+  Log-Output "CNI config:`n$(Get-Content -Raw ${antrea_conf})"
+}
+
+function Prepare-KubeProxyInterfaceForAntrea {
+  $interface_alias="HNS Internal NIC"
+  $interface_to_add = "vEthernet ($interface_alias)"
+  Log-Output "Creating netadapter $interface_to_add for kube-proxy"
+  if (Get-NetAdapter -InterfaceAlias $interface_to_add -ErrorAction SilentlyContinue) {
+     Log-Output "NetAdapter $interface_to_add exists, exit."
+     return
+  }
+  [Environment]::SetEnvironmentVariable("INTERFACE_TO_ADD_SERVICE_IP", $interface_to_add, [System.EnvironmentVariableTarget]::Machine)
+  $hns_switch_name = $(Get-VMSwitch -SwitchType Internal).Name
+  Add-VMNetworkAdapter -ManagementOS -Name $interface_alias -SwitchName $hns_switch_name
+  Set-NetIPInterface -ifAlias $interface_to_add -Forwarding Enabled
+}
+
+
+
+# Return true if antrea is enabled as windows network policy provider.
+# It checks the WINDOWS_NETWORK_POLICY_PROVIDER field in kube_env.
+#
+# Required ${kube_env} keys:
+#   WINDOWS_NETWORK_POLICY_PROVIDER
+function Is-Antrea-Enabled {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+
+  if (${KubeEnv}['WINDOWS_NETWORK_POLICY_PROVIDER'] -eq "antrea") {
+    return $true
+  }
+  return $false
+}
+
+##### End of Google internal patch #####
 
 # Export all public functions:
 Export-ModuleMember -Function *-*
