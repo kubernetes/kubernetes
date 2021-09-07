@@ -19,6 +19,7 @@ package validating
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,6 +66,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	var relevantHooks []*generic.WebhookInvocation
 	// Construct all the versions we need to call our webhooks
 	versionedAttrs := map[schema.GroupVersionKind]*generic.VersionedAttributes{}
+	var hooksNameList []string
 	for _, hook := range hooks {
 		invocation, statusError := d.plugin.ShouldCallHook(hook, attr, o)
 		if statusError != nil {
@@ -74,6 +76,7 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			continue
 		}
 		relevantHooks = append(relevantHooks, invocation)
+		hooksNameList = append(hooksNameList, hook.GetName())
 		// If we already have this version, continue
 		if _, ok := versionedAttrs[invocation.Kind]; ok {
 			continue
@@ -94,7 +97,8 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	select {
 	case <-ctx.Done():
 		// parent context is canceled or timed out, no point in continuing
-		return apierrors.NewTimeoutError("request did not complete within requested timeout", 0)
+		return apierrors.NewTimeoutError("request did not complete within requested timeout, while processing follwing webhooks:\n"+
+			strings.Join(hooksNameList, "\n"), 0)
 	default:
 	}
 

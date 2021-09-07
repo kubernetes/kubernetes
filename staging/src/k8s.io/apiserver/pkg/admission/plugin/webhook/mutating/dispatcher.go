@@ -186,7 +186,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 				select {
 				case <-ctx.Done():
 					// parent context is canceled or timed out, no point in continuing
-					return apierrors.NewTimeoutError("request did not complete within requested timeout", 0)
+					return apierrors.NewTimeoutError("request did not complete within requested timeout, while calling webhook: "+hook.Name, 0)
 				default:
 					// individual webhook timed out, but parent context did not, continue
 					continue
