@@ -114,6 +114,9 @@ service RuntimeService {
 
     // Status returns the status of the runtime.
     rpc Status(StatusRequest) returns (StatusResponse) {}
+
+    // CheckpointContainer checkpoints a container
+    rpc CheckpointContainer(CheckpointContainerRequest) returns (CheckpointContainerResponse) {}
 }
 
 // ImageService defines the public APIs for managing images.
@@ -1543,3 +1546,16 @@ message ReopenContainerLogRequest {
 
 message ReopenContainerLogResponse{
 }
+
+message CheckpointContainerRequest {
+    // ID of the container to be checkpointed.
+    string container_id = 1;
+    // Location of the checkpoint archive used for export
+    string location = 2;
+    // Timeout in seconds for the checkpoint to complete.
+    // Timeout of zero means to use the CRI default.
+    // Timeout > 0 means to use the user specified timeout.
+    int64 timeout = 3;
+}
+
+message CheckpointContainerResponse {}
