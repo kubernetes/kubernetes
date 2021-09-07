@@ -2,7 +2,7 @@
 
 module k8s.io/kubectl
 
-go 1.16
+go 1.17
 
 require (
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd

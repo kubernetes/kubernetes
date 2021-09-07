@@ -1,6 +1,6 @@
 module fake/import/path
 
-go 1.16
+go 1.17
 
 require (
 	github.com/imdario/mergo v0.3.6 // indirect
