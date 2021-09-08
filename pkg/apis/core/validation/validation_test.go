@@ -12282,6 +12282,16 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs:      1,
 		},
 		{
+			name: "internalTrafficPolicy field nil when type is ExternalName",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.InternalTrafficPolicy = nil
+				s.Spec.Type = core.ServiceTypeExternalName
+				s.Spec.ExternalName = "foo.bar.com"
+			},
+			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
+			numErrs:      0,
+		},
+		{
 			name: "invalid internalTraffic field",
 			tweakSvc: func(s *core.Service) {
 				invalid := core.ServiceInternalTrafficPolicyType("invalid")
