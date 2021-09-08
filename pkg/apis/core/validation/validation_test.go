@@ -12292,6 +12292,21 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs:      0,
 		},
 		{
+			// Typically this should fail validation, but in v1.22 we have existing clusters
+			// that may have allowed internalTrafficPolicy when Type=ExternalName.
+			// This test case ensures we don't break compatibility for internalTrafficPolicy
+			// when Type=ExternalName
+			name: "internalTrafficPolicy field is set when type is ExternalName",
+			tweakSvc: func(s *core.Service) {
+				cluster := core.ServiceInternalTrafficPolicyCluster
+				s.Spec.InternalTrafficPolicy = &cluster
+				s.Spec.Type = core.ServiceTypeExternalName
+				s.Spec.ExternalName = "foo.bar.com"
+			},
+			featureGates: []featuregate.Feature{features.ServiceInternalTrafficPolicy},
+			numErrs:      0,
+		},
+		{
 			name: "invalid internalTraffic field",
 			tweakSvc: func(s *core.Service) {
 				invalid := core.ServiceInternalTrafficPolicyType("invalid")
