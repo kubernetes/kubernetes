@@ -72,7 +72,7 @@ func init() {
 	dbMetricsMonitors = make(map[string]struct{})
 }
 
-func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
+func replacedInOpenShift_newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
 	// retry in a loop in the background until we successfully create the client, storing the client or error encountered
 
