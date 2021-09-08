@@ -134,16 +134,16 @@ type workload struct {
 	// Name of the workload.
 	Name string
 	// Values of parameters used in the workloadTemplate.
-	Params Params
+	Params params
 }
 
-type Params struct {
+type params struct {
 	params map[string]int
 	// isUsed field records whether params is used or not.
 	isUsed map[string]bool
 }
 
-// UnmarshalJSON is a custom unmarshaler for Params.
+// UnmarshalJSON is a custom unmarshaler for params.
 //
 // from(json):
 // 	{
@@ -152,7 +152,7 @@ type Params struct {
 // 	}
 //
 // to:
-//	Params{
+//	params{
 //		params: map[string]int{
 //			"intNodes": 500,
 //			"initPods": 50,
@@ -160,7 +160,7 @@ type Params struct {
 //		isUsed: map[string]bool{}, // empty map
 //	}
 //
-func (p *Params) UnmarshalJSON(b []byte) error {
+func (p *params) UnmarshalJSON(b []byte) error {
 	aux := map[string]int{}
 
 	if err := json.Unmarshal(b, &aux); err != nil {
@@ -173,7 +173,7 @@ func (p *Params) UnmarshalJSON(b []byte) error {
 }
 
 // getParam gets param with key.
-func (p Params) getParam(key string) (int, error) {
+func (p params) getParam(key string) (int, error) {
 	p.isUsed[key] = true
 	param, ok := p.params[key]
 	if ok {
