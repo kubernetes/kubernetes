@@ -183,8 +183,8 @@ func NewCmdEnv(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Co
 
 func validateNoOverwrites(existing []v1.EnvVar, env []v1.EnvVar) error {
 	for _, e := range env {
-		if current, exists := findEnv(existing, e.Name); exists && current.Value != e.Value {
-			return fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", current.Name, current.Value)
+		if _, exists := findEnv(existing, e.Name); exists {
+			return fmt.Errorf("'%s' already exists, and --overwrite is false", e.Name)
 		}
 	}
 	return nil
