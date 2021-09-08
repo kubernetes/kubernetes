@@ -17,9 +17,12 @@ limitations under the License.
 package scheduler
 
 import (
+	"container/heap"
 	"context"
+
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,6 +53,15 @@ const (
 	// to ensure that a certain minimum of nodes are checked for feasibility.
 	// This in turn helps ensure a minimum level of spreading.
 	minFeasibleNodesPercentageToFind = 5
+	// minNodeScoresToDump is the number of nodes' score to dump when the logging
+	// level ranged in [4, 6)
+	minNodeScoresToDump = 3
+	// minPluginScoresToDump is the number of plugins' score to dump when the
+	// logging level ranged in [4, 6)
+	minPluginScoresToDump = 3
+	// moreNodeScoresToDump is the number of nodes score to dump when the
+	// logging level ranged in [6, 10), and all plugins' score will be dumped
+	moreNodeScoresToDump = 10
 )
 
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
@@ -79,6 +91,16 @@ type genericScheduler struct {
 	percentageOfNodesToScore int32
 	nextStartNodeIndex       int
 }
+
+type pluginScore struct {
+	Name  string
+	Score int64
+}
+
+type pluginScoreList []pluginScore
+
+// NodeToPluginScores declares a map from node name to its PluginScoreList.
+type nodeToPluginScores map[string]pluginScoreList
 
 // snapshot snapshots scheduler cache and node infos for all fit and priority
 // functions.
@@ -403,6 +425,7 @@ func prioritizeNodes(
 	pod *v1.Pod,
 	nodes []*v1.Node,
 ) (framework.NodeScoreList, error) {
+
 	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(extenders) == 0 && !fwk.HasScorePlugins() {
@@ -428,14 +451,6 @@ func prioritizeNodes(
 		return nil, scoreStatus.AsError()
 	}
 
-	if klog.V(10).Enabled() {
-		for plugin, nodeScoreList := range scoresMap {
-			for _, nodeScore := range nodeScoreList {
-				klog.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
-			}
-		}
-	}
-
 	// Summarize all scores.
 	result := make(framework.NodeScoreList, 0, len(nodes))
 
@@ -444,6 +459,10 @@ func prioritizeNodes(
 		for j := range scoresMap {
 			result[i].Score += scoresMap[j][i].Score
 		}
+	}
+
+	if klog.V(4).Enabled() {
+		logNodeAndPluginScores(result, scoresMap, pod)
 	}
 
 	if len(extenders) != 0 && nodes != nil {
@@ -504,4 +523,106 @@ func NewGenericScheduler(
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
+}
+
+// To expose more information about the scheduling process but not has a big drop on performance,
+// we use a dynamic strategy to dump depending on the logging level:
+// * for logging level ranged in [4, 6), dump the scores for topM nodes/plugins. And make it as performant as possible.
+// * for logging level ranged in [6, 10), dump the scores for topN nodes, and probably show all plugins
+// * for logging level >= 10, dump the scores for all nodes/plugins.
+func logNodeAndPluginScores(nodeScores framework.NodeScoreList, scoresMap framework.PluginToNodeScores, pod *v1.Pod) {
+	if klog.V(10).Enabled() {
+		for plugin, nodeScoreList := range scoresMap {
+			for _, nodeScore := range nodeScoreList {
+				klog.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
+			}
+		}
+		return
+	}
+
+	// Log the top M node scores for the pod
+	topMNodes := minNodeScoresToDump
+	if klog.V(6).Enabled() {
+		topMNodes = moreNodeScoresToDump
+	}
+
+	// Use the min-heap to maintain a top M node score list
+	nsh := make(nodeScoreHeap, 0, topMNodes)
+	for i, nodeScore := range nodeScores {
+		if len(nsh) < int(topMNodes) || nodeScore.Score > nsh[0].Score {
+			if len(nsh) == int(topMNodes) {
+				heap.Pop(&nsh)
+			}
+			heap.Push(&nsh, &nodeScores[i])
+		}
+	}
+
+	// Build a map of Nodes->PluginScores on that node
+	nodeScoresMap := make(nodeToPluginScores, topMNodes)
+	for _, nodeScore := range nsh {
+		nodeScoresMap[nodeScore.Name] = make(pluginScoreList, 0)
+	}
+
+	// Convert the scoresMap (which contains Plugins->NodeScores) to the Nodes->PluginScores map
+	for plugin, nodeScoreList := range scoresMap {
+		for _, nodeScore := range nodeScoreList {
+			// Get the top M nodes' plugin scores
+			if _, ok := nodeScoresMap[nodeScore.Name]; ok {
+				nodeScoresMap[nodeScore.Name] = append(nodeScoresMap[nodeScore.Name], pluginScore{Name: plugin, Score: nodeScore.Score})
+			}
+		}
+	}
+
+	// Log the top N plugin scores for the top M nodes
+	topNPlugins := minPluginScoresToDump
+	if klog.V(6).Enabled() {
+		// Log all plugins' socre if -v6
+		topNPlugins = -1
+	}
+
+	for name, pluginScores := range nodeScoresMap {
+		sort.Slice(pluginScores, func(i int, j int) bool {
+			return pluginScores[i].Score > pluginScores[j].Score
+		})
+		// Get the top N plugin socres only if logging level ranged in [4, 6)
+		if topNPlugins > 0 && len(pluginScores) > int(topNPlugins) {
+			nodeScoresMap[name] = pluginScores[:topNPlugins]
+		}
+	}
+
+	scoresMessage := fmt.Sprintf("Top %d plugins for pod on node", topMNodes)
+	for len(nsh) > 0 {
+		nodeScore := heap.Pop(&nsh).(*framework.NodeScore)
+		pluginScores := nodeScoresMap[nodeScore.Name]
+		klog.InfoS(scoresMessage, "pod", klog.KObj(pod), "node", nodeScore.Name, "score", nodeScore.Score, "plugins", pluginScores)
+	}
+}
+
+// nodeScoreHeap is a min-heap ordered by the score of nodes. The
+// scheduler uses this to find the top-N scoring nodes when the
+// logging verbose level is ranged in [4, 10)
+type nodeScoreHeap []*framework.NodeScore
+
+// var _ heap.Interface = &nodeScoreHeap{}
+
+func (nsh nodeScoreHeap) Len() int {
+	return len(nsh)
+}
+
+func (nsh nodeScoreHeap) Less(i, j int) bool {
+	return nsh[i].Score < nsh[j].Score
+}
+
+func (nsh nodeScoreHeap) Swap(i, j int) {
+	nsh[i], nsh[j] = nsh[j], nsh[i]
+}
+
+func (nsh *nodeScoreHeap) Push(v interface{}) {
+	*nsh = append(*nsh, v.(*framework.NodeScore))
+}
+
+func (nsh *nodeScoreHeap) Pop() interface{} {
+	ns := (*nsh)[nsh.Len()-1]
+	*nsh = (*nsh)[:nsh.Len()-1]
+	return ns
 }
