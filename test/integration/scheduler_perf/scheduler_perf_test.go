@@ -816,8 +816,8 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 
 	// check unused params and inform users
 	unusedParams := w.unusedParams()
-	for _, p := range unusedParams {
-		b.Logf("the parameter %s is defined on workload %s, but it is unused. Please make sure there are no typos.", p, w.Name)
+	if len(unusedParams) != 0 {
+		b.Fatalf("the parameters %v are defined on workload %s, but unused.\nPlease make sure there are no typos.", unusedParams, w.Name)
 	}
 
 	// Some tests have unschedulable pods. Do not add an implicit barrier at the
