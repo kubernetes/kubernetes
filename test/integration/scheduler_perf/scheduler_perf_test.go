@@ -172,8 +172,8 @@ func (p *params) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// getParam gets param with key.
-func (p params) getParam(key string) (int, error) {
+// get returns param.
+func (p params) get(key string) (int, error) {
 	p.isUsed[key] = true
 	param, ok := p.params[key]
 	if ok {
@@ -284,7 +284,7 @@ func (*createNodesOp) collectsMetrics() bool {
 func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 	if cno.CountParam != "" {
 		var err error
-		cno.Count, err = w.Params.getParam(cno.CountParam[1:])
+		cno.Count, err = w.Params.get(cno.CountParam[1:])
 		if err != nil {
 			return nil, err
 		}
@@ -326,7 +326,7 @@ func (*createNamespacesOp) collectsMetrics() bool {
 func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
 	if cmo.CountParam != "" {
 		var err error
-		cmo.Count, err = w.Params.getParam(cmo.CountParam[1:])
+		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
 		if err != nil {
 			return nil, err
 		}
@@ -386,7 +386,7 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 	if cpo.CountParam != "" {
 		var err error
-		cpo.Count, err = w.Params.getParam(cpo.CountParam[1:])
+		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
 		if err != nil {
 			return nil, err
 		}
@@ -428,7 +428,7 @@ func (cpso *createPodSetsOp) collectsMetrics() bool {
 func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
 	if cpso.CountParam != "" {
 		var err error
-		cpso.Count, err = w.Params.getParam(cpso.CountParam[1:])
+		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
 		if err != nil {
 			return nil, err
 		}
