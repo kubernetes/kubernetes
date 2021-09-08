@@ -4809,6 +4809,8 @@ func validateServiceInternalTrafficFieldsValue(service *core.Service) field.Erro
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
 		if service.Spec.InternalTrafficPolicy == nil {
+			// We do not forbid internalTrafficPolicy on other Service types because of historical reasons.
+			// We did not check that before it went beta and we don't want to invalidate existing stored objects.
 			if service.Spec.Type == core.ServiceTypeNodePort ||
 				service.Spec.Type == core.ServiceTypeLoadBalancer || service.Spec.Type == core.ServiceTypeClusterIP {
 				allErrs = append(allErrs, field.Required(field.NewPath("spec").Child("internalTrafficPolicy"), ""))
