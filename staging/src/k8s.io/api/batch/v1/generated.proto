@@ -298,7 +298,7 @@ message JobStatus {
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time completionTime = 3;
 
-  // The number of actively running pods.
+  // The number of pending and running pods.
   // +optional
   optional int32 active = 4;
 
@@ -338,6 +338,13 @@ message JobStatus {
   // remains null.
   // +optional
   optional UncountedTerminatedPods uncountedTerminatedPods = 8;
+
+  // The number of pods which have a Ready condition.
+  //
+  // This field is alpha-level. The job controller populates the field when
+  // the feature gate JobReadyPods is enabled (disabled by default).
+  // +optional
+  optional int32 ready = 9;
 }
 
 // JobTemplateSpec describes the data a Job should have when created from a template
