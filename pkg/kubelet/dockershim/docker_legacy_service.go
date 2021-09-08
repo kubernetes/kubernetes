@@ -30,7 +30,7 @@ import (
 	"github.com/armon/circbuf"
 	dockertypes "github.com/docker/docker/api/types"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
@@ -48,8 +48,8 @@ import (
 // for details.
 
 // GetContainerLogs get container logs directly from docker daemon.
-func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
-	container, err := d.client.InspectContainer(containerID.ID)
+func (ds *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, containerID kubecontainer.ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error {
+	container, err := ds.client.InspectContainer(containerID.ID)
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, contain
 		ErrorStream:  stderr,
 		RawTerminal:  container.Config.Tty,
 	}
-	err = d.client.Logs(containerID.ID, opts, sopts)
+	err = ds.client.Logs(containerID.ID, opts, sopts)
 	if errors.Is(err, errMaximumWrite) {
 		klog.V(2).InfoS("Finished logs, hit byte limit", "byteLimit", *logOptions.LimitBytes)
 		err = nil
@@ -95,7 +95,7 @@ func (d *dockerService) GetContainerLogs(_ context.Context, pod *v1.Pod, contain
 // GetContainerLogTail attempts to read up to MaxContainerTerminationMessageLogLength
 // from the end of the log when docker is configured with a log driver other than json-log.
 // It reads up to MaxContainerTerminationMessageLogLines lines.
-func (d *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerID kubecontainer.ContainerID) (string, error) {
+func (ds *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerID kubecontainer.ContainerID) (string, error) {
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
 	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
 	// Although this is not a full spec pod, dockerLegacyService.GetContainerLogs() currently completely ignores its pod param
@@ -106,7 +106,7 @@ func (d *dockerService) GetContainerLogTail(uid kubetypes.UID, name, namespace s
 			Namespace: namespace,
 		},
 	}
-	err := d.GetContainerLogs(context.Background(), pod, containerID, &v1.PodLogOptions{TailLines: &value}, buf, buf)
+	err := ds.GetContainerLogs(context.Background(), pod, containerID, &v1.PodLogOptions{TailLines: &value}, buf, buf)
 	if err != nil {
 		return "", err
 	}
@@ -118,8 +118,8 @@ var criSupportedLogDrivers = []string{"json-file"}
 
 // IsCRISupportedLogDriver checks whether the logging driver used by docker is
 // supported by native CRI integration.
-func (d *dockerService) IsCRISupportedLogDriver() (bool, error) {
-	info, err := d.client.Info()
+func (ds *dockerService) IsCRISupportedLogDriver() (bool, error) {
+	info, err := ds.client.Info()
 	if err != nil {
 		return false, fmt.Errorf("failed to get docker info: %v", err)
 	}
