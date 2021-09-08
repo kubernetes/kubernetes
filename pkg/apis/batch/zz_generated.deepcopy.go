@@ -314,6 +314,11 @@ func (in *JobStatus) DeepCopyInto(out *JobStatus) {
 		in, out := &in.CompletionTime, &out.CompletionTime
 		*out = (*in).DeepCopy()
 	}
+	if in.Ready != nil {
+		in, out := &in.Ready, &out.Ready
+		*out = new(int32)
+		**out = **in
+	}
 	if in.UncountedTerminatedPods != nil {
 		in, out := &in.UncountedTerminatedPods, &out.UncountedTerminatedPods
 		*out = new(UncountedTerminatedPods)
