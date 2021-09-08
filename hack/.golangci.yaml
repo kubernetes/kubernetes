@@ -1,0 +1,12 @@
+---
+run:
+  timeout: 30m
+
+linters:
+  disable-all: true
+  enable:
+  - deadcode
+  - unused
+  - varcheck
+  - ineffassign
+  - exportloopref

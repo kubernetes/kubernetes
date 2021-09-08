@@ -61,6 +61,7 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsL
 		return
 	}
 	for _, pod := range podList.Items {
+		pod := pod
 		availability := "not available"
 		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
 			availability = "available"

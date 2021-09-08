@@ -121,6 +121,7 @@ func CheckAuditList(el auditinternal.EventList, expected []AuditEvent) (missing 
 	expectations := newAuditEventTracker(expected)
 
 	for _, e := range el.Items {
+		e := e
 		event, err := testEventFromInternal(&e)
 		if err != nil {
 			return expected, err
@@ -138,6 +139,7 @@ func CheckForDuplicates(el auditinternal.EventList) (auditinternal.EventList, er
 	existingEvents := []AuditEvent{}
 	duplicates := auditinternal.EventList{}
 	for _, e := range el.Items {
+		e := e
 		event, err := testEventFromInternal(&e)
 		if err != nil {
 			return duplicates, err

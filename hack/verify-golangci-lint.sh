@@ -44,10 +44,4 @@ popd >/dev/null
 cd "${KUBE_ROOT}"
 
 echo 'running golangci-lint '
-golangci-lint run \
-  --timeout 30m \
-  --disable-all \
-  -E deadcode \
-  -E unused \
-  -E varcheck \
-  -E ineffassign
+golangci-lint run --config "${KUBE_ROOT}/hack/.golangci.yaml"
