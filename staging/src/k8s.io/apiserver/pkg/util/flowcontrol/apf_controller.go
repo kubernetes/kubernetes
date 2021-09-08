@@ -62,7 +62,15 @@ import (
 // undesired becomes completely unused, all the config objects are
 // read and processed as a whole.
 
-// StartFunction begins the process of handlig a request.  If the
+// The funcs in this package follow the naming convention that the suffix
+// "Locked" means the relevant mutex must be locked at the start of each
+// call and will be locked upon return.  For a configController, the
+// suffix "ReadLocked" stipulates a read lock while just "Locked"
+// stipulates a full lock.  Absence of either suffix means that either
+// (a) the lock must NOT be held at call time and will not be held
+// upon return or (b) locking is irrelevant.
+
+// StartFunction begins the process of handling a request.  If the
 // request gets queued then this function uses the given hashValue as
 // the source of entropy as it shuffle-shards the request into a
 // queue.  The descr1 and descr2 values play no role in the logic but
@@ -109,9 +117,14 @@ type configController struct {
 	requestWaitLimit time.Duration
 
 	// This must be locked while accessing flowSchemas or
-	// priorityLevelStates.  It is the lock involved in
-	// LockingWriteMultiple.
-	lock sync.Mutex
+	// priorityLevelStates.  A lock for writing is needed
+	// for writing to any of the following:
+	// - the flowSchemas field
+	// - the slice held in the flowSchemas field
+	// - the priorityLevelStates field
+	// - the map held in the priorityLevelStates field
+	// - any field of a priorityLevelState held in that map
+	lock sync.RWMutex
 
 	// flowSchemas holds the flow schema objects, sorted by increasing
 	// numerical (decreasing logical) matching precedence.  Every
@@ -236,8 +249,8 @@ func (cfgCtlr *configController) MaintainObservations(stopCh <-chan struct{}) {
 }
 
 func (cfgCtlr *configController) updateObservations() {
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
+	cfgCtlr.lock.RLock()
+	defer cfgCtlr.lock.RUnlock()
 	for _, plc := range cfgCtlr.priorityLevelStates {
 		if plc.queues != nil {
 			plc.queues.UpdateObservations()
@@ -668,8 +681,8 @@ func (immediateRequest) Finish(execute func()) bool {
 // waiting in its queue, or `Time{}` if this did not happen.
 func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDigest, queueNoteFn fq.QueueNoteFn) (fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, isExempt bool, req fq.Request, startWaitingTime time.Time) {
 	klog.V(7).Infof("startRequest(%#+v)", rd)
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
+	cfgCtlr.lock.RLock()
+	defer cfgCtlr.lock.RUnlock()
 	var selectedFlowSchema *flowcontrol.FlowSchema
 	for _, fs := range cfgCtlr.flowSchemas {
 		if matchesFlowSchema(rd, fs) {
@@ -716,15 +729,15 @@ func (cfgCtlr *configController) startRequest(ctx context.Context, rd RequestDig
 	klog.V(7).Infof("startRequest(%#+v) => fsName=%q, distMethod=%#+v, plName=%q, numQueues=%d", rd, selectedFlowSchema.Name, selectedFlowSchema.Spec.DistinguisherMethod, plName, numQueues)
 	req, idle := plState.queues.StartRequest(ctx, hashValue, flowDistinguisher, selectedFlowSchema.Name, rd.RequestInfo, rd.User, queueNoteFn)
 	if idle {
-		cfgCtlr.maybeReapLocked(plName, plState)
+		cfgCtlr.maybeReapReadLocked(plName, plState)
 	}
 	return selectedFlowSchema, plState.pl, false, req, startWaitingTime
 }
 
 // Call this after getting a clue that the given priority level is undesired and idle
 func (cfgCtlr *configController) maybeReap(plName string) {
-	cfgCtlr.lock.Lock()
-	defer cfgCtlr.lock.Unlock()
+	cfgCtlr.lock.RLock()
+	defer cfgCtlr.lock.RUnlock()
 	plState := cfgCtlr.priorityLevelStates[plName]
 	if plState == nil {
 		klog.V(7).Infof("plName=%s, plState==nil", plName)
@@ -741,9 +754,12 @@ func (cfgCtlr *configController) maybeReap(plName string) {
 	cfgCtlr.configQueue.Add(0)
 }
 
-// Call this if both (1) plState.queues is non-nil and reported being
-// idle, and (2) cfgCtlr's lock has not been released since then.
-func (cfgCtlr *configController) maybeReapLocked(plName string, plState *priorityLevelState) {
+// maybeReapLocked requires the cfgCtlr's lock to already be held and
+// will remove the last internal traces of the named priority level if
+// it has no more use.  Call this if both (1) plState.queues is
+// non-nil and reported being idle, and (2) cfgCtlr's lock has not
+// been released since then.
+func (cfgCtlr *configController) maybeReapReadLocked(plName string, plState *priorityLevelState) {
 	if !(plState.quiescing && plState.numPending == 0) {
 		return
 	}
