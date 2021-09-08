@@ -2227,6 +2227,8 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
+		// TODO: move inside syncPod and make reentrant
+		// https://github.com/kubernetes/kubernetes/issues/105014
 		kl.probeManager.AddPod(pod)
 	}
 }
@@ -2261,6 +2263,9 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 		if err := kl.deletePod(pod); err != nil {
 			klog.V(2).InfoS("Failed to delete pod", "pod", klog.KObj(pod), "err", err)
 		}
+		// TODO: move inside syncTerminatingPod|syncTerminatedPod (we should stop probing
+		// once the pod kill is acknowledged and during eviction)
+		// https://github.com/kubernetes/kubernetes/issues/105014
 		kl.probeManager.RemovePod(pod)
 	}
 }
