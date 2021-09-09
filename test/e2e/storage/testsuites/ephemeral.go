@@ -457,6 +457,9 @@ func VolumeSourceEnabled(c clientset.Interface, t *framework.TimeoutContext, ns 
 	}
 
 	pod, err := c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		err = e2epod.WaitForPodRunningInNamespace(c, pod)
+	}
 
 	switch {
 	case err == nil:
@@ -467,7 +470,9 @@ func VolumeSourceEnabled(c clientset.Interface, t *framework.TimeoutContext, ns 
 		// "Invalid" because it uses a feature that isn't supported.
 		return false, nil
 	default:
-		// Unexpected error.
-		return false, err
+		// Unexpected error. This may be due to tests with node skew, so the error is
+		// logged but no error is returned so that tests may continue.
+		framework.Logf("VolumeSourceEnabled saw unexpected error. Assuming source is not supported and continuing: %v", err)
+		return false, nil
 	}
 }
