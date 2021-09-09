@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/clock"
 )
 
 // DelayingInterface is an Interface that can Add an item at a later time. This makes it easier to
@@ -51,11 +51,11 @@ func NewNamedDelayingQueue(name string) DelayingInterface {
 
 // NewDelayingQueueWithCustomClock constructs a new named workqueue
 // with ability to inject real or fake clock for testing purposes
-func NewDelayingQueueWithCustomClock(clock clock.Clock, name string) DelayingInterface {
+func NewDelayingQueueWithCustomClock(clock clock.WithTicker, name string) DelayingInterface {
 	return newDelayingQueue(clock, NewNamed(name), name)
 }
 
-func newDelayingQueue(clock clock.Clock, q Interface, name string) *delayingType {
+func newDelayingQueue(clock clock.WithTicker, q Interface, name string) *delayingType {
 	ret := &delayingType{
 		Interface:       q,
 		clock:           clock,
