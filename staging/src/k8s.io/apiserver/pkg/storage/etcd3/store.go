@@ -758,7 +758,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 
 			data, _, err := s.transformer.TransformFromStorage(kv.Value, authenticatedDataString(kv.Key))
 			if err != nil {
-				return storage.NewInternalErrorf("unable to transform key %q: %v", kv.Key, err)
+				return storage.NewInternalErrorf("unable to transform key %q: %v, please check whether the secret has changed", kv.Key, err)
 			}
 
 			if err := appendListItem(v, data, uint64(kv.ModRevision), pred, s.codec, s.versioner, newItemFunc); err != nil {
