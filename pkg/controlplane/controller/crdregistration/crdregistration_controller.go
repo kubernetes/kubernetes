@@ -40,6 +40,8 @@ import (
 type AutoAPIServiceRegistration interface {
 	// AddAPIServiceToSync adds an API service to auto-register.
 	AddAPIServiceToSync(in *v1.APIService)
+	// AddAPIServiceToSyncSynchronously adds an API service to auto-register synchronously without using queue.
+	AddAPIServiceToSyncSynchronously(in *v1.APIService)
 	// RemoveAPIServiceToSync removes an API service to auto-register.
 	RemoveAPIServiceToSync(name string)
 }
@@ -50,7 +52,7 @@ type crdRegistrationController struct {
 
 	apiServiceRegistration AutoAPIServiceRegistration
 
-	syncHandler func(groupVersion schema.GroupVersion) error
+	syncHandler func(groupVersion schema.GroupVersion, synchronous bool) error
 
 	syncedInitialSet chan struct{}
 
@@ -122,7 +124,8 @@ func (c *crdRegistrationController) Run(workers int, stopCh <-chan struct{}) {
 	} else {
 		for _, crd := range crds {
 			for _, version := range crd.Spec.Versions {
-				if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}); err != nil {
+				klog.V(4).Infof("CRD registration controller initial sync %s %s", crd.Spec.Group, version)
+				if err := c.syncHandler(schema.GroupVersion{Group: crd.Spec.Group, Version: version.Name}, true); err != nil {
 					utilruntime.HandleError(err)
 				}
 			}
@@ -164,7 +167,7 @@ func (c *crdRegistrationController) processNextWorkItem() bool {
 	defer c.queue.Done(key)
 
 	// do your work on the key.  This method will contains your "do stuff" logic
-	err := c.syncHandler(key.(schema.GroupVersion))
+	err := c.syncHandler(key.(schema.GroupVersion), false)
 	if err == nil {
 		// if you had no error, tell the queue to stop tracking history for your key.  This will
 		// reset things like failure counts for per-item rate limiting
@@ -190,7 +193,7 @@ func (c *crdRegistrationController) enqueueCRD(crd *apiextensionsv1.CustomResour
 	}
 }
 
-func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.GroupVersion) error {
+func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.GroupVersion, synchronous bool) error {
 	apiServiceName := groupVersion.Version + "." + groupVersion.Group
 
 	// check all CRDs.  There shouldn't that many, but if we have problems later we can index them
@@ -207,7 +210,7 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 				continue
 			}
 
-			c.apiServiceRegistration.AddAPIServiceToSync(&v1.APIService{
+			apiservice := &v1.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: apiServiceName},
 				Spec: v1.APIServiceSpec{
 					Group:                groupVersion.Group,
@@ -215,7 +218,13 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 					GroupPriorityMinimum: 1000, // CRDs should have relatively low priority
 					VersionPriority:      100,  // CRDs will be sorted by kube-like versions like any other APIService with the same VersionPriority
 				},
-			})
+			}
+			if synchronous {
+				// Initial import should be done synchronously to prevent any races
+				c.apiServiceRegistration.AddAPIServiceToSyncSynchronously(apiservice)
+			} else {
+				c.apiServiceRegistration.AddAPIServiceToSync(apiservice)
+			}
 			return nil
 		}
 	}

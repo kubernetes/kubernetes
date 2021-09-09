@@ -33,6 +33,7 @@ func TestHandleVersionUpdate(t *testing.T) {
 		name         string
 		startingCRDs []*apiextensionsv1.CustomResourceDefinition
 		version      schema.GroupVersion
+		sync         bool
 
 		expectedAdded   []*apiregistration.APIService
 		expectedRemoved []string
@@ -56,6 +57,7 @@ func TestHandleVersionUpdate(t *testing.T) {
 				},
 			},
 			version: schema.GroupVersion{Group: "group.com", Version: "v1"},
+			sync:    false,
 
 			expectedAdded: []*apiregistration.APIService{
 				{
@@ -86,6 +88,28 @@ func TestHandleVersionUpdate(t *testing.T) {
 				},
 			},
 			version: schema.GroupVersion{Group: "group.com", Version: "v2"},
+			sync:    false,
+
+			expectedRemoved: []string{"v2.group.com"},
+		},
+		{
+			name: "simple remove crd",
+			startingCRDs: []*apiextensionsv1.CustomResourceDefinition{
+				{
+					Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+						Group: "group.com",
+						Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+							{
+								Name:    "v1",
+								Served:  true,
+								Storage: true,
+							},
+						},
+					},
+				},
+			},
+			version: schema.GroupVersion{Group: "group.com", Version: "v2"},
+			sync:    true,
 
 			expectedRemoved: []string{"v2.group.com"},
 		},
@@ -104,7 +128,7 @@ func TestHandleVersionUpdate(t *testing.T) {
 				crdCache.Add(test.startingCRDs[i])
 			}
 
-			c.handleVersionUpdate(test.version)
+			c.handleVersionUpdate(test.version, test.sync)
 
 			if !reflect.DeepEqual(test.expectedAdded, registration.added) {
 				t.Errorf("%s expected %v, got %v", test.name, test.expectedAdded, registration.added)
@@ -124,6 +148,11 @@ type fakeAPIServiceRegistration struct {
 func (a *fakeAPIServiceRegistration) AddAPIServiceToSync(in *apiregistration.APIService) {
 	a.added = append(a.added, in)
 }
+
+func (a *fakeAPIServiceRegistration) AddAPIServiceToSyncSynchronously(in *apiregistration.APIService) {
+	a.added = append(a.added, in)
+}
+
 func (a *fakeAPIServiceRegistration) RemoveAPIServiceToSync(name string) {
 	a.removed = append(a.removed, name)
 }

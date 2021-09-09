@@ -66,22 +66,28 @@ func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregat
 	}
 
 	c.syncHandler = c.sync
-
-	// update each service at least once, also those which are not coming from APIServices, namely local services
-	for _, name := range openAPIAggregationManager.GetAPIServiceNames() {
-		c.queue.AddAfter(name, time.Second)
-	}
-
 	return c
 }
 
 // Run starts OpenAPI AggregationController
-func (c *AggregationController) Run(stopCh <-chan struct{}) {
+func (c *AggregationController) Run(stopCh <-chan struct{}, openapiControllerSyncedCh chan<- struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Info("Starting OpenAPI AggregationController")
 	defer klog.Info("Shutting down OpenAPI AggregationController")
+
+	// update each service at least once, also those which are not coming from APIServices, namely local services
+	for _, name := range c.openAPIAggregationManager.GetAPIServiceNames() {
+		klog.V(4).Infof("OpenAPI Initial aggregation started for %s", name)
+		// This is initial import and thus allow queue handles failures
+		_, err := c.sync(name)
+		if err != nil {
+			klog.V(4).Infof("OpenAPI Initial aggregation failed %s, err: %q, ignoring", name, err)
+			c.queue.AddAfter(name, time.Second)
+		}
+	}
+	close(openapiControllerSyncedCh)
 
 	go wait.Until(c.runWorker, time.Second, stopCh)
 

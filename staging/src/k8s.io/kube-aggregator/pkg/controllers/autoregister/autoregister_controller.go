@@ -57,6 +57,9 @@ type AutoAPIServiceRegistration interface {
 	AddAPIServiceToSyncOnStart(in *v1.APIService)
 	// AddAPIServiceToSync adds an API service to sync continuously.
 	AddAPIServiceToSync(in *v1.APIService)
+	// AddAPIServiceToSyncSynchronously adds an API service to sync continuously
+	// but it does do this synchronously
+	AddAPIServiceToSyncSynchronously(in *v1.APIService)
 	// RemoveAPIServiceToSync removes an API service to auto-register.
 	RemoveAPIServiceToSync(name string)
 }
@@ -302,6 +305,28 @@ func (c *autoRegisterController) AddAPIServiceToSyncOnStart(in *v1.APIService) {
 // AddAPIServiceToSync registers an API service to sync continuously.
 func (c *autoRegisterController) AddAPIServiceToSync(in *v1.APIService) {
 	c.addAPIServiceToSync(in, manageContinuously)
+}
+
+// AddAPIServiceToSyncSynchronously registers an API service synchronously.
+// This assures that internal API services are registered before API server is readyz
+// and their OpenAPI specs are imported.
+func (c *autoRegisterController) AddAPIServiceToSyncSynchronously(in *v1.APIService) {
+	c.apiServicesToSyncLock.Lock()
+	defer c.apiServicesToSyncLock.Unlock()
+
+	apiService := in.DeepCopy()
+	if apiService.Labels == nil {
+		apiService.Labels = map[string]string{}
+	}
+	apiService.Labels[AutoRegisterManagedLabel] = manageContinuously
+
+	c.apiServicesToSync[apiService.Name] = apiService
+	if err := c.checkAPIService(apiService.Name); err != nil {
+		// in error cases, adding into queue to retry. In any case,
+		// if error is persistent, in second run queue will dequeue it.
+		klog.Warning("Unsuccessful check API Service operation for %q err: %v", apiService.Name, err)
+		c.queue.Add(apiService.Name)
+	}
 }
 
 func (c *autoRegisterController) addAPIServiceToSync(in *v1.APIService, syncType string) {
