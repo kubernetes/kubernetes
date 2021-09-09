@@ -36,15 +36,17 @@ func PodRequestsAndLimits(pod *v1.Pod) (reqs, limits v1.ResourceList) {
 	return PodRequestsAndLimitsReuse(pod, nil, nil)
 }
 
-// PodRequestsAndLimitsReuse returns a dictionary of all defined resources summed up for all
-// containers of the pod. If PodOverhead feature is enabled, pod overhead is added to the
-// total container resource requests and to the total container limits which have a
-// non-zero quantity. The caller may avoid allocations of resource lists by passing
-// a requests and limits list to the function, which will be cleared before use.
-func PodRequestsAndLimitsReuse(pod *v1.Pod, reuseReqs, reuseLimits v1.ResourceList) (reqs, limits v1.ResourceList) {
-	// attempt to reuse the maps if passed, or allocate otherwise
-	reqs, limits = reuseOrClearResourceList(reuseReqs), reuseOrClearResourceList(reuseLimits)
+// PodRequestsAndLimitsWithoutOverhead will create a dictionary of all defined resources summed up for all
+// containers of the pod.
+func PodRequestsAndLimitsWithoutOverhead(pod *v1.Pod) (reqs, limits v1.ResourceList) {
+	reqs = make(v1.ResourceList, 4)
+	limits = make(v1.ResourceList, 4)
+	podRequestsAndLimitsWithoutOverhead(pod, reqs, limits)
 
+	return reqs, limits
+}
+
+func podRequestsAndLimitsWithoutOverhead(pod *v1.Pod, reqs, limits v1.ResourceList) {
 	for _, container := range pod.Spec.Containers {
 		addResourceList(reqs, container.Resources.Requests)
 		addResourceList(limits, container.Resources.Limits)
@@ -54,6 +56,18 @@ func PodRequestsAndLimitsReuse(pod *v1.Pod, reuseReqs, reuseLimits v1.ResourceLi
 		maxResourceList(reqs, container.Resources.Requests)
 		maxResourceList(limits, container.Resources.Limits)
 	}
+}
+
+// PodRequestsAndLimitsReuse returns a dictionary of all defined resources summed up for all
+// containers of the pod. If PodOverhead feature is enabled, pod overhead is added to the
+// total container resource requests and to the total container limits which have a
+// non-zero quantity. The caller may avoid allocations of resource lists by passing
+// a requests and limits list to the function, which will be cleared before use.
+func PodRequestsAndLimitsReuse(pod *v1.Pod, reuseReqs, reuseLimits v1.ResourceList) (reqs, limits v1.ResourceList) {
+	// attempt to reuse the maps if passed, or allocate otherwise
+	reqs, limits = reuseOrClearResourceList(reuseReqs), reuseOrClearResourceList(reuseLimits)
+
+	podRequestsAndLimitsWithoutOverhead(pod, reqs, limits)
 
 	// if PodOverhead feature is supported, add overhead for running a pod
 	// to the sum of requests and to non-zero limits:
