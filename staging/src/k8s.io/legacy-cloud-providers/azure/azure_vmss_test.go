@@ -835,6 +835,57 @@ func TestGetPowerStatusByNodeName(t *testing.T) {
 	}
 }
 
+func TestGetProvisioningStateByNodeName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	testCases := []struct {
+		description               string
+		vmList                    []string
+		provisioningState         string
+		expectedProvisioningState string
+		expectedErr               error
+	}{
+		{
+			description:               "GetProvisioningStateByNodeName should return empty value when the vm.ProvisioningState is nil",
+			provisioningState:         "",
+			vmList:                    []string{"vmss-vm-000001"},
+			expectedProvisioningState: "",
+		},
+		{
+			description:               "GetProvisioningStateByNodeName should return Succeeded when the vm is running",
+			provisioningState:         "Succeeded",
+			vmList:                    []string{"vmss-vm-000001"},
+			expectedProvisioningState: "Succeeded",
+		},
+	}
+
+	for _, test := range testCases {
+		ss, err := newTestScaleSet(ctrl)
+		assert.NoError(t, err, "unexpected error when creating test VMSS")
+
+		expectedVMSS := buildTestVMSS(testVMSSName, "vmss-vm-")
+		mockVMSSClient := ss.cloud.VirtualMachineScaleSetsClient.(*mockvmssclient.MockInterface)
+		mockVMSSClient.EXPECT().List(gomock.Any(), ss.ResourceGroup).Return([]compute.VirtualMachineScaleSet{expectedVMSS}, nil).AnyTimes()
+
+		expectedVMSSVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, testVMSSName, "", 0, test.vmList, "", false)
+		mockVMSSVMClient := ss.cloud.VirtualMachineScaleSetVMsClient.(*mockvmssvmclient.MockInterface)
+		if test.provisioningState != "" {
+			expectedVMSSVMs[0].ProvisioningState = to.StringPtr(test.provisioningState)
+		} else {
+			expectedVMSSVMs[0].ProvisioningState = nil
+		}
+		mockVMSSVMClient.EXPECT().List(gomock.Any(), ss.ResourceGroup, testVMSSName, gomock.Any()).Return(expectedVMSSVMs, nil).AnyTimes()
+
+		mockVMsClient := ss.cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		mockVMsClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachine{}, nil).AnyTimes()
+
+		provisioningState, err := ss.GetProvisioningStateByNodeName("vmss-vm-000001")
+		assert.Equal(t, test.expectedErr, err, test.description+", but an error occurs")
+		assert.Equal(t, test.expectedProvisioningState, provisioningState, test.description)
+	}
+}
+
 func TestGetVmssVMByInstanceID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
