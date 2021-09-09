@@ -26,6 +26,7 @@ limitations under the License.
 package v1
 
 import (
+	gojson "encoding/json"
 	"fmt"
 	"strings"
 
@@ -1090,6 +1091,27 @@ func LabelSelectorQueryParam(version string) string {
 // TODO: remove me when watch is refactored
 func FieldSelectorQueryParam(version string) string {
 	return "fieldSelector"
+}
+
+//MarshalJSON implements the json.Marshaler interface.
+func (meta ObjectMeta) MarshalJSON() ([]byte, error) {
+	// use Alias to avoid infinite loop
+	type Alias ObjectMeta
+	data, err := gojson.Marshal(struct {
+		*Alias
+	}{
+		Alias:  (*Alias)(&meta),
+	})
+
+	// omit CreationTimestamp with zero value
+	t := meta.GetCreationTimestamp()
+	if t.Equal(&Time{})  {
+		var m map[string]interface{}
+		err = gojson.Unmarshal(data, &m)
+		delete(m, "creationTimestamp")
+		data, err = gojson.Marshal(m)
+	}
+	return data, err
 }
 
 // String returns available api versions as a human-friendly version string.

@@ -17,9 +17,11 @@ limitations under the License.
 package v1
 
 import (
+	"bytes"
 	gojson "encoding/json"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
@@ -131,5 +133,41 @@ func TestVerbsProto(t *testing.T) {
 		if !reflect.DeepEqual(input, resource) {
 			t.Errorf("Marshal->Unmarshal is not idempotent: '%v' vs '%v'", input, resource)
 		}
+	}
+}
+
+func TestCreationTimestampMarshalJSON(t *testing.T) {
+	testCases := []struct {
+		name string
+		objectMeta ObjectMeta
+		expected []byte
+	}{
+		{
+			name: "ObjectMeta has CreationTimestamp set.",
+			objectMeta: ObjectMeta{
+				Name: "namespace",
+				CreationTimestamp: NewTime(time.Date(2021, 9, 6, 20, 9, 23, 0, time.UTC)),
+			},
+			expected: []byte(`{"name":"namespace","creationTimestamp":"2021-09-06T20:09:23Z"}`),
+		},{
+			name: "ObjectMeta has CreationTimestamp with zero value.",
+			objectMeta: ObjectMeta{
+				Name: "namespace",
+			},
+			expected: []byte(`{"name":"namespace"}`),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			data, err := gojson.Marshal(tc.objectMeta)
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+
+			if !bytes.Equal(data, tc.expected) {
+				t.Fatalf("Actual output does not match expected.\nActual:  %v\nExpected: %v\n", string(data), string(tc.expected))
+			}
+		})
 	}
 }
