@@ -25,7 +25,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/testutil"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func alwaysReady() bool { return true }
@@ -322,7 +322,7 @@ func TestGCOrphaned(t *testing.T) {
 				podInformer.Informer().GetStore().Add(pod)
 			}
 			// Overwrite queue
-			fakeClock := clock.NewFakeClock(time.Now())
+			fakeClock := testingclock.NewFakeClock(time.Now())
 			gcc.nodeQueue.ShutDown()
 			gcc.nodeQueue = workqueue.NewDelayingQueueWithCustomClock(fakeClock, "podgc_test_queue")
 

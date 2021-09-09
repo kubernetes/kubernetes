@@ -21,9 +21,9 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
-
 	"k8s.io/klog/v2"
+	// TODO: Switch to k8s.io/utils/clock once it supports AfterFunc()
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 // WorkArgs keeps arguments that will be passed to the function executed by the worker.
