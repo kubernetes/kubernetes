@@ -76,14 +76,13 @@ type request struct {
 // queue is an array of requests with additional metadata required for
 // the FQScheduler
 type queue struct {
-	// The requests not yet executing in the real world are stored in a FIFO list.
+	// The requests are stored in a FIFO list.
 	requests fifo
 
 	// virtualStart is the "virtual time" (R progress meter reading) at
 	// which the next request will be dispatched in the virtual world.
 	virtualStart float64
 
-	// requestsExecuting is the count in the real world
 	requestsExecuting int
 	index             int
 
