@@ -1207,11 +1207,11 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 		{decQuantity(1024, 0, BinarySI), 1024},
 		{decQuantity(8*1024, 0, BinarySI), 8 * 1024},
 		{decQuantity(7*1024*1024, 0, BinarySI), 7 * 1024 * 1024},
-		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 1024},
-		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * (1024 * 1024 * 1024 * 1024)},
-		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)},
-		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) / float64(1024)},
-		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(1024*1024*1024*1024*1024*1024*1024*1024)},
+		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(100000000)},
 
 		{decQuantity(1024, 0, DecimalSI), 1024},
 		{decQuantity(8*1024, 0, DecimalSI), 8 * 1024},
@@ -1250,6 +1250,40 @@ func TestQuantityAsApproximateFloat64(t *testing.T) {
 			if item.in.d.Dec != nil {
 				if i, ok := item.in.AsInt64(); ok {
 					q := intQuantity(i, 0, item.in.Format)
+					out := q.AsApproximateFloat64()
+					if out != item.out {
+						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestStringQuantityAsApproximateFloat64(t *testing.T) {
+	table := []struct {
+		in  string
+		out float64
+	}{
+		{"2Ki", 2048},
+		{"1.1Ki", 1126.4e+0},
+		{"1Mi", 1.048576e+06},
+		{"2Gi", 2.147483648e+09},
+	}
+
+	for _, item := range table {
+		t.Run(item.in, func(t *testing.T) {
+			in, err := ParseQuantity(item.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := in.AsApproximateFloat64()
+			if out != item.out {
+				t.Fatalf("expected %v, got %v", item.out, out)
+			}
+			if in.d.Dec != nil {
+				if i, ok := in.AsInt64(); ok {
+					q := intQuantity(i, 0, in.Format)
 					out := q.AsApproximateFloat64()
 					if out != item.out {
 						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)

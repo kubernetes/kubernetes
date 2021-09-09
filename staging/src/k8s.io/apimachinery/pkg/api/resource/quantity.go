@@ -460,17 +460,7 @@ func (q *Quantity) AsApproximateFloat64() float64 {
 		return base
 	}
 
-	// multiply by the appropriate exponential scale
-	switch q.Format {
-	case DecimalExponent, DecimalSI:
-		return base * math.Pow10(exponent)
-	default:
-		// fast path for exponents that can fit in 64 bits
-		if exponent > 0 && exponent < 7 {
-			return base * float64(int64(1)<<(exponent*10))
-		}
-		return base * math.Pow(2, float64(exponent*10))
-	}
+	return base * math.Pow10(exponent)
 }
 
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
