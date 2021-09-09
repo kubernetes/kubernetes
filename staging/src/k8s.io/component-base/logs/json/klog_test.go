@@ -31,6 +31,20 @@ import (
 	"k8s.io/klog/v2"
 )
 
+type kmeta struct {
+	Name, Namespace string
+}
+
+func (k kmeta) GetName() string {
+	return k.Name
+}
+
+func (k kmeta) GetNamespace() string {
+	return k.Namespace
+}
+
+var _ klog.KMetadata = kmeta{}
+
 func TestKlogIntegration(t *testing.T) {
 	timeNow = func() time.Time {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
@@ -129,6 +143,24 @@ func TestKlogIntegration(t *testing.T) {
 				klog.InfoSDepth(1, "test", "count", 1)
 			},
 			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"test","v":0,"count":1}`,
+		},
+		{
+			name: "KObj",
+			fun: func() {
+				klog.InfoS("some", "pod", klog.KObj(&kmeta{Name: "pod-1", Namespace: "kube-system"}))
+			},
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"some","v":0,"pod":{"name":"pod-1","namespace":"kube-system"}}`,
+		},
+		{
+			name: "KObjs",
+			fun: func() {
+				klog.InfoS("several", "pods",
+					klog.KObjs([]interface{}{
+						&kmeta{Name: "pod-1", Namespace: "kube-system"},
+						&kmeta{Name: "pod-2", Namespace: "kube-system"},
+					}))
+			},
+			format: `{"ts":%f,"caller":"json/klog_test.go:%d","msg":"several","v":0,"pods":[{"name":"pod-1","namespace":"kube-system"},{"name":"pod-2","namespace":"kube-system"}]}`,
 		},
 		{
 			name: "Warning",
