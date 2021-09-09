@@ -212,7 +212,7 @@ kube::util::list_staging_repos \
 # pin referenced versions
 ensure_require_replace_directives_for_all_dependencies
 # resolves/expands references in the root go.mod (if needed)
-go mod tidy >>"${LOG_FILE}" 2>&1
+go mod tidy -compat=1.17 >>"${LOG_FILE}" 2>&1
 # pin expanded versions
 ensure_require_replace_directives_for_all_dependencies
 # group replace directives
@@ -244,7 +244,7 @@ done
 
 kube::log::status "go.mod: sorting staging modules"
 # tidy staging repos in reverse dependency order.
-# the content of dependencies' go.mod files affects what `go mod tidy` chooses to record in a go.mod file.
+# the content of dependencies' go.mod files affects what `go mod tidy -compat=1.17` chooses to record in a go.mod file.
 tidy_unordered="${TMP_DIR}/tidy_unordered.txt"
 kube::util::list_staging_repos \
     | xargs -I {} echo "k8s.io/{}" > "${tidy_unordered}"
@@ -306,7 +306,7 @@ for repo in $(tsort "${TMP_DIR}/tidy_deps.txt"); do
              "-dropreplace \(.Replace.Path)"' |
     xargs -L 100 go mod edit -fmt
 
-    go mod tidy -v >>"${LOG_FILE}" 2>&1
+    go mod tidy -compat=1.17 -v >>"${LOG_FILE}" 2>&1
 
     # disallow transitive dependencies on k8s.io/kubernetes
     loopback_deps=()
@@ -335,7 +335,7 @@ $(go mod why "${loopback_deps[@]}")"
   popd >/dev/null 2>&1
 done
 echo "=== tidying root" >> "${LOG_FILE}"
-go mod tidy >>"${LOG_FILE}" 2>&1
+go mod tidy -compat=1.17 >>"${LOG_FILE}" 2>&1
 
 # disallow transitive dependencies on k8s.io/kubernetes
 loopback_deps=()

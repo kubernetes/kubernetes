@@ -43,6 +43,6 @@ for mod in "${MODULES[@]}"; do
   pushd "${KUBE_ROOT}/${mod}" >/dev/null
     echo "=== tidying go.mod/go.sum in ${mod}"
     go mod edit -fmt
-    go mod tidy
+    go mod tidy -compat=1.17
   popd >/dev/null
 done
