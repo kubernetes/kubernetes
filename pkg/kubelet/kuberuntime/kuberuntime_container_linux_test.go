@@ -223,6 +223,50 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 	}
 }
 
+func TestCalculateLinuxResources(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	m.cpuCFSQuota = true
+
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		cpuReq   resource.Quantity
+		cpuLim   resource.Quantity
+		memLim   resource.Quantity
+		expected *runtimeapi.LinuxContainerResources
+	}{
+		{
+			name:   "Request128MBLimit256MB",
+			cpuReq: resource.MustParse("1"),
+			cpuLim: resource.MustParse("2"),
+			memLim: resource.MustParse("128Mi"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           200000,
+				CpuShares:          1024,
+				MemoryLimitInBytes: 134217728,
+			},
+		},
+		{
+			name:   "RequestNoMemory",
+			cpuReq: resource.MustParse("2"),
+			cpuLim: resource.MustParse("8"),
+			memLim: resource.MustParse("0"),
+			expected: &runtimeapi.LinuxContainerResources{
+				CpuPeriod:          100000,
+				CpuQuota:           800000,
+				CpuShares:          2048,
+				MemoryLimitInBytes: 0,
+			},
+		},
+	}
+	for _, test := range tests {
+		linuxContainerResources := m.calculateLinuxResources(&test.cpuReq, &test.cpuLim, &test.memLim)
+		assert.Equal(t, test.expected, linuxContainerResources)
+	}
+}
+
 func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
