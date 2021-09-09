@@ -331,6 +331,16 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 // PrepareRun prepares the aggregator to run, by setting up the OpenAPI spec and calling
 // the generic PrepareRun.
 func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
+	// add post start hook before generic PrepareRun in order to be before /healthz installation
+	if s.openAPIConfig != nil {
+		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
+			go s.openAPIAggregationController.Run(context.StopCh)
+			return nil
+		})
+	}
+
+	prepared := s.GenericAPIServer.PrepareRun()
+
 	// delay OpenAPI setup until the delegate had a chance to setup their OpenAPI handlers
 	if s.openAPIConfig != nil {
 		specDownloader := openapiaggregator.NewDownloader()
@@ -344,19 +354,7 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 			return preparedAPIAggregator{}, err
 		}
 		s.openAPIAggregationController = openapicontroller.NewAggregationController(&specDownloader, openAPIAggregator)
-
-		s.GenericAPIServer.AddPostStartHookOrDie("apiservice-openapi-controller", func(context genericapiserver.PostStartHookContext) error {
-			openapiControllerSyncedCh := make(chan struct{})
-			go s.openAPIAggregationController.Run(context.StopCh, openapiControllerSyncedCh)
-			select {
-			case <-context.StopCh:
-			case <-openapiControllerSyncedCh:
-			}
-			return nil
-		})
 	}
-
-	prepared := s.GenericAPIServer.PrepareRun()
 
 	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
 }
