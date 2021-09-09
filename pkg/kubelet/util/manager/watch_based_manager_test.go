@@ -28,7 +28,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -37,6 +36,9 @@ import (
 	core "k8s.io/client-go/testing"
 
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -88,7 +90,7 @@ func TestSecretCache(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
 	store.AddReference("ns", "name")
@@ -158,7 +160,7 @@ func TestSecretCacheMultipleRegistrations(t *testing.T) {
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
 	store.AddReference("ns", "name")
@@ -264,7 +266,7 @@ func TestImmutableSecretStopsTheReflector(t *testing.T) {
 			fakeWatch := watch.NewFake()
 			fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
 
-			fakeClock := clock.NewFakeClock(time.Now())
+			fakeClock := testingclock.NewFakeClock(time.Now())
 			store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
 			key := objectKey{namespace: "ns", name: "name"}
@@ -351,7 +353,7 @@ func TestMaxIdleTimeStopsTheReflector(t *testing.T) {
 	fakeClient.AddReactor("list", "secrets", listReactor)
 	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("secrets", core.DefaultWatchReactor(fakeWatch, nil))
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretCache(fakeClient, fakeClock, time.Minute)
 
 	key := objectKey{namespace: "ns", name: "name"}
@@ -415,7 +417,7 @@ func TestReflectorNotStopedOnSlowInitialization(t *testing.T) {
 		},
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	fakeClient := &fake.Clientset{}
 	listReactor := func(a core.Action) (bool, runtime.Object, error) {
