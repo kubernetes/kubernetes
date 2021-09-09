@@ -790,7 +790,6 @@ func (dsc *DaemonSetsController) resolveControllerRef(namespace string, controll
 // podsShouldBeOnNode figures out the DaemonSet pods to be created and deleted on the given node:
 //   - nodesNeedingDaemonPods: the pods need to start on the node
 //   - podsToDelete: the Pods need to be deleted on the node
-//   - err: unexpected error
 func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	node *v1.Node,
 	nodeToDaemonPods map[string][]*v1.Pod,
@@ -807,7 +806,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 		nodesNeedingDaemonPods = append(nodesNeedingDaemonPods, node.Name)
 	case shouldContinueRunning:
 		// If a daemon pod failed, delete it
-		// If there's non-daemon pods left on this node, we will create it in the next sync loop
+		// If there's no daemon pods left on this node, will add to nodesNeedingDaemonPods later and then create it.
 		var daemonPodsRunning []*v1.Pod
 		for _, pod := range daemonPods {
 			if pod.DeletionTimestamp != nil {
