@@ -71,10 +71,13 @@ type VMSet interface {
 	// DetachDisk detaches a vhd from host. The vhd can be identified by diskName or diskURI.
 	DetachDisk(diskName, diskURI string, nodeName types.NodeName) error
 	// GetDataDisks gets a list of data disks attached to the node.
-	GetDataDisks(nodeName types.NodeName, string azcache.AzureCacheReadType) ([]compute.DataDisk, error)
+	GetDataDisks(nodeName types.NodeName, crt azcache.AzureCacheReadType) ([]compute.DataDisk, error)
 
 	// GetPowerStatusByNodeName returns the power state of the specified node.
 	GetPowerStatusByNodeName(name string) (string, error)
+
+	// GetProvisioningStateByNodeName returns the provisioningState for the specified node.
+	GetProvisioningStateByNodeName(name string) (string, error)
 
 	// GetPrivateIPsByNodeName returns a slice of all private ips assigned to node (ipv6 and ipv4)
 	GetPrivateIPsByNodeName(name string) ([]string, error)

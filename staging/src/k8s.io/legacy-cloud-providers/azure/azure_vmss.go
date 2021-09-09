@@ -241,6 +241,30 @@ func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, er
 	return vmPowerStateStopped, nil
 }
 
+// GetProvisioningStateByNodeName returns the provisioningState for the specified node.
+func (ss *scaleSet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(name, azcache.CacheReadTypeUnsafe)
+	if err != nil {
+		klog.Errorf("Failed to check isNodeManagedByAvailabilitySet: %v", err)
+		return "", err
+	}
+	if managedByAS {
+		// vm is managed by availability set.
+		return ss.availabilitySet.GetProvisioningStateByNodeName(name)
+	}
+
+	_, _, vm, err := ss.getVmssVM(name, azcache.CacheReadTypeDefault)
+	if err != nil {
+		return provisioningState, err
+	}
+
+	if vm.VirtualMachineScaleSetVMProperties == nil || vm.VirtualMachineScaleSetVMProperties.ProvisioningState == nil {
+		return provisioningState, nil
+	}
+
+	return to.String(vm.VirtualMachineScaleSetVMProperties.ProvisioningState), nil
+}
+
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
 // The node must belong to one of scale sets.
 func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID string, crt azcache.AzureCacheReadType) (*compute.VirtualMachineScaleSetVM, error) {

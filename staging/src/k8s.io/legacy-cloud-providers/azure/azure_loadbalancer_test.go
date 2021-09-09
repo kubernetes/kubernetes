@@ -1943,6 +1943,36 @@ func TestReconcileSecurityGroup(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:    "reconcileSecurityGroup shall create shared sgs for service with azure-shared-securityrule annotations",
+			service: getTestService("test1", v1.ProtocolTCP, map[string]string{ServiceAnnotationSharedSecurityRule: "true"}, true, 80),
+			existingSgs: map[string]network.SecurityGroup{"nsg": {
+				Name:                          to.StringPtr("nsg"),
+				SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{},
+			}},
+			lbIP:   to.StringPtr("1.2.3.4"),
+			wantLb: true,
+			expectedSg: &network.SecurityGroup{
+				Name: to.StringPtr("nsg"),
+				SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{
+					SecurityRules: &[]network.SecurityRule{
+						{
+							Name: to.StringPtr("shared-TCP-80-Internet"),
+							SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+								Protocol:                   network.SecurityRuleProtocol("Tcp"),
+								SourcePortRange:            to.StringPtr("*"),
+								DestinationPortRange:       to.StringPtr("80"),
+								SourceAddressPrefix:        to.StringPtr("Internet"),
+								DestinationAddressPrefixes: to.StringSlicePtr([]string{"1.2.3.4"}),
+								Access:                     network.SecurityRuleAccess("Allow"),
+								Priority:                   to.Int32Ptr(500),
+								Direction:                  network.SecurityRuleDirection("Inbound"),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for i, test := range testCases {
