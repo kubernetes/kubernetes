@@ -30,6 +30,15 @@ import (
 )
 
 func main() {
+	err := runKubectlCmd()
+	defer func() {
+		if err != nil {
+			os.Exit(1)
+		}
+	}()
+}
+
+func runKubectlCmd() error {
 	flags := pflag.NewFlagSet("kubectl-convert", pflag.ExitOnError)
 	pflag.CommandLine = flags
 
@@ -51,7 +60,8 @@ func main() {
 	cmd := convert.NewCmdConvert(f, genericclioptions.IOStreams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr})
 	matchVersionKubeConfigFlags.AddFlags(cmd.PersistentFlags())
 	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
+		return err
 	}
 
+	return nil
 }

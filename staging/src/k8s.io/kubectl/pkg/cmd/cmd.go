@@ -230,7 +230,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
       Find more information at:
             https://kubernetes.io/docs/reference/kubectl/overview/`),
-		Run: runHelp,
+		RunE: runHelp,
 		// Hook before and after Run initialize and write profiles to disk,
 		// respectively.
 		PersistentPreRunE: func(*cobra.Command, []string) error {
@@ -432,8 +432,8 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 	}
 }
 
-func runHelp(cmd *cobra.Command, args []string) {
-	cmd.Help()
+func runHelp(cmd *cobra.Command, args []string) error {
+	return cmd.Help()
 }
 
 func registerCompletionFuncForGlobalFlags(cmd *cobra.Command, f cmdutil.Factory) {

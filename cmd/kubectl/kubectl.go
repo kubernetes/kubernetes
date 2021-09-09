@@ -33,6 +33,15 @@ import (
 )
 
 func main() {
+	err := runKubectlCmd()
+	defer func() {
+		if err != nil {
+			os.Exit(1)
+		}
+	}()
+}
+
+func runKubectlCmd() error {
 	rand.Seed(time.Now().UnixNano())
 
 	command := cmd.NewDefaultKubectlCommand()
@@ -47,6 +56,7 @@ func main() {
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
