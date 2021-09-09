@@ -37,7 +37,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -81,6 +80,8 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func init() {
@@ -114,7 +115,7 @@ type TestKubelet struct {
 	fakeContainerManager *cm.FakeContainerManager
 	fakeKubeClient       *fake.Clientset
 	fakeMirrorClient     *podtest.FakeMirrorClient
-	fakeClock            *clock.FakeClock
+	fakeClock            *testingclock.FakeClock
 	mounter              mount.Interface
 	volumePlugin         *volumetest.FakeVolumePlugin
 }
@@ -291,7 +292,7 @@ func newTestKubeletWithImageList(
 	assert.NoError(t, err)
 	kubelet.containerGC = containerGC
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.resyncInterval = 10 * time.Second

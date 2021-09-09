@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -121,6 +120,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -1139,7 +1139,7 @@ type Kubelet struct {
 
 	// clock is an interface that provides time related functionality in a way that makes it
 	// easy to test the code.
-	clock clock.Clock
+	clock clock.WithTicker
 
 	// handlers called during the tryUpdateNodeStatus cycle
 	setNodeStatusFuncs []func(*v1.Node) error
