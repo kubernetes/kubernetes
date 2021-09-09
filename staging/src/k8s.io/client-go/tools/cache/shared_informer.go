@@ -368,6 +368,10 @@ func (s *sharedIndexInformer) SetWatchErrorHandler(handler WatchErrorHandler) er
 func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
+	if s.HasStarted() {
+		klog.Warningf("The sharedIndexInformer has started, run more than once is not allowed")
+		return
+	}
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KnownObjects:          s.indexer,
 		EmitDeltaTypeReplaced: true,
@@ -408,6 +412,12 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.stopped = true // Don't want any new listeners
 	}()
 	s.controller.Run(stopCh)
+}
+
+func (s *sharedIndexInformer) HasStarted() bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+	return s.started
 }
 
 func (s *sharedIndexInformer) HasSynced() bool {
