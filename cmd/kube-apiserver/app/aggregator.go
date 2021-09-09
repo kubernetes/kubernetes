@@ -141,12 +141,14 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		autoRegistrationController)
 
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
-		go crdRegistrationController.Run(5, context.StopCh)
+		go crdRegistrationController.Run(5, context.StopCh, aggregatorServer.CrdApiRegistrationDoneCh)
 		go func() {
 			// let the CRD controller process the initial set of CRDs before starting the autoregistration controller.
 			// this prevents the autoregistration controller's initial sync from deleting APIServices for CRDs that still exist.
 			// we only need to do this if CRDs are enabled on this server.  We can't use discovery because we are the source for discovery.
-			crdRegistrationController.WaitForInitialSync()
+			if aggregatorConfig.GenericConfig.MergedResourceConfig.AnyVersionForGroupEnabled("apiextensions.k8s.io") {
+				crdRegistrationController.WaitForInitialSync()
+			}
 			autoRegistrationController.Run(5, context.StopCh)
 		}()
 		return nil
