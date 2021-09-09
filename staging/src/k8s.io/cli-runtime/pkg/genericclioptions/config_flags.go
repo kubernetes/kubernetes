@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-
+	"k8s.io/klog/v2"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	diskcached "k8s.io/client-go/discovery/cached/disk"
@@ -141,9 +141,12 @@ func (f *ConfigFlags) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 
 func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.Warner = klog.Warning
+	
 	// use the standard defaults for this client command
 	// DEPRECATED: remove and replace with something more accurate
 	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
+
 
 	if f.KubeConfig != nil {
 		loadingRules.ExplicitPath = *f.KubeConfig
