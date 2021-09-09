@@ -104,6 +104,18 @@ for repo in $(kube::util::list_staging_repos); do
       go mod edit -require "${dep}@${rev}"
       go mod edit -replace "${dep}=${replacement}@${rev}"
     fi
+
+    # When replacing with a fork, always add a replace statement in all go.mod
+    # files (not just the root of the staging repos!) because there might be
+    # indirect dependencies on the fork.
+    #
+    # This is excessive, but the resulting commit should never be merged, so it
+    # isn't that important to get this exactly right.
+    if [ "${replacement}" != "${dep}" ]; then
+        find . -name go.mod -print | while read -r modfile; do
+            (cd "$(dirname "${modfile}")" && go mod edit -replace "${dep}=${replacement}@${rev}")
+        done
+    fi
   popd >/dev/null 2>&1
 done
 
