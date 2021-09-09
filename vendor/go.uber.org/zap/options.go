@@ -138,3 +138,11 @@ func OnFatal(action zapcore.CheckWriteAction) Option {
 		log.onFatal = action
 	})
 }
+
+// WithClock specifies the clock used by the logger to determine the current
+// time for logged entries. Defaults to the system clock with time.Now.
+func WithClock(clock zapcore.Clock) Option {
+	return optionFunc(func(log *Logger) {
+		log.clock = clock
+	})
+}

@@ -292,8 +292,10 @@ github.com/fsnotify/fsnotify
 github.com/fvbommel/sortorder
 # github.com/go-errors/errors v1.0.1 => github.com/go-errors/errors v1.0.1
 github.com/go-errors/errors
-# github.com/go-logr/logr v0.4.0 => github.com/go-logr/logr v0.4.0
+# github.com/go-logr/logr v1.1.0 => github.com/go-logr/logr v1.1.0
 github.com/go-logr/logr
+# github.com/go-logr/zapr v1.1.0 => github.com/go-logr/zapr v1.1.0
+github.com/go-logr/zapr
 # github.com/go-openapi/jsonpointer v0.19.5 => github.com/go-openapi/jsonpointer v0.19.5
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonreference v0.19.5 => github.com/go-openapi/jsonreference v0.19.5
@@ -951,7 +953,7 @@ go.starlark.net/syntax
 go.uber.org/atomic
 # go.uber.org/multierr v1.6.0 => go.uber.org/multierr v1.6.0
 go.uber.org/multierr
-# go.uber.org/zap v1.17.0 => go.uber.org/zap v1.17.0
+# go.uber.org/zap v1.19.0 => go.uber.org/zap v1.19.0
 go.uber.org/zap
 go.uber.org/zap/buffer
 go.uber.org/zap/internal/bufferpool
@@ -2000,7 +2002,7 @@ k8s.io/gengo/generator
 k8s.io/gengo/namer
 k8s.io/gengo/parser
 k8s.io/gengo/types
-# k8s.io/klog/v2 v2.9.0 => k8s.io/klog/v2 v2.9.0
+# k8s.io/klog/v2 v2.20.0 => k8s.io/klog/v2 v2.20.0
 ## explicit
 k8s.io/klog/v2
 # k8s.io/kube-aggregator v0.0.0 => ./staging/src/k8s.io/kube-aggregator
@@ -2422,7 +2424,7 @@ sigs.k8s.io/yaml
 # github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 # github.com/auth0/go-jwt-middleware => github.com/auth0/go-jwt-middleware v1.0.1
 # github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.38.49
-# github.com/benbjohnson/clock => github.com/benbjohnson/clock v1.0.3
+# github.com/benbjohnson/clock => github.com/benbjohnson/clock v1.1.0
 # github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 # github.com/bgentry/speakeasy => github.com/bgentry/speakeasy v0.1.0
 # github.com/bits-and-blooms/bitset => github.com/bits-and-blooms/bitset v1.2.0
@@ -2493,7 +2495,8 @@ sigs.k8s.io/yaml
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 # github.com/go-kit/log => github.com/go-kit/log v0.1.0
 # github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.0
-# github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
+# github.com/go-logr/logr => github.com/go-logr/logr v1.1.0
+# github.com/go-logr/zapr => github.com/go-logr/zapr v1.1.0
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
 # github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
@@ -2687,7 +2690,7 @@ sigs.k8s.io/yaml
 # go.uber.org/atomic => go.uber.org/atomic v1.7.0
 # go.uber.org/goleak => go.uber.org/goleak v1.1.10
 # go.uber.org/multierr => go.uber.org/multierr v1.6.0
-# go.uber.org/zap => go.uber.org/zap v1.17.0
+# go.uber.org/zap => go.uber.org/zap v1.19.0
 # golang.org/x/crypto => golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 # golang.org/x/exp => golang.org/x/exp v0.0.0-20210220032938-85be41e4509f
 # golang.org/x/image => golang.org/x/image v0.0.0-20190802002840-cff245a6509b
@@ -2741,7 +2744,7 @@ sigs.k8s.io/yaml
 # k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 # k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 # k8s.io/gengo => k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
-# k8s.io/klog/v2 => k8s.io/klog/v2 v2.9.0
+# k8s.io/klog/v2 => k8s.io/klog/v2 v2.20.0
 # k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 # k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 # k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8

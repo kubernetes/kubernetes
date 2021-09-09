@@ -47,12 +47,12 @@ func TestZapLoggerInfo(t *testing.T) {
 		},
 		{
 			msg:        "test for strongly typed Zap field",
-			format:     "{\"ts\":%f,\"caller\":\"json/json.go:%d\",\"msg\":\"strongly-typed Zap Field passed to logr\",\"v\":0}\n{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for strongly typed Zap field\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"strongly-typed Zap Field passed to logr\",\"zap field\":{\"Key\":\"attempt\",\"Type\":11,\"Integer\":3,\"String\":\"\",\"Interface\":null}}\n{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for strongly typed Zap field\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
 			keysValues: []interface{}{"ns", "default", "podnum", 2, zap.Int("attempt", 3), "attempt", "Running", 10},
 		},
 		{
 			msg:        "test for non-string key argument",
-			format:     "{\"ts\":%f,\"caller\":\"json/json.go:%d\",\"msg\":\"non-string key argument passed to logging, ignoring all later arguments\",\"v\":0}\n{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for non-string key argument\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"non-string key argument passed to logging, ignoring all later arguments\",\"invalid key\":200}\n{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for non-string key argument\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
 			keysValues: []interface{}{"ns", "default", "podnum", 2, 200, "replica", "Running", 10},
 		},
 		{
@@ -147,7 +147,7 @@ func TestZapLoggerError(t *testing.T) {
 	logStr := buffer.String()
 	var ts float64
 	var lineNo int
-	expectFormat := `{"ts":%f,"caller":"json/json_test.go:%d","msg":"wrong namespace","v":0,"ns":"default","podnum":2,"time":"1µs","err":"invalid namespace:default"}`
+	expectFormat := `{"ts":%f,"caller":"json/json_test.go:%d","msg":"wrong namespace","ns":"default","podnum":2,"time":"1µs","err":"invalid namespace:default"}`
 	n, err := fmt.Sscanf(logStr, expectFormat, &ts, &lineNo)
 	if n != 2 || err != nil {
 		t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logStr)
