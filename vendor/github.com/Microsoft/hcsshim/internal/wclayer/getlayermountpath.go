@@ -21,8 +21,7 @@ func GetLayerMountPath(ctx context.Context, path string) (_ string, err error) {
 	defer func() { oc.SetSpanStatus(span, err) }()
 	span.AddAttributes(trace.StringAttribute("path", path))
 
-	var mountPathLength uintptr
-	mountPathLength = 0
+	var mountPathLength uintptr = 0
 
 	// Call the procedure itself.
 	log.G(ctx).Debug("Calling proc (1)")
