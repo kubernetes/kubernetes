@@ -25,6 +25,8 @@ import (
 
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
+
+	_ "k8s.io/component-base/logs/json/register"
 )
 
 func main() {
