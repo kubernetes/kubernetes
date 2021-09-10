@@ -206,7 +206,8 @@ func TestKlogIntegration(t *testing.T) {
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
 			var buffer bytes.Buffer
-			var logger = NewJSONLogger(zapcore.AddSync(&buffer))
+			writer := zapcore.AddSync(&buffer)
+			logger, _ := NewJSONLogger(writer, writer)
 			klog.SetLogger(logger)
 			defer klog.ClearLogger()
 
@@ -236,7 +237,8 @@ func TestKlogIntegration(t *testing.T) {
 // TestKlogV test klog -v(--verbose) func available with json logger
 func TestKlogV(t *testing.T) {
 	var buffer testBuff
-	logger := NewJSONLogger(&buffer)
+	writer := zapcore.AddSync(&buffer)
+	logger, _ := NewJSONLogger(writer, writer)
 	klog.SetLogger(logger)
 	defer klog.ClearLogger()
 	fs := flag.FlagSet{}

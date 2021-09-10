@@ -37,8 +37,12 @@ func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field
 			}
 		}
 	}
-	if _, err := registry.LogRegistry.Get(c.Format); err != nil {
+	_, err := registry.LogRegistry.Get(c.Format)
+	if err != nil {
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
 	}
+
+	// Currently nothing to validate for c.Options.
+
 	return errs
 }

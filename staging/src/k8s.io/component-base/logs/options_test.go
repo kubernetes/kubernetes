@@ -68,6 +68,7 @@ func TestOptions(t *testing.T) {
 				Config: config.LoggingConfiguration{
 					Format:       DefaultLogFormat,
 					Sanitization: true,
+					Options:      NewOptions().Config.Options,
 				},
 			},
 		},
@@ -76,7 +77,8 @@ func TestOptions(t *testing.T) {
 			args: []string{"--logging-format=test"},
 			want: &Options{
 				Config: config.LoggingConfiguration{
-					Format: "test",
+					Format:  "test",
+					Options: NewOptions().Config.Options,
 				},
 			},
 			errs: field.ErrorList{&field.Error{
