@@ -56,6 +56,8 @@ type ContainerManager interface {
 	// for the container. If it returns error, new container log file MUST NOT
 	// be created.
 	ReopenContainerLog(ContainerID string) error
+	// CheckpointContainer checkpoints a container
+	CheckpointContainer(options *runtimeapi.CheckpointContainerRequest) error
 }
 
 // PodSandboxManager contains methods for operating on PodSandboxes. The methods
@@ -76,8 +78,6 @@ type PodSandboxManager interface {
 	ListPodSandbox(filter *runtimeapi.PodSandboxFilter) ([]*runtimeapi.PodSandbox, error)
 	// PortForward prepares a streaming endpoint to forward ports from a PodSandbox, and returns the address.
 	PortForward(*runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error)
-	// CheckpointContainer checkpoints a container
-	CheckpointContainer(containerID, checkpointDir string) error
 }
 
 // ContainerStatsManager contains methods for retrieving the container

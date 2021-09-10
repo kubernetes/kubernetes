@@ -322,3 +322,13 @@ func (f *RemoteRuntime) ReopenContainerLog(ctx context.Context, req *kubeapi.Reo
 
 	return &kubeapi.ReopenContainerLogResponse{}, nil
 }
+
+// CheckpointContainer checkpoints the given container.
+func (f *RemoteRuntime) CheckpointContainer(ctx context.Context, req *kubeapi.CheckpointContainerRequest) (*kubeapi.CheckpointContainerResponse, error) {
+	err := f.RuntimeService.CheckpointContainer(&kubeapi.CheckpointContainerRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.CheckpointContainerResponse{}, nil
+}
