@@ -24,18 +24,38 @@ import (
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
-	// JSONLogger is global json log format logr
-	JSONLogger logr.Logger
+	// JSONFactory manages configuration and creation of a JSON logger.
+	JSONFactory Factory
 
 	// timeNow stubbed out for testing
 	timeNow = time.Now
 )
 
-func init() {
-	JSONLogger = NewJSONLogger(zapcore.Lock(os.Stdout))
+type Factory struct {}
+
+func (f Factory) Convert(in *runtime.RawExtension, out *runtime.Object, s conversion.Scope) error {
+	// No options at the moment. Simply pass them through and complain in Validate.
+	return runtime.Convert_runtime_RawExtension_To_runtime_Object(in, out, s)
+}
+
+func (f Factory) Validate(config runtime.Object, fldPath *field.Path) field.ErrorList {
+	var errs field.ErrorList
+	if config != nil {
+		// TODO: dumping config is not informative
+		errs = append(errs, field.Invalid(fldPath, config, "JSON format does not support configuration options"))
+	}
+	return errs
+}
+
+func (f Factory) Create(config runtime.Object) (logr.Logger, error) {
+	return NewJSONLogger(os.Stdout), nil
 }
 
 // NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.

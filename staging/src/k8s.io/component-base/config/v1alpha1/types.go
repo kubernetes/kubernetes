@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const EndpointsResourceLock = "endpoints"
@@ -90,4 +91,7 @@ type LoggingConfiguration struct {
 	// [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 	Sanitization bool `json:"sanitization,omitempty"`
+	// Options holds additional parameters that are specific
+	// to the selected format.
+	Options runtime.RawExtension `json:"options,omitempty"`
 }

@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs/registry"
 )
 
 func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field.Path) field.ErrorList {
@@ -37,8 +38,18 @@ func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field
 			}
 		}
 	}
-	if _, err := LogRegistry.Get(c.Format); err != nil {
+	factory, err := registry.LogRegistry.Get(c.Format)
+	if err != nil {
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
+	} else {
+		if factory == nil {
+			if c.Options != nil {
+				// TODO: dumping config is not informative
+				errs = append(errs, field.Invalid(fldPath.Child("options"), c.Options, "Default log format does not have options."))
+			}
+		} else {
+			errs = append(errs, factory.Validate(c.Options, fldPath.Child("options"))...)
+		}
 	}
 	return errs
 }

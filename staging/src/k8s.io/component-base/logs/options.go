@@ -22,6 +22,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs/registry"
 	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs/sanitization"
 )
@@ -58,11 +59,12 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 // Apply set klog logger from LogFormat type
 func (o *Options) Apply() {
 	// if log format not exists, use nil loggr
-	loggr, _ := LogRegistry.Get(o.Config.Format)
-	if loggr == nil {
+	factory, _ := registry.LogRegistry.Get(o.Config.Format)
+	if factory == nil {
 		klog.ClearLogger()
 	} else {
-		klog.SetLogger(*loggr)
+		log, _ := factory.Create(o.Config.Options)
+		klog.SetLogger(log)
 	}
 	if o.Config.Sanitization {
 		klog.SetLogFilter(&sanitization.SanitizingFilter{})

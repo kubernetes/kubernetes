@@ -18,6 +18,7 @@ package config
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // ClientConnectionConfiguration contains details for constructing a client.
@@ -88,4 +89,7 @@ type LoggingConfiguration struct {
 	// [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 	Sanitization bool
+	// Options holds additional parameters that are specific
+	// to the selected format.
+	Options runtime.Object
 }

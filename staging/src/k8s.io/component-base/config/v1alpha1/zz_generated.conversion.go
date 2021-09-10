@@ -145,11 +145,17 @@ func autoConvert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionCo
 func autoConvert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in *LoggingConfiguration, out *config.LoggingConfiguration, s conversion.Scope) error {
 	out.Format = in.Format
 	out.Sanitization = in.Sanitization
+	if err := runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Options, &out.Options, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(in *config.LoggingConfiguration, out *LoggingConfiguration, s conversion.Scope) error {
 	out.Format = in.Format
 	out.Sanitization = in.Sanitization
+	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Options, &out.Options, s); err != nil {
+		return err
+	}
 	return nil
 }
