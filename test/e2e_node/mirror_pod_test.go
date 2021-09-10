@@ -139,6 +139,61 @@ var _ = SIGDescribe("MirrorPod", func() {
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 	})
+	ginkgo.Context("when create a mirror pod without changes ", func() {
+		var ns, podPath, staticPodName, mirrorPodName string
+		ginkgo.BeforeEach(func() {
+		})
+		/*
+			Release: v1.23
+			Testname: Mirror Pod, recreate
+			Description: When a static pod's manifest is removed and readded, the mirror pod MUST successfully recreate. Create the static pod, verify it is running, remove its manifest and then add it back, and verify the static pod runs again.
+		*/
+		ginkgo.It("should successfully recreate when file is removed and recreated [NodeConformance]", func() {
+			ns = f.Namespace.Name
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
+			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
+
+			podPath = framework.TestContext.KubeletConfig.StaticPodPath
+			ginkgo.By("create the static pod")
+			err := createStaticPod(podPath, staticPodName, ns,
+				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to be running")
+			gomega.Eventually(func() error {
+				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("delete the pod manifest from disk")
+			err = deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("recreate the file")
+			err = createStaticPod(podPath, staticPodName, ns,
+				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("mirror pod should stay running")
+			// NOTE(ehashman): There might be some initial delay while pod is
+			// Pending before it hits error state; wait on slower environments
+			// for things to hit steady state before watching for error
+			gomega.Eventually(func() error {
+				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+			gomega.Consistently(func() error {
+				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+			}, time.Second*30, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("delete the static pod")
+			err = deleteStaticPod(podPath, staticPodName, ns)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(func() error {
+				return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+		})
+	})
 })
 
 func staticPodPath(dir, name, namespace string) string {
