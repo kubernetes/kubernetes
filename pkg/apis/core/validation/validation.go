@@ -1749,12 +1749,8 @@ func ValidatePersistentVolumeSpec(pvSpec *core.PersistentVolumeSpec, pvName stri
 	}
 	numVolumes := 0
 	if pvSpec.HostPath != nil {
-		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostPath"), "may not specify more than 1 volume type"))
-		} else {
-			numVolumes++
-			allErrs = append(allErrs, validateHostPathVolumeSource(pvSpec.HostPath, fldPath.Child("hostPath"))...)
-		}
+		numVolumes++
+		allErrs = append(allErrs, validateHostPathVolumeSource(pvSpec.HostPath, fldPath.Child("hostPath"))...)
 	}
 	if pvSpec.GCEPersistentDisk != nil {
 		if numVolumes > 0 {
@@ -2771,12 +2767,8 @@ func validateHandler(handler *core.Handler, fldPath *field.Path) field.ErrorList
 	numHandlers := 0
 	allErrors := field.ErrorList{}
 	if handler.Exec != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
-		} else {
-			numHandlers++
-			allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
-		}
+		numHandlers++
+		allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
 	}
 	if handler.HTTPGet != nil {
 		if numHandlers > 0 {
