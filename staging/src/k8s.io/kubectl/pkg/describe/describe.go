@@ -4145,7 +4145,7 @@ func DescribeEvents(el *corev1.EventList, w PrefixWriter) {
 			firstTimestampSince = translateTimestampSince(e.FirstTimestamp)
 		}
 		if e.Series != nil {
-			interval = fmt.Sprintf("%s (x%d over %s)", translateMicroTimestampSince(e.Series.LastObservedTime), e.Series.Count+1, firstTimestampSince)
+			interval = fmt.Sprintf("%s (x%d over %s)", translateMicroTimestampSince(e.Series.LastObservedTime), e.Series.Count, firstTimestampSince)
 		} else if e.Count > 1 {
 			interval = fmt.Sprintf("%s (x%d over %s)", translateTimestampSince(e.LastTimestamp), e.Count, firstTimestampSince)
 		} else {
