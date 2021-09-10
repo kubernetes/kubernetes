@@ -132,7 +132,7 @@ func NewCmdCreateSecretGeneric(f cmdutil.Factory, ioStreams genericclioptions.IO
 	o := NewSecretOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
+		Use:                   "secret generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a secret from a local file, directory, or literal value"),
 		Long:                  secretLong,
