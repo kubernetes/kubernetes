@@ -180,9 +180,6 @@ var _ = SIGDescribe("MirrorPod", func() {
 				if err := checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid, true); err != nil {
 					return err
 				}
-				if pod.Spec.Containers[0].Image != image {
-					return fmt.Errorf("container does not yet show new image")
-				}
 				return nil
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 

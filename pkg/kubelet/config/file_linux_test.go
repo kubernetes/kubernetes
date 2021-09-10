@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -72,7 +73,7 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 	var testCases = getTestCases(hostname)
 
 	for _, testCase := range testCases {
-		func() {
+		t.Run(testCase.desc, func(t *testing.T) {
 			dirName, err := mkTempDir("file-test")
 			if err != nil {
 				t.Fatalf("unable to create temp dir: %v", err)
@@ -89,19 +90,28 @@ func TestReadPodsFromFileExistAlready(t *testing.T) {
 					// TODO: remove the conversion when validation is performed on versioned objects.
 					internalPod := &api.Pod{}
 					if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
-						t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+						t.Fatalf("Cannot convert pod %#v, %#v", pod, err)
 					}
 					if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
-						t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
+						t.Fatalf("Invalid pod %#v, %#v", internalPod, errs)
 					}
 				}
+
+				for i, pod := range testCase.expected.Pods {
+					if v, ok := pod.Annotations[kubetypes.ConfigHashAnnotationKey]; ok && v == "" {
+						if i < len(update.Pods) {
+							pod.Annotations[kubetypes.ConfigHashAnnotationKey] = update.Pods[i].Annotations[kubetypes.ConfigHashAnnotationKey]
+						}
+					}
+				}
+
 				if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
-					t.Fatalf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
+					t.Fatalf("%s", diff.ObjectReflectDiff(testCase.expected, update))
 				}
 			case <-time.After(wait.ForeverTestTimeout):
-				t.Fatalf("%s: Expected update, timeout instead", testCase.desc)
+				t.Fatalf("Expected update, timeout instead")
 			}
-		}()
+		})
 	}
 }
 
@@ -172,7 +182,7 @@ func getTestCases(hostname types.NodeName) []*testCase {
 					Name:        "test-" + string(hostname),
 					UID:         "12345",
 					Namespace:   "mynamespace",
-					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
+					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: ""},
 					SelfLink:    getSelfLink("test-"+string(hostname), "mynamespace"),
 				},
 				Spec: v1.PodSpec{
@@ -287,7 +297,7 @@ func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *test
 
 	fileNamePre := "test_pod_manifest"
 	for index, testCase := range testCases {
-		func() {
+		t.Run(testCase.desc, func(t *testing.T) {
 			dirName, err := mkTempDir("dir-test")
 			fileName := fmt.Sprintf("%s_%d", fileNamePre, index)
 			if err != nil {
@@ -356,7 +366,7 @@ func watchFileChanged(watchDir bool, symlink bool, period time.Duration, t *test
 				// expect an update by MOVED_TO inotify event cause changing file name
 				expectUpdate(t, ch, testCase)
 			}
-		}()
+		})
 	}
 }
 
@@ -374,19 +384,29 @@ func expectUpdate(t *testing.T, ch chan interface{}, testCase *testCase) {
 				// TODO: remove the conversion when validation is performed on versioned objects.
 				internalPod := &api.Pod{}
 				if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
-					t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+					t.Fatalf("Cannot convert pod %#v, %#v", pod, err)
 				}
 				if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) > 0 {
-					t.Fatalf("%s: Invalid pod %#v, %#v", testCase.desc, internalPod, errs)
+					t.Fatalf("Invalid pod %#v, %#v", internalPod, errs)
+				}
+			}
+
+			for i, pod := range testCase.expected.Pods {
+				if i < len(update.Pods) {
+					pod.Annotations[kubetypes.ConfigHashAnnotationKey] = update.Pods[i].Annotations[kubetypes.ConfigHashAnnotationKey]
 				}
 			}
 
 			if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
-				t.Fatalf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
+				t.Fatalf("Diff: %s", diff.ObjectReflectDiff(testCase.expected, update))
+			}
+
+			for _, pod := range testCase.expected.Pods {
+				pod.Annotations[kubetypes.ConfigHashAnnotationKey] = ""
 			}
 			return
 		case <-timer:
-			t.Fatalf("%s: Expected update, timeout instead", testCase.desc)
+			t.Fatal("Expected update, timeout instead")
 		}
 	}
 }

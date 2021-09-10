@@ -53,21 +53,28 @@ func generatePodName(name string, nodeName types.NodeName) string {
 	return fmt.Sprintf("%s-%s", name, strings.ToLower(string(nodeName)))
 }
 
-func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
-	if len(pod.UID) == 0 {
-		hasher := md5.New()
-		hash.DeepHashObject(hasher, pod)
-		// DeepHashObject resets the hash, so we should write the pod source
-		// information AFTER it.
-		if isFile {
-			fmt.Fprintf(hasher, "host:%s", nodeName)
-			fmt.Fprintf(hasher, "file:%s", source)
-		} else {
-			fmt.Fprintf(hasher, "url:%s", source)
-		}
-		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
-		klog.V(5).InfoS("Generated UID", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
+// hashPod hashes a pod retrieved from a given source
+func hashPod(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) string {
+	// calculate the hash for the input and assign to UID if none is set
+	hasher := md5.New()
+	hash.DeepHashObject(hasher, pod)
+	// DeepHashObject resets the hash, so we should write the pod source
+	// information AFTER it.
+	if isFile {
+		fmt.Fprintf(hasher, "host:%s", nodeName)
+		fmt.Fprintf(hasher, "file:%s", source)
+	} else {
+		fmt.Fprintf(hasher, "url:%s", source)
 	}
+	return hex.EncodeToString(hasher.Sum(nil)[0:])
+}
+
+func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.NodeName) error {
+	podHash := hashPod(pod, source, isFile, nodeName)
+	if len(pod.UID) == 0 {
+		pod.UID = types.UID(podHash)
+	}
+	klog.V(5).InfoS("Generated hash", "uid", podHash, "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
 
 	pod.Name = generatePodName(pod.Name, nodeName)
 	klog.V(5).InfoS("Generated pod name", "pod", klog.KObj(pod), "podUID", pod.UID, "source", source)
@@ -86,7 +93,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, nodeName types.Node
 		pod.Annotations = make(map[string]string)
 	}
 	// The generated UID is the hash of the file.
-	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = string(pod.UID)
+	pod.Annotations[kubetypes.ConfigHashAnnotationKey] = podHash
 
 	if isFile {
 		// Applying the default Taint tolerations to static pods,

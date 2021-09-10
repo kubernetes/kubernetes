@@ -23,11 +23,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/diff"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	utiltesting "k8s.io/client-go/util/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -163,7 +164,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "mynamespace",
-						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: ""},
 						SelfLink:    getSelfLink("foo-"+nodeName, "mynamespace"),
 					},
 					Spec: v1.PodSpec{
@@ -235,7 +236,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						UID:         "111",
 						Name:        "foo" + "-" + nodeName,
 						Namespace:   "default",
-						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "111"},
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: ""},
 						SelfLink:    getSelfLink("foo-"+nodeName, metav1.NamespaceDefault),
 					},
 					Spec: v1.PodSpec{
@@ -264,7 +265,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						UID:         "222",
 						Name:        "bar" + "-" + nodeName,
 						Namespace:   "default",
-						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "222"},
+						Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: ""},
 						SelfLink:    getSelfLink("bar-"+nodeName, metav1.NamespaceDefault),
 					},
 					Spec: v1.PodSpec{
@@ -292,37 +293,46 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		data, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), testCase.pods)
-		if err != nil {
-			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
-		}
-		fakeHandler := utiltesting.FakeHandler{
-			StatusCode:   http.StatusOK,
-			ResponseBody: string(data),
-		}
-		testServer := httptest.NewServer(&fakeHandler)
-		defer testServer.Close()
-		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, http.Header{}, types.NodeName(nodeName), ch, nil, 0, http.DefaultClient}
-		if err := c.extractFromURL(); err != nil {
-			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
-			continue
-		}
-		update := (<-ch).(kubetypes.PodUpdate)
+		t.Run(testCase.desc, func(t *testing.T) {
+			data, err := runtime.Encode(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), testCase.pods)
+			if err != nil {
+				t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
+			}
+			fakeHandler := utiltesting.FakeHandler{
+				StatusCode:   http.StatusOK,
+				ResponseBody: string(data),
+			}
+			testServer := httptest.NewServer(&fakeHandler)
+			defer testServer.Close()
+			ch := make(chan interface{}, 1)
+			c := sourceURL{testServer.URL, http.Header{}, types.NodeName(nodeName), ch, nil, 0, http.DefaultClient}
+			if err := c.extractFromURL(); err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			update := (<-ch).(kubetypes.PodUpdate)
 
-		if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
-			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
-		}
-		for _, pod := range update.Pods {
-			// TODO: remove the conversion when validation is performed on versioned objects.
-			internalPod := &api.Pod{}
-			if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
-				t.Fatalf("%s: Cannot convert pod %#v, %#v", testCase.desc, pod, err)
+			for i, pod := range testCase.expected.Pods {
+				if v, ok := pod.Annotations[kubetypes.ConfigHashAnnotationKey]; ok && v == "" {
+					if i < len(update.Pods) {
+						pod.Annotations[kubetypes.ConfigHashAnnotationKey] = update.Pods[i].Annotations[kubetypes.ConfigHashAnnotationKey]
+					}
+				}
 			}
-			if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) != 0 {
-				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errs.ToAggregate())
+
+			if !apiequality.Semantic.DeepEqual(testCase.expected, update) {
+				t.Errorf("Objects differed: %s", diff.ObjectReflectDiff(testCase.expected, update))
 			}
-		}
+			for _, pod := range update.Pods {
+				// TODO: remove the conversion when validation is performed on versioned objects.
+				internalPod := &api.Pod{}
+				if err := k8s_api_v1.Convert_v1_Pod_To_core_Pod(pod, internalPod, nil); err != nil {
+					t.Fatalf("Cannot convert pod %#v, %#v", pod, err)
+				}
+				if errs := validation.ValidatePodCreate(internalPod, validation.PodValidationOptions{}); len(errs) != 0 {
+					t.Errorf("Expected no validation errors on %#v, Got %v", pod, errs.ToAggregate())
+				}
+			}
+		})
 	}
 }
 
