@@ -17,6 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -426,6 +428,10 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64
+}
+
+func (k KubeletConfiguration) String() string {
+	return fmt.Sprintf("kubeletConfiguration version: %s", k.ShowHiddenMetricsForVersion)
 }
 
 // KubeletAuthorizationMode denotes the authorization mode for the kubelet

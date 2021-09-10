@@ -90,19 +90,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 					"Pass --feature-gates=DynamicKubeletConfig=true to the Kubelet and API server to enable this feature.\n" +
 					"For `make test-e2e-node`, you can set `TEST_ARGS='--feature-gates=DynamicKubeletConfig=true'`."))
 			}
-			// record before state so we can restore it after the test
-			if beforeNode == nil {
-				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				beforeNode = node
-			}
-			if source := beforeNode.Spec.ConfigSource; source != nil {
-				if source.ConfigMap != nil {
-					cm, err := f.ClientSet.CoreV1().ConfigMaps(source.ConfigMap.Namespace).Get(context.TODO(), source.ConfigMap.Name, metav1.GetOptions{})
-					framework.ExpectNoError(err)
-					beforeConfigMap = cm
-				}
-			}
+
 			if beforeKC == nil {
 				kc, err := getCurrentKubeletConfig()
 				framework.ExpectNoError(err)
@@ -110,14 +98,29 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				beforeKC.ShowHiddenMetricsForVersion = "1.22"
 			}
 
-			if beforeConfigMap != nil {
-				data, err := kubeletconfigcodec.EncodeKubeletConfig(beforeKC, kubeletconfigv1beta1.SchemeGroupVersion)
+			// record before state so we can restore it after the test
+			if beforeNode == nil {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
-				beforeConfigMap.Data = map[string]string{
-					"kubelet": string(data),
+				beforeNode = node
+
+				if source := beforeNode.Spec.ConfigSource; source != nil {
+					if source.ConfigMap != nil {
+						cm, err := f.ClientSet.CoreV1().ConfigMaps(source.ConfigMap.Namespace).Get(context.TODO(), source.ConfigMap.Name, metav1.GetOptions{})
+						framework.ExpectNoError(err)
+						beforeConfigMap = cm
+
+						data, err := kubeletconfigcodec.EncodeKubeletConfig(beforeKC, kubeletconfigv1beta1.SchemeGroupVersion)
+						framework.ExpectNoError(err)
+						beforeConfigMap.Data = map[string]string{
+							"kubelet": string(data),
+						}
+
+						err = updateConfigMapFunc(f, &nodeConfigTestCase{configMap: beforeConfigMap})
+						framework.ExpectNoError(err)
+						beforeConfigMap, _ = f.ClientSet.CoreV1().ConfigMaps(source.ConfigMap.Namespace).Get(context.TODO(), source.ConfigMap.Name, metav1.GetOptions{})
+					}
 				}
-				beforeConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), beforeConfigMap, metav1.UpdateOptions{})
-				framework.ExpectNoError(err)
 			}
 
 			// reset the node's assigned/active/last-known-good config by setting the source to nil,
@@ -132,6 +135,10 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				framework.ExpectNoError(err)
 				localKC = kc
 			}
+			framework.Logf("beforeNode: %+v", beforeNode)
+			framework.Logf("beforeConfigMap: %+v", beforeConfigMap)
+			framework.Logf("beforeKC: %+v", beforeKC)
+			framework.Logf("localKC: %+v", localKC)
 		})
 
 		ginkgo.AfterEach(func() {
