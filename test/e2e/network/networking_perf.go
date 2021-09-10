@@ -39,8 +39,9 @@ import (
 const (
 	// use this timeout for larger clusters
 	largeClusterTimeout = 400 * time.Second
-	// iperf2BaselineBandwidthMegabytesPerSecond sets a baseline for iperf2 bandwidth of 90 MB/s
-	iperf2BaselineBandwidthMegabytesPerSecond = 90
+	// iperf2BaselineBandwidthMegabytesPerSecond sets a baseline for iperf2 bandwidth of 10 MBps = 80 Mbps
+	// this limits is chosen in order to support small devices with 100 mbps cards.
+	iperf2BaselineBandwidthMegabytesPerSecond = 10
 	// iperf2Port selects an arbitrary, unique port to run iperf2's client and server on
 	iperf2Port = 6789
 	// labelKey is used as a key for selectors
