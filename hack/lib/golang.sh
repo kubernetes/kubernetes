@@ -52,6 +52,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   darwin/arm64
   windows/amd64
   windows/386
+  windows/arm64
 )
 
 # Which platforms we should compile test targets for.
@@ -65,6 +66,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   darwin/amd64
   darwin/arm64
   windows/amd64
+  windows/arm64
 )
 
 # The set of server targets that we are only building for Linux
