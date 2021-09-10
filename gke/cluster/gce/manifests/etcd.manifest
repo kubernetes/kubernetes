@@ -112,24 +112,16 @@
       {
         "name": "ETCD_LOG_FILE",
         "value": "/var/log/etcd{{ suffix }}.log"
-      },
-      {
-        "name": "ETCDCTL_API",
-        "value": "3"
       }
         ],
     "livenessProbe": {
-      "exec": {
-        "command": [
-          "/bin/sh",
-          "-c",
-          "set -x; exec /usr/local/bin/etcdctl --endpoints=127.0.0.1:{{ port }} {{ etcdctl_certs }} --command-timeout=15s endpoint health"
-        ]
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": {{ etcd_livenessprobe_port }},
+        "path": "/health"
       },
       "initialDelaySeconds": {{ liveness_probe_initial_delay }},
-      "timeoutSeconds": 15,
-      "periodSeconds": 5,
-      "failureThreshold": 5
+      "timeoutSeconds": 15
     },
     "ports": [
       { "name": "serverport",
