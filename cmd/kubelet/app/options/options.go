@@ -120,8 +120,7 @@ type KubeletFlags struct {
 	RemoteRuntimeEndpoint string
 	// remoteImageEndpoint is the endpoint of remote image service
 	RemoteImageEndpoint string
-	// experimentalMounterPath is the path of mounter binary. Leave empty to use the default mount path
-	ExperimentalMounterPath string
+
 	// This flag, if set, enables a check prior to mount operations to verify that the required components
 	// (binaries, etc.) to mount the volume are available on the underlying node. If the check is enabled
 	// and fails the mount operation fails.
@@ -370,8 +369,6 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 	fs.MarkDeprecated("keep-terminated-pod-volumes", "will be removed in a future version")
 	fs.BoolVar(&f.ReallyCrashForTesting, "really-crash-for-testing", f.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.MarkDeprecated("really-crash-for-testing", "will be removed in a future version.")
-	fs.StringVar(&f.ExperimentalMounterPath, "experimental-mounter-path", f.ExperimentalMounterPath, "[Experimental] Path of mounter binary. Leave empty to use the default mount.")
-	fs.MarkDeprecated("experimental-mounter-path", "will be removed in 1.23. in favor of using CSI.")
 	fs.BoolVar(&f.ExperimentalCheckNodeCapabilitiesBeforeMount, "experimental-check-node-capabilities-before-mount", f.ExperimentalCheckNodeCapabilitiesBeforeMount, "[Experimental] if set true, the kubelet will check the underlying node for required components (binaries, etc.) before performing the mount")
 	fs.MarkDeprecated("experimental-check-node-capabilities-before-mount", "will be removed in 1.23. in favor of using CSI.")
 	fs.StringVar(&f.CloudProvider, "cloud-provider", f.CloudProvider, "The provider for cloud services. Set to empty string for running with no cloud provider. If set, the cloud provider determines the name of the node (consult cloud provider documentation to determine if and how the hostname is used).")
