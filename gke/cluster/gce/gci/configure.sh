@@ -1042,9 +1042,15 @@ function log-proto {
 
 ######### Main Function ##########
 log-init
+detect_host_info
+
+if [[ "${IS_PRELOADER:-"false"}" == "true" ]]; then
+  echo "Running in preloader instead of VM bootsrapping. Skipping installation steps as preloader script will source configure.sh and call corresponding functions."
+  exit
+fi
+
 log-start 'ConfigureMain'
 echo "Start to install kubernetes files"
-log-wrap 'DetectHostInfo' detect_host_info
 
 # if install fails, message-of-the-day (motd) will warn at login shell
 log-wrap 'SetBrokenMotd' set-broken-motd
