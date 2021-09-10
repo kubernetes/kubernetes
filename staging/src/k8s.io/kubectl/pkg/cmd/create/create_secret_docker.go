@@ -129,7 +129,7 @@ func NewCmdCreateSecretDockerRegistry(f cmdutil.Factory, ioStreams genericcliopt
 	o := NewSecretDockerRegistryOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-file=[key=]source] [--dry-run=server|client|none]",
+		Use:                   "secret docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-file=[key=]source] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a secret for use with a Docker registry"),
 		Long:                  secretForDockerRegistryLong,
