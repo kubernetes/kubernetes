@@ -454,5 +454,8 @@ func getValidCreationData(subscriptionID, resourceGroup, sourceResourceID, sourc
 
 func isInstanceNotFoundError(err error) bool {
 	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, strings.ToLower(vmssVMNotActiveErrorMessage)) {
+		return true
+	}
 	return strings.Contains(errMsg, errStatusCode400) && strings.Contains(errMsg, errInvalidParameter) && strings.Contains(errMsg, errTargetInstanceIds)
 }
