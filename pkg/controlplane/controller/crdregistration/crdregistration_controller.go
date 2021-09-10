@@ -105,7 +105,7 @@ func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinit
 	return c
 }
 
-func (c *crdRegistrationController) Run(workers int, stopCh <-chan struct{}, CrdApiRegistrationDoneCh chan struct{}) {
+func (c *crdRegistrationController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
@@ -131,7 +131,6 @@ func (c *crdRegistrationController) Run(workers int, stopCh <-chan struct{}, Crd
 			}
 		}
 	}
-	close(CrdApiRegistrationDoneCh)
 	close(c.syncedInitialSet)
 
 	// start up your worker threads based on workers.  Some controllers have multiple kinds of workers

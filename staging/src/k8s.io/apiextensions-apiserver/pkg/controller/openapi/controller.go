@@ -77,7 +77,6 @@ func NewController(crdInformer informers.CustomResourceDefinitionInformer) *Cont
 }
 
 // Run sets openAPIAggregationManager and starts workers
-// openapiControllerSyncedCh waits for CRD OpenAPI specs synchronized first.
 func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenAPIService, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()

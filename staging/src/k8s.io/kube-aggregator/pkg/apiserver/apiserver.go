@@ -147,10 +147,6 @@ type APIAggregator struct {
 	// egressSelector selects the proper egress dialer to communicate with the custom apiserver
 	// overwrites proxyTransport dialer if not nil
 	egressSelector *egressselector.EgressSelector
-
-	// CRD API auto registration done channel, it is essential for API registration controller
-	// whose completed OpenAPI aggregations.
-	CrdApiRegistrationDoneCh chan struct{}
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
@@ -197,7 +193,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		openAPIConfig:              c.GenericConfig.OpenAPIConfig,
 		egressSelector:             c.GenericConfig.EgressSelector,
 		proxyCurrentCertKeyContent: func() (bytes []byte, bytes2 []byte) { return nil, nil },
-		CrdApiRegistrationDoneCh:   make(chan struct{}),
 	}
 
 	// used later  to filter the served resource by those that have expired.
@@ -265,8 +260,6 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		// Wait until autoregister completed API service registration
-		<-s.CrdApiRegistrationDoneCh
 		handlerSyncedCh := make(chan struct{})
 		go apiserviceRegistrationController.Run(context.StopCh, handlerSyncedCh)
 		select {
