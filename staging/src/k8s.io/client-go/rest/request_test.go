@@ -54,6 +54,7 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -1563,7 +1564,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
-	clock := clock.FakeClock{}
+	clock := testingclock.FakeClock{}
 	request.backoff = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
 		Backoff: flowcontrol.NewFakeBackOff(
