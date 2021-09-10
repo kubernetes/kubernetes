@@ -89,7 +89,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	o := NewSecretTLSOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run=server|client|none]",
+		Use:                   "secret tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a TLS secret"),
 		Long:                  secretForTLSLong,
