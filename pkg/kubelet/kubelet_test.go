@@ -1418,15 +1418,18 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	assert.NoError(t, err, "expected pod with hostNetwork=true to succeed when network in error")
 }
 
-func TestFilterOutTerminatedPods(t *testing.T) {
+func TestFilterOutInactivePods(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	pods := newTestPods(5)
+	pods := newTestPods(8)
 	now := metav1.NewTime(time.Now())
+
+	// terminal pods are excluded
 	pods[0].Status.Phase = v1.PodFailed
 	pods[1].Status.Phase = v1.PodSucceeded
-	// The pod is terminating, should not filter out.
+
+	// deleted pod is included unless it's known to be terminated
 	pods[2].Status.Phase = v1.PodRunning
 	pods[2].DeletionTimestamp = &now
 	pods[2].Status.ContainerStatuses = []v1.ContainerStatus{
@@ -1436,18 +1439,31 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 			},
 		}},
 	}
+
+	// pending and running pods are included
 	pods[3].Status.Phase = v1.PodPending
 	pods[4].Status.Phase = v1.PodRunning
 
-	kubelet.podWorkers.(*fakePodWorkers).running = map[types.UID]bool{
-		pods[2].UID: true,
-		pods[3].UID: true,
-		pods[4].UID: true,
+	// pod that is running but has been rejected by admission is excluded
+	pods[5].Status.Phase = v1.PodRunning
+	kubelet.statusManager.SetPodStatus(pods[5], v1.PodStatus{Phase: v1.PodFailed})
+
+	// pod that is running according to the api but is known terminated is excluded
+	pods[6].Status.Phase = v1.PodRunning
+	kubelet.podWorkers.(*fakePodWorkers).terminated = map[types.UID]bool{
+		pods[6].UID: true,
 	}
 
-	expected := []*v1.Pod{pods[2], pods[3], pods[4]}
+	// pod that is failed but still terminating is included (it may still be consuming
+	// resources)
+	pods[7].Status.Phase = v1.PodFailed
+	kubelet.podWorkers.(*fakePodWorkers).terminationRequested = map[types.UID]bool{
+		pods[7].UID: true,
+	}
+
+	expected := []*v1.Pod{pods[2], pods[3], pods[4], pods[7]}
 	kubelet.podManager.SetPods(pods)
-	actual := kubelet.filterOutTerminatedPods(pods)
+	actual := kubelet.filterOutInactivePods(pods)
 	assert.Equal(t, expected, actual)
 }
 
