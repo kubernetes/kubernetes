@@ -30,9 +30,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	controller "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
+	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 
@@ -105,7 +107,19 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				kc, err := getCurrentKubeletConfig()
 				framework.ExpectNoError(err)
 				beforeKC = kc
+				beforeKC.ShowHiddenMetricsForVersion = "1.22"
 			}
+
+			if beforeConfigMap != nil {
+				data, err := kubeletconfigcodec.EncodeKubeletConfig(beforeKC, kubeletconfigv1beta1.SchemeGroupVersion)
+				framework.ExpectNoError(err)
+				beforeConfigMap.Data = map[string]string{
+					"kubelet": string(data),
+				}
+				beforeConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Update(context.TODO(), beforeConfigMap, metav1.UpdateOptions{})
+				framework.ExpectNoError(err)
+			}
+
 			// reset the node's assigned/active/last-known-good config by setting the source to nil,
 			// so each test starts from a clean-slate
 			(&nodeConfigTestCase{
@@ -705,7 +719,7 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
 				correctKC := beforeKC.DeepCopy()
-				correctConfigMap := newKubeletConfigMap("dynamic-kubelet-config-test-delete-createe", correctKC)
+				correctConfigMap := newKubeletConfigMap("dynamic-kubelet-config-test-delete-create", correctKC)
 				correctConfigMap, err = f.ClientSet.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), correctConfigMap, metav1.CreateOptions{})
 				framework.ExpectNoError(err)
 
@@ -878,8 +892,12 @@ func (tc *nodeConfigTestCase) run(f *framework.Framework, fn func(f *framework.F
 	tc.checkNodeConfigSource(f)
 	// check status
 	tc.checkConfigStatus(f)
-	// check that the Kubelet's config-related metrics are correct
-	tc.checkConfigMetrics(f)
+
+	// if configSource is nil, dynamic-kubelet-config will not work, skip the metrics check.
+	if !(tc.configSource == nil || (tc.expectConfigStatus.err != "" && tc.expectConfigStatus.lkgActive && tc.expectConfigStatus.lastKnownGood == nil)) {
+		// check that the Kubelet's config-related metrics are correct
+		tc.checkConfigMetrics(f)
+	}
 	// check expectConfig
 	if tc.expectConfig != nil {
 		tc.checkConfig(f)
@@ -914,8 +932,8 @@ func updateConfigMapFunc(f *framework.Framework, tc *nodeConfigTestCase) error {
 	return nil
 }
 
-// recreateConfigMapFunc deletes and recreates the ConfigMap described by tc.configMap.
-// The new ConfigMap will match tc.configMap.
+// // recreateConfigMapFunc deletes and recreates the ConfigMap described by tc.configMap.
+// // The new ConfigMap will match tc.configMap.
 func recreateConfigMapFunc(f *framework.Framework, tc *nodeConfigTestCase) error {
 	// need to ignore NotFound error, since there could be cases where delete
 	// fails during a retry because the delete in a previous attempt succeeded,

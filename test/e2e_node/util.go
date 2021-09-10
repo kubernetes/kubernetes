@@ -271,7 +271,6 @@ func setNodeConfigSource(f *framework.Framework, source *v1.NodeConfigSource) er
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
