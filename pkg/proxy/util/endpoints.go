@@ -36,13 +36,13 @@ func IPPart(s string) string {
 	// Must be IP:port
 	host, _, err := net.SplitHostPort(s)
 	if err != nil {
-		klog.Errorf("Error parsing '%s': %v", s, err)
+		klog.ErrorS(err, "Parse error", "IPPart", s)
 		return ""
 	}
 	// Check if host string is a valid IP address
 	ip := netutils.ParseIPSloppy(host)
 	if ip == nil {
-		klog.Errorf("invalid IP part '%s'", host)
+		klog.ErrorS(nil, "Invalid IP part", "host", host)
 		return ""
 	}
 	return ip.String()
@@ -53,12 +53,12 @@ func PortPart(s string) (int, error) {
 	// Must be IP:port
 	_, port, err := net.SplitHostPort(s)
 	if err != nil {
-		klog.Errorf("Error parsing '%s': %v", s, err)
+		klog.ErrorS(err, "Parse error", "portPart", s)
 		return -1, err
 	}
 	portNumber, err := strconv.Atoi(port)
 	if err != nil {
-		klog.Errorf("Error parsing '%s': %v", port, err)
+		klog.ErrorS(err, "Parse error", "port", port)
 		return -1, err
 	}
 	return portNumber, nil

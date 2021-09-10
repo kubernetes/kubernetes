@@ -176,12 +176,12 @@ func GetLocalAddrSet() netutils.IPSet {
 func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).Infof("Skipping service %s in namespace %s due to clusterIP = %q", service.Name, service.Namespace, service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service in namespace due to cluster IP", "service", service.Name, "namespace", service.Namespace, "clusterIP", service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).Infof("Skipping service %s in namespace %s due to Type=ExternalName", service.Name, service.Namespace)
+		klog.V(3).InfoS("Skipping service in namespace due to Type=ExternalName", "service", service.Name, "namespace", service.Namespace)
 		return true
 	}
 	return false
@@ -254,7 +254,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 // LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
 func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
 	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	klog.Errorf("%s (service %s/%s).", errMsg, svcNamespace, svcName)
+	klog.ErrorS(nil, "Service", "errorMessage", errMsg, "name", svcName, "namespace", svcNamespace)
 	if recorder != nil {
 		recorder.Eventf(
 			&v1.ObjectReference{
@@ -274,7 +274,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			klog.Errorf("Skipping invalid IP: %s", ip)
+			klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
 		}
 	}
 	return ipFamilyMap
@@ -288,7 +288,7 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
-			klog.Errorf("Skipping invalid cidr: %s", cidr)
+			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
 		}
 	}
 	return ipFamilyMap
@@ -367,7 +367,7 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 		if err := sysctl.SetSysctl(name, newVal); err != nil {
 			return fmt.Errorf("can't set sysctl %s to %d: %v", name, newVal, err)
 		}
-		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
+		klog.V(1).InfoS("Changed sysctl", "name", name, "oldValue", oldVal, "newValue", newVal)
 	}
 	return nil
 }
@@ -496,7 +496,7 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 	for k, v := range replacementPortsMap {
 		// Only close newly opened local ports - leave ones that were open before this update
 		if originalPortsMap[k] == nil {
-			klog.V(2).Infof("Closing local port %s", k.String())
+			klog.V(2).InfoS("Closing local port", "port", k.String())
 			v.Close()
 		}
 	}
