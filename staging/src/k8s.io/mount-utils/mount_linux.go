@@ -30,7 +30,7 @@ import (
 	"syscall"
 	"time"
 
-	"k8s.io/klog/v2"
+        "k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
 	utilio "k8s.io/utils/io"
 )
@@ -437,6 +437,11 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 			args = []string{
 				"-F",  // Force flag
 				"-m0", // Zero blocks reserved for super-user
+				source,
+			}
+		} else if fstype == "xfs" {
+			args = []string{
+				"-f",  // force flag
 				source,
 			}
 		}
