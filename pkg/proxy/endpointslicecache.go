@@ -266,7 +266,7 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 	// iterate through endpoints to add them to endpointSet.
 	for _, endpoint := range endpoints {
 		if len(endpoint.Addresses) == 0 {
-			klog.InfoS("Ignoring invalid endpoint port with empty addresses", "endpoint", endpoint)
+			klog.InfoS("Ignoring invalid endpoint port with empty address", "endpoint", endpoint)
 			continue
 		}
 
@@ -355,7 +355,7 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 			// Ensure endpoints are always returned in the same order to simplify diffing.
 			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
 
-			klog.V(3).InfoS("Setting endpoints for service port names", "servicePortName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
+			klog.V(3).InfoS("Setting endpoints for service port name", "servicePortName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 

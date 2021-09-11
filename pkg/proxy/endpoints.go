@@ -466,7 +466,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 				}
 			}
 
-			klog.V(3).InfoS("Setting endpoints for service ports", "servicePortName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
+			klog.V(3).InfoS("Setting endpoints for service port", "servicePortName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 	return endpointsMap
