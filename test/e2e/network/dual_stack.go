@@ -367,7 +367,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		expectedPolicy := v1.IPFamilyPolicyRequireDualStack
 		expectedFamilies := []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
 
-		service := createService(t.ServiceName, t.Namespace, t.Labels, nil, expectedFamilies)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, &expectedPolicy, expectedFamilies)
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
@@ -412,7 +412,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 		expectedPolicy := v1.IPFamilyPolicyRequireDualStack
 		expectedFamilies := []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
 
-		service := createService(t.ServiceName, t.Namespace, t.Labels, nil, expectedFamilies)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, &expectedPolicy, expectedFamilies)
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
