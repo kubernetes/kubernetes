@@ -92,16 +92,17 @@ func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
 	return pods, nil
 }
 
-// GetActivePods returns pods that may have a running container (a
-// terminated pod is one that is known to have no running containers and
-// will not get any more).
+// GetActivePods returns pods that have been admitted to the kubelet that
+// are not fully terminated. This is mapped to the "desired state" of the
+// kubelet - what pods should be running.
 //
-// TODO: This method must include pods that have been force deleted from
-// the config source (and thus removed from the pod manager) but are still
-// terminating.
+// WARNING: Currently this list does not include pods that have been force
+// deleted but may still be terminating, which means resources assigned to
+// those pods during admission may still be in use. See
+// https://github.com/kubernetes/kubernetes/issues/104824
 func (kl *Kubelet) GetActivePods() []*v1.Pod {
 	allPods := kl.podManager.GetPods()
-	activePods := kl.filterOutTerminatedPods(allPods)
+	activePods := kl.filterOutInactivePods(allPods)
 	return activePods
 }
 
@@ -968,19 +969,32 @@ func (kl *Kubelet) podResourcesAreReclaimed(pod *v1.Pod) bool {
 	return kl.PodResourcesAreReclaimed(pod, status)
 }
 
-// filterOutTerminatedPods returns pods that are not in a terminal phase
+// filterOutInactivePods returns pods that are not in a terminal phase
 // or are known to be fully terminated. This method should only be used
 // when the set of pods being filtered is upstream of the pod worker, i.e.
 // the pods the pod manager is aware of.
-func (kl *Kubelet) filterOutTerminatedPods(pods []*v1.Pod) []*v1.Pod {
+func (kl *Kubelet) filterOutInactivePods(pods []*v1.Pod) []*v1.Pod {
 	filteredPods := make([]*v1.Pod, 0, len(pods))
 	for _, p := range pods {
+		// if a pod is fully terminated by UID, it should be excluded from the
+		// list of pods
 		if kl.podWorkers.IsPodKnownTerminated(p.UID) {
 			continue
 		}
-		if p.Status.Phase == v1.PodSucceeded || p.Status.Phase == v1.PodFailed {
+
+		// terminal pods are considered inactive UNLESS they are actively terminating
+		isTerminal := p.Status.Phase == v1.PodSucceeded || p.Status.Phase == v1.PodFailed
+		if !isTerminal {
+			// a pod that has been marked terminal within the Kubelet is considered
+			// inactive (may have been rejected by Kubelet admision)
+			if status, ok := kl.statusManager.GetPodStatus(p.UID); ok {
+				isTerminal = status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed
+			}
+		}
+		if isTerminal && !kl.podWorkers.IsPodTerminationRequested(p.UID) {
 			continue
 		}
+
 		filteredPods = append(filteredPods, p)
 	}
 	return filteredPods
