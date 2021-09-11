@@ -548,8 +548,8 @@ func (r *ResourceMonitor) GetLatest() (ResourceUsagePerNode, error) {
 	return result, utilerrors.NewAggregate(errs)
 }
 
-// GetMasterNodeLatest returns the latest resource usage of master and node.
-func (r *ResourceMonitor) GetMasterNodeLatest(usagePerNode ResourceUsagePerNode) ResourceUsagePerNode {
+// GetControlPlaneLatest returns the latest resource usage of control plane and node.
+func (r *ResourceMonitor) GetControlPlaneLatest(usagePerNode ResourceUsagePerNode) ResourceUsagePerNode {
 	result := make(ResourceUsagePerNode)
 	var controlPlaneUsage ResourceUsagePerContainer
 	var nodesUsage []ResourceUsagePerContainer
@@ -640,8 +640,8 @@ func (r *ResourceMonitor) GetCPUSummary() NodesCPUSummary {
 	return result
 }
 
-// GetMasterNodeCPUSummary returns summary of master node CPUs.
-func (r *ResourceMonitor) GetMasterNodeCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
+// GetControlPlaneCPUSummary returns summary of control plane CPUs.
+func (r *ResourceMonitor) GetControlPlaneCPUSummary(summaryPerNode NodesCPUSummary) NodesCPUSummary {
 	result := make(NodesCPUSummary)
 	var controlPlaneSummary ContainersCPUSummary
 	var nodesSummaries []ContainersCPUSummary
