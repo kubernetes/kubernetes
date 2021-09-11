@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	gomock "github.com/golang/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
@@ -1551,8 +1552,11 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 	}
 	summaryProvider := &fakeSummaryProvider{result: makeMemoryStats("2Gi", map[*v1.Pod]statsapi.PodStats{})}
 
-	thresholdNotifier := &MockThresholdNotifier{}
-	thresholdNotifier.On("UpdateThreshold", summaryProvider.result).Return(nil).Twice()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	thresholdNotifier := NewMockThresholdNotifier(mockCtrl)
+	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(nil).Times(2)
 
 	manager := &managerImpl{
 		clock:                        fakeClock,
@@ -1568,29 +1572,24 @@ func TestUpdateMemcgThreshold(t *testing.T) {
 		thresholdNotifiers:           []ThresholdNotifier{thresholdNotifier},
 	}
 
-	manager.synchronize(diskInfoProvider, activePodsFunc)
 	// The UpdateThreshold method should have been called once, since this is the first run.
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
-
 	manager.synchronize(diskInfoProvider, activePodsFunc)
-	// The UpdateThreshold method should not have been called again, since not enough time has passed
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
 
+	// The UpdateThreshold method should not have been called again, since not enough time has passed
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// The UpdateThreshold method should be called again since enough time has passed
 	fakeClock.Step(2 * notifierRefreshInterval)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
-	// The UpdateThreshold method should be called again since enough time has passed
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 2)
 
 	// new memory threshold notifier that returns an error
-	thresholdNotifier = &MockThresholdNotifier{}
-	thresholdNotifier.On("UpdateThreshold", summaryProvider.result).Return(fmt.Errorf("error updating threshold"))
-	thresholdNotifier.On("Description").Return("mock thresholdNotifier").Once()
+	thresholdNotifier = NewMockThresholdNotifier(mockCtrl)
+	thresholdNotifier.EXPECT().UpdateThreshold(summaryProvider.result).Return(fmt.Errorf("error updating threshold")).Times(1)
+	thresholdNotifier.EXPECT().Description().Return("mock thresholdNotifier").Times(1)
 	manager.thresholdNotifiers = []ThresholdNotifier{thresholdNotifier}
 
-	fakeClock.Step(2 * notifierRefreshInterval)
-	manager.synchronize(diskInfoProvider, activePodsFunc)
 	// The UpdateThreshold method should be called because at least notifierRefreshInterval time has passed.
 	// The Description method should be called because UpdateThreshold returned an error
-	thresholdNotifier.AssertNumberOfCalls(t, "UpdateThreshold", 1)
-	thresholdNotifier.AssertNumberOfCalls(t, "Description", 1)
+	fakeClock.Step(2 * notifierRefreshInterval)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
 }

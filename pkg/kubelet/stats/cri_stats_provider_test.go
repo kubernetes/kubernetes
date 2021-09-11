@@ -139,8 +139,11 @@ func TestCRIListPodStats(t *testing.T) {
 		podLogStats1 = makeFakeLogStats(6000)
 	)
 
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	var (
-		mockCadvisor       = new(cadvisortest.Mock)
+		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
@@ -171,11 +174,11 @@ func TestCRIListPodStats(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCadvisor.
-		On("ContainerInfoV2", "/", options).Return(infos, nil).
-		On("RootFsInfo").Return(rootFsInfo, nil).
-		On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil).
-		On("GetDirFsInfo", unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
+	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
+	mockCadvisor.EXPECT().RootFsInfo().Return(rootFsInfo, nil)
+	mockCadvisor.EXPECT().GetDirFsInfo(imageFsMountpoint).Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().GetDirFsInfo(unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
+
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
 		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5,
 	})
@@ -317,8 +320,6 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.NotNil(c8.CPU.Time)
 	assert.NotNil(c8.Memory.Time)
 	checkCRIPodCPUAndMemoryStats(assert, p3, infos[sandbox3Cgroup].Stats[0])
-
-	mockCadvisor.AssertExpectations(t)
 }
 
 func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
@@ -336,8 +337,11 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 		containerStats1 = makeFakeContainerStats(container1, unknownMountpoint)
 	)
 
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	var (
-		mockCadvisor       = new(cadvisortest.Mock)
+		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
@@ -361,11 +365,11 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCadvisor.
-		On("ContainerInfoV2", "/", options).Return(infos, nil).
-		On("RootFsInfo").Return(rootFsInfo, nil).
-		On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil).
-		On("GetDirFsInfo", unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
+	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
+	mockCadvisor.EXPECT().RootFsInfo().Return(rootFsInfo, nil)
+	mockCadvisor.EXPECT().GetDirFsInfo(imageFsMountpoint).Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().GetDirFsInfo(unknownMountpoint).Return(cadvisorapiv2.FsInfo{}, cadvisorfs.ErrNoSuchDevice)
+
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
 		sandbox0,
 	})
@@ -424,8 +428,6 @@ func TestAcceleratorUsageStatsCanBeDisabled(t *testing.T) {
 	assert.Nil(c1.Accelerators)
 
 	checkCRIPodCPUAndMemoryStats(assert, p0, infos[sandbox0Cgroup].Stats[0])
-
-	mockCadvisor.AssertExpectations(t)
 }
 
 func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
@@ -477,8 +479,11 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		containerStats9 = makeFakeContainerStats(container9, imageFsMountpoint)
 	)
 
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	var (
-		mockCadvisor       = new(cadvisortest.Mock)
+		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
@@ -508,8 +513,8 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCadvisor.
-		On("ContainerInfoV2", "/", options).Return(infos, nil)
+	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
+
 	fakeRuntimeService.SetFakeSandboxes([]*critest.FakePodSandbox{
 		sandbox0, sandbox1, sandbox2, sandbox3, sandbox4, sandbox5, sandbox6,
 	})
@@ -632,8 +637,6 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Equal(containerStats9.Cpu.Timestamp, p6.CPU.Time.UnixNano())
 	assert.NotNil(c9.Memory.Time)
 	assert.Equal(containerStats9.Memory.Timestamp, p6.Memory.Time.UnixNano())
-
-	mockCadvisor.AssertExpectations(t)
 }
 
 func TestCRIImagesFsStats(t *testing.T) {
@@ -642,16 +645,19 @@ func TestCRIImagesFsStats(t *testing.T) {
 		imageFsInfo       = getTestFsInfo(2000)
 		imageFsUsage      = makeFakeImageFsUsage(imageFsMountpoint)
 	)
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	var (
-		mockCadvisor       = new(cadvisortest.Mock)
+		mockCadvisor       = cadvisortest.NewMockInterface(mockCtrl)
 		mockRuntimeCache   = new(kubecontainertest.MockRuntimeCache)
 		mockPodManager     = new(kubepodtest.MockManager)
 		resourceAnalyzer   = new(fakeResourceAnalyzer)
 		fakeRuntimeService = critest.NewFakeRuntimeService()
 		fakeImageService   = critest.NewFakeImageService()
 	)
-
-	mockCadvisor.On("GetDirFsInfo", imageFsMountpoint).Return(imageFsInfo, nil)
+	mockCadvisor.EXPECT().GetDirFsInfo(imageFsMountpoint).Return(imageFsInfo, nil)
 	fakeImageService.SetFakeFilesystemUsage([]*runtimeapi.FilesystemUsage{
 		imageFsUsage,
 	})
@@ -678,8 +684,6 @@ func TestCRIImagesFsStats(t *testing.T) {
 	assert.Equal(imageFsInfo.Inodes, stats.Inodes)
 	assert.Equal(imageFsUsage.UsedBytes.Value, *stats.UsedBytes)
 	assert.Equal(imageFsUsage.InodesUsed.Value, *stats.InodesUsed)
-
-	mockCadvisor.AssertExpectations(t)
 }
 
 func makeFakePodSandbox(name, uid, namespace string, terminated bool) *critest.FakePodSandbox {
