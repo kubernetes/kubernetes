@@ -194,7 +194,7 @@ func newProxyServer(
 			// Just because the feature gate is enabled doesn't mean the node
 			// actually supports dual-stack
 			if _, err := ipt[1].ChainExists(utiliptables.TableNAT, utiliptables.ChainPostrouting); err != nil {
-				klog.WarningS("No iptables support for IPv6: %v", err)
+				klog.Warningf("No iptables support for IPv6: %v", err)
 				dualStack = false
 			}
 		} else {
@@ -205,7 +205,7 @@ func newProxyServer(
 	if dualStack {
 		klog.V(0).InfoS("kube-proxy running in dual-stack mode", "primary", iptInterface.Protocol())
 	} else {
-		klog.V(0).InfoS("kube-proxy running in single-stack", "mode", iptInterface.Protocol())
+		klog.V(0).InfoS("kube-proxy running in single-stack mode", "primary", iptInterface.Protocol())
 	}
 
 	if proxyMode == proxyModeIPTables {
