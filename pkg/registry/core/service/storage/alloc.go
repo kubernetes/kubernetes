@@ -62,6 +62,13 @@ func makeAlloc(defaultFamily api.IPFamily, ipAllocs map[api.IPFamily]ipallocator
 
 func (al *Allocators) allocateCreate(service *api.Service, dryRun bool) (transaction, error) {
 	result := metaTransaction{}
+	success := false
+
+	defer func() {
+		if !success {
+			result.Revert()
+		}
+	}()
 
 	// Ensure IP family fields are correctly initialized.  We do it here, since
 	// we want this to be visible even when dryRun == true.
@@ -74,7 +81,6 @@ func (al *Allocators) allocateCreate(service *api.Service, dryRun bool) (transac
 	//does (and is tested!).  Fixing that all is a big PR and will have to
 	//happen later.
 	if txn, err := al.txnAllocClusterIPs(service, dryRun); err != nil {
-		result.Revert()
 		return nil, err
 	} else {
 		result = append(result, txn)
@@ -82,12 +88,12 @@ func (al *Allocators) allocateCreate(service *api.Service, dryRun bool) (transac
 
 	// Allocate ports
 	if txn, err := al.txnAllocNodePorts(service, dryRun); err != nil {
-		result.Revert()
 		return nil, err
 	} else {
 		result = append(result, txn)
 	}
 
+	success = true
 	return result, nil
 }
 
@@ -569,6 +575,13 @@ func (al *Allocators) allocHealthCheckNodePort(service *api.Service, nodePortOp 
 
 func (al *Allocators) allocateUpdate(after After, before Before, dryRun bool) (transaction, error) {
 	result := metaTransaction{}
+	success := false
+
+	defer func() {
+		if !success {
+			result.Revert()
+		}
+	}()
 
 	// Ensure IP family fields are correctly initialized.  We do it here, since
 	// we want this to be visible even when dryRun == true.
@@ -581,7 +594,6 @@ func (al *Allocators) allocateUpdate(after After, before Before, dryRun bool) (t
 	//does (and is tested!).  Fixing that all is a big PR and will have to
 	//happen later.
 	if txn, err := al.txnUpdateClusterIPs(after, before, dryRun); err != nil {
-		result.Revert()
 		return nil, err
 	} else {
 		result = append(result, txn)
@@ -589,12 +601,12 @@ func (al *Allocators) allocateUpdate(after After, before Before, dryRun bool) (t
 
 	// Allocate ports
 	if txn, err := al.txnUpdateNodePorts(after, before, dryRun); err != nil {
-		result.Revert()
 		return nil, err
 	} else {
 		result = append(result, txn)
 	}
 
+	success = true
 	return result, nil
 }
 
