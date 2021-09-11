@@ -116,12 +116,28 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 							"kubelet": string(data),
 						}
 
-						err = updateConfigMapFunc(f, &nodeConfigTestCase{configMap: beforeConfigMap})
-						framework.ExpectNoError(err)
-						beforeConfigMap, _ = f.ClientSet.CoreV1().ConfigMaps(source.ConfigMap.Namespace).Get(context.TODO(), source.ConfigMap.Name, metav1.GetOptions{})
+						source = &v1.NodeConfigSource{ConfigMap: &v1.ConfigMapNodeConfigSource{
+							Namespace:        beforeConfigMap.Namespace,
+							Name:             beforeConfigMap.Name,
+							KubeletConfigKey: "kubelet",
+						}}
+
+						(&nodeConfigTestCase{
+							desc:         "enable ShowHiddenMetricsForVersion in release 1.22",
+							configSource: source,
+						}).run(f, setConfigSourceFunc, false, 0)
 					}
 				}
+
 			}
+
+			framework.Logf("Step1")
+			tempNode, _ := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+			tempKC, _ := getCurrentKubeletConfig()
+			framework.Logf("beforeNode: %+v", tempNode)
+			framework.Logf("beforeConfigMap: %+v", beforeConfigMap)
+			framework.Logf("beforeKC: %+v", beforeKC)
+			framework.Logf("localKC: %+v", tempKC)
 
 			// reset the node's assigned/active/last-known-good config by setting the source to nil,
 			// so each test starts from a clean-slate
@@ -135,10 +151,12 @@ var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletCo
 				framework.ExpectNoError(err)
 				localKC = kc
 			}
-			framework.Logf("beforeNode: %+v", beforeNode)
-			framework.Logf("beforeConfigMap: %+v", beforeConfigMap)
-			framework.Logf("beforeKC: %+v", beforeKC)
-			framework.Logf("localKC: %+v", localKC)
+
+			framework.Logf("Step2")
+			tempNode, _ = f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+			tempKC, _ = getCurrentKubeletConfig()
+			framework.Logf("beforeNode: %+v", tempNode)
+			framework.Logf("localKC: %+v", tempKC)
 		})
 
 		ginkgo.AfterEach(func() {
