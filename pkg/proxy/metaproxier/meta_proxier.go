@@ -94,7 +94,7 @@ func (proxier *metaProxier) OnServiceSynced() {
 func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.V(4).Infof("failed to add endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
+		klog.V(4).InfoS("failed to add endpoints", "namespace", endpoints.ObjectMeta.Namespace, "name", endpoints.ObjectMeta.Name, "error", err)
 		return
 	}
 	if *ipFamily == v1.IPv4Protocol {
@@ -109,7 +109,7 @@ func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.V(4).Infof("failed to update endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
+		klog.V(4).InfoS("failed to update endpoints", "namespace", endpoints.ObjectMeta.Namespace, "name", endpoints.ObjectMeta.Name, "error", err)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoi
 func (proxier *metaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.V(4).Infof("failed to delete endpoints %s/%s with error %v", endpoints.ObjectMeta.Namespace, endpoints.ObjectMeta.Name, err)
+		klog.V(4).InfoS("failed to delete endpoints", "namespace", endpoints.ObjectMeta.Namespace, "name", endpoints.ObjectMeta.Name, "error", err)
 		return
 	}
 
@@ -152,7 +152,7 @@ func (proxier *metaProxier) OnEndpointSliceAdd(endpointSlice *discovery.Endpoint
 	case discovery.AddressTypeIPv6:
 		proxier.ipv6Proxier.OnEndpointSliceAdd(endpointSlice)
 	default:
-		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+		klog.V(4).InfoS("EndpointSlice address type not supported", "kube-proxy", endpointSlice.AddressType)
 	}
 }
 
@@ -165,7 +165,7 @@ func (proxier *metaProxier) OnEndpointSliceUpdate(oldEndpointSlice, newEndpointS
 	case discovery.AddressTypeIPv6:
 		proxier.ipv6Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
 	default:
-		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", newEndpointSlice.AddressType)
+		klog.V(4).InfoS("EndpointSlice address type not supported", "kube-proxy", newEndpointSlice.AddressType)
 	}
 }
 
@@ -178,7 +178,7 @@ func (proxier *metaProxier) OnEndpointSliceDelete(endpointSlice *discovery.Endpo
 	case discovery.AddressTypeIPv6:
 		proxier.ipv6Proxier.OnEndpointSliceDelete(endpointSlice)
 	default:
-		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+		klog.V(4).InfoS("EndpointSlice address type not supported", "kube-proxy", endpointSlice.AddressType)
 	}
 }
 
