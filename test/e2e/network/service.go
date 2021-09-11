@@ -1214,6 +1214,9 @@ var _ = common.SIGDescribe("Services", func() {
 				{Port: 80, Name: "http", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(9376)},
 			}
 		})
+		if err != nil && strings.Contains(err.Error(), "Use of external IPs is denied by admission control") {
+			e2eskipper.Skipf("Admission controller to deny services with external IPs is enabled - skip.")
+		}
 		framework.ExpectNoError(err)
 		err = jig.CreateServicePods(2)
 		framework.ExpectNoError(err)
