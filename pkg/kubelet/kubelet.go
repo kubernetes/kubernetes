@@ -1428,7 +1428,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	if err := kl.initializeModules(); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
-		klog.ErrorS(err, "failed to intialize internal modules")
+		klog.ErrorS(err, "failed to initialize internal modules")
 		os.Exit(1)
 	}
 
