@@ -98,7 +98,7 @@ func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protoc
 			klog.ErrorS(err, "Couldn't find an endpoint for service", "service", service)
 			return nil, err
 		}
-		klog.V(3).InfoS("Mapped service to endpoint", "serivce", service, "endpoint", endpoint)
+		klog.V(3).InfoS("Mapped service to endpoint", "service", service, "endpoint", endpoint)
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
 		outConn, err := net.DialTimeout(protocol, endpoint, dialTimeout)
