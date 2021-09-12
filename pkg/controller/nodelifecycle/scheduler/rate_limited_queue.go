@@ -285,9 +285,7 @@ func (q *RateLimitedTimedQueue) Clear() {
 func (q *RateLimitedTimedQueue) SwapLimiter(newQPS float32) {
 	q.limiterLock.Lock()
 	defer q.limiterLock.Unlock()
-	if q.limiter.QPS() == newQPS {
-		return
-	}
+
 	var newLimiter flowcontrol.RateLimiter
 	if newQPS <= 0 {
 		newLimiter = flowcontrol.NewFakeNeverRateLimiter()
