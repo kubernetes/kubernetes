@@ -176,12 +176,12 @@ func GetLocalAddrSet() netutils.IPSet {
 func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).InfoS("Skipping service in namespace due to cluster IP", "service", service.Name, "namespace", service.Namespace, "clusterIP", service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service due to cluster IP", "service", klog.KObj(service), "namespace", service.Namespace, "clusterIP", service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).InfoS("Skipping service in namespace due to Type=ExternalName", "service", service.Name, "namespace", service.Namespace)
+		klog.V(3).InfoS("Skipping service in namespace due to Type=ExternalName", "service", klog.KObj(service), "namespace", service.Namespace)
 		return true
 	}
 	return false
@@ -254,7 +254,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 // LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
 func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
 	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	klog.ErrorS(nil, "Service", "errorMessage", errMsg, "name", svcName, "namespace", svcNamespace)
+	klog.ErrorS(nil, "Incorrect IP version", "service", klog.KRef(svcName, svcNamespace), "field", fieldName, "value", fieldValue)
 	if recorder != nil {
 		recorder.Eventf(
 			&v1.ObjectReference{
@@ -367,7 +367,7 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 		if err := sysctl.SetSysctl(name, newVal); err != nil {
 			return fmt.Errorf("can't set sysctl %s to %d: %v", name, newVal, err)
 		}
-		klog.V(1).InfoS("Changed sysctl", "name", name, "oldValue", oldVal, "newValue", newVal)
+		klog.V(1).InfoS("Changed sysctl", "name", name, "before", oldVal, "after", newVal)
 	}
 	return nil
 }
