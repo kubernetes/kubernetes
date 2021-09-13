@@ -187,6 +187,10 @@ type TestContextType struct {
 
 	// SnapshotControllerHTTPPort the port used for communicating with the snapshot controller HTTP endpoint.
 	SnapshotControllerHTTPPort int
+
+	// RequireDevices makes mandatory on the environment on which tests are run 1+ devices exposed through device plugins.
+	// With this enabled The e2e tests requiring devices for their operation can assume that if devices aren't reported, the test can fail
+	RequireDevices bool
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
