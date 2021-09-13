@@ -166,7 +166,7 @@ func standardEndpointInfo(ep *BaseEndpointInfo) Endpoint {
 func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.EndpointSlice, remove bool) bool {
 	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
 	if err != nil {
-		klog.ErrorS(err, "Error getting endpoint slice cache keys",)
+		klog.ErrorS(err, "Error getting endpoint slice cache keys")
 		return false
 	}
 
