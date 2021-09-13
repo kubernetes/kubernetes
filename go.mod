@@ -346,7 +346,7 @@ replace (
 	github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.4.1
 	github.com/moby/term => github.com/moby/term v0.0.0-20210610120745-9d4ed1856297
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
-	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
+	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.2
 	github.com/mohae/deepcopy => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/monochromegane/go-gitignore => github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00
 	github.com/morikuni/aec => github.com/morikuni/aec v1.0.0
