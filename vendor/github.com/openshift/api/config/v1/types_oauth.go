@@ -66,6 +66,8 @@ type TokenConfig struct {
 	// per client, then that value takes precedence. If the timeout value is
 	// not specified and the client does not override the value, then tokens
 	// are valid until their lifetime.
+	//
+	// WARNING: existing tokens' timeout will not be affected (lowered) by changing this value
 	// +optional
 	AccessTokenInactivityTimeout *metav1.Duration `json:"accessTokenInactivityTimeout,omitempty"`
 }
