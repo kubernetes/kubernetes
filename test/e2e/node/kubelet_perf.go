@@ -115,7 +115,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	cpuSummary := rm.GetCPUSummary()
 	framework.Logf("%s", rm.FormatCPUSummary(cpuSummary))
 	// Log perf result
-	printPerfData(e2eperf.CPUUsageToPerfData(rm.GetControlPlaneCPUSummary(cpuSummary)))
+	printPerfData(e2eperf.CPUUsageToPerfData(rm.GetMasterCPUSummary(cpuSummary)))
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	ginkgo.By("Deleting the RC")
