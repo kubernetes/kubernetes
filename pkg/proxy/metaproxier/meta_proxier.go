@@ -94,7 +94,7 @@ func (proxier *metaProxier) OnServiceSynced() {
 func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.ErrorS(err, "failed to add endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta), "error", err)
+		klog.ErrorS(err, "failed to add endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta))
 		return
 	}
 	if *ipFamily == v1.IPv4Protocol {
@@ -109,7 +109,7 @@ func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.ErrorS(err, "failed to update endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta), "error", err)
+		klog.ErrorS(err, "failed to update endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta))
 		return
 	}
 
@@ -125,7 +125,7 @@ func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoi
 func (proxier *metaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	ipFamily, err := endpointsIPFamily(endpoints)
 	if err != nil {
-		klog.ErrorS(err, "failed to delete endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta), "error", err)
+		klog.ErrorS(err, "failed to delete endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta))
 		return
 	}
 
