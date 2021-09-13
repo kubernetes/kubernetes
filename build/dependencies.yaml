@@ -134,7 +134,7 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: buster-v1.6.6
+    version: buster-v1.6.7
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=
