@@ -270,6 +270,10 @@ function download-or-bust {
   done
 }
 
+function record-preload-info {
+  echo "$1,$2" >> "${KUBE_HOME}/preload_info"
+}
+
 function is-preloaded {
   local -r key=$1
   local -r value=$2
@@ -306,6 +310,8 @@ function install-gci-mounter-tools {
   tar xf /tmp/mounter.tar -C "${CONTAINERIZED_MOUNTER_HOME}/rootfs"
   rm /tmp/mounter.tar
   mkdir -p "${CONTAINERIZED_MOUNTER_HOME}/rootfs/var/lib/kubelet"
+
+  record-preload-info "mounter" "${mounter_tar_sha}"
 }
 
 # Install node problem detector binary.
@@ -341,6 +347,8 @@ function install-node-problem-detector {
   chmod a+x "${KUBE_BIN}/node-problem-detector"
   rmdir "${npd_dir}/bin"
   rm -f "${KUBE_HOME}/${npd_tar}"
+
+  record-preload-info "${npd_tar}" "${npd_hash}"
 }
 
 function install-cni-binaries {
@@ -367,6 +375,8 @@ function install-cni-binaries {
   mv "${cni_dir}/bin"/* "${KUBE_BIN}"
   rmdir "${cni_dir}/bin"
   rm -f "${KUBE_HOME}/${cni_tar}"
+
+  record-preload-info "${cni_tar}" "${cni_hash}"
 }
 
 # Install crictl binary.
@@ -396,6 +406,8 @@ EOF
   download-or-bust "${crictl_hash}" "${crictl_path}/${crictl}"
   tar xf "${crictl}"
   mv crictl "${KUBE_BIN}/crictl"
+
+  record-preload-info "${crictl}" "${crictl_hash}"
 }
 
 function install-exec-auth-plugin {
@@ -422,6 +434,8 @@ function install-exec-auth-plugin {
   echo "Downloading gke-exec-auth-plugin license"
   download-or-bust "" "${license_url}"
   mv "${KUBE_HOME}/LICENSES/LICENSE" "${KUBE_BIN}/gke-exec-auth-plugin-license"
+
+  record-preload-info "gke-exec-auth-plugin" "${plugin_hash}"
 }
 
 function install-kube-manifests {
@@ -469,6 +483,8 @@ function install-kube-manifests {
 
   rm -f "${KUBE_HOME}/${manifests_tar}"
   rm -f "${KUBE_HOME}/${manifests_tar}.sha512"
+
+  record-preload-info "${manifests_tar}" "${manifests_tar_hash}"
 }
 
 # Installs hurl to ${KUBE_HOME}/bin/hurl if not already installed.
@@ -781,6 +797,8 @@ function install-kube-binary-config {
     rm -rf "${KUBE_HOME}"/LICENSES
     mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
     mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
+
+    record-preload-info "${server_binary_tar}" "${server_binary_tar_hash}"
   fi
 
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
