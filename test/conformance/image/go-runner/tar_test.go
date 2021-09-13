@@ -27,8 +27,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/pkg/errors"
 )
 
 func TestTar(t *testing.T) {
@@ -123,7 +121,7 @@ func readAllTar(tarPath string) (map[string]string, error) {
 
 	gzStream, err := gzip.NewReader(fileReader)
 	if err != nil {
-		return nil, errors.Wrap(err, "couldn't uncompress reader")
+		return nil, fmt.Errorf("couldn't uncompress reader: %w", err)
 	}
 	defer gzStream.Close()
 

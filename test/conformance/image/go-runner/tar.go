@@ -19,12 +19,11 @@ package main
 import (
 	"archive/tar"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // tarDir takes a source and variable writers and walks 'source' writing each file
@@ -32,12 +31,12 @@ import (
 func tarDir(dir, outpath string) error {
 	// ensure the src actually exists before trying to tar it
 	if _, err := os.Stat(dir); err != nil {
-		return errors.Wrapf(err, "tar unable to stat directory %v", dir)
+		return fmt.Errorf("tar unable to stat directory %v: %w", dir, err)
 	}
 
 	outfile, err := os.Create(outpath)
 	if err != nil {
-		return errors.Wrapf(err, "creating tarball %v", outpath)
+		return fmt.Errorf("creating tarball %v: %w", outpath, err)
 	}
 	defer outfile.Close()
 
@@ -61,23 +60,27 @@ func tarDir(dir, outpath string) error {
 		// Create a new dir/file header.
 		header, err := tar.FileInfoHeader(fi, fi.Name())
 		if err != nil {
-			return errors.Wrapf(err, "creating file info header %v", fi.Name())
+			return fmt.Errorf("creating file info header %v: %w", fi.Name(), err)
 		}
 
 		// Update the name to correctly reflect the desired destination when untaring.
 		header.Name = strings.TrimPrefix(strings.Replace(file, dir, "", -1), string(filepath.Separator))
 		if err := tw.WriteHeader(header); err != nil {
-			return errors.Wrapf(err, "writing header for tarball %v", header.Name)
+			return fmt.Errorf("writing header for tarball %v: %w", header.Name, err)
 		}
 
 		// Open files, copy into tarfile, and close.
 		f, err := os.Open(file)
 		if err != nil {
-			return errors.Wrapf(err, "opening file %v for writing into tarball", file)
+			return fmt.Errorf("opening file %v for writing into tarball: %w", file, err)
 		}
 		defer f.Close()
 
 		_, err = io.Copy(tw, f)
-		return errors.Wrapf(err, "creating file %v contents into tarball", file)
+		if err != nil {
+			return fmt.Errorf("creating file %v contents into tarball: %w", file, err)
+		}
+
+		return nil
 	})
 }

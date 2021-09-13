@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -24,8 +25,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -62,7 +61,7 @@ func configureAndRunWithEnv(env Getenver) error {
 	logFilePath := filepath.Join(resultsDir, logFileName)
 	logFile, err := os.Create(logFilePath)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create log file %v", logFilePath)
+		return fmt.Errorf("failed to create log file %v: %w", logFilePath, err)
 	}
 	mw := io.MultiWriter(os.Stdout, logFile)
 	cmd := getCmd(env, mw)
@@ -70,12 +69,18 @@ func configureAndRunWithEnv(env Getenver) error {
 	log.Printf("Running command:\n%v\n", cmdInfo(cmd))
 	err = cmd.Start()
 	if err != nil {
-		return errors.Wrap(err, "starting command")
+		return fmt.Errorf("starting command: %w", err)
 	}
 
 	// Handle signals and shutdown process gracefully.
 	go setupSigHandler(cmd.Process.Pid)
-	return errors.Wrap(cmd.Wait(), "running command")
+
+	err = cmd.Wait()
+	if err != nil {
+		return fmt.Errorf("running command: %w", err)
+	}
+
+	return nil
 }
 
 // setupSigHandler will kill the process identified by the given PID if it
@@ -107,7 +112,7 @@ func saveResults(resultsDir string) error {
 
 	err := tarDir(resultsDir, filepath.Join(resultsDir, resultsTarballName))
 	if err != nil {
-		return errors.Wrapf(err, "tar directory %v", resultsDir)
+		return fmt.Errorf("tar directory %v: %w", resultsDir, err)
 	}
 
 	doneFile := filepath.Join(resultsDir, doneFileName)
@@ -115,11 +120,13 @@ func saveResults(resultsDir string) error {
 	resultsTarball := filepath.Join(resultsDir, resultsTarballName)
 	resultsTarball, err = filepath.Abs(resultsTarball)
 	if err != nil {
-		return errors.Wrapf(err, "failed to find absolute path for %v", resultsTarball)
+		return fmt.Errorf("failed to find absolute path for %v: %w", resultsTarball, err)
 	}
 
-	return errors.Wrap(
-		ioutil.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0777)),
-		"writing donefile",
-	)
+	err = ioutil.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0777))
+	if err != nil {
+		return fmt.Errorf("writing donefile: %w", err)
+	}
+
+	return nil
 }
