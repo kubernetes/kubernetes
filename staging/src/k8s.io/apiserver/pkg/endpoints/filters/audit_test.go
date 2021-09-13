@@ -101,10 +101,15 @@ func TestConstructResponseWriter(t *testing.T) {
 	}
 
 	actual = decorateResponseWriter(context.Background(), &fancyResponseWriter{}, nil, nil, nil)
-	switch v := actual.(type) {
-	case *fancyResponseWriterDelegator:
-	default:
-		t.Errorf("Expected fancyResponseWriterDelegator, got %v", reflect.TypeOf(v))
+	//lint:ignore SA1019 above this line's pay grade
+	if _, ok := actual.(http.CloseNotifier); !ok {
+		t.Errorf("Expected an http.CloseNotifier, got %v", reflect.TypeOf(actual))
+	}
+	if _, ok := actual.(http.Flusher); !ok {
+		t.Errorf("Expected an http.Flusher, got %v", reflect.TypeOf(actual))
+	}
+	if _, ok := actual.(http.Hijacker); !ok {
+		t.Errorf("Expected an http.Hijacker, got %v", reflect.TypeOf(actual))
 	}
 }
 
