@@ -136,7 +136,7 @@ dependencies:
       match: BASE_IMAGE_VERSION\?=
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: buster-v1.6.6
+    version: buster-v1.6.7
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=
