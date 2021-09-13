@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -173,13 +174,12 @@ var _ = SIGDescribe("MirrorPod", func() {
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
 			framework.ExpectNoError(err)
 
-			ginkgo.By("mirror pod should stay running")
-			// NOTE(ehashman): There might be some initial delay while pod is
-			// Pending before it hits error state; wait on slower environments
-			// for things to hit steady state before watching for error
+			ginkgo.By("mirror pod should restart with count 1")
 			gomega.Eventually(func() error {
-				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
+				return checkMirrorPodRunningWithRestartCount(2*time.Second, 2*time.Minute, f.ClientSet, mirrorPodName, ns, 1)
 			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
+
+			ginkgo.By("mirror pod should stay running")
 			gomega.Consistently(func() error {
 				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
 			}, time.Second*30, time.Second*4).Should(gomega.BeNil())
@@ -249,8 +249,40 @@ func checkMirrorPodRunning(cl clientset.Interface, name, namespace string) error
 	}
 	for i := range pod.Status.ContainerStatuses {
 		if pod.Status.ContainerStatuses[i].State.Running == nil {
-			return fmt.Errorf("expected the mirror pod %q with container %q to be running", name, pod.Status.ContainerStatuses[i].Name)
+			return fmt.Errorf("expected the mirror pod %q with container %q to be running (got containers=%v)", name, pod.Status.ContainerStatuses[i].Name, pod.Status.ContainerStatuses[i].State)
 		}
+	}
+	return validateMirrorPod(cl, pod)
+}
+
+func checkMirrorPodRunningWithRestartCount(interval time.Duration, timeout time.Duration, cl clientset.Interface, name, namespace string, count int32) error {
+	var pod *v1.Pod
+	var err error
+	err = wait.PollImmediate(interval, timeout, func() (bool, error) {
+		pod, err = cl.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("expected the mirror pod %q to appear: %v", name, err)
+		}
+		if pod.Status.Phase != v1.PodRunning {
+			return false, fmt.Errorf("expected the mirror pod %q to be running, got %q", name, pod.Status.Phase)
+		}
+		for i := range pod.Status.ContainerStatuses {
+			if pod.Status.ContainerStatuses[i].State.Waiting != nil {
+				// retry if pod is in waiting state
+				return false, nil
+			}
+			if pod.Status.ContainerStatuses[i].State.Running == nil {
+				return false, fmt.Errorf("expected the mirror pod %q with container %q to be running (got containers=%v)", name, pod.Status.ContainerStatuses[i].Name, pod.Status.ContainerStatuses[i].State)
+			}
+			if pod.Status.ContainerStatuses[i].RestartCount == count {
+				// found the restart count
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		return err
 	}
 	return validateMirrorPod(cl, pod)
 }
