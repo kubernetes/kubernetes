@@ -98,7 +98,7 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affi
 
 	if _, exists := lb.services[svcPort]; !exists {
 		lb.services[svcPort] = &balancerState{affinity: *newAffinityPolicy(affinityType, ttlSeconds)}
-		klog.V(4).InfoS("LoadBalancerRR service does not exist, created", "servicePortName" ,svcPort)
+		klog.V(4).InfoS("LoadBalancerRR service does not exist, created", "servicePortName", svcPort)
 	} else if affinityType != "" {
 		lb.services[svcPort].affinity.affinityType = affinityType
 	}
@@ -106,7 +106,7 @@ func (lb *LoadBalancerRR) newServiceInternal(svcPort proxy.ServicePortName, affi
 }
 
 func (lb *LoadBalancerRR) DeleteService(svcPort proxy.ServicePortName) {
-	klog.V(4).InfoS("LoadBalancerRR DeleteService", "servicePortName" ,svcPort)
+	klog.V(4).InfoS("LoadBalancerRR DeleteService", "servicePortName", svcPort)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 	delete(lb.services, svcPort)
@@ -193,7 +193,7 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 func removeSessionAffinityByEndpoint(state *balancerState, svcPort proxy.ServicePortName, endpoint string) {
 	for _, affinity := range state.affinity.affinityMap {
 		if affinity.endpoint == endpoint {
-			klog.V(4).InfoS("Removing client from affinityMap for service", "endpoint", affinity.endpoint, "servicePortName" ,svcPort)
+			klog.V(4).InfoS("Removing client from affinityMap for service", "endpoint", affinity.endpoint, "servicePortName", svcPort)
 			delete(state.affinity.affinityMap, affinity.clientIP)
 		}
 	}
@@ -214,7 +214,7 @@ func (lb *LoadBalancerRR) removeStaleAffinity(svcPort proxy.ServicePortName, new
 	}
 	for _, existingEndpoint := range state.endpoints {
 		if !newEndpointsSet.Has(existingEndpoint) {
-			klog.V(2).InfoS("Delete endpoint for service", "endpoint" ,existingEndpoint, "servicePortName" ,svcPort)
+			klog.V(2).InfoS("Delete endpoint for service", "endpoint", existingEndpoint, "servicePortName", svcPort)
 			removeSessionAffinityByEndpoint(state, svcPort, existingEndpoint)
 		}
 	}

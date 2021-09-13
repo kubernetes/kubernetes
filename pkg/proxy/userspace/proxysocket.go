@@ -260,7 +260,7 @@ func (udp *udpProxySocket) getBackendConn(activeClients *ClientCache, cliAddr ne
 			return nil, err
 		}
 		if err = svrConn.SetDeadline(time.Now().Add(timeout)); err != nil {
-			klog.ErrorS(err,"SetDeadline failed")
+			klog.ErrorS(err, "SetDeadline failed")
 			return nil, err
 		}
 		activeClients.Clients[cliAddr.String()] = svrConn
