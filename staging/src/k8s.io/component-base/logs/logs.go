@@ -31,14 +31,33 @@ const logFlushFreqFlagName = "log-flush-frequency"
 
 var logFlushFreq = pflag.Duration(logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
 
+var klogFlags flag.FlagSet
+
 func init() {
-	klog.InitFlags(flag.CommandLine)
+	// Register all klog command line flags, but with deprecated ones marked as such.
+	// https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	fs.VisitAll(func(f *flag.Flag) {
+		usage := f.Usage
+		switch f.Name {
+		case "v":
+			// unchanged
+		case "vmodule":
+			usage += " (only works for --logging-format=text)"
+		default:
+			usage += " (DEPRECATED: will be removed in Kubernetes XXX)"
+		}
+		flag.CommandLine.Var(f.Value, f.Name, usage)
+		klogFlags.Var(f.Value, f.Name, usage)
+	})
 }
 
 // AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
-// same value as the global flags.
+// same value as the global flags. This includes klog flags.
 func AddFlags(fs *pflag.FlagSet) {
 	fs.AddFlag(pflag.Lookup(logFlushFreqFlagName))
+	fs.AddGoFlagSet(&klogFlags)
 }
 
 // KlogWriter serves as a bridge between the standard log package and the glog package.
