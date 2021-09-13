@@ -205,9 +205,7 @@ type StatefulSetStatus struct {
 	Conditions []StatefulSetCondition
 
 	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
-	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
-	// Remove omitempty when graduating to beta
-	// +optional
+	// This is a beta field and requires enabling StatefulSetMinReadySeconds feature gate.
 	AvailableReplicas int32
 }
 
