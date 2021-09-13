@@ -240,7 +240,7 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 			}
 			// TODO: handle nil ports to mean "all"
 			if port.Port == nil || *port.Port == int32(0) {
-				klog.InfoS("Ignoring invalid endpoint port","portName", *port.Name)
+				klog.InfoS("Ignoring invalid endpoint port", "portName", *port.Name)
 				continue
 			}
 

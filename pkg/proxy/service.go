@@ -216,7 +216,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	if apiservice.NeedsHealthCheck(service) {
 		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
-			klog.ErrorS(nil,"Service has no healthcheck nodeport", "service", klog.KObj(service))
+			klog.ErrorS(nil, "Service has no healthcheck nodeport", "service", klog.KObj(service))
 		} else {
 			info.healthCheckNodePort = int(p)
 		}
