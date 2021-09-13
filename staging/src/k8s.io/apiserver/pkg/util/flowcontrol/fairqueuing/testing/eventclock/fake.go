@@ -55,7 +55,7 @@ func (wgc *waitGroupCounter) Add(delta int) {
 			var frame runtime.Frame
 			frame, more = frames.Next()
 			fileParts := strings.Split(frame.File, "/")
-			isMine := strings.HasSuffix(frame.File, "/fairqueuing/eventclock/testing/fake.go")
+			isMine := strings.HasSuffix(frame.File, "/fairqueuing/testing/eventclock/fake.go")
 			if isMine {
 				boundary = 2
 			}
