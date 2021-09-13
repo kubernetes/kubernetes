@@ -538,6 +538,9 @@ func startGarbageCollectorController(ctx ControllerContext) (controller.Interfac
 	discoveryClient := ctx.ClientBuilder.DiscoveryClientOrDie("generic-garbage-collector")
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
+	// Increase garbage collector controller's throughput: each object deletion takes two API calls,
+	// so to get |config.QPS| deletion rate we need to allow 2x more requests for this controller.
+	config.QPS *= 2
 	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return nil, true, err
