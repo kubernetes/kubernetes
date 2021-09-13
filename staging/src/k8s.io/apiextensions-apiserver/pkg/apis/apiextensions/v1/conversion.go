@@ -103,7 +103,7 @@ func Convert_apiextensions_CustomResourceDefinitionSpec_To_v1_CustomResourceDefi
 
 func Convert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(in *CustomResourceDefinitionSpec, out *apiextensions.CustomResourceDefinitionSpec, s conversion.Scope) error {
 	if err := autoConvert_v1_CustomResourceDefinitionSpec_To_apiextensions_CustomResourceDefinitionSpec(in, out, s); err != nil {
-		return nil
+		return err
 	}
 
 	if len(out.Versions) == 0 {
