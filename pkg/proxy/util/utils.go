@@ -176,12 +176,12 @@ func GetLocalAddrSet() netutils.IPSet {
 func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).InfoS("Skipping service due to cluster IP", "service", klog.KObj(service), "namespace", service.Namespace, "clusterIP", service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service due to cluster IP", "service", klog.KObj(service), "clusterIP", service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).InfoS("Skipping service in namespace due to Type=ExternalName", "service", klog.KObj(service), "namespace", service.Namespace)
+		klog.V(3).InfoS("Skipping service in namespace due to Type=ExternalName", "service", klog.KObj(service))
 		return true
 	}
 	return false
