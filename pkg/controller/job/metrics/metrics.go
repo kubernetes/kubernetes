@@ -63,7 +63,7 @@ var (
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,
 			Name:           "job_finished_total",
-			Help:           "The number of finished job",
+			Help:           "The number of finished jobs",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"completion_mode", "result"},
