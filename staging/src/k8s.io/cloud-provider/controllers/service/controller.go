@@ -518,16 +518,7 @@ func (s *serviceCache) delete(serviceName string) {
 
 // needsCleanup checks if load balancer needs to be cleaned up as indicated by finalizer.
 func needsCleanup(service *v1.Service) bool {
-	if !servicehelper.HasLBFinalizer(service) {
-		return false
-	}
-
-	if service.ObjectMeta.DeletionTimestamp != nil {
-		return true
-	}
-
-	// Service doesn't want loadBalancer but owns loadBalancer finalizer also need to be cleaned up.
-	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
+	if servicehelper.HasLBFinalizer(service) && service.ObjectMeta.DeletionTimestamp != nil {
 		return true
 	}
 
