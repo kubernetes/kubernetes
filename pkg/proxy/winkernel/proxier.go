@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
@@ -188,20 +187,22 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 		return false
 	}
 
-	globals, err := hcn.GetGlobals()
-	if err != nil {
-		klog.ErrorS(err, "Unable to determine networking stack version. Falling back to single-stack")
-		return false
-	}
-
-	if !kernelSupportsDualstack(globals.Version) {
-		klog.InfoS("This version of Windows does not support dual-stack. Falling back to single-stack")
+	// First tag of hcsshim that has a proper check for dual stack support is v0.8.22 due to a bug.
+	if err := hcn.IPv6DualStackSupported(); err != nil {
+		// Hcn *can* fail the query to grab the version of hcn itself (which this call will do internally before parsing
+		// to see if dual stack is supported), but the only time this can happen, at least that can be discerned, is if the host
+		// is pre-1803 and hcn didn't exist. hcsshim should truthfully return a known error if this happened that we can
+		// check against, and the case where 'err != this known error' would be the 'this feature isn't supported' case, as is being
+		// used here. For now, seeming as how nothing before ws2019 (1809) is listed as supported for k8s we can pretty much assume
+		// any error here isn't because the query failed, it's just that dualstack simply isn't supported on the host. With all
+		// that in mind, just log as info and not error to let the user know we're falling back.
+		klog.InfoS("This version of Windows does not support dual-stack. Falling back to single-stack", "err", err.Error())
 		return false
 	}
 
 	// check if network is using overlay
 	hns, _ := newHostNetworkService()
-	networkName, err = getNetworkName(networkName)
+	networkName, err := getNetworkName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
 		return false
@@ -219,19 +220,6 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	}
 
 	return true
-}
-
-// The hcsshim version logic has a bug that did not calculate the versioning of DualStack correctly.
-// DualStack is supported in WS 2004+ (10.0.19041+) where HCN component version is 11.10+
-// https://github.com/microsoft/hcsshim/pull/1003#issuecomment-827930358
-func kernelSupportsDualstack(currentVersion hcn.Version) bool {
-	hnsVersion := fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor)
-	v, err := version.ParseSemantic(hnsVersion)
-	if err != nil {
-		return false
-	}
-
-	return v.AtLeast(version.MustParseSemantic("11.10.0"))
 }
 
 func Log(v interface{}, message string, level klog.Level) {
