@@ -22,8 +22,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/component-base/config"
-	"k8s.io/component-base/logs/registry"
 	"k8s.io/component-base/config/v1alpha1"
+	"k8s.io/component-base/logs/registry"
 	"k8s.io/component-base/logs/sanitization"
 )
 
@@ -63,7 +63,7 @@ func (o *Options) Apply() {
 	if factory == nil {
 		klog.ClearLogger()
 	} else {
-		log, _ := factory.Create(o.Config.Options)
+		log, _ := factory.Create(o.Config.Options[o.Config.Format])
 		klog.SetLogger(log)
 	}
 	if o.Config.Sanitization {

@@ -90,6 +90,6 @@ type LoggingConfiguration struct {
 	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 	Sanitization bool
 	// Options holds additional parameters that are specific
-	// to the selected format.
-	Options runtime.Object
+	// to the different logging formats.
+	Options map[string]runtime.Object
 }

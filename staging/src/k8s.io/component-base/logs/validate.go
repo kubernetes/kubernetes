@@ -38,17 +38,24 @@ func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field
 			}
 		}
 	}
-	factory, err := registry.LogRegistry.Get(c.Format)
+	_, err := registry.LogRegistry.Get(c.Format)
 	if err != nil {
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
-	} else {
-		if factory == nil {
-			if c.Options != nil {
-				// TODO: dumping config is not informative
-				errs = append(errs, field.Invalid(fldPath.Child("options"), c.Options, "Default log format does not have options."))
-			}
+	}
+
+	for format, options := range c.Options {
+		factory, err := registry.LogRegistry.Get(format)
+		if err != nil {
+			errs = append(errs, field.Invalid(fldPath.Child("options"), format, "Unsupported log format"))
 		} else {
-			errs = append(errs, factory.Validate(c.Options, fldPath.Child("options"))...)
+			if factory == nil {
+				if options != nil {
+					// TODO: dumping config is not informative
+					errs = append(errs, field.Invalid(fldPath.Child("options", format), c.Options, "Log format does not have options."))
+				}
+			} else {
+				errs = append(errs, factory.Validate(options, fldPath.Child("options", format))...)
+			}
 		}
 	}
 	return errs

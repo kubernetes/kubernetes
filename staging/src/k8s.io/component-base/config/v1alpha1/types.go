@@ -92,6 +92,6 @@ type LoggingConfiguration struct {
 	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 	Sanitization bool `json:"sanitization,omitempty"`
 	// Options holds additional parameters that are specific
-	// to the selected format.
-	Options runtime.RawExtension `json:"options,omitempty"`
+	// to the different logging formats.
+	Options map[string]runtime.RawExtension `json:"options,omitempty"`
 }

@@ -26,8 +26,8 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 var (
@@ -38,7 +38,7 @@ var (
 	timeNow = time.Now
 )
 
-type Factory struct {}
+type Factory struct{}
 
 func (f Factory) Convert(in *runtime.RawExtension, out *runtime.Object, s conversion.Scope) error {
 	// No options at the moment. Simply pass them through and complain in Validate.

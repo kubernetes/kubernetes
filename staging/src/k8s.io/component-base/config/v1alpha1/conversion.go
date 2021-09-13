@@ -18,9 +18,9 @@ package v1alpha1
 
 import (
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/logs/registry"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // Important! The public back-and-forth conversion functions for the types in this generic
@@ -58,21 +58,26 @@ func Convert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(in *Lo
 	// TODO: is it possible to avoid manually copying these two fields?
 	out.Format = in.Format
 	out.Sanitization = in.Sanitization
-	if len(in.Options.Raw) == 0 || string(in.Options.Raw) == "null" {
-		out.Options = nil
-	} else {
+	out.Options = map[string]runtime.Object{}
+	for format, options := range in.Options {
+		if len(options.Raw) == 0 || string(options.Raw) == "null" {
+			continue
+		}
+
 		// Here we avoid returning an error as much as possible. Wrong log format
 		// or options for default format will be reported better during validation.
 		factory, err := registry.LogRegistry.Get(in.Format)
+		var object runtime.Object
 		if err != nil || factory == nil {
-			err = runtime.Convert_runtime_RawExtension_To_runtime_Object(&in.Options, &out.Options, s)
+			err = runtime.Convert_runtime_RawExtension_To_runtime_Object(&options, &object, s)
 		} else {
 			// let factory convert to internal type
-			err = factory.Convert(&in.Options, &out.Options, s)
+			err = factory.Convert(&options, &object, s)
 		}
 		if err != nil {
 			return err
 		}
+		out.Options[format] = object
 	}
 	return nil
 }
