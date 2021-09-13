@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -161,12 +160,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// we need to wrap the roundtripper in another roundtripper which will apply the front proxy headers
-	proxyRoundTripper, upgrade, err := maybeWrapForConnectionUpgrades(handlingInfo.restConfig, handlingInfo.proxyRoundTripper, req)
-	if err != nil {
-		proxyError(w, req, err.Error(), http.StatusInternalServerError)
-		return
-	}
+	proxyRoundTripper := handlingInfo.proxyRoundTripper
+	upgrade := httpstream.IsUpgradeRequest(req)
+
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), proxyRoundTripper)
 
 	// if we are upgrading, then the upgrade path tries to use this request with the TLS config we provide, but it does
@@ -178,6 +174,8 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
+	handler.InterceptRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
+	handler.RequireSameHostRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
 	handler.ServeHTTP(w, newReq)
 }
 
@@ -210,27 +208,6 @@ func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, co
 	}
 
 	return newReq, cancelFn
-}
-
-// maybeWrapForConnectionUpgrades wraps the roundtripper for upgrades.  The bool indicates if it was wrapped
-func maybeWrapForConnectionUpgrades(restConfig *restclient.Config, rt http.RoundTripper, req *http.Request) (http.RoundTripper, bool, error) {
-	if !httpstream.IsUpgradeRequest(req) {
-		return rt, false, nil
-	}
-
-	tlsConfig, err := restclient.TLSConfigFor(restConfig)
-	if err != nil {
-		return nil, true, err
-	}
-	followRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
-	requireSameHostRedirects := utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, followRedirects, requireSameHostRedirects)
-	wrappedRT, err := restclient.HTTPWrappersForConfig(restConfig, upgradeRoundTripper)
-	if err != nil {
-		return nil, true, err
-	}
-
-	return wrappedRT, true, nil
 }
 
 // responder implements rest.Responder for assisting a connector in writing objects or errors.
