@@ -301,14 +301,6 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &flags.cfg.CertificatesDir)
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
-
-	// TODO: remove these flags in a future version:
-	// https://github.com/kubernetes/kubeadm/issues/2163
-	const deprecationMessage = "This flag will be removed in a future version. Please use 'kubeadm certs generate-csr' instead."
-	options.AddCSRFlag(cmd.Flags(), &flags.csrOnly)
-	cmd.Flags().MarkDeprecated(options.CSROnly, deprecationMessage)
-	options.AddCSRDirFlag(cmd.Flags(), &flags.csrPath)
-	cmd.Flags().MarkDeprecated(options.CSRDir, deprecationMessage)
 }
 
 func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {
