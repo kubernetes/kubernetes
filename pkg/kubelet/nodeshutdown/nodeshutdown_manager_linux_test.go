@@ -39,6 +39,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 )
 
+// lock is to prevent systemDbus from being modified in the case of concurrency.
+var lock sync.Mutex
+
 type fakeDbus struct {
 	currentInhibitDelay        time.Duration
 	overrideSystemInhibitDelay time.Duration
@@ -226,6 +229,8 @@ func TestManager(t *testing.T) {
 
 			fakeShutdownChan := make(chan bool)
 			fakeDbus := &fakeDbus{currentInhibitDelay: tc.systemInhibitDelay, shutdownChan: fakeShutdownChan, overrideSystemInhibitDelay: tc.overrideSystemInhibitDelay}
+
+			lock.Lock()
 			systemDbus = func() (dbusInhibiter, error) {
 				return fakeDbus, nil
 			}
@@ -238,6 +243,8 @@ func TestManager(t *testing.T) {
 			manager.clock = clock.NewFakeClock(time.Now())
 
 			err := manager.Start()
+			lock.Unlock()
+
 			if tc.expectedError != nil {
 				if !strings.Contains(err.Error(), tc.expectedError.Error()) {
 					t.Errorf("unexpected error message. Got: %s want %s", err.Error(), tc.expectedError.Error())
@@ -341,6 +348,7 @@ func TestRestart(t *testing.T) {
 	var shutdownChanMut sync.Mutex
 	var connChan = make(chan struct{}, 1)
 
+	lock.Lock()
 	systemDbus = func() (dbusInhibiter, error) {
 		defer func() {
 			connChan <- struct{}{}
@@ -357,6 +365,8 @@ func TestRestart(t *testing.T) {
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager, _ := NewManager(fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, syncNodeStatus, shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods)
 	err := manager.Start()
+	lock.Unlock()
+
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
