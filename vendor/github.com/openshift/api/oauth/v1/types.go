@@ -8,7 +8,12 @@ import (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// OAuthAccessToken describes an OAuth access token
+// OAuthAccessToken describes an OAuth access token.
+// The name of a token must be prefixed with a `sha256~` string, must not contain "/" or "%" characters and must be at
+// least 32 characters long.
+//
+// The name of the token is constructed from the actual token by sha256-hashing it and using URL-safe unpadded
+// base64-encoding (as described in RFC4648) on the hashed result.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
 // +openshift:compatibility-gen:level=1
@@ -139,6 +144,8 @@ type OAuthClient struct {
 	// - 0: Tokens for this client never time out
 	// - X: Tokens time out if there is no activity for X seconds
 	// The current minimum allowed value for X is 300 (5 minutes)
+	//
+	// WARNING: existing tokens' timeout will not be affected (lowered) by changing this value
 	AccessTokenInactivityTimeoutSeconds *int32 `json:"accessTokenInactivityTimeoutSeconds,omitempty" protobuf:"varint,9,opt,name=accessTokenInactivityTimeoutSeconds"`
 }
 

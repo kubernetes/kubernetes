@@ -111,13 +111,14 @@ var FeatureSets = map[FeatureSet]*FeatureGateEnabledDisabled{
 		Disabled: []string{},
 	},
 	TechPreviewNoUpgrade: newDefaultFeatures().
-		with("CSIDriverAzureDisk").    // sig-storage, jsafrane, OCP specific
-		with("CSIDriverVSphere").      // sig-storage, jsafrane, OCP specific
-		with("CSIMigrationAWS").       // sig-storage, jsafrane, Kubernetes feature gate
-		with("CSIMigrationOpenStack"). // sig-storage, jsafrane, Kubernetes feature gate
-		with("CSIMigrationGCE").       // sig-storage, fbertina, Kubernetes feature gate
-		with("CSIMigrationAzureDisk"). // sig-storage, fbertina, Kubernetes feature gate
-		with("ExternalCloudProvider"). // sig-cloud-provider, jspeed, OCP specific
+		with("CSIDriverAzureDisk").         // sig-storage, jsafrane, OCP specific
+		with("CSIDriverVSphere").           // sig-storage, jsafrane, OCP specific
+		with("CSIMigrationAWS").            // sig-storage, jsafrane, Kubernetes feature gate
+		with("CSIMigrationOpenStack").      // sig-storage, jsafrane, Kubernetes feature gate
+		with("CSIMigrationGCE").            // sig-storage, fbertina, Kubernetes feature gate
+		with("CSIMigrationAzureDisk").      // sig-storage, fbertina, Kubernetes feature gate
+		with("ExternalCloudProvider").      // sig-cloud-provider, jspeed, OCP specific
+		with("InsightsOperatorPullingSCA"). // insights-operator/ccx, tremes, OCP specific
 		toFeatures(),
 	LatencySensitive: newDefaultFeatures().
 		with(
@@ -139,6 +140,7 @@ var defaultFeatures = &FeatureGateEnabledDisabled{
 		"NodeDisruptionExclusion",        // sig-scheduling, ccoleman
 		"ServiceNodeExclusion",           // sig-scheduling, ccoleman
 		"DownwardAPIHugePages",           // sig-node, rphillips
+		"PodSecurity",                    // sig-auth, s-urbaniak
 	},
 	Disabled: []string{
 		"LegacyNodeRoleBehavior", // sig-scheduling, ccoleman

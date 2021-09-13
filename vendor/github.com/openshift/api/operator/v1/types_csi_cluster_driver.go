@@ -45,6 +45,7 @@ const (
 	AWSEBSCSIDriver          CSIDriverName = "ebs.csi.aws.com"
 	AWSEFSCSIDriver          CSIDriverName = "efs.csi.aws.com"
 	AzureDiskCSIDriver       CSIDriverName = "disk.csi.azure.com"
+	AzureFileCSIDriver       CSIDriverName = "file.csi.azure.com"
 	GCPPDCSIDriver           CSIDriverName = "pd.csi.storage.gke.io"
 	CinderCSIDriver          CSIDriverName = "cinder.csi.openstack.org"
 	VSphereCSIDriver         CSIDriverName = "csi.vsphere.vmware.com"
