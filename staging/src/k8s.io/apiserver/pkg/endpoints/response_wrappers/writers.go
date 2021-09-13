@@ -22,68 +22,68 @@ import (
 	"net/http"
 )
 
-// Wrap wraps the given middle ResponseWriter to make it also
-// implement http.CloseNotifier and http.Flusher and http.Hijacker if
-// the given inner ResponseWriter implements all three, implement
-// http.CloseNotifier and http.Flusher if inner implements those two,
-// otherwise add nothing.
+// Wrap037 wraps the given middle ResponseWriter to make it also
+// implement some extension interfaces depending on which
+// of those are also implemented by the given inner ResponseWriter.
+// Of the 8 possible cases, this func recognizes the following three.
+// -- Implement http.CloseNotifier, http.Flusher, and http.Hijacker if inner does.
+// -- Implement http.CloseNotifier and http.Flusher if inner does.
+// -- Otherwise add nothing.
 // The behavior added to middle is centered on delegating to inner
 // and may be augmented by the optional functional parameters here.
-// - beforeCloseNotify, if not nil, is called before inner.CloseNotify and
-//   if it returns a non-nil value that is returned instead of calling on inner.
-// - afterCloseNofity, if not nil, is given the channel returned by inner and
-//   returns the channel for the wrapper to return.
-// - beforeFlush, if not nil, is called before inner.Flush.
-// - afterFlush, if not nil, is called after inner.Flush.
-// - beforeHijack, if not nil, is called before inner.Hijack and if it
-//   returns an error then that is returned with nils instead of invoking inner.Hijack.
-// - afterHijack, if not nil, is called after inner.Hijack with the returned values from
-//   that and returns the values for the wrapper to return.
-func Wrap(inner http.ResponseWriter,
+// - closeNotify, if not nil, is used in place of inner.CloseNotify
+//   and is given that func as a parameter.
+// - flush, if not nil, is used in place of inner.Flush
+//   and is given that func as a parameter.
+// - hijack, if not nil, is used in place of inner.Hijack
+//   and is given that func as a parameter.
+func Wrap037(inner http.ResponseWriter,
 	middle http.ResponseWriter,
-	beforeCloseNotify func() <-chan bool,
-	afterCloseNofity func(<-chan bool) <-chan bool,
-	beforeFlush func(),
-	afterFlush func(),
-	beforeHijack func() error,
-	afterHijack func(net.Conn, *bufio.ReadWriter, error) (net.Conn, *bufio.ReadWriter, error),
+	closeNotify func(func() <-chan bool) <-chan bool,
+	flush func(func()),
+	hijack func(func() (net.Conn, *bufio.ReadWriter, error)) (net.Conn, *bufio.ReadWriter, error),
 ) http.ResponseWriter {
-	//lint:ignore SA1019 above this line's pay grade
-	if _, cn := inner.(http.CloseNotifier); !cn {
+	wrap03 := Wrap03(inner, middle, closeNotify, flush)
+	return Wrap03To037(inner, wrap03, hijack)
+}
+
+// Wrap03 wraps the given middle ResponseWriter to make it also
+// implement some extension interfaces depending on which
+// of those are also implemented by the given inner ResponseWriter.
+// Of the 4 possible cases, this func recognizes the following two.
+// -- Implement http.CloseNotifier and http.Flusher if inner does.
+// -- Otherwise add nothing.
+// The behavior added to middle is centered on delegating to inner
+// and may be augmented by the optional functional parameters here.
+// - closeNotify, if not nil, is used in place of inner.CloseNotify
+//   and is given that func as a parameter.
+// - flush, if not nil, is used in place of inner.Flush
+//   and is given that func as a parameter.
+func Wrap03(inner http.ResponseWriter,
+	middle http.ResponseWriter,
+	closeNotify func(func() <-chan bool) <-chan bool,
+	flush func(func()),
+) http.ResponseWriter {
+	narrowed, ok := inner.(closeNotifierAndFlusher)
+	if !ok {
 		return middle
 	}
-	if _, fl := inner.(http.Flusher); !fl {
-		return middle
+	return &withCloseNotifyAndFlush{
+		ResponseWriter: middle,
+		inner:          narrowed,
+		closeNotify:    closeNotify,
+		flush:          flush,
 	}
-	wrap1 := withCloseNotifyAndFlush{
-		ResponseWriter:    middle,
-		inner:             inner.(ResponseWriterAndCloseNotifierAndFlusher),
-		beforeCloseNotify: beforeCloseNotify,
-		afterCloseNofity:  afterCloseNofity,
-		beforeFlush:       beforeFlush,
-		afterFlush:        afterFlush,
-	}
-	if _, hj := inner.(http.Hijacker); hj {
-		return &withCloseNotifyAndFlushAndHijack{
-			withCloseNotifyAndFlush: wrap1,
-			beforeHijack:            beforeHijack,
-			afterHijack:             afterHijack,
-		}
-	}
-	return &wrap1
 }
 
 type withCloseNotifyAndFlush struct {
 	http.ResponseWriter
-	inner             ResponseWriterAndCloseNotifierAndFlusher
-	beforeCloseNotify func() <-chan bool
-	afterCloseNofity  func(<-chan bool) <-chan bool
-	beforeFlush       func()
-	afterFlush        func()
+	inner       closeNotifierAndFlusher
+	closeNotify func(func() <-chan bool) <-chan bool
+	flush       func(func())
 }
 
-type ResponseWriterAndCloseNotifierAndFlusher interface {
-	http.ResponseWriter
+type closeNotifierAndFlusher interface {
 	//lint:ignore SA1019 above this line's pay grade
 	http.CloseNotifier
 	http.Flusher
@@ -94,50 +94,69 @@ var _ http.CloseNotifier = &withCloseNotifyAndFlush{}
 var _ http.Flusher = &withCloseNotifyAndFlush{}
 
 func (wr *withCloseNotifyAndFlush) CloseNotify() <-chan bool {
-	if wr.beforeCloseNotify != nil {
-		ans := wr.beforeCloseNotify()
-		if ans != nil {
-			return ans
-		}
+	if wr.closeNotify != nil {
+		return wr.closeNotify(wr.inner.CloseNotify)
 	}
-	ans := wr.inner.CloseNotify()
-	if wr.afterCloseNofity != nil {
-		return wr.afterCloseNofity(ans)
-	}
-	return ans
+	return wr.inner.CloseNotify()
 }
 
 func (wr *withCloseNotifyAndFlush) Flush() {
-	if wr.beforeFlush != nil {
-		wr.beforeFlush()
-	}
-	wr.inner.Flush()
-	if wr.afterFlush != nil {
-		wr.afterFlush()
+	if wr.flush != nil {
+		wr.flush(wr.inner.Flush)
+	} else {
+		wr.inner.Flush()
+
 	}
 }
 
-type withCloseNotifyAndFlushAndHijack struct {
-	withCloseNotifyAndFlush
-	beforeHijack func() error
-	afterHijack  func(net.Conn, *bufio.ReadWriter, error) (net.Conn, *bufio.ReadWriter, error)
+// Wrap03To037 wraps the given middle ResponseWriter to make it also
+// implement some extension interfaces depending on which
+// of those are also implemented by the given middle and inner ResponseWriters.
+// Of the possible cases, this func recognizes the following two.
+// -- Add http.Hijacker if inner implements it and middle implements
+//    http.CloseNotifier and http.Flusher.
+// -- Otherwise add nothing.
+// The behavior added to middle is centered on delegating to inner
+// and may be augmented by the optional functional parameters here.
+// - hijack, if not nil, is used in place of inner.Hijack
+//   and is given that func as a parameter.
+func Wrap03To037(inner http.ResponseWriter,
+	middle http.ResponseWriter,
+	hijack func(func() (net.Conn, *bufio.ReadWriter, error)) (net.Conn, *bufio.ReadWriter, error),
+) http.ResponseWriter {
+	middleNarrowed, ok := middle.(responseWriterAndCloseNotifierAndFlusher)
+	if !ok {
+		return middle
+	}
+	if innerNarrowed, hj := inner.(http.Hijacker); hj {
+		return &closeNotifierAndFlusherWithHijack{
+			responseWriterAndCloseNotifierAndFlusher: middleNarrowed,
+			inner:                                    innerNarrowed,
+			hijack:                                   hijack,
+		}
+	}
+	return middle
+}
+
+type closeNotifierAndFlusherWithHijack struct {
+	responseWriterAndCloseNotifierAndFlusher
+	inner  http.Hijacker
+	hijack func(func() (net.Conn, *bufio.ReadWriter, error)) (net.Conn, *bufio.ReadWriter, error)
+}
+
+type responseWriterAndCloseNotifierAndFlusher interface {
+	http.ResponseWriter
+	closeNotifierAndFlusher
 }
 
 //lint:ignore SA1019 above this line's pay grade
-var _ http.CloseNotifier = &withCloseNotifyAndFlushAndHijack{}
-var _ http.Flusher = &withCloseNotifyAndFlushAndHijack{}
-var _ http.Hijacker = &withCloseNotifyAndFlushAndHijack{}
+var _ http.CloseNotifier = &closeNotifierAndFlusherWithHijack{}
+var _ http.Flusher = &closeNotifierAndFlusherWithHijack{}
+var _ http.Hijacker = &closeNotifierAndFlusherWithHijack{}
 
-func (wr *withCloseNotifyAndFlushAndHijack) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if wr.beforeHijack != nil {
-		err := wr.beforeHijack()
-		if err != nil {
-			return nil, nil, err
-		}
+func (wr *closeNotifierAndFlusherWithHijack) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if wr.hijack != nil {
+		return wr.hijack(wr.inner.Hijack)
 	}
-	conn, rw, err := wr.inner.(http.Hijacker).Hijack()
-	if wr.afterHijack != nil {
-		return wr.afterHijack(conn, rw, err)
-	}
-	return conn, rw, err
+	return wr.inner.Hijack()
 }

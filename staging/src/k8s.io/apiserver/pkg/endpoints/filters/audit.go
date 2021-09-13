@@ -17,9 +17,11 @@ limitations under the License.
 package filters
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -169,12 +171,14 @@ func decorateResponseWriter(ctx context.Context, responseWriter http.ResponseWri
 		omitStages:     omitStages,
 	}
 
-	return response_wrappers.Wrap(responseWriter,
+	return response_wrappers.Wrap037(responseWriter,
 		delegate,
 		nil, nil,
-		nil, nil,
-		func() error { delegate.processCode(http.StatusSwitchingProtocols); return nil },
-		nil)
+		func(innerHijack func() (net.Conn, *bufio.ReadWriter, error)) (net.Conn, *bufio.ReadWriter, error) {
+			delegate.processCode(http.StatusSwitchingProtocols)
+			return innerHijack()
+		},
+	)
 }
 
 var _ http.ResponseWriter = &auditResponseWriter{}
