@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,7 +49,8 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if err != nil {
 			return err
 		}
-		_, err = w.Write(data)
+		stringLiteral := strconv.QuoteToASCII(string(data))
+		_, err = w.Write([]byte(stringLiteral))
 		if err != nil {
 			return err
 		}
