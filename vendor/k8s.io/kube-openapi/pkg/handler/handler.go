@@ -36,8 +36,6 @@ import (
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -57,16 +55,14 @@ type OpenAPIService struct {
 
 	lastModified time.Time
 
-	specBytes []byte
-	specPb    []byte
-	specPbGz  []byte
+	openapiSpec *spec.Swagger
+	specBytes   []byte
+	specPb      []byte
+	specPbGz    []byte
 
 	specBytesETag string
 	specPbETag    string
 	specPbGzETag  string
-
-	cacheDirty  bool
-	specFetcher specFetcherFunc
 }
 
 func init() {
@@ -79,71 +75,61 @@ func computeETag(data []byte) string {
 	return fmt.Sprintf("\"%X\"", sha512.Sum512(data))
 }
 
-type specFetcherFunc func() (spec *spec.Swagger, err error)
-
 // NewOpenAPIService builds an OpenAPIService starting with the given spec.
-func NewOpenAPIService(spec *spec.Swagger, fetcher specFetcherFunc) (*OpenAPIService, error) {
+func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
 	o := &OpenAPIService{}
 	// TODO(DangerOnTheRanger): is it safe to remove this UpdateSpec call?
 	if err := o.UpdateSpec(spec); err != nil {
 		return nil, err
 	}
-	o.cacheDirty = true
 	return o, nil
 }
 
-func (o *OpenAPIService) MarkCacheDirty() {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
-	o.cacheDirty = true
-	klog.V(2).Infof("OpenAPI spec cache marked dirty, will update with new spec on next request")
-}
-
-func (o *OpenAPIService) CacheDirty() bool {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
-	return o.cacheDirty
-}
-
 func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time) {
-	if o.CacheDirty() {
-		spec, err := o.specFetcher()
-		if err != nil {
-			o.UpdateSpec(spec)
-		} else {
-			// TODO(DangerOnTheRanger): better error handling
-			klog.V(2).Infof("Error refreshing OpenAPI spec cache: %s", err)
-		}
-	}
 	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
+	if o.specBytes == nil {
+		o.rwMutex.RUnlock()
+		// TODO(DangerOnTheRanger): marshalSpec() can return an error - find a good way to handle it
+		o.marshalSpec()
+	} else {
+		o.rwMutex.RUnlock()
+	}
 	return o.specBytes, o.specBytesETag, o.lastModified
 }
 
 func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time) {
-	if o.CacheDirty() {
-		spec, err := o.specFetcher()
-		if err != nil {
-			o.UpdateSpec(spec)
-		} else {
-			// TODO(DangerOnTheRanger): better error handling
-			klog.V(2).Infof("Error refreshing OpenAPI spec cache: %s", err)
-		}
-	}
 	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
+	if o.specBytes == nil {
+		o.rwMutex.RUnlock()
+		o.marshalSpec()
+	} else {
+		o.rwMutex.RUnlock()
+	}
 	return o.specPb, o.specPbETag, o.lastModified
 }
 
 func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
-	// TODO(DangerOnTheRanger): add lazy aggregation here
 	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
+	if o.specBytes == nil {
+		o.rwMutex.RUnlock()
+		o.marshalSpec()
+	} else {
+		o.rwMutex.RUnlock()
+	}
 	return o.specPbGz, o.specPbGzETag, o.lastModified
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
-	specBytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(openapiSpec)
+	o.rwMutex.Lock()
+	defer o.rwMutex.Unlock()
+	o.openapiSpec = openapiSpec
+	o.specBytes = nil
+	return nil
+}
+
+func (o *OpenAPIService) marshalSpec() (err error) {
+	o.rwMutex.Lock()
+	specBytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(o.openapiSpec)
 	if err != nil {
 		return err
 	}
@@ -159,7 +145,6 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 
 	lastModified := time.Now()
 
-	o.rwMutex.Lock()
 	defer o.rwMutex.Unlock()
 
 	o.specBytes = specBytes
@@ -169,8 +154,6 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 	o.specPbETag = specPbETag
 	o.specPbGzETag = specPbGzETag
 	o.lastModified = lastModified
-
-	o.cacheDirty = false
 
 	return nil
 }
@@ -236,8 +219,8 @@ func toGzip(data []byte) []byte {
 // RegisterOpenAPIVersionedService registers a handler to provide access to provided swagger spec.
 //
 // Deprecated: use OpenAPIService.RegisterOpenAPIVersionedService instead.
-func RegisterOpenAPIVersionedService(spec *spec.Swagger, servePath string, handler common.PathHandler, fetcher specFetcherFunc) (*OpenAPIService, error) {
-	o, err := NewOpenAPIService(spec, fetcher)
+func RegisterOpenAPIVersionedService(spec *spec.Swagger, servePath string, handler common.PathHandler) (*OpenAPIService, error) {
+	o, err := NewOpenAPIService(spec)
 	if err != nil {
 		return nil, err
 	}
@@ -291,12 +274,12 @@ func (o *OpenAPIService) RegisterOpenAPIVersionedService(servePath string, handl
 
 // BuildAndRegisterOpenAPIVersionedService builds the spec and registers a handler to provide access to it.
 // Use this method if your OpenAPI spec is static. If you want to update the spec, use BuildOpenAPISpec then RegisterOpenAPIVersionedService.
-func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*restful.WebService, config *common.Config, handler common.PathHandler, fetcher specFetcherFunc) (*OpenAPIService, error) {
+func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*restful.WebService, config *common.Config, handler common.PathHandler) (*OpenAPIService, error) {
 	spec, err := builder.BuildOpenAPISpec(webServices, config)
 	if err != nil {
 		return nil, err
 	}
-	o, err := NewOpenAPIService(spec, fetcher)
+	o, err := NewOpenAPIService(spec)
 	if err != nil {
 		return nil, err
 	}
