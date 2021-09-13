@@ -203,9 +203,9 @@ func newProxyServer(
 		}
 	}
 	if dualStack {
-		klog.V(0).InfoS("kube-proxy running in dual-stack mode", "primary", iptInterface.Protocol())
+		klog.V(0).InfoS("kube-proxy running in dual-stack mode", "ipFamily", iptInterface.Protocol())
 	} else {
-		klog.V(0).InfoS("kube-proxy running in single-stack mode", "primary", iptInterface.Protocol())
+		klog.V(0).InfoS("kube-proxy running in single-stack mode", "ipFamily", iptInterface.Protocol())
 	}
 
 	if proxyMode == proxyModeIPTables {
