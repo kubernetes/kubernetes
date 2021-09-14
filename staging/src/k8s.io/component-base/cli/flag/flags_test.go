@@ -18,11 +18,12 @@ package flag
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/klog/v2"
-	"testing"
 )
 
 type FakeLogger struct {
@@ -31,16 +32,18 @@ type FakeLogger struct {
 	errorBuffer bytes.Buffer
 }
 
-func (logger *FakeLogger) Enabled() bool { return true }
-func (logger *FakeLogger) Info(msg string, keysAndValues ...interface{}) {
+func (logger *FakeLogger) Init(info logr.RuntimeInfo) {}
+func (logger *FakeLogger) Enabled(lvl int) bool       { return true }
+func (logger *FakeLogger) Info(lvl int, msg string, keysAndValues ...interface{}) {
 	logger.infoBuffer.WriteString(msg)
 }
 func (logger *FakeLogger) Error(err error, msg string, keysAndValues ...interface{}) {
 	logger.errorBuffer.WriteString(msg)
 }
-func (logger *FakeLogger) V(level int) logr.Logger                             { return logger }
-func (logger *FakeLogger) WithValues(keysAndValues ...interface{}) logr.Logger { return logger }
-func (logger *FakeLogger) WithName(name string) logr.Logger                    { return logger }
+func (logger *FakeLogger) WithValues(keysAndValues ...interface{}) logr.LogSink { return logger }
+func (logger *FakeLogger) WithName(name string) logr.LogSink                    { return logger }
+
+var _ logr.LogSink = &FakeLogger{}
 
 func TestWordSepNormalizeFunc(t *testing.T) {
 	cases := []struct {
@@ -63,7 +66,7 @@ func TestWordSepNormalizeFunc(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.flagName, func(t *testing.T) {
 			fakeLogger := &FakeLogger{}
-			klog.SetLogger(fakeLogger)
+			klog.SetLogger(logr.New(fakeLogger))
 			result := WordSepNormalizeFunc(nil, tc.flagName)
 			assert.Equal(t, pflag.NormalizedName(tc.expectedFlagName), result)
 			assert.Equal(t, "", fakeLogger.infoBuffer.String())
@@ -97,7 +100,7 @@ func TestWarnWordSepNormalizeFunc(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.flagName, func(t *testing.T) {
 			fakeLogger := &FakeLogger{}
-			klog.SetLogger(fakeLogger)
+			klog.SetLogger(logr.New(fakeLogger))
 			result := WarnWordSepNormalizeFunc(nil, tc.flagName)
 			assert.Equal(t, pflag.NormalizedName(tc.expectedFlagName), result)
 			assert.Equal(t, tc.expectedWarning, fakeLogger.infoBuffer.String())

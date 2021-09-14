@@ -53,13 +53,14 @@ import (
 )
 
 const (
-	configFile             = "config/performance-config.yaml"
-	createNodesOpcode      = "createNodes"
-	createNamespacesOpcode = "createNamespaces"
-	createPodsOpcode       = "createPods"
-	createPodSetsOpcode    = "createPodSets"
-	churnOpcode            = "churn"
-	barrierOpcode          = "barrier"
+	configFile               = "config/performance-config.yaml"
+	createNodesOpcode        = "createNodes"
+	createNamespacesOpcode   = "createNamespaces"
+	createPodsOpcode         = "createPods"
+	createPodSetsOpcode      = "createPodSets"
+	churnOpcode              = "churn"
+	barrierOpcode            = "barrier"
+	extensionPointsLabelName = "extension_point"
 
 	// Two modes supported in "churn" operator.
 
@@ -71,11 +72,13 @@ const (
 
 var (
 	defaultMetricsCollectorConfig = metricsCollectorConfig{
-		Metrics: []string{
-			"scheduler_scheduling_algorithm_predicate_evaluation_seconds",
-			"scheduler_scheduling_algorithm_priority_evaluation_seconds",
-			"scheduler_e2e_scheduling_duration_seconds",
-			"scheduler_pod_scheduling_duration_seconds",
+		Metrics: map[string]*labelValues{
+			"scheduler_framework_extension_point_duration_seconds": {
+				label:  extensionPointsLabelName,
+				values: []string{"Filter", "Score"},
+			},
+			"scheduler_e2e_scheduling_duration_seconds": nil,
+			"scheduler_pod_scheduling_duration_seconds": nil,
 		},
 	}
 )

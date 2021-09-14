@@ -696,7 +696,7 @@ func TestDifferentWidths(t *testing.T) {
 		concurrencyLimit:       6,
 		evalDuration:           time.Second * 20,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.1},
+		expectedFairnessMargin: []float64{0.16},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -735,7 +735,7 @@ func TestTooWide(t *testing.T) {
 		concurrencyLimit:       6,
 		evalDuration:           time.Second * 40,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.35},
+		expectedFairnessMargin: []float64{0.38},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -1034,7 +1034,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 }
 
 func TestSelectQueueLocked(t *testing.T) {
-	var G float64 = 60
+	var G float64 = 0.003
 	tests := []struct {
 		name                    string
 		robinIndex              int
@@ -1087,7 +1087,7 @@ func TestSelectQueueLocked(t *testing.T) {
 			robinIndexExpected:    []int{0},
 		},
 		{
-			name:             "width > 1, seats are available for request with the least finish time, queue is picked",
+			name:             "width > 1, seats are available for request with the least finish R, queue is picked",
 			concurrencyLimit: 50,
 			totSeatsInUse:    25,
 			robinIndex:       -1,
@@ -1110,7 +1110,7 @@ func TestSelectQueueLocked(t *testing.T) {
 			robinIndexExpected:    []int{1},
 		},
 		{
-			name:             "width > 1, seats are not available for request with the least finish time, queue is not picked",
+			name:             "width > 1, seats are not available for request with the least finish R, queue is not picked",
 			concurrencyLimit: 50,
 			totSeatsInUse:    26,
 			robinIndex:       -1,
@@ -1165,9 +1165,10 @@ func TestSelectQueueLocked(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			qs := &queueSet{
-				estimatedServiceTime: G,
-				robinIndex:           test.robinIndex,
-				totSeatsInUse:        test.totSeatsInUse,
+				estimatedServiceSeconds: G,
+				robinIndex:              test.robinIndex,
+				totSeatsInUse:           test.totSeatsInUse,
+				qCfg:                    fq.QueuingConfig{Name: "TestSelectQueueLocked/" + test.name},
 				dCfg: fq.DispatchingConfig{
 					ConcurrencyLimit: test.concurrencyLimit,
 				},

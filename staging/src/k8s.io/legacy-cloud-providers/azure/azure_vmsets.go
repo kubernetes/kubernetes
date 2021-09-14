@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=azure_vmsets.go  -destination=mockvmsets/azure_mock_vmsets.go -package=mockvmsets VMSet
 package azure
 
 import (
@@ -31,8 +32,7 @@ import (
 
 // VMSet defines functions all vmsets (including scale set and availability
 // set) should be implemented.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/azure_vmsets.go -package=mockvmsets VMSet > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/mockvmsets/azure_mock_vmsets.go
+
 type VMSet interface {
 	// GetInstanceIDByNodeName gets the cloud provider ID by node name.
 	// It must return ("", cloudprovider.InstanceNotFound) if the instance does

@@ -53,9 +53,9 @@ func InitCustomEphemeralTestSuite(patterns []storageframework.TestPattern) stora
 	}
 }
 
-// InitEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
-// using test suite default patterns
-func InitEphemeralTestSuite() storageframework.TestSuite {
+// GenericEphemeralTestPatterns returns the test patterns for
+// generic ephemeral inline volumes.
+func GenericEphemeralTestPatterns() []storageframework.TestPattern {
 	genericLateBinding := storageframework.DefaultFsGenericEphemeralVolume
 	genericLateBinding.Name += " (late-binding)"
 	genericLateBinding.BindingMode = storagev1.VolumeBindingWaitForFirstConsumer
@@ -64,13 +64,30 @@ func InitEphemeralTestSuite() storageframework.TestSuite {
 	genericImmediateBinding.Name += " (immediate-binding)"
 	genericImmediateBinding.BindingMode = storagev1.VolumeBindingImmediate
 
-	patterns := []storageframework.TestPattern{
-		storageframework.DefaultFsCSIEphemeralVolume,
+	return []storageframework.TestPattern{
 		genericLateBinding,
 		genericImmediateBinding,
 	}
+}
 
-	return InitCustomEphemeralTestSuite(patterns)
+// CSIEphemeralTestPatterns returns the test patterns for
+// CSI ephemeral inline volumes.
+func CSIEphemeralTestPatterns() []storageframework.TestPattern {
+	return []storageframework.TestPattern{
+		storageframework.DefaultFsCSIEphemeralVolume,
+	}
+}
+
+// AllEphemeralTestPatterns returns all pre-defined test patterns for
+// generic and CSI ephemeral inline volumes.
+func AllEphemeralTestPatterns() []storageframework.TestPattern {
+	return append(GenericEphemeralTestPatterns(), CSIEphemeralTestPatterns()...)
+}
+
+// InitEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
+// using test suite default patterns
+func InitEphemeralTestSuite() storageframework.TestSuite {
+	return InitCustomEphemeralTestSuite(AllEphemeralTestPatterns())
 }
 
 func (p *ephemeralTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {

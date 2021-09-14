@@ -809,8 +809,8 @@ func TestIsInstanceNotFoundError(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			errMsg:         "not an active Virtual Machine scale set vm",
-			expectedResult: false,
+			errMsg:         "The provided instanceId 857 is not an active Virtual Machine Scale Set VM instanceId.",
+			expectedResult: true,
 		},
 		{
 			errMsg:         `compute.VirtualMachineScaleSetVMsClient#Update: Failure sending request: StatusCode=400 -- Original Error: Code="InvalidParameter" Message="The provided instanceId 1181 is not an active Virtual Machine Scale Set VM instanceId." Target="instanceIds"`,

@@ -37,6 +37,9 @@ type Interface interface {
 	CIDR() net.IPNet
 	IPFamily() api.IPFamily
 	Has(ip net.IP) bool
+
+	// DryRun offers a way to try operations without persisting them.
+	DryRun() Interface
 }
 
 var (
@@ -46,11 +49,12 @@ var (
 )
 
 type ErrNotInRange struct {
+	IP         net.IP
 	ValidRange string
 }
 
 func (e *ErrNotInRange) Error() string {
-	return fmt.Sprintf("provided IP is not in the valid range. The range of valid IPs is %s", e.ValidRange)
+	return fmt.Sprintf("the provided IP (%v) is not in the valid range. The range of valid IPs is %s", e.IP, e.ValidRange)
 }
 
 // Range is a contiguous block of IPs that can be allocated atomically.
@@ -98,11 +102,13 @@ func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, 
 		}
 	} else {
 		family = api.IPv4Protocol
-		// Don't use the IPv4 network's broadcast address.
+		// Don't use the IPv4 network's broadcast address, but don't just
+		// Allocate() it - we don't ever want to be able to release it.
 		max--
 	}
 
-	// Don't use the network's ".0" address.
+	// Don't use the network's ".0" address, but don't just Allocate() it - we
+	// don't ever want to be able to release it.
 	base.Add(base, big.NewInt(1))
 	max--
 
@@ -114,6 +120,7 @@ func New(cidr *net.IPNet, allocatorFactory allocator.AllocatorFactory) (*Range, 
 	}
 	var err error
 	r.alloc, err = allocatorFactory(r.max, rangeSpec)
+
 	return &r, err
 }
 
@@ -162,18 +169,35 @@ func (r *Range) CIDR() net.IPNet {
 	return *r.net
 }
 
+// DryRun returns a non-persisting form of this Range.
+func (r *Range) DryRun() Interface {
+	return dryRunRange{r}
+}
+
+// For clearer code.
+const dryRunTrue = true
+const dryRunFalse = false
+
 // Allocate attempts to reserve the provided IP. ErrNotInRange or
 // ErrAllocated will be returned if the IP is not valid for this range
 // or has already been reserved.  ErrFull will be returned if there
 // are no addresses left.
 func (r *Range) Allocate(ip net.IP) error {
+	return r.allocate(ip, dryRunFalse)
+}
+
+func (r *Range) allocate(ip net.IP, dryRun bool) error {
 	label := r.CIDR()
 	ok, offset := r.contains(ip)
 	if !ok {
 		// update metrics
 		clusterIPAllocationErrors.WithLabelValues(label.String()).Inc()
-
-		return &ErrNotInRange{r.net.String()}
+		return &ErrNotInRange{ip, r.net.String()}
+	}
+	if dryRun {
+		// Don't bother to check whether the IP is actually free. It's racy and
+		// not worth the effort to plumb any further.
+		return nil
 	}
 
 	allocated, err := r.alloc.Allocate(offset)
@@ -200,7 +224,17 @@ func (r *Range) Allocate(ip net.IP) error {
 // AllocateNext reserves one of the IPs from the pool. ErrFull may
 // be returned if there are no addresses left.
 func (r *Range) AllocateNext() (net.IP, error) {
+	return r.allocateNext(dryRunFalse)
+}
+
+func (r *Range) allocateNext(dryRun bool) (net.IP, error) {
 	label := r.CIDR()
+	if dryRun {
+		// Don't bother finding a free value. It's racy and not worth the
+		// effort to plumb any further.
+		return r.CIDR().IP, nil
+	}
+
 	offset, ok, err := r.alloc.AllocateNext()
 	if err != nil {
 		// update metrics
@@ -226,8 +260,15 @@ func (r *Range) AllocateNext() (net.IP, error) {
 // unallocated IP or an IP out of the range is a no-op and
 // returns no error.
 func (r *Range) Release(ip net.IP) error {
+	return r.release(ip, dryRunFalse)
+}
+
+func (r *Range) release(ip net.IP, dryRun bool) error {
 	ok, offset := r.contains(ip)
 	if !ok {
+		return nil
+	}
+	if dryRun {
 		return nil
 	}
 
@@ -311,4 +352,41 @@ func (r *Range) contains(ip net.IP) (bool, int) {
 // base + offset = ip. It requires ip >= base.
 func calculateIPOffset(base *big.Int, ip net.IP) int {
 	return int(big.NewInt(0).Sub(netutils.BigForIP(ip), base).Int64())
+}
+
+// dryRunRange is a shim to satisfy Interface without persisting state.
+type dryRunRange struct {
+	real *Range
+}
+
+func (dry dryRunRange) Allocate(ip net.IP) error {
+	return dry.real.allocate(ip, dryRunTrue)
+}
+
+func (dry dryRunRange) AllocateNext() (net.IP, error) {
+	return dry.real.allocateNext(dryRunTrue)
+}
+
+func (dry dryRunRange) Release(ip net.IP) error {
+	return dry.real.release(ip, dryRunTrue)
+}
+
+func (dry dryRunRange) ForEach(cb func(net.IP)) {
+	dry.real.ForEach(cb)
+}
+
+func (dry dryRunRange) CIDR() net.IPNet {
+	return dry.real.CIDR()
+}
+
+func (dry dryRunRange) IPFamily() api.IPFamily {
+	return dry.real.IPFamily()
+}
+
+func (dry dryRunRange) DryRun() Interface {
+	return dry
+}
+
+func (dry dryRunRange) Has(ip net.IP) bool {
+	return dry.real.Has(ip)
 }

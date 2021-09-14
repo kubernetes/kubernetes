@@ -490,9 +490,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			if cpuAlloc < minCoreCount {
 				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable < %d", minCoreCount)
 			}
-			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount == 0 {
-				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
-			}
+
+			requireSRIOVDevices()
 
 			onlineCPUs, err := getOnlineCPUs()
 			framework.ExpectNoError(err)
@@ -532,9 +531,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		ginkgo.It("should return the expected responses with cpumanager none policy", func() {
 			// current default is "none" policy - no need to restart the kubelet
 
-			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount == 0 {
-				e2eskipper.Skipf("this test is meant to run on a system with at least one configured VF from SRIOV device")
-			}
+			requireSRIOVDevices()
 
 			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
 			defer func() {
@@ -575,9 +572,8 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			if cpuAlloc < minCoreCount {
 				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable < %d", minCoreCount)
 			}
-			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount > 0 {
-				e2eskipper.Skipf("this test is meant to run on a system with no configured VF from SRIOV device")
-			}
+
+			requireLackOfSRIOVDevices()
 
 			onlineCPUs, err := getOnlineCPUs()
 			framework.ExpectNoError(err)
@@ -606,9 +602,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		ginkgo.It("should return the expected responses with cpumanager none policy", func() {
 			// current default is "none" policy - no need to restart the kubelet
 
-			if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount > 0 {
-				e2eskipper.Skipf("this test is meant to run on a system with no configured VF from SRIOV device")
-			}
+			requireLackOfSRIOVDevices()
 
 			oldCfg := enablePodResourcesFeatureGateInKubelet(f)
 			defer func() {
@@ -650,6 +644,12 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 
 	})
 })
+
+func requireLackOfSRIOVDevices() {
+	if sriovdevCount, err := countSRIOVDevices(); err != nil || sriovdevCount > 0 {
+		e2eskipper.Skipf("this test is meant to run on a system with no configured VF from SRIOV device")
+	}
+}
 
 func getOnlineCPUs() (cpuset.CPUSet, error) {
 	onlineCPUList, err := ioutil.ReadFile("/sys/devices/system/cpu/online")

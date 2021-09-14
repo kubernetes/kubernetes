@@ -458,8 +458,8 @@ func (f *DeltaFIFO) listLocked() []interface{} {
 func (f *DeltaFIFO) ListKeys() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	list := make([]string, 0, len(f.items))
-	for key := range f.items {
+	list := make([]string, 0, len(f.queue))
+	for _, key := range f.queue {
 		list = append(list, key)
 	}
 	return list
@@ -572,7 +572,7 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 // of the Deltas associated with K.  Otherwise the pre-existing keys
 // are those listed by `f.knownObjects` and the current object of K is
 // what `f.knownObjects.GetByKey(K)` returns.
-func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
+func (f *DeltaFIFO) Replace(list []interface{}, _ string) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	keys := make(sets.String, len(list))

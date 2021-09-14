@@ -132,9 +132,11 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/conformance/image/Makefile
+      match: BASE_IMAGE_VERSION\?=
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: buster-v1.6.6
+    version: buster-v1.6.7
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=
@@ -154,7 +156,7 @@ dependencies:
       match: TAG\s*\?=
 
   - name: "k8s.gcr.io/pause: dependents"
-    version: 3.5
+    version: 3.6
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=

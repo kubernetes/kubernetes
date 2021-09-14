@@ -20,7 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/integer"
 )
 
@@ -37,7 +38,7 @@ type Backoff struct {
 	perItemBackoff  map[string]*backoffEntry
 }
 
-func NewFakeBackOff(initial, max time.Duration, tc *clock.FakeClock) *Backoff {
+func NewFakeBackOff(initial, max time.Duration, tc *testingclock.FakeClock) *Backoff {
 	return &Backoff{
 		perItemBackoff:  map[string]*backoffEntry{},
 		Clock:           tc,

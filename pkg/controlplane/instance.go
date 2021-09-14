@@ -55,7 +55,6 @@ import (
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -75,6 +74,7 @@ import (
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
+	flowcontrolv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/controlplane/controller/apiserverleasegc"
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -83,6 +83,7 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/utils/clock"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"
@@ -120,6 +121,8 @@ const (
 	KubeAPIServer = "kube-apiserver"
 	// KubeAPIServerIdentityLeaseLabelSelector selects kube-apiserver identity leases
 	KubeAPIServerIdentityLeaseLabelSelector = IdentityLeaseComponentLabelKey + "=" + KubeAPIServer
+	// repairLoopInterval defines the interval used to run the Services ClusterIP and NodePort repair loops
+	repairLoopInterval = 3 * time.Minute
 )
 
 // ExtraConfig defines extra configuration for the master
@@ -199,6 +202,10 @@ type ExtraConfig struct {
 
 	IdentityLeaseDurationSeconds      int
 	IdentityLeaseRenewIntervalSeconds int
+
+	// RepairServicesInterval interval used by the repair loops for
+	// the Services NodePort and ClusterIP resources
+	RepairServicesInterval time.Duration
 }
 
 // Config defines configuration for the master
@@ -320,6 +327,10 @@ func (c *Config) Complete() CompletedConfig {
 
 	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
 		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
+	}
+
+	if cfg.ExtraConfig.RepairServicesInterval == 0 {
+		cfg.ExtraConfig.RepairServicesInterval = repairLoopInterval
 	}
 
 	return CompletedConfig{&cfg}
@@ -654,6 +665,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		storageapiv1.SchemeGroupVersion,
 		storageapiv1beta1.SchemeGroupVersion,
 		schedulingapiv1.SchemeGroupVersion,
+		flowcontrolv1beta2.SchemeGroupVersion,
 		flowcontrolv1beta1.SchemeGroupVersion,
 	)
 	// disable alpha versions explicitly so we have a full list of what's possible to serve

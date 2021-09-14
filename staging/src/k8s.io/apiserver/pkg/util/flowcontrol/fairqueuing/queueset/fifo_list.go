@@ -45,6 +45,9 @@ type fifo interface {
 	// Dequeue pulls out the oldest request from the list.
 	Dequeue() (*request, bool)
 
+	// Peek returns the oldest request without removing it.
+	Peek() (*request, bool)
+
 	// Length returns the number of requests in the list.
 	Length() int
 
@@ -97,18 +100,28 @@ func (l *requestFIFO) Enqueue(req *request) removeFromFIFOFunc {
 }
 
 func (l *requestFIFO) Dequeue() (*request, bool) {
+	return l.getFirst(true)
+}
+
+func (l *requestFIFO) Peek() (*request, bool) {
+	return l.getFirst(false)
+}
+
+func (l *requestFIFO) getFirst(remove bool) (*request, bool) {
 	e := l.Front()
 	if e == nil {
 		return nil, false
 	}
 
-	defer func() {
-		l.Remove(e)
-		e.Value = nil
-	}()
+	if remove {
+		defer func() {
+			l.Remove(e)
+			e.Value = nil
+		}()
+	}
 
 	request, ok := e.Value.(*request)
-	if ok {
+	if remove && ok {
 		l.seatsSum -= request.Seats()
 	}
 	return request, ok

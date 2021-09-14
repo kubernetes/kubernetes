@@ -47,7 +47,9 @@ type ServiceHandler interface {
 }
 
 // EndpointsHandler is an abstract interface of objects which receive
-// notifications about endpoints object changes.
+// notifications about endpoints object changes. This is not a required
+// sub-interface of proxy.Provider, and proxy implementations should
+// not implement it unless they can't handle EndpointSlices.
 type EndpointsHandler interface {
 	// OnEndpointsAdd is called whenever creation of new endpoints object
 	// is observed.

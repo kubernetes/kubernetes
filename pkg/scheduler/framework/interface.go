@@ -131,7 +131,7 @@ func NewPodsToActivate() *PodsToActivate {
 }
 
 // Status indicates the result of running a plugin. It consists of a code, a
-// message, (optionally) an error and an plugin name it fails by.
+// message, (optionally) an error, and a plugin name it fails by.
 // When the status code is not Success, the reasons should explain why.
 // And, when code is Success, all the other fields should be empty.
 // NOTE: A nil Status is also considered as Success.

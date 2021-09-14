@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mockrouteclient/interface.go -package=mockrouteclient Interface
 package routeclient
 
 import (
@@ -32,8 +33,6 @@ const (
 )
 
 // Interface is the client interface for Route.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/routeclient/interface.go -package=mockrouteclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/routeclient/mockrouteclient/interface.go
 type Interface interface {
 	// CreateOrUpdate creates or updates a Route.
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, routeTableName string, routeName string, routeParameters network.Route, etag string) *retry.Error

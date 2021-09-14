@@ -368,7 +368,7 @@ func (f *FakeExtender) IsBinder() bool {
 	return true
 }
 
-// IsInterested returns a bool true indicating whether extender
+// IsInterested returns a bool indicating whether this extender is interested in this Pod.
 func (f *FakeExtender) IsInterested(pod *v1.Pod) bool {
 	return !f.UnInterested
 }
