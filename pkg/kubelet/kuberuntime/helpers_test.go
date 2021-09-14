@@ -51,14 +51,14 @@ func TestIsInitContainerFailed(t *testing.T) {
 				ExitCode: 1,
 			},
 			isFailed:    true,
-			description: "Init container which state is exited and exitcode is non-zero shoud return true",
+			description: "Init container which in exited state and non-zero exit code should return true",
 		},
 		{
 			status: &kubecontainer.Status{
 				State: kubecontainer.ContainerStateUnknown,
 			},
 			isFailed:    true,
-			description: "Init container which state is unknown should return true",
+			description: "Init container which in unknown state should return true",
 		},
 		{
 			status: &kubecontainer.Status{
@@ -66,7 +66,7 @@ func TestIsInitContainerFailed(t *testing.T) {
 				ExitCode: 0,
 			},
 			isFailed:    true,
-			description: "Init container which reason is OOMKilled shoud return true",
+			description: "Init container which reason is OOMKilled should return true",
 		},
 		{
 			status: &kubecontainer.Status{
@@ -74,21 +74,21 @@ func TestIsInitContainerFailed(t *testing.T) {
 				ExitCode: 0,
 			},
 			isFailed:    false,
-			description: "Init container which state is exited and exitcode is zero shoud return false",
+			description: "Init container which in exited state and zero exit code should return false",
 		},
 		{
 			status: &kubecontainer.Status{
 				State: kubecontainer.ContainerStateRunning,
 			},
 			isFailed:    false,
-			description: "Init container which state is running should return false",
+			description: "Init container which in running state should return false",
 		},
 		{
 			status: &kubecontainer.Status{
 				State: kubecontainer.ContainerStateCreated,
 			},
 			isFailed:    false,
-			description: "Init container which state is created should return false",
+			description: "Init container which in created state should return false",
 		},
 	}
 	for i, test := range tests {
