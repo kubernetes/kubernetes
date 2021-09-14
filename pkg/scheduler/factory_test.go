@@ -459,7 +459,6 @@ func newConfigFactoryWithFrameworkRegistry(
 	return &Configurator{
 		client:                   client,
 		informerFactory:          informerFactory,
-		podInformer:              informerFactory.Core().V1().Pods(),
 		disablePreemption:        disablePodPreemption,
 		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
 		podInitialBackoffSeconds: podInitialBackoffDurationSeconds,

@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -285,8 +284,7 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	c.Client = client
-	c.InformerFactory = informers.NewSharedInformerFactory(client, 0)
-	c.PodInformer = scheduler.NewPodInformer(client, 0)
+	c.InformerFactory = scheduler.NewInformerFactory(client, 0)
 	c.LeaderElection = leaderElectionConfig
 
 	return c, nil
