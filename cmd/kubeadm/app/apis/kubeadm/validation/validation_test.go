@@ -223,41 +223,31 @@ func TestValidateIPNetFromString(t *testing.T) {
 
 func TestValidatePodSubnetNodeMask(t *testing.T) {
 	var tests = []struct {
-		name           string
-		subnet         string
-		cmExtraArgs    map[string]string
-		checkDualStack bool
-		expected       bool
+		name        string
+		subnet      string
+		cmExtraArgs map[string]string
+		expected    bool
 	}{
-		{"single IPv4, but mask too small. Default node-mask", "10.0.0.16/29", nil, false, false},
-		{"single IPv4, but mask too small. Configured node-mask", "10.0.0.16/24", map[string]string{"node-cidr-mask-size": "23"}, false, false},
-		{"single IPv6, but mask too small. Default node-mask", "2001:db8::1/112", nil, false, false},
-		{"single IPv6, but mask too small. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size": "24"}, false, false},
-		{"single IPv6, but mask difference greater than 16. Default node-mask", "2001:db8::1/12", nil, false, false},
-		{"single IPv6, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size": "120"}, false, false},
-		{"single IPv4 CIDR", "10.0.0.16/12", nil, false, true},
-		{"single IPv6 CIDR", "2001:db8::/48", nil, false, true},
 		// dual-stack:
-		{"dual IPv4 only, but mask too small. Default node-mask", "10.0.0.16/29", nil, true, false},
-		{"dual IPv4 only, but mask too small. Configured node-mask", "10.0.0.16/24", map[string]string{"node-cidr-mask-size-ipv4": "23"}, true, false},
-		{"dual IPv6 only, but mask too small. Default node-mask", "2001:db8::1/112", nil, true, false},
-		{"dual IPv6 only, but mask too small. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, true, false},
-		{"dual IPv6 only, but mask difference greater than 16. Default node-mask", "2001:db8::1/12", nil, true, false},
-		{"dual IPv6 only, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, true, false},
-		{"dual IPv4 only CIDR", "10.0.0.16/12", nil, true, true},
-		{"dual IPv6 only CIDR", "2001:db8::/48", nil, true, true},
-		{"dual, but IPv4 mask too small. Default node-mask", "10.0.0.16/29,2001:db8::/48", nil, true, false},
-		{"dual, but IPv4 mask too small. Configured node-mask", "10.0.0.16/24,2001:db8::/48", map[string]string{"node-cidr-mask-size-ipv4": "23"}, true, false},
-		{"dual, but IPv6 mask too small. Default node-mask", "2001:db8::1/112,10.0.0.16/16", nil, true, false},
-		{"dual, but IPv6 mask too small. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, true, false},
-		{"dual, but mask difference greater than 16. Default node-mask", "2001:db8::1/12,10.0.0.16/16", nil, true, false},
-		{"dual, but mask difference greater than 16. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, true, false},
-		{"dual IPv4 IPv6", "2001:db8::/48,10.0.0.16/12", nil, true, true},
-		{"dual IPv6 IPv4", "2001:db8::/48,10.0.0.16/12", nil, true, true},
+		{"dual IPv4 only, but mask too small. Default node-mask", "10.0.0.16/29", nil, false},
+		{"dual IPv4 only, but mask too small. Configured node-mask", "10.0.0.16/24", map[string]string{"node-cidr-mask-size-ipv4": "23"}, false},
+		{"dual IPv6 only, but mask too small. Default node-mask", "2001:db8::1/112", nil, false},
+		{"dual IPv6 only, but mask too small. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, false},
+		{"dual IPv6 only, but mask difference greater than 16. Default node-mask", "2001:db8::1/12", nil, false},
+		{"dual IPv6 only, but mask difference greater than 16. Configured node-mask", "2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, false},
+		{"dual IPv4 only CIDR", "10.0.0.16/12", nil, true},
+		{"dual IPv6 only CIDR", "2001:db8::/48", nil, true},
+		{"dual, but IPv4 mask too small. Default node-mask", "10.0.0.16/29,2001:db8::/48", nil, false},
+		{"dual, but IPv4 mask too small. Configured node-mask", "10.0.0.16/24,2001:db8::/48", map[string]string{"node-cidr-mask-size-ipv4": "23"}, false},
+		{"dual, but IPv6 mask too small. Default node-mask", "2001:db8::1/112,10.0.0.16/16", nil, false},
+		{"dual, but IPv6 mask too small. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "24"}, false},
+		{"dual, but mask difference greater than 16. Default node-mask", "2001:db8::1/12,10.0.0.16/16", nil, false},
+		{"dual, but mask difference greater than 16. Configured node-mask", "10.0.0.16/16,2001:db8::1/64", map[string]string{"node-cidr-mask-size-ipv6": "120"}, false},
+		{"dual IPv4 IPv6", "2001:db8::/48,10.0.0.16/12", nil, true},
+		{"dual IPv6 IPv4", "2001:db8::/48,10.0.0.16/12", nil, true},
 	}
 	for _, rt := range tests {
 		cfg := &kubeadmapi.ClusterConfiguration{
-			FeatureGates: map[string]bool{features.IPv6DualStack: rt.checkDualStack},
 			ControllerManager: kubeadmapi.ControlPlaneComponent{
 				ExtraArgs: rt.cmExtraArgs,
 			},

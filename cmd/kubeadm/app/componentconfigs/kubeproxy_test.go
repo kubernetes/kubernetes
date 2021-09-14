@@ -33,7 +33,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 func testKubeProxyConfigMap(contents string) *v1.ConfigMap {
@@ -101,26 +100,6 @@ func TestKubeProxyDefault(t *testing.T) {
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
 					ClusterCIDR: "192.168.0.0/16",
-				},
-			},
-		},
-		{
-			name: "IPv6DualStack feature gate set to true",
-			clusterCfg: kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					features.IPv6DualStack: true,
-				},
-			},
-			endpoint: kubeadmapi.APIEndpoint{},
-			expected: kubeProxyConfig{
-				config: kubeproxyconfig.KubeProxyConfiguration{
-					FeatureGates: map[string]bool{
-						features.IPv6DualStack: true,
-					},
-					BindAddress: kubeadmapiv1.DefaultProxyBindAddressv6,
-					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-						Kubeconfig: kubeproxyKubeConfigFileName,
-					},
 				},
 			},
 		},
