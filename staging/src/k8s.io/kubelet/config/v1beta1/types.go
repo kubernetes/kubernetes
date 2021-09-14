@@ -599,9 +599,10 @@ type KubeletConfiguration struct {
 	// dynamically updating this field, consider that
 	// changes will only take effect on Pods created after the update. Draining
 	// the node is recommended before changing this field.
+	// If set to the empty string, will override the default and effectively disable DNS lookups.
 	// Default: "/etc/resolv.conf"
 	// +optional
-	ResolverConfig string `json:"resolvConf,omitempty"`
+	ResolverConfig *string `json:"resolvConf,omitempty"`
 	// runOnce causes the Kubelet to check the API server once for pods,
 	// run those in addition to the pods specified by static pod files, and exit.
 	// Default: false
