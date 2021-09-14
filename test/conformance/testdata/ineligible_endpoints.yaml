@@ -256,99 +256,99 @@
 - endpoint: deleteNetworkingV1NamespacedNetworkPolicy
   reason: optional feature
   link: https://github.com/kubernetes/kubernetes/pull/100149#issuecomment-800501953
- - Endpoint: createRbacAuthorizationV1ClusterRole
+- endpoint: createRbacAuthorizationV1ClusterRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: createRbacAuthorizationV1ClusterRoleBinding
+- endpoint: createRbacAuthorizationV1ClusterRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: createRbacAuthorizationV1NamespacedRoleBinding
+- endpoint: createRbacAuthorizationV1NamespacedRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1ClusterRole
+- endpoint: deleteRbacAuthorizationV1ClusterRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1ClusterRoleBinding
+- endpoint: deleteRbacAuthorizationV1ClusterRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1NamespacedRoleBinding
+- endpoint: deleteRbacAuthorizationV1NamespacedRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: getRbacAuthorizationV1APIResources
+- endpoint: getRbacAuthorizationV1APIResources
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: getRbacAuthorizationAPIGroup
+- endpoint: getRbacAuthorizationAPIGroup
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: createRbacAuthorizationV1NamespacedRole
+- endpoint: createRbacAuthorizationV1NamespacedRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1CollectionClusterRole
+- endpoint: deleteRbacAuthorizationV1CollectionClusterRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1CollectionClusterRoleBinding
+- endpoint: deleteRbacAuthorizationV1CollectionClusterRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1CollectionNamespacedRole
+- endpoint: deleteRbacAuthorizationV1CollectionNamespacedRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1CollectionNamespacedRoleBinding
+- endpoint: deleteRbacAuthorizationV1CollectionNamespacedRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: deleteRbacAuthorizationV1NamespacedRole
+- endpoint: deleteRbacAuthorizationV1NamespacedRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: listRbacAuthorizationV1ClusterRole
+- endpoint: listRbacAuthorizationV1ClusterRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: listRbacAuthorizationV1ClusterRoleBinding
+- endpoint: listRbacAuthorizationV1ClusterRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: listRbacAuthorizationV1NamespacedRole
+- endpoint: listRbacAuthorizationV1NamespacedRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: listRbacAuthorizationV1NamespacedRoleBinding
+- endpoint: listRbacAuthorizationV1NamespacedRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: listRbacAuthorizationV1RoleBindingForAllNamespaces
+- endpoint: listRbacAuthorizationV1RoleBindingForAllNamespaces
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: listRbacAuthorizationV1RoleForAllNamespaces
+- endpoint: listRbacAuthorizationV1RoleForAllNamespaces
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: patchRbacAuthorizationV1ClusterRole
+- endpoint: patchRbacAuthorizationV1ClusterRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: patchRbacAuthorizationV1ClusterRoleBinding
+- endpoint: patchRbacAuthorizationV1ClusterRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: patchRbacAuthorizationV1NamespacedRole
+- endpoint: patchRbacAuthorizationV1NamespacedRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: patchRbacAuthorizationV1NamespacedRoleBinding
+- endpoint: patchRbacAuthorizationV1NamespacedRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: readRbacAuthorizationV1ClusterRole
+- endpoint: readRbacAuthorizationV1ClusterRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: readRbacAuthorizationV1ClusterRoleBinding
+- endpoint: readRbacAuthorizationV1ClusterRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: readRbacAuthorizationV1NamespacedRole
+- endpoint: readRbacAuthorizationV1NamespacedRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: readRbacAuthorizationV1NamespacedRoleBinding
+- endpoint: readRbacAuthorizationV1NamespacedRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: replaceRbacAuthorizationV1ClusterRole
+- endpoint: replaceRbacAuthorizationV1ClusterRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: replaceRbacAuthorizationV1ClusterRoleBinding
+- endpoint: replaceRbacAuthorizationV1ClusterRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: replaceRbacAuthorizationV1NamespacedRole
+- endpoint: replaceRbacAuthorizationV1NamespacedRole
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
-- Endpoint: replaceRbacAuthorizationV1NamespacedRoleBinding
+- endpoint: replaceRbacAuthorizationV1NamespacedRoleBinding
   reason: optional feature
   link: https://kubernetes.io/docs/reference/access-authn-authz/rbac/ 
