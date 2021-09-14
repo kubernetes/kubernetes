@@ -62,7 +62,7 @@ func (q *graceTerminateRSList) add(rs *listItem) bool {
 		return false
 	}
 
-	klog.V(5).InfoS("Adding rs graceful delete rsList", "realServer", rs)
+	klog.V(5).InfoS("Adding rs item to graceful delete rsList", "realServer", rs)
 	q.list[uniqueRS] = rs
 	return true
 }
