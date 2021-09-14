@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -159,7 +158,7 @@ func (m *manager) Start() {
 	//lint:ignore SA1015 Ticker can link since this is only called once and doesn't handle termination.
 	syncTicker := time.Tick(syncPeriod)
 	// syncPod and syncBatch share the same go routine to avoid sync races.
-	go wait.Forever(func() {
+	go func() {
 		for {
 			select {
 			case syncRequest := <-m.podStatusChannel:
@@ -177,7 +176,7 @@ func (m *manager) Start() {
 				m.syncBatch()
 			}
 		}
-	}, 0)
+	}()
 }
 
 func (m *manager) GetPodStatus(uid types.UID) (v1.PodStatus, bool) {
