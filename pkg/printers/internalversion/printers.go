@@ -1786,11 +1786,7 @@ func printEvent(obj *api.Event, options printers.GenerateOptions) ([]metav1.Tabl
 	count := obj.Count
 	if obj.Series != nil {
 		lastTimestamp = translateMicroTimestampSince(obj.Series.LastObservedTime)
-		// When a series is created for the first time, its count is set to 1.
-		// However, for a series to be created, there needs to be an isomorphic
-		// singleton event created beforehand. This singleton event is not
-		// counted in the series count which is why one is added here.
-		count = obj.Series.Count + 1
+		count = obj.Series.Count
 	} else if count == 0 {
 		// Singleton events don't have a count set in the new API.
 		count = 1
