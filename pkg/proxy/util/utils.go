@@ -288,7 +288,7 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
-			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
+			klog.ErrorS(nil, "Skipping invalid CIDR", "CIDR", cidr)
 		}
 	}
 	return ipFamilyMap
