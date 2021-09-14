@@ -34,7 +34,6 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 func testKubeletConfigMap(contents string) *v1.ConfigMap {
@@ -128,18 +127,14 @@ func TestKubeletDefault(t *testing.T) {
 		{
 			name: "Service subnet, enabled dual stack defaulting works",
 			clusterCfg: kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{
-					features.IPv6DualStack: true,
-				},
+				FeatureGates: map[string]bool{},
 				Networking: kubeadmapi.Networking{
 					ServiceSubnet: "192.168.0.0/16",
 				},
 			},
 			expected: kubeletConfig{
 				config: kubeletconfig.KubeletConfiguration{
-					FeatureGates: map[string]bool{
-						features.IPv6DualStack: true,
-					},
+					FeatureGates:  map[string]bool{},
 					StaticPodPath: kubeadmapiv1.DefaultManifestsDir,
 					ClusterDNS:    []string{"192.168.0.10"},
 					Authentication: kubeletconfig.KubeletAuthentication{
