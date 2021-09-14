@@ -45,7 +45,7 @@ type hnsV1 struct{}
 func (hns hnsV1) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcsshim.GetHNSNetworkByName(name)
 	if err != nil {
-		klog.Errorf("%v", err)
+		klog.ErrorS(err, "failed to get HNS network by name")
 		return nil, err
 	}
 
@@ -58,7 +58,7 @@ func (hns hnsV1) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcsshim.GetHNSEndpointByID(id)
 	if err != nil {
-		klog.Errorf("%v", err)
+		klog.ErrorS(err, "failed to get HNS endpoint by id")
 		return nil, err
 	}
 	return &endpointsInfo{
@@ -77,7 +77,7 @@ func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	hnsnetwork, err := hcsshim.GetHNSNetworkByName(networkName)
 	if err != nil {
-		klog.Errorf("%v", err)
+		klog.ErrorS(err, "failed to get HNS network by name")
 		return nil, err
 	}
 
@@ -162,7 +162,7 @@ func (hns hnsV1) deleteEndpoint(hnsID string) error {
 	}
 	_, err = hnsendpoint.Delete()
 	if err == nil {
-		klog.V(3).Infof("Remote endpoint resource deleted id %s", hnsID)
+		klog.V(3).InfoS("Remote endpoint resource deleted id", "ID", hnsID)
 	}
 	return err
 }
@@ -174,7 +174,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	}
 
 	if flags.isDSR {
-		klog.V(3).Info("DSR is not supported in V1. Using non DSR instead")
+		klog.V(3).InfoS("DSR is not supported in V1. Using non DSR instead")
 	}
 
 	for _, plist := range plists {
