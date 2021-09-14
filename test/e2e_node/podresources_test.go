@@ -854,7 +854,6 @@ func enablePodResourcesFeatureGateInKubelet(f *framework.Framework) (oldCfg *kub
 	if newCfg.FeatureGates == nil {
 		newCfg.FeatureGates = make(map[string]bool)
 	}
-	newCfg.FeatureGates["KubeletPodResourcesGetAllocatable"] = true
 
 	// Update the Kubelet configuration.
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
