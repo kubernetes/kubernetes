@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -71,19 +72,19 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
-func setup(t *testing.T, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResources(t, groupVersions, nil)
 }
 
-func setupWithOptions(t *testing.T, opts *framework.ControlPlaneConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResourcesWithOptions(t, opts, groupVersions, nil)
 }
 
-func setupWithResources(t *testing.T, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithResources(t testing.TB, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	return setupWithResourcesWithOptions(t, &framework.ControlPlaneConfigOptions{}, groupVersions, resources)
 }
 
-func setupWithResourcesWithOptions(t *testing.T, opts *framework.ControlPlaneConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
+func setupWithResourcesWithOptions(t testing.TB, opts *framework.ControlPlaneConfigOptions, groupVersions []schema.GroupVersion, resources []schema.GroupVersionResource) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(opts)
 	if len(groupVersions) > 0 || len(resources) > 0 {
 		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
@@ -2326,6 +2327,103 @@ func TestDedupOwnerReferences(t *testing.T) {
 	// cleanup
 	if err := client.CoreV1().Namespaces().Delete(context.TODO(), ns, metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("failed to delete test ns: %v", err)
+	}
+}
+
+func BenchmarkFieldValidation(b *testing.B) {
+	_, client, closeFn := setup(b)
+	defer closeFn()
+	flag.Lookup("v").Value.Set("0")
+
+	baseDeploy := `{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": %s,
+			"labels": {"app": "nginx"}
+                },
+		"spec": {
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`
+
+	// TODO: add bigger objects to benchmarks table once confirmed that this is how we want to do benchmarking.
+	// TODO: split POST and PUT into their own test-cases.
+	benchmarks := []struct {
+		name   string
+		params map[string]string
+	}{
+		{
+			name:   "nonstrict-deployment",
+			params: map[string]string{},
+		},
+		{
+			name:   "strict-deployment",
+			params: map[string]string{"validate": "strict"},
+		},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ResetTimer()
+			b.ReportAllocs()
+			for n := 0; n < b.N; n++ {
+				// append the timestamp to the name so that we don't hit conflicts when running the test multiple times
+				// (i.e. without it -count=n for n>1 will fail, this might be from not tearing stuff down properly).
+				deployName := fmt.Sprintf("dep-%s-%d-%d-%d", bm.name, n, b.N, time.Now().UnixNano())
+				deployString := fmt.Sprintf(baseDeploy, fmt.Sprintf(`"%s"`, deployName))
+				deploy := []byte(deployString)
+
+				appsPath := "/apis/apps/v1"
+				postReq := client.CoreV1().RESTClient().Post().
+					AbsPath(appsPath).
+					Namespace("default").
+					Resource("deployments")
+				for k, v := range bm.params {
+					postReq = postReq.Param(k, v)
+				}
+
+				_, err := postReq.Body(deploy).
+					DoRaw(context.TODO())
+				if err != nil {
+					panic(err)
+				}
+
+				// TODO: put PUT in a different bench case than POST (ie. have a baseReq) be a part of the test case.
+				putReq := client.CoreV1().RESTClient().Put().
+					AbsPath(appsPath).
+					Namespace("default").
+					Resource("deployments").
+					Name(deployName)
+				for k, v := range bm.params {
+					putReq = putReq.Param(k, v)
+				}
+
+				_, err = putReq.Body(deploy).
+					DoRaw(context.TODO())
+				if err != nil {
+					panic(err)
+				}
+			}
+		})
+
 	}
 }
 
