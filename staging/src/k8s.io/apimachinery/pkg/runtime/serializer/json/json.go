@@ -20,10 +20,8 @@ import (
 	"encoding/json"
 	"io"
 	"strconv"
-	"unsafe"
 
-	jsoniter "github.com/json-iterator/go"
-	"github.com/modern-go/reflect2"
+	kjson "sigs.k8s.io/json"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -110,79 +108,6 @@ type Serializer struct {
 var _ runtime.Serializer = &Serializer{}
 var _ recognizer.RecognizingDecoder = &Serializer{}
 
-type customNumberExtension struct {
-	jsoniter.DummyExtension
-}
-
-func (cne *customNumberExtension) CreateDecoder(typ reflect2.Type) jsoniter.ValDecoder {
-	if typ.String() == "interface {}" {
-		return customNumberDecoder{}
-	}
-	return nil
-}
-
-type customNumberDecoder struct {
-}
-
-func (customNumberDecoder) Decode(ptr unsafe.Pointer, iter *jsoniter.Iterator) {
-	switch iter.WhatIsNext() {
-	case jsoniter.NumberValue:
-		var number jsoniter.Number
-		iter.ReadVal(&number)
-		i64, err := strconv.ParseInt(string(number), 10, 64)
-		if err == nil {
-			*(*interface{})(ptr) = i64
-			return
-		}
-		f64, err := strconv.ParseFloat(string(number), 64)
-		if err == nil {
-			*(*interface{})(ptr) = f64
-			return
-		}
-		iter.ReportError("DecodeNumber", err.Error())
-	default:
-		*(*interface{})(ptr) = iter.Read()
-	}
-}
-
-// CaseSensitiveJSONIterator returns a jsoniterator API that's configured to be
-// case-sensitive when unmarshalling, and otherwise compatible with
-// the encoding/json standard library.
-func CaseSensitiveJSONIterator() jsoniter.API {
-	config := jsoniter.Config{
-		EscapeHTML:             true,
-		SortMapKeys:            true,
-		ValidateJsonRawMessage: true,
-		CaseSensitive:          true,
-	}.Froze()
-	// Force jsoniter to decode number to interface{} via int64/float64, if possible.
-	config.RegisterExtension(&customNumberExtension{})
-	return config
-}
-
-// StrictCaseSensitiveJSONIterator returns a jsoniterator API that's configured to be
-// case-sensitive, but also disallows unknown fields when unmarshalling. It is compatible with
-// the encoding/json standard library.
-func StrictCaseSensitiveJSONIterator() jsoniter.API {
-	config := jsoniter.Config{
-		EscapeHTML:             true,
-		SortMapKeys:            true,
-		ValidateJsonRawMessage: true,
-		CaseSensitive:          true,
-		DisallowUnknownFields:  true,
-	}.Froze()
-	// Force jsoniter to decode number to interface{} via int64/float64, if possible.
-	config.RegisterExtension(&customNumberExtension{})
-	return config
-}
-
-// Private copies of jsoniter to try to shield against possible mutations
-// from outside. Still does not protect from package level jsoniter.Register*() functions - someone calling them
-// in some other library will mess with every usage of the jsoniter library in the whole program.
-// See https://github.com/json-iterator/go/issues/265
-var caseSensitiveJSONIterator = CaseSensitiveJSONIterator()
-var strictCaseSensitiveJSONIterator = StrictCaseSensitiveJSONIterator()
-
 // gvkWithDefaults returns group kind and version defaulting from provided default
 func gvkWithDefaults(actual, defaultGVK schema.GroupVersionKind) schema.GroupVersionKind {
 	if len(actual.Kind) == 0 {
@@ -237,7 +162,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err), isUnstructured:
-			if err := caseSensitiveJSONIterator.Unmarshal(data, into); err != nil {
+			if err := kjson.UnmarshalCaseSensitivePreserveInts(data, into); err != nil {
 				return nil, actual, err
 			}
 			return into, actual, nil
@@ -261,35 +186,35 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		return nil, actual, err
 	}
 
-	if err := caseSensitiveJSONIterator.Unmarshal(data, obj); err != nil {
-		return nil, actual, err
-	}
-
-	// If the deserializer is non-strict, return successfully here.
+	// If the deserializer is non-strict, return here.
 	if !s.options.Strict {
+		if err := kjson.UnmarshalCaseSensitivePreserveInts(data, obj); err != nil {
+			return nil, actual, err
+		}
 		return obj, actual, nil
 	}
 
-	// In strict mode pass the data trough the YAMLToJSONStrict converter.
-	// This is done to catch duplicate fields regardless of encoding (JSON or YAML). For JSON data,
-	// the output would equal the input, unless there is a parsing error such as duplicate fields.
-	// As we know this was successful in the non-strict case, the only error that may be returned here
-	// is because of the newly-added strictness. hence we know we can return the typed strictDecoderError
-	// the actual error is that the object contains duplicate fields.
-	altered, err := yaml.YAMLToJSONStrict(originalData)
+	var allStrictErrs []error
+	if s.options.Yaml {
+		// In strict mode pass the original data through the YAMLToJSONStrict converter.
+		// This is done to catch duplicate fields in YAML that would have been dropped in the original YAMLToJSON conversion.
+		// TODO: rework YAMLToJSONStrict to return warnings about duplicate fields without terminating so we don't have to do this twice.
+		_, err := yaml.YAMLToJSONStrict(originalData)
+		if err != nil {
+			allStrictErrs = append(allStrictErrs, err)
+		}
+	}
+
+	strictJSONErrs, err := kjson.UnmarshalStrict(data, obj)
 	if err != nil {
-		return nil, actual, runtime.NewStrictDecodingError(err.Error(), string(originalData))
+		// fatal decoding error, not due to strictness
+		return nil, actual, err
 	}
-	// As performance is not an issue for now for the strict deserializer (one has regardless to do
-	// the unmarshal twice), we take the sanitized, altered data that is guaranteed to have no duplicated
-	// fields, and unmarshal this into a copy of the already-populated obj. Any error that occurs here is
-	// due to that a matching field doesn't exist in the object. hence we can return a typed strictDecoderError,
-	// the actual error is that the object contains unknown field.
-	strictObj := obj.DeepCopyObject()
-	if err := strictCaseSensitiveJSONIterator.Unmarshal(altered, strictObj); err != nil {
-		return nil, actual, runtime.NewStrictDecodingError(err.Error(), string(originalData))
+	allStrictErrs = append(allStrictErrs, strictJSONErrs...)
+	if len(allStrictErrs) > 0 {
+		// return the successfully decoded object along with the strict errors
+		return obj, actual, runtime.NewStrictDecodingError(allStrictErrs)
 	}
-	// Always return the same object as the non-strict serializer to avoid any deviations.
 	return obj, actual, nil
 }
 

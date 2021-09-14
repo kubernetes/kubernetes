@@ -263,7 +263,7 @@ profiles:
           - Score: 2
             Utilization: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoder error for {"scoringStrategy":{"requestedToCapacityRatio":{"shape":[{"Score":2,"Utilization":1}]}}}: v1beta2.NodeResourcesFitArgs.ScoringStrategy: v1beta2.ScoringStrategy.RequestedToCapacityRatio: v1beta2.RequestedToCapacityRatioParam.Shape: []v1beta2.UtilizationShapePoint: v1beta2.UtilizationShapePoint.ReadObject: found unknown field: Score, error found in #10 byte of ...|:[{"Score":2,"Utiliz|..., bigger context ...|gy":{"requestedToCapacityRatio":{"shape":[{"Score":2,"Utilization":1}]}}}|...`,
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "Score", unknown field "Utilization"`,
 		},
 		{
 			name: "v1beta2 NodeResourcesFitArgs resources encoding is strict",
@@ -279,7 +279,7 @@ profiles:
         - Name: cpu
           Weight: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoder error for {"scoringStrategy":{"resources":[{"Name":"cpu","Weight":1}]}}: v1beta2.NodeResourcesFitArgs.ScoringStrategy: v1beta2.ScoringStrategy.Resources: []v1beta2.ResourceSpec: v1beta2.ResourceSpec.ReadObject: found unknown field: Name, error found in #10 byte of ...|":[{"Name":"cpu","We|..., bigger context ...|{"scoringStrategy":{"resources":[{"Name":"cpu","Weight":1}]}}|...`,
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "Name", unknown field "Weight"`,
 		},
 		{
 			name: "out-of-tree plugin args",
@@ -604,7 +604,7 @@ profiles:
           - Score: 2
             Utilization: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoder error for {"scoringStrategy":{"requestedToCapacityRatio":{"shape":[{"Score":2,"Utilization":1}]}}}: v1beta3.NodeResourcesFitArgs.ScoringStrategy: v1beta3.ScoringStrategy.RequestedToCapacityRatio: v1beta3.RequestedToCapacityRatioParam.Shape: []v1beta3.UtilizationShapePoint: v1beta3.UtilizationShapePoint.ReadObject: found unknown field: Score, error found in #10 byte of ...|:[{"Score":2,"Utiliz|..., bigger context ...|gy":{"requestedToCapacityRatio":{"shape":[{"Score":2,"Utilization":1}]}}}|...`,
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "Score", unknown field "Utilization"`,
 		},
 		{
 			name: "v1beta3 NodeResourcesFitArgs resources encoding is strict",
@@ -620,7 +620,7 @@ profiles:
         - Name: cpu
           Weight: 1
 `),
-			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoder error for {"scoringStrategy":{"resources":[{"Name":"cpu","Weight":1}]}}: v1beta3.NodeResourcesFitArgs.ScoringStrategy: v1beta3.ScoringStrategy.Resources: []v1beta3.ResourceSpec: v1beta3.ResourceSpec.ReadObject: found unknown field: Name, error found in #10 byte of ...|":[{"Name":"cpu","We|..., bigger context ...|{"scoringStrategy":{"resources":[{"Name":"cpu","Weight":1}]}}|...`,
+			wantErr: `decoding .profiles[0].pluginConfig[0]: decoding args for plugin NodeResourcesFit: strict decoding error: unknown field "Name", unknown field "Weight"`,
 		},
 		{
 			name: "out-of-tree plugin args",

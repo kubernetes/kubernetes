@@ -1133,7 +1133,7 @@ profiles:
 				ConfigFile: unknownFieldConfig,
 				Logs:       logs.NewOptions(),
 			},
-			expectedError: "found unknown field: foo",
+			expectedError: `unknown field "foo"`,
 			checkErrFn:    runtime.IsStrictDecodingError,
 		},
 		{
