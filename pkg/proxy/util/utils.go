@@ -274,7 +274,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
+			klog.ErrorS(nil, "Skipping invalid IP", "IP", ip)
 		}
 	}
 	return ipFamilyMap
