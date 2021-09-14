@@ -16,3 +16,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace sigs.k8s.io/json => github.com/liggitt/json v0.0.0-20211020163728-48258682683b
