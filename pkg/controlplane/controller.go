@@ -42,7 +42,9 @@ import (
 	"k8s.io/kubernetes/pkg/util/async"
 )
 
-const kubernetesServiceName = "kubernetes"
+const (
+	kubernetesServiceName = "kubernetes"
+)
 
 // Controller is the controller manager for the core bootstrap Kubernetes
 // controller loops, which manage creating the "kubernetes" service, the
@@ -110,11 +112,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
 		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
 
-		ServiceClusterIPInterval: 3 * time.Minute,
+		ServiceClusterIPInterval: c.ExtraConfig.RepairServicesInterval,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
 		ServiceNodePortRange:    c.ExtraConfig.ServiceNodePortRange,
-		ServiceNodePortInterval: 3 * time.Minute,
+		ServiceNodePortInterval: c.ExtraConfig.RepairServicesInterval,
 
 		PublicIP: c.GenericConfig.PublicAddress,
 
