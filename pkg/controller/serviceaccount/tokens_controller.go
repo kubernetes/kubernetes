@@ -98,7 +98,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    e.queueServiceAccountSync,
-			UpdateFunc: e.queueServiceAccountUpdateSync,
+			UpdateFunc: e.queueServiceAccountSync,
 			DeleteFunc: e.queueServiceAccountSync,
 		},
 		options.ServiceAccountResync,
@@ -120,7 +120,7 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 			},
 			Handler: cache.ResourceEventHandlerFuncs{
 				AddFunc:    e.queueSecretSync,
-				UpdateFunc: e.queueSecretUpdateSync,
+				UpdateFunc: e.queueSecretSync,
 				DeleteFunc: e.queueSecretSync,
 			},
 		},
@@ -189,12 +189,6 @@ func (e *TokensController) queueServiceAccountSync(obj interface{}) {
 	}
 }
 
-func (e *TokensController) queueServiceAccountUpdateSync(oldObj interface{}, newObj interface{}) {
-	if serviceAccount, ok := newObj.(*v1.ServiceAccount); ok {
-		e.syncServiceAccountQueue.Add(makeServiceAccountKey(serviceAccount))
-	}
-}
-
 // complete optionally requeues key, then calls queue.Done(key)
 func (e *TokensController) retryOrForget(queue workqueue.RateLimitingInterface, key interface{}, requeue bool) {
 	if !requeue {
@@ -214,12 +208,6 @@ func (e *TokensController) retryOrForget(queue workqueue.RateLimitingInterface, 
 
 func (e *TokensController) queueSecretSync(obj interface{}) {
 	if secret, ok := obj.(*v1.Secret); ok {
-		e.syncSecretQueue.Add(makeSecretQueueKey(secret))
-	}
-}
-
-func (e *TokensController) queueSecretUpdateSync(oldObj interface{}, newObj interface{}) {
-	if secret, ok := newObj.(*v1.Secret); ok {
 		e.syncSecretQueue.Add(makeSecretQueueKey(secret))
 	}
 }

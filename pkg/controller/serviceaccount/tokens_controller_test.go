@@ -601,7 +601,7 @@ func TestTokenCreation(t *testing.T) {
 		}
 		if tc.UpdatedServiceAccount != nil {
 			serviceAccounts.Add(tc.UpdatedServiceAccount)
-			controller.queueServiceAccountUpdateSync(nil, tc.UpdatedServiceAccount)
+			controller.queueServiceAccountSync(tc.UpdatedServiceAccount)
 		}
 		if tc.DeletedServiceAccount != nil {
 			serviceAccounts.Delete(tc.DeletedServiceAccount)
@@ -616,7 +616,7 @@ func TestTokenCreation(t *testing.T) {
 		}
 		if tc.UpdatedSecret != nil {
 			secrets.Add(tc.UpdatedSecret)
-			controller.queueSecretUpdateSync(nil, tc.UpdatedSecret)
+			controller.queueSecretSync(tc.UpdatedSecret)
 		}
 		if tc.DeletedSecret != nil {
 			secrets.Delete(tc.DeletedSecret)
