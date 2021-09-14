@@ -89,60 +89,6 @@ func (proxier *metaProxier) OnServiceSynced() {
 	proxier.ipv6Proxier.OnServiceSynced()
 }
 
-// OnEndpointsAdd is called whenever creation of new endpoints object
-// is observed.
-func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
-	ipFamily, err := endpointsIPFamily(endpoints)
-	if err != nil {
-		klog.ErrorS(err, "failed to add endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta))
-		return
-	}
-	if *ipFamily == v1.IPv4Protocol {
-		proxier.ipv4Proxier.OnEndpointsAdd(endpoints)
-		return
-	}
-	proxier.ipv6Proxier.OnEndpointsAdd(endpoints)
-}
-
-// OnEndpointsUpdate is called whenever modification of an existing
-// endpoints object is observed.
-func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
-	ipFamily, err := endpointsIPFamily(endpoints)
-	if err != nil {
-		klog.ErrorS(err, "failed to update endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta))
-		return
-	}
-
-	if *ipFamily == v1.IPv4Protocol {
-		proxier.ipv4Proxier.OnEndpointsUpdate(oldEndpoints, endpoints)
-		return
-	}
-	proxier.ipv6Proxier.OnEndpointsUpdate(oldEndpoints, endpoints)
-}
-
-// OnEndpointsDelete is called whenever deletion of an existing
-// endpoints object is observed.
-func (proxier *metaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
-	ipFamily, err := endpointsIPFamily(endpoints)
-	if err != nil {
-		klog.ErrorS(err, "failed to delete endpoints", "endpoints", klog.KObj(&endpoints.ObjectMeta))
-		return
-	}
-
-	if *ipFamily == v1.IPv4Protocol {
-		proxier.ipv4Proxier.OnEndpointsDelete(endpoints)
-		return
-	}
-	proxier.ipv6Proxier.OnEndpointsDelete(endpoints)
-}
-
-// OnEndpointsSynced is called once all the initial event handlers
-// were called and the state is fully propagated to local cache.
-func (proxier *metaProxier) OnEndpointsSynced() {
-	proxier.ipv4Proxier.OnEndpointsSynced()
-	proxier.ipv6Proxier.OnEndpointsSynced()
-}
-
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
 func (proxier *metaProxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
