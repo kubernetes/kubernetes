@@ -152,7 +152,7 @@ func (proxier *metaProxier) OnEndpointSliceAdd(endpointSlice *discovery.Endpoint
 	case discovery.AddressTypeIPv6:
 		proxier.ipv6Proxier.OnEndpointSliceAdd(endpointSlice)
 	default:
-		klog.ErrorS(nil, "EndpointSlice address type not supported", "type", endpointSlice.AddressType)
+		klog.V(4).InfoS("EndpointSlice address type not supported", "type", endpointSlice.AddressType)
 	}
 }
 
@@ -165,7 +165,7 @@ func (proxier *metaProxier) OnEndpointSliceUpdate(oldEndpointSlice, newEndpointS
 	case discovery.AddressTypeIPv6:
 		proxier.ipv6Proxier.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
 	default:
-		klog.ErrorS(nil, "EndpointSlice address type not supported", "type", newEndpointSlice.AddressType)
+		klog.V(4).InfoS("EndpointSlice address type not supported", "type", newEndpointSlice.AddressType)
 	}
 }
 
