@@ -165,15 +165,15 @@ func (set *IPSet) syncIPSetEntries() {
 					klog.ErrorS(err, "Failed to delete ip set entry from ip set", "entry", entry, "ipSet", set.Name)
 				}
 			} else {
-				klog.V(3).InfoS("Successfully delete legacy ip set entry from ip set", "entry", entry, "ipSet", set.Name)
+				klog.V(3).InfoS("Successfully deleted legacy ip set entry from ip set", "entry", entry, "ipSet", set.Name)
 			}
 		}
 		// Create active entries
 		for _, entry := range set.activeEntries.Difference(currentIPSetEntries).List() {
 			if err := set.handle.AddEntry(entry, &set.IPSet, true); err != nil {
-				klog.ErrorS(err, "Failed to add entry to ip set", "entry", entry, "ipSet", set.Name)
+				klog.ErrorS(err, "Failed to add ip set entry to ip set", "entry", entry, "ipSet", set.Name)
 			} else {
-				klog.V(3).InfoS("Successfully add entry to ip set", "entry", entry, "ipSet", set.Name)
+				klog.V(3).InfoS("Successfully added ip set entry to ip set", "entry", entry, "ipSet", set.Name)
 			}
 		}
 	}
