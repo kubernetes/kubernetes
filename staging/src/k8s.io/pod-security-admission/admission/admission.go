@@ -44,7 +44,6 @@ const (
 	namespacePodCheckTimeout = 1 * time.Second
 )
 
-
 // Admission implements the core admission logic for the Pod Security Admission controller.
 // The admission logic can be
 type Admission struct {
@@ -426,7 +425,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		klog.InfoS("Pod Security evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
 	}
 
-	response := sharedAllowedResponse()
+	response := allowedResponse()
 	if enforce {
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
 			response = forbiddenResponse(result.ForbiddenDetail())

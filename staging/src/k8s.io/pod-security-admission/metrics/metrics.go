@@ -19,7 +19,9 @@ package metrics
 import (
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	Version "k8s.io/component-base/version"
 	"k8s.io/pod-security-admission/api"
+	"strconv"
 )
 
 const (
@@ -39,14 +41,13 @@ type Decision string
 type Mode string
 
 const (
-	ModeAudit = "audit"
-	ModeEnforce = "enforce"
-	ModeWarn = "warn"
-	DecisionAllow = "allow" // Policy evaluated, request allowed
-	DecisionDeny = "deny" // Policy evaluated, request denied
-	DecisionIgnore = "ignore" // Request not relevant, policy not evaluated
+	ModeAudit      = "audit"
+	ModeEnforce    = "enforce"
+	ModeWarn       = "warn"
+	DecisionAllow  = "allow"  // Policy evaluated, request allowed
+	DecisionDeny   = "deny"   // Policy evaluated, request denied
 	DecisionExempt = "exempt" // Request exempt, policy not evaluated
-	DecisionError = "error" // Error preventing evaluation, policy not evaluated
+	DecisionError  = "error"  // Error preventing evaluation, policy not evaluated
 )
 
 type EvaluationRecorder interface {
@@ -69,16 +70,31 @@ func (r PrometheusRecorder) RecordEvaluation(decision Decision, policy api.Level
 	subresource := attrs.GetSubresource()
 	var version string
 	if policy.Valid() {
-		v, err := api.ParseVersion(policy.Version.String())
-		if err != nil || v.Latest(){
+		if policy.Version.Latest() {
 			version = "latest"
-		}else{
-			if v.Older(){
-				// TODO
+		} else {
+			apiVersion := api.MajorMinorVersion(getAPIVersion())
+			if !apiVersion.Older(policy.Version) {
+				version = policy.Version.String()
+			} else {
+				version = "future"
 			}
 		}
 		SecurityEvaluation.WithLabelValues(dec, string(policy.Level),
 			version, string(evalMode), operation, resource, subresource).Inc()
 	}
+}
 
+func getAPIVersion() (major int, minor int) {
+	var err error
+	apiVersion := Version.Get()
+	major, err = strconv.Atoi(apiVersion.Major)
+	if err != nil {
+		return
+	}
+	minor, err = strconv.Atoi(apiVersion.Minor)
+	if err != nil {
+		return
+	}
+	return major, minor
 }
