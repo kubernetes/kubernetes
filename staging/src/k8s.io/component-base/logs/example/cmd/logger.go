@@ -51,6 +51,7 @@ func NewLoggerCommand() *cobra.Command {
 		},
 	}
 	o.AddFlags(cmd.Flags())
+	logs.AddFlags(cmd.Flags())
 	return cmd
 }
 
@@ -62,6 +63,7 @@ func runLogger() {
 	klog.ErrorS(err, "Log using ErrorS")
 	data := SensitiveData{Key: "secret"}
 	klog.Infof("Log with sensitive key, data: %q", data)
+	klog.V(1).Info("Log less important message")
 }
 
 type SensitiveData struct {
