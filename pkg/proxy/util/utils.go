@@ -254,7 +254,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 // LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
 func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
 	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	klog.ErrorS(nil, "Incorrect IP version", "service", klog.KRef(svcName, svcNamespace), "field", fieldName, "value", fieldValue)
+	klog.ErrorS(nil, "Incorrect IP version", "service", klog.KRef(svcNamespace, svcName), "field", fieldName, "value", fieldValue)
 	if recorder != nil {
 		recorder.Eventf(
 			&v1.ObjectReference{
