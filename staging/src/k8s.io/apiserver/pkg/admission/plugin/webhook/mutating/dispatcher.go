@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utiljson "k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
@@ -60,8 +61,6 @@ const (
 	// failed or returned an internal server error.
 	MutationAuditAnnotationFailedOpenKeyPrefix string = "failed-open." + MutationAuditAnnotationPrefix
 )
-
-var encodingjson = json.CaseSensitiveJSONIterator()
 
 type mutatingDispatcher struct {
 	cm     *webhookutil.ClientManager
@@ -444,7 +443,7 @@ func mutationAnnotationValue(configuration, webhook string, mutated bool) (strin
 		Webhook:       webhook,
 		Mutated:       mutated,
 	}
-	bytes, err := encodingjson.Marshal(m)
+	bytes, err := utiljson.Marshal(m)
 	return string(bytes), err
 }
 
@@ -455,6 +454,6 @@ func jsonPatchAnnotationValue(configuration, webhook string, patch interface{}) 
 		Patch:         patch,
 		PatchType:     string(admissionv1.PatchTypeJSONPatch),
 	}
-	bytes, err := encodingjson.Marshal(p)
+	bytes, err := utiljson.Marshal(p)
 	return string(bytes), err
 }

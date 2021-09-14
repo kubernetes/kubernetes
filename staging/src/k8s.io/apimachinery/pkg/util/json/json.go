@@ -17,10 +17,11 @@ limitations under the License.
 package json
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+
+	kjson "sigs.k8s.io/json"
 )
 
 // NewEncoder delegates to json.NewEncoder
@@ -38,50 +39,11 @@ func Marshal(v interface{}) ([]byte, error) {
 // limit recursive depth to prevent stack overflow errors
 const maxDepth = 10000
 
-// Unmarshal unmarshals the given data
-// If v is a *map[string]interface{}, *[]interface{}, or *interface{} numbers
-// are converted to int64 or float64
+// Unmarshal unmarshals the given data.
+// Object keys are case-sensitive.
+// Numbers decoded into interface{} fields are converted to int64 or float64.
 func Unmarshal(data []byte, v interface{}) error {
-	switch v := v.(type) {
-	case *map[string]interface{}:
-		// Build a decoder from the given data
-		decoder := json.NewDecoder(bytes.NewBuffer(data))
-		// Preserve numbers, rather than casting to float64 automatically
-		decoder.UseNumber()
-		// Run the decode
-		if err := decoder.Decode(v); err != nil {
-			return err
-		}
-		// If the decode succeeds, post-process the map to convert json.Number objects to int64 or float64
-		return ConvertMapNumbers(*v, 0)
-
-	case *[]interface{}:
-		// Build a decoder from the given data
-		decoder := json.NewDecoder(bytes.NewBuffer(data))
-		// Preserve numbers, rather than casting to float64 automatically
-		decoder.UseNumber()
-		// Run the decode
-		if err := decoder.Decode(v); err != nil {
-			return err
-		}
-		// If the decode succeeds, post-process the map to convert json.Number objects to int64 or float64
-		return ConvertSliceNumbers(*v, 0)
-
-	case *interface{}:
-		// Build a decoder from the given data
-		decoder := json.NewDecoder(bytes.NewBuffer(data))
-		// Preserve numbers, rather than casting to float64 automatically
-		decoder.UseNumber()
-		// Run the decode
-		if err := decoder.Decode(v); err != nil {
-			return err
-		}
-		// If the decode succeeds, post-process the map to convert json.Number objects to int64 or float64
-		return ConvertInterfaceNumbers(v, 0)
-
-	default:
-		return json.Unmarshal(data, v)
-	}
+	return kjson.UnmarshalCaseSensitivePreserveInts(data, v)
 }
 
 // ConvertInterfaceNumbers converts any json.Number values to int64 or float64.

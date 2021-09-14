@@ -39,8 +39,7 @@ type testDecodable struct {
 	Interface interface{}   `json:"interface"`
 }
 
-// DecodableSpec has 15 fields. json-iterator treats struct with more than 10
-// fields differently from struct that has less than 10 fields.
+// DecodableSpec has 15 fields.
 type DecodableSpec struct {
 	A int `json:"A"`
 	B int `json:"B"`
@@ -264,7 +263,7 @@ func TestDecode(t *testing.T) {
 			creater:     &mockCreater{obj: &testDecodable{}},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), `json_test.testDecodable.Interface: DecodeNumber: strconv.ParseFloat: parsing "1e1000": value out of range`)
+				return strings.Contains(err.Error(), `json: cannot unmarshal number 1e1000 into Go struct field testDecodable.interface of type float64`)
 			},
 		},
 		// Unmarshalling is case-sensitive
@@ -298,7 +297,7 @@ func TestDecode(t *testing.T) {
 			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), "found unknown field")
+				return strings.Contains(err.Error(), `unknown field "unknown"`)
 			},
 			strict: true,
 		},
@@ -309,7 +308,7 @@ func TestDecode(t *testing.T) {
 			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), "found unknown field: unknown")
+				return strings.Contains(err.Error(), `unknown field "unknown"`)
 			},
 			yaml:   true,
 			strict: true,
@@ -321,7 +320,7 @@ func TestDecode(t *testing.T) {
 			typer:       &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
 			expectedGVK: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
 			errFn: func(err error) bool {
-				return strings.Contains(err.Error(), `"value" already set in map`)
+				return strings.Contains(err.Error(), `duplicate field "value"`)
 			},
 			strict: true,
 		},
@@ -526,7 +525,7 @@ func TestDecode(t *testing.T) {
 			if !test.errFn(err) {
 				t.Errorf("%d: failed: %v", i, err)
 			}
-			if obj != nil {
+			if !runtime.IsStrictDecodingError(err) && obj != nil {
 				t.Errorf("%d: should have returned nil object", i)
 			}
 			continue
