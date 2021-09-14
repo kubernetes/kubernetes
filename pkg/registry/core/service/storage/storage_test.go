@@ -561,29 +561,79 @@ func TestServiceDefaultOnRead(t *testing.T) {
 		input  runtime.Object
 		expect runtime.Object
 	}{{
-		name:   "no change v4",
-		input:  svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1")),
-		expect: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1")),
+		name:  "single v4",
+		input: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1")),
+		expect: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv4Protocol)),
 	}, {
-		name:   "missing clusterIPs v4",
-		input:  svctest.MakeService("foo", svctest.SetClusterIP("10.0.0.1")),
-		expect: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1")),
+		name:  "single v6",
+		input: svctest.MakeService("foo", svctest.SetClusterIPs("2000::1")),
+		expect: svctest.MakeService("foo", svctest.SetClusterIPs("2000::1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv6Protocol)),
 	}, {
-		name:   "no change v6",
-		input:  svctest.MakeService("foo", svctest.SetClusterIPs("2000::1")),
-		expect: svctest.MakeService("foo", svctest.SetClusterIPs("2000::1")),
+		name:  "missing clusterIPs v4",
+		input: svctest.MakeService("foo", svctest.SetClusterIP("10.0.0.1")),
+		expect: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv4Protocol)),
 	}, {
-		name:   "missing clusterIPs v6",
-		input:  svctest.MakeService("foo", svctest.SetClusterIP("2000::1")),
-		expect: svctest.MakeService("foo", svctest.SetClusterIPs("2000::1")),
+		name:  "missing clusterIPs v6",
+		input: svctest.MakeService("foo", svctest.SetClusterIP("2000::1")),
+		expect: svctest.MakeService("foo", svctest.SetClusterIPs("2000::1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv6Protocol)),
 	}, {
-		name:   "list, no change v4",
-		input:  makeServiceList(svctest.SetClusterIPs("10.0.0.1")),
-		expect: makeServiceList(svctest.SetClusterIPs("10.0.0.1")),
+		name:  "list v4",
+		input: makeServiceList(svctest.SetClusterIPs("10.0.0.1")),
+		expect: makeServiceList(svctest.SetClusterIPs("10.0.0.1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv4Protocol)),
 	}, {
-		name:   "list, missing clusterIPs v4",
-		input:  makeServiceList(svctest.SetClusterIP("10.0.0.1")),
-		expect: makeServiceList(svctest.SetClusterIPs("10.0.0.1")),
+		name:  "list missing clusterIPs v4",
+		input: makeServiceList(svctest.SetClusterIP("10.0.0.1")),
+		expect: makeServiceList(svctest.SetClusterIPs("10.0.0.1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv4Protocol)),
+	}, {
+		name:   "external name",
+		input:  makeServiceList(svctest.SetTypeExternalName),
+		expect: makeServiceList(svctest.SetTypeExternalName),
+	}, {
+		name:  "dual v4v6",
+		input: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1", "2000::1")),
+		expect: svctest.MakeService("foo", svctest.SetClusterIPs("10.0.0.1", "2000::1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+	}, {
+		name:  "dual v6v4",
+		input: svctest.MakeService("foo", svctest.SetClusterIPs("2000::1", "10.0.0.1")),
+		expect: svctest.MakeService("foo", svctest.SetClusterIPs("2000::1", "10.0.0.1"),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			svctest.SetIPFamilies(api.IPv6Protocol, api.IPv4Protocol)),
+	}, {
+		name:  "headless",
+		input: svctest.MakeService("foo", svctest.SetHeadless),
+		expect: svctest.MakeService("foo", svctest.SetHeadless,
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv4Protocol)),
+	}, {
+		name: "headless selectorless",
+		input: svctest.MakeService("foo", svctest.SetHeadless,
+			svctest.SetSelector(map[string]string{})),
+		expect: svctest.MakeService("foo", svctest.SetHeadless,
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicyRequireDualStack),
+			svctest.SetIPFamilies(api.IPv4Protocol, api.IPv6Protocol)),
+	}, {
+		name: "headless selectorless pre-set",
+		input: svctest.MakeService("foo", svctest.SetHeadless,
+			svctest.SetSelector(map[string]string{}),
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv6Protocol)),
+		expect: svctest.MakeService("foo", svctest.SetHeadless,
+			svctest.SetIPFamilyPolicy(api.IPFamilyPolicySingleStack),
+			svctest.SetIPFamilies(api.IPv6Protocol)),
 	}, {
 		name:  "not Service or ServiceList",
 		input: &api.Pod{},
@@ -593,7 +643,7 @@ func TestServiceDefaultOnRead(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol})
+			storage, _, server := newStorage(t, []api.IPFamily{api.IPv4Protocol, api.IPv6Protocol})
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
@@ -619,11 +669,17 @@ func TestServiceDefaultOnRead(t *testing.T) {
 			}
 
 			// Verify fields we know are affected
-			if svc.Spec.ClusterIP != exp.Spec.ClusterIP {
-				t.Errorf("clusterIP: expected %v, got %v", exp.Spec.ClusterIP, svc.Spec.ClusterIP)
+			if want, got := exp.Spec.ClusterIP, svc.Spec.ClusterIP; want != got {
+				t.Errorf("clusterIP: expected %v, got %v", want, got)
 			}
-			if !reflect.DeepEqual(svc.Spec.ClusterIPs, exp.Spec.ClusterIPs) {
-				t.Errorf("clusterIPs: expected %v, got %v", exp.Spec.ClusterIPs, svc.Spec.ClusterIPs)
+			if want, got := exp.Spec.ClusterIPs, svc.Spec.ClusterIPs; !reflect.DeepEqual(want, got) {
+				t.Errorf("clusterIPs: expected %v, got %v", want, got)
+			}
+			if want, got := fmtIPFamilyPolicy(exp.Spec.IPFamilyPolicy), fmtIPFamilyPolicy(svc.Spec.IPFamilyPolicy); want != got {
+				t.Errorf("ipFamilyPolicy: expected %v, got %v", want, got)
+			}
+			if want, got := exp.Spec.IPFamilies, svc.Spec.IPFamilies; !reflect.DeepEqual(want, got) {
+				t.Errorf("ipFamilies: expected %v, got %v", want, got)
 			}
 		})
 	}
