@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/utils/clock"
 )
 
 type Interface interface {
@@ -47,7 +47,7 @@ func NewNamed(name string) *Type {
 	)
 }
 
-func newQueue(c clock.Clock, metrics queueMetrics, updatePeriod time.Duration) *Type {
+func newQueue(c clock.WithTicker, metrics queueMetrics, updatePeriod time.Duration) *Type {
 	t := &Type{
 		clock:                      c,
 		dirty:                      set{},
@@ -92,7 +92,7 @@ type Type struct {
 	metrics queueMetrics
 
 	unfinishedWorkUpdatePeriod time.Duration
-	clock                      clock.Clock
+	clock                      clock.WithTicker
 }
 
 type empty struct{}

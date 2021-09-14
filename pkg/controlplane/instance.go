@@ -55,7 +55,6 @@ import (
 	storageapiv1alpha1 "k8s.io/api/storage/v1alpha1"
 	storageapiv1beta1 "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -84,6 +83,7 @@ import (
 	"k8s.io/kubernetes/pkg/routes"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+	"k8s.io/utils/clock"
 
 	// RESTStorage installers
 	admissionregistrationrest "k8s.io/kubernetes/pkg/registry/admissionregistration/rest"

@@ -24,12 +24,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var zero time.Time
@@ -468,7 +468,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		}},
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	t.Log(fakeClock.Now())
 	_, err := manager.detectImages(fakeClock.Now())
 	require.NoError(t, err)

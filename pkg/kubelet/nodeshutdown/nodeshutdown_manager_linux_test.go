@@ -30,13 +30,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type fakeDbus struct {
@@ -235,7 +235,7 @@ func TestManager(t *testing.T) {
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager, _ := NewManager(fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, tc.shutdownGracePeriodCriticalPods)
-			manager.clock = clock.NewFakeClock(time.Now())
+			manager.clock = testingclock.NewFakeClock(time.Now())
 
 			err := manager.Start()
 			if tc.expectedError != nil {
@@ -312,7 +312,7 @@ func TestFeatureEnabled(t *testing.T) {
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager, _ := NewManager(fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, 0 /*shutdownGracePeriodCriticalPods*/)
-			manager.clock = clock.NewFakeClock(time.Now())
+			manager.clock = testingclock.NewFakeClock(time.Now())
 
 			assert.Equal(t, tc.expectEnabled, manager.isFeatureEnabled())
 		})
