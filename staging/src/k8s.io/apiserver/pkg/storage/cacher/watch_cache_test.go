@@ -31,13 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/tools/cache"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
@@ -81,7 +81,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
 	}
 	versioner := etcd3.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, clock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
+	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -443,7 +443,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	store := newTestWatchCache(3, &cache.Indexers{})
-	fc := store.clock.(*clock.FakeClock)
+	fc := store.clock.(*testingclock.FakeClock)
 
 	// In background, step clock after the below call starts the timer.
 	go func() {

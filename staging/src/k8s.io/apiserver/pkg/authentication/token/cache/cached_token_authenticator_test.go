@@ -31,13 +31,14 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestCachedTokenAuthenticator(t *testing.T) {
@@ -52,7 +53,7 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 		calledWithToken = append(calledWithToken, token)
 		return &authenticator.Response{User: resultUsers[token]}, resultOk, resultErr
 	})
-	fakeClock := utilclock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
 
@@ -126,7 +127,7 @@ func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 		auds, _ := authenticator.AudiencesFrom(ctx)
 		return &authenticator.Response{User: resultUsers[auds[0]+token]}, true, nil
 	})
-	fakeClock := utilclock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
 
@@ -546,7 +547,7 @@ func (s *singleBenchmark) bench(b *testing.B) {
 		true,
 		4*time.Second,
 		500*time.Millisecond,
-		utilclock.RealClock{},
+		clock.RealClock{},
 	)
 
 	b.ResetTimer()

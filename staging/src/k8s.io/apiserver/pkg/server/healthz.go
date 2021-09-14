@@ -21,8 +21,8 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/utils/clock"
 )
 
 // AddHealthChecks adds HealthCheck(s) to health endpoints (healthz, livez, readyz) but
