@@ -245,6 +245,7 @@ func TestSchedulerCreation(t *testing.T) {
 			s, err := New(
 				client,
 				informerFactory,
+				nil,
 				profile.NewRecorderFactory(eventBroadcaster),
 				stopCh,
 				tc.opts...,
@@ -553,6 +554,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	sched, err := New(
 		client,
 		informerFactory,
+		nil,
 		profile.NewRecorderFactory(broadcaster),
 		ctx.Done(),
 		WithProfiles(

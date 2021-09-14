@@ -33,6 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -87,6 +89,7 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 	sched, err := scheduler.New(
 		clientSet,
 		informerFactory,
+		nil,
 		profile.NewRecorderFactory(evtBroadcaster),
 		ctx.Done(),
 		scheduler.WithKubeConfig(kubeConfig),
@@ -156,15 +159,16 @@ func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {
 
 // TestContext store necessary context info
 type TestContext struct {
-	CloseFn         framework.CloseFunc
-	HTTPServer      *httptest.Server
-	NS              *v1.Namespace
-	ClientSet       clientset.Interface
-	KubeConfig      *restclient.Config
-	InformerFactory informers.SharedInformerFactory
-	Scheduler       *scheduler.Scheduler
-	Ctx             context.Context
-	CancelFn        context.CancelFunc
+	CloseFn            framework.CloseFunc
+	HTTPServer         *httptest.Server
+	NS                 *v1.Namespace
+	ClientSet          clientset.Interface
+	KubeConfig         *restclient.Config
+	InformerFactory    informers.SharedInformerFactory
+	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
+	Scheduler          *scheduler.Scheduler
+	Ctx                context.Context
+	CancelFn           context.CancelFunc
 }
 
 // CleanupNodes cleans all nodes which were created during integration test
@@ -193,6 +197,10 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 func SyncInformerFactory(testCtx *TestContext) {
 	testCtx.InformerFactory.Start(testCtx.Ctx.Done())
 	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	if testCtx.DynInformerFactory != nil {
+		testCtx.DynInformerFactory.Start(testCtx.Ctx.Done())
+		testCtx.DynInformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	}
 }
 
 // CleanupTest cleans related resources which were created during integration test
@@ -395,6 +403,10 @@ func InitTestSchedulerWithOptions(
 ) *TestContext {
 	// 1. Create scheduler
 	testCtx.InformerFactory = scheduler.NewInformerFactory(testCtx.ClientSet, 0)
+	if testCtx.KubeConfig != nil {
+		dynClient := dynamic.NewForConfigOrDie(testCtx.KubeConfig)
+		testCtx.DynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
+	}
 
 	var err error
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
@@ -408,6 +420,7 @@ func InitTestSchedulerWithOptions(
 	testCtx.Scheduler, err = scheduler.New(
 		testCtx.ClientSet,
 		testCtx.InformerFactory,
+		testCtx.DynInformerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
 		testCtx.Ctx.Done(),
 		opts...,
