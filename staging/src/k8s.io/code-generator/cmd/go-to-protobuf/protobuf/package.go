@@ -199,7 +199,7 @@ func (p *protobufPackage) generatorFunc(c *generator.Context) []generator.Genera
 }
 
 func (p *protobufPackage) GoPackageName() string {
-	return filepath.Base(p.PackagePath)
+	return p.PackagePath
 }
 
 func (p *protobufPackage) ImportPath() string {

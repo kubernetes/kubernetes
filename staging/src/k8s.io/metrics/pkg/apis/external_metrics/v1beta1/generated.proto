@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/metrics/pkg/apis/external_metrics/v1beta1";
 
 // ExternalMetricValue is a metric value for external metric
 // A single metric value is identified by metric name and a set of string labels.

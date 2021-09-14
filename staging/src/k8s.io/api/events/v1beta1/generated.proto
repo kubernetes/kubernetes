@@ -27,7 +27,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1beta1";
+option go_package = "k8s.io/api/events/v1beta1";
 
 // Event is a report of an event somewhere in the cluster. It generally denotes some state change in the system.
 // Events have a limited retention time and triggers and messages may evolve

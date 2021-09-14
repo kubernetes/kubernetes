@@ -26,7 +26,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1alpha1";
+option go_package = "k8s.io/api/flowcontrol/v1alpha1";
 
 // FlowDistinguisherMethod specifies the method of a flow distinguisher.
 message FlowDistinguisherMethod {

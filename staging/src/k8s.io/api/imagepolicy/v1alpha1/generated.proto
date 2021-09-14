@@ -26,7 +26,7 @@ import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 
 // Package-wide variables from generator "generated".
-option go_package = "v1alpha1";
+option go_package = "k8s.io/api/imagepolicy/v1alpha1";
 
 // ImageReview checks if the set of images in a pod are allowed.
 message ImageReview {
