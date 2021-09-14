@@ -234,7 +234,7 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 	}
 	// Periodically call m.reconcileState() to continue to keep the CPU sets of
 	// all pods in sync with and guaranteed CPUs handed out among them.
-	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
+	go wait.Forever(func() { m.reconcileState() }, m.reconcilePeriod)
 	return nil
 }
 

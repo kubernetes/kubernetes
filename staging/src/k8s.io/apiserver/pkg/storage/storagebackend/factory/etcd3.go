@@ -81,7 +81,7 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	clientErrMsg := &atomic.Value{}
 	clientErrMsg.Store("etcd client connection not yet established")
 
-	go wait.PollUntil(time.Second, func() (bool, error) {
+	go wait.PollInfinite(time.Second, func() (bool, error) {
 		client, err := newETCD3Client(c.Transport)
 		if err != nil {
 			clientErrMsg.Store(err.Error())
@@ -90,7 +90,7 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		clientValue.Store(client)
 		clientErrMsg.Store("")
 		return true, nil
-	}, wait.NeverStop)
+	})
 
 	return func() error {
 		if errMsg := clientErrMsg.Load().(string); len(errMsg) > 0 {

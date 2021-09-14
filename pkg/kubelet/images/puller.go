@@ -19,7 +19,7 @@ package images
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -64,7 +64,7 @@ type serialImagePuller struct {
 
 func newSerialImagePuller(imageService kubecontainer.ImageService) imagePuller {
 	imagePuller := &serialImagePuller{imageService, make(chan *imagePullRequest, maxImagePullRequests)}
-	go wait.Until(imagePuller.processImagePullRequests, time.Second, wait.NeverStop)
+	go wait.Forever(imagePuller.processImagePullRequests, time.Second)
 	return imagePuller
 }
 

@@ -611,7 +611,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 			klog.ErrorS(nil, "Healthz server returned without error")
 		}
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+	go wait.Forever(fn, 5*time.Second)
 }
 
 func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh chan error) {
@@ -650,7 +650,7 @@ func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh cha
 			}
 		}
 	}
-	go wait.Until(fn, 5*time.Second, wait.NeverStop)
+	go wait.Forever(fn, 5*time.Second)
 }
 
 // Run runs the specified ProxyServer.  This should never exit (unless CleanupAndExit is set).

@@ -134,12 +134,12 @@ func (m *qosContainerManagerImpl) Start(getNodeAllocatable func() v1.ResourceLis
 
 	// update qos cgroup tiers on startup and in periodic intervals
 	// to ensure desired state is in sync with actual state.
-	go wait.Until(func() {
+	go wait.Forever(func() {
 		err := m.UpdateCgroups()
 		if err != nil {
 			klog.InfoS("Failed to reserve QoS requests", "err", err)
 		}
-	}, periodicQOSCgroupUpdateInterval, wait.NeverStop)
+	}, periodicQOSCgroupUpdateInterval)
 
 	return nil
 }

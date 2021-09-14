@@ -55,7 +55,7 @@ func NewSourceURL(url string, header http.Header, nodeName types.NodeName, perio
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
 	klog.V(1).InfoS("Watching URL", "URL", url)
-	go wait.Until(config.run, period, wait.NeverStop)
+	go wait.Forever(config.run, period)
 }
 
 func (s *sourceURL) run() {

@@ -24,9 +24,9 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -175,7 +175,7 @@ func NewImageGCManager(runtime container.Runtime, statsProvider StatsProvider, r
 }
 
 func (im *realImageGCManager) Start() {
-	go wait.Until(func() {
+	go wait.Forever(func() {
 		// Initial detection make detected time "unknown" in the past.
 		var ts time.Time
 		if im.initialized {
@@ -187,17 +187,17 @@ func (im *realImageGCManager) Start() {
 		} else {
 			im.initialized = true
 		}
-	}, 5*time.Minute, wait.NeverStop)
+	}, 5*time.Minute)
 
 	// Start a goroutine periodically updates image cache.
-	go wait.Until(func() {
+	go wait.Forever(func() {
 		images, err := im.runtime.ListImages()
 		if err != nil {
 			klog.InfoS("Failed to update image list", "err", err)
 		} else {
 			im.imageCache.set(images)
 		}
-	}, 30*time.Second, wait.NeverStop)
+	}, 30*time.Second)
 
 }
 

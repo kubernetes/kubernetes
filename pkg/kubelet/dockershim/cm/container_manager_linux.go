@@ -82,7 +82,7 @@ func (m *containerManager) Start() error {
 		}
 		m.cgroupsManager = manager
 	}
-	go wait.Until(m.doWork, 5*time.Minute, wait.NeverStop)
+	go wait.Forever(m.doWork, 5*time.Minute)
 	return nil
 }
 

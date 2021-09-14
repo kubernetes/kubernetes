@@ -74,7 +74,7 @@ func (m *Mux) Channel(source string) chan interface{} {
 	}
 	newChannel := make(chan interface{})
 	m.sources[source] = newChannel
-	go wait.Until(func() { m.listen(source, newChannel) }, 0, wait.NeverStop)
+	go wait.Forever(func() { m.listen(source, newChannel) }, 0)
 	return newChannel
 }
 

@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	"k8s.io/klog/v2"
@@ -196,7 +196,7 @@ func NewObjectCache(
 	}
 
 	// TODO propagate stopCh from the higher level.
-	go wait.Until(store.startRecycleIdleWatch, time.Minute, wait.NeverStop)
+	go wait.Forever(store.startRecycleIdleWatch, time.Minute)
 	return store
 }
 

@@ -203,5 +203,5 @@ func (m *GracefulTerminationManager) MoveRSOutofGracefulDeleteList(uniqueRS stri
 
 // Run start a goroutine to try to delete rs in the graceful delete rsList with an interval 1 minute
 func (m *GracefulTerminationManager) Run() {
-	go wait.Until(m.tryDeleteRs, rsCheckDeleteInterval, wait.NeverStop)
+	go wait.Forever(m.tryDeleteRs, rsCheckDeleteInterval)
 }

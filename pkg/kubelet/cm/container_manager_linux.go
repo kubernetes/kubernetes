@@ -669,7 +669,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	}
 	if hasEnsureStateFuncs {
 		// Run ensure state functions every minute.
-		go wait.Until(func() {
+		go wait.Forever(func() {
 			for _, cont := range cm.systemContainers {
 				if cont.ensureStateFunc != nil {
 					if err := cont.ensureStateFunc(cont.manager); err != nil {
@@ -677,18 +677,18 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 					}
 				}
 			}
-		}, time.Minute, wait.NeverStop)
+		}, time.Minute)
 
 	}
 
 	if len(cm.periodicTasks) > 0 {
-		go wait.Until(func() {
+		go wait.Forever(func() {
 			for _, task := range cm.periodicTasks {
 				if task != nil {
 					task()
 				}
 			}
-		}, 5*time.Minute, wait.NeverStop)
+		}, 5*time.Minute)
 	}
 
 	// Starts device manager.

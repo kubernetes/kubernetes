@@ -45,14 +45,14 @@ func (a containerStatusbyCreatedList) Less(i, j int) bool {
 
 func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int) *podContainerDeletor {
 	buffer := make(chan kubecontainer.ContainerID, containerDeletorBufferLimit)
-	go wait.Until(func() {
+	go wait.Forever(func() {
 		for {
 			id := <-buffer
 			if err := runtime.DeleteContainer(id); err != nil {
 				klog.InfoS("DeleteContainer returned error", "containerID", id, "err", err)
 			}
 		}
-	}, 0, wait.NeverStop)
+	}, 0)
 
 	return &podContainerDeletor{
 		worker:           buffer,
