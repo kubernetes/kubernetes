@@ -730,8 +730,9 @@ const (
 
 	// owner: @fromanirh
 	// alpha: v1.22
+	// beta: v1.23
 	//
-	// Allow fine-tuning of cpumanager policies
+	// Allow the usage of options to fine-tune the cpumanager policies.
 	CPUManagerPolicyOptions featuregate.Feature = "CPUManagerPolicyOptions"
 
 	// owner: @jiahuif
@@ -740,6 +741,33 @@ const (
 	//
 	// Enables Leader Migration for kube-controller-manager and cloud-controller-manager
 	ControllerManagerLeaderMigration featuregate.Feature = "ControllerManagerLeaderMigration"
+
+	// owner: @fromanirh
+	// alpha: v1.23
+	// beta: see below.
+	//
+	// Allow fine-tuning of cpumanager policies, experimental, alpha-quality options
+	// Per https://groups.google.com/g/kubernetes-sig-architecture/c/Nxsc7pfe5rw/m/vF2djJh0BAAJ
+	// We want to avoid a proliferation of feature gates. This feature gate:
+	// - will guard *a group* of cpumanager options whose quality level is alpha.
+	// - will never graduate to beta or stable.
+	// See https://groups.google.com/g/kubernetes-sig-architecture/c/Nxsc7pfe5rw/m/vF2djJh0BAAJ
+	// for details about the removal of this feature gate.
+	CPUManagerPolicyAlphaOptions featuregate.Feature = "CPUManagerPolicyAlphaOptions"
+
+	// owner: @fromanirh
+	// beta: v1.23
+	// beta: see below.
+	//
+	// Allow fine-tuning of cpumanager policies, experimental, beta-quality options
+	// Per https://groups.google.com/g/kubernetes-sig-architecture/c/Nxsc7pfe5rw/m/vF2djJh0BAAJ
+	// We want to avoid a proliferation of feature gates. This feature gate:
+	// - will guard *a group* of cpumanager options whose quality level is beta.
+	// - is thus *introduced* as beta
+	// - will never graduate to stable.
+	// See https://groups.google.com/g/kubernetes-sig-architecture/c/Nxsc7pfe5rw/m/vF2djJh0BAAJ
+	// for details about the removal of this feature gate.
+	CPUManagerPolicyBetaOptions featuregate.Feature = "CPUManagerPolicyBetaOptions"
 )
 
 func init() {
@@ -849,8 +877,10 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DelegateFSGroupToCSIDriver:                     {Default: false, PreRelease: featuregate.Alpha},
 	KubeletInUserNamespace:                         {Default: false, PreRelease: featuregate.Alpha},
 	MemoryQoS:                                      {Default: false, PreRelease: featuregate.Alpha},
-	CPUManagerPolicyOptions:                        {Default: false, PreRelease: featuregate.Alpha},
+	CPUManagerPolicyOptions:                        {Default: true, PreRelease: featuregate.Beta},
 	ControllerManagerLeaderMigration:               {Default: true, PreRelease: featuregate.Beta},
+	CPUManagerPolicyAlphaOptions:                   {Default: false, PreRelease: featuregate.Alpha},
+	CPUManagerPolicyBetaOptions:                    {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
