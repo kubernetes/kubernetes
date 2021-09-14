@@ -8,4 +8,4 @@ metadata:
 spec:
   containers:
   - name: kubernetes-pause3
-    image: k8s.gcr.io/pause:3.5
+    image: k8s.gcr.io/pause:3.6
