@@ -271,7 +271,7 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 
 	namespacedName, _, err := endpointSliceCacheKeys(endpointSlice)
 	if err != nil {
-		klog.ErrorS(err, "Error getting endpoint slice cache keys")
+		klog.InfoS("Error getting endpoint slice cache keys", "error", err)
 		return false
 	}
 
@@ -349,8 +349,8 @@ func getLastChangeTriggerTime(annotations map[string]string) time.Time {
 	}
 	val, err := time.Parse(time.RFC3339Nano, annotations[v1.EndpointsLastChangeTriggerTime])
 	if err != nil {
-		klog.ErrorS(err, "Error while parsing EndpointsLastChangeTriggerTimeAnnotation",
-			"endpointsLastChangeTriggerTimeAnnotation", annotations[v1.EndpointsLastChangeTriggerTime])
+		klog.InfoS("Error while parsing EndpointsLastChangeTriggerTimeAnnotation", "error", err,
+			"value", annotations[v1.EndpointsLastChangeTriggerTime])
 		// In case of error val = time.Zero, which is ignored in the upstream code.
 	}
 	return val
