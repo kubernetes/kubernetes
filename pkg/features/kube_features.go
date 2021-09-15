@@ -899,6 +899,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.APIPriorityAndFairness:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
+	genericfeatures.OpenAPIEnums:            {Default: false, PreRelease: featuregate.Alpha},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
