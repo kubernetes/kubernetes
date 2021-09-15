@@ -93,8 +93,13 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 
 		decodeSerializer := s.Serializer
-		// TODO: put behind feature flag?
-		if strictValidation(req.URL) {
+		// TODO: put behind feature gate?
+		validationDirective, err := fieldValidation(req)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+		if validationDirective == strictFieldValidation {
 			decodeSerializer = s.StrictSerializer
 		}
 		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)

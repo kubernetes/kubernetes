@@ -104,8 +104,13 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 
 		trace.Step("About to convert to expected version")
 		decodeSerializer := s.Serializer
-		// TODO: put behind feature flag?
-		if strictValidation(req.URL) {
+		// TODO: put behind feature gate?
+		validationDirective, err := fieldValidation(req)
+		if err != nil {
+			scope.err(err, w, req)
+			return
+		}
+		if validationDirective == strictFieldValidation {
 			decodeSerializer = s.StrictSerializer
 		}
 		decoder := scope.Serializer.DecoderToVersion(decodeSerializer, scope.HubGroupVersion)

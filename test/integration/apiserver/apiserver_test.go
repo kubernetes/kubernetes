@@ -2330,6 +2330,8 @@ func TestDedupOwnerReferences(t *testing.T) {
 	}
 }
 
+// Benchmark field validation for strict vs non-strict
+// TODO: add actual correctness integration tests too
 func BenchmarkFieldValidation(b *testing.B) {
 	_, client, closeFn := setup(b)
 	defer closeFn()
@@ -2366,17 +2368,22 @@ func BenchmarkFieldValidation(b *testing.B) {
 
 	// TODO: add bigger objects to benchmarks table once confirmed that this is how we want to do benchmarking.
 	// TODO: split POST and PUT into their own test-cases.
+	// TODO: add test for "Warn" validation once it is implemented.
 	benchmarks := []struct {
 		name   string
 		params map[string]string
 	}{
 		{
-			name:   "nonstrict-deployment",
+			name:   "default-ignore-validation-deployment",
 			params: map[string]string{},
 		},
 		{
-			name:   "strict-deployment",
-			params: map[string]string{"validate": "strict"},
+			name:   "ignore-validation-deployment",
+			params: map[string]string{"fieldValidation": "Ignore"},
+		},
+		{
+			name:   "strict-validation-deployment",
+			params: map[string]string{"fieldValidation": "Strict"},
 		},
 	}
 

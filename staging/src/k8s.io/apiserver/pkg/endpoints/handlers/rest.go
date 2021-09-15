@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -456,13 +457,60 @@ func isDryRun(url *url.URL) bool {
 	return len(url.Query()["dryRun"]) != 0
 }
 
-// TODO: currently strict validation is set via
-// query param. Alternatively we could use a request header.
-// TODO: maybe we should check content-type here and error for protobuf (ie take the full req instead of just the URL?)
-// TODO: what do we want the query param to actually be (I went with ?validate=strict but am open to whatever)
-func strictValidation(url *url.URL) bool {
-	validateParam := url.Query()["validate"]
-	return len(validateParam) == 1 && validateParam[0] == "strict"
+type fieldValidationDirective int
+
+const (
+	ignoreFieldValidation fieldValidationDirective = iota
+	strictFieldValidation
+	warnFieldValidation
+)
+
+// fieldValidation checks if the fieldValidation query parameter is set on the request,
+// and if so ensures that the parameter is valid and that the request has a valid
+// media type, because the list of media types that support field validation are a subset of
+// all supported media types (only json and yaml supports field validation).
+func fieldValidation(req *http.Request) (fieldValidationDirective, error) {
+	supportedMediaTypes := []string{"application/json", "application/yaml"}
+	supported := false
+	contentType := req.Header.Get("ContentType")
+	// TODO: not sure if it is okay to assume empty content type is a valid one
+	if contentType != "" {
+		for _, v := range strings.Split(contentType, ",") {
+			t, _, err := mime.ParseMediaType(v)
+			if err != nil {
+				return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("could not parse media type: %v", v))
+			}
+			for _, mt := range supportedMediaTypes {
+				if t == mt {
+					supported = true
+					break
+				}
+			}
+		}
+		if !supported {
+			return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter only supports media types types %v\n content type provided: %s", supportedMediaTypes, contentType))
+		}
+	}
+
+	validationParam := req.URL.Query()["fieldValidation"]
+	switch len(validationParam) {
+	case 0:
+		return ignoreFieldValidation, nil
+	case 1:
+		switch validationParam[0] {
+		case "Ignore":
+			return ignoreFieldValidation, nil
+		case "Strict":
+			return strictFieldValidation, nil
+		case "Warn":
+			return warnFieldValidation, nil
+		default:
+			return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter unsupported: %v", validationParam))
+		}
+	default:
+		return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation should only be one value: %v", validationParam))
+
+	}
 }
 
 type etcdError interface {
