@@ -87,6 +87,7 @@ type Controller struct {
 	eventRecorder       record.EventRecorder
 	nodeLister          corelisters.NodeLister
 	nodeListerSynced    cache.InformerSynced
+	endpointsLister     corelisters.EndpointsLister
 	// services that need to be synced
 	queue workqueue.RateLimitingInterface
 
@@ -106,6 +107,7 @@ func New(
 	kubeClient clientset.Interface,
 	serviceInformer coreinformers.ServiceInformer,
 	nodeInformer coreinformers.NodeInformer,
+	endpointsInformer coreinformers.EndpointsInformer,
 	clusterName string,
 	featureGate featuregate.FeatureGate,
 ) (*Controller, error) {
@@ -131,6 +133,7 @@ func New(
 		eventRecorder:    recorder,
 		nodeLister:       nodeInformer.Lister(),
 		nodeListerSynced: nodeInformer.Informer().HasSynced,
+		endpointsLister:  endpointsInformer.Lister(),
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(minRetryDelay, maxRetryDelay), "service"),
 		// nodeSyncCh has a size 1 buffer. Only one pending sync signal would be cached.
 		nodeSyncCh: make(chan interface{}, 1),
@@ -190,6 +193,18 @@ func New(
 		time.Duration(0),
 	)
 
+	endpointsInformer.Informer().AddEventHandlerWithResyncPeriod(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(cur interface{}) {
+				s.enqueueServiceForEndpoints(cur)
+			},
+			UpdateFunc: func(old, cur interface{}) {
+				s.enqueueServiceForEndpoints(cur)
+			},
+		},
+		time.Duration(0),
+	)
+
 	if err := s.init(); err != nil {
 		return nil, err
 	}
@@ -214,6 +229,23 @@ func (s *Controller) enqueueService(obj interface{}) {
 		return
 	}
 	s.queue.Add(key)
+}
+
+// obj could be an *v1.Endpoints, or a DeletionFinalStateUnknown marker item.
+func (s *Controller) enqueueServiceForEndpoints(obj interface{}) {
+	eps, ok := obj.(*v1.Endpoints)
+	if !ok {
+		return
+	}
+	svc, err := s.serviceLister.Services(eps.Namespace).Get(eps.Name)
+	if err != nil && errors.IsNotFound(err) {
+		return
+	} else if err != nil {
+		s.enqueueService(obj)
+	}
+	if wantsLoadBalancer(svc) || needsCleanup(svc) {
+		s.enqueueService(obj)
+	}
 }
 
 // Run starts a background goroutine that watches for changes to services that
@@ -440,6 +472,11 @@ func (s *Controller) syncLoadBalancerIfNeeded(ctx context.Context, service *v1.S
 
 func (s *Controller) ensureLoadBalancer(ctx context.Context, service *v1.Service) (*v1.LoadBalancerStatus, error) {
 	nodes, err := listWithPredicate(s.nodeLister, s.getNodeConditionPredicate())
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, err = filterLocalModeNodes(s.endpointsLister, nodes, service)
 	if err != nil {
 		return nil, err
 	}
@@ -761,6 +798,11 @@ func (s *Controller) nodeSyncService(svc *v1.Service) bool {
 		return true
 	}
 
+	hosts, err = filterLocalModeNodes(s.endpointsLister, hosts, svc)
+	if err != nil {
+		return true
+	}
+
 	if err := s.lockedUpdateLoadBalancerHosts(svc, hosts); err != nil {
 		runtime.HandleError(fmt.Errorf("failed to update load balancer hosts for service %s/%s: %v", svc.Namespace, svc.Name, err))
 		return true
@@ -970,6 +1012,41 @@ func listWithPredicate(nodeLister corelisters.NodeLister, predicate NodeConditio
 	for i := range nodes {
 		if predicate(nodes[i]) {
 			filtered = append(filtered, nodes[i])
+		}
+	}
+
+	return filtered, nil
+}
+
+// filterLocalModeNodes gets nodes that have endpoints running on themselves.
+func filterLocalModeNodes(endpointsLister corelisters.EndpointsLister, nodes []*v1.Node, service *v1.Service) ([]*v1.Node, error) {
+	if !servicehelper.RequestsOnlyLocalTraffic(service) {
+		return nodes, nil
+	}
+
+	eps, err := endpointsLister.Endpoints(service.Namespace).Get(service.Name)
+	if err != nil && errors.IsNotFound(err) {
+		klog.Warningf("get nil endpoints when filter local mode nodes for service[%s/%s]: %v",
+			service.Namespace, service.Name, err)
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to get endpoints when ensureLoadBalancer: %v", err)
+	}
+
+	nodeNameMap := make(map[string]struct{})
+	for _, subset := range eps.Subsets {
+		for _, addr := range subset.Addresses {
+			if addr.NodeName == nil {
+				return nil, fmt.Errorf("failed to filter local mode nodes for service[%s/%s], NodeName is nil for ip %s",
+					service.Namespace, service.Name, addr.IP)
+			}
+			nodeNameMap[*addr.NodeName] = struct{}{}
+		}
+	}
+
+	var filtered []*v1.Node
+	for _, node := range nodes {
+		if _, ok := nodeNameMap[node.Name]; ok {
+			filtered = append(filtered, node)
 		}
 	}
 
