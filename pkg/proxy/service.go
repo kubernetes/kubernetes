@@ -183,7 +183,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	// Log the IPs not matching the ipFamily
 	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
 		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
-			"ipFamily", sct.ipFamily,"externalIPs", strings.Join(ips, ","), "service", klog.KObj(service))
+			"ipFamily", sct.ipFamily, "externalIPs", strings.Join(ips, ","), "service", klog.KObj(service))
 	}
 
 	ipFamilyMap = utilproxy.MapCIDRsByIPFamily(loadBalancerSourceRanges)
