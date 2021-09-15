@@ -182,14 +182,16 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 	// Log the IPs not matching the ipFamily
 	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
-		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IPFamily", "serviceChangeTracker", sct.ipFamily, "externalIPs", strings.Join(ips, ","), "service", klog.KObj(service))
+		klog.V(4).InfoS("Service change tracker ignored the following external IPs for given service as they don't match IP Family",
+			"ipFamily", sct.ipFamily,"externalIPs", strings.Join(ips, ","), "service", klog.KObj(service))
 	}
 
 	ipFamilyMap = utilproxy.MapCIDRsByIPFamily(loadBalancerSourceRanges)
 	info.loadBalancerSourceRanges = ipFamilyMap[sct.ipFamily]
 	// Log the CIDRs not matching the ipFamily
 	if cidrs, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
-		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given service as they don't match IPFamily", "serviceChangeTracker", sct.ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ","), "service", klog.KObj(service))
+		klog.V(4).InfoS("Service change tracker ignored the following load balancer source ranges for given Service as they don't match IP Family",
+			"ipFamily", sct.ipFamily, "loadBalancerSourceRanges", strings.Join(cidrs, ","), "service", klog.KObj(service))
 	}
 
 	// Obtain Load Balancer Ingress IPs
@@ -204,8 +206,8 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		ipFamilyMap = utilproxy.MapIPsByIPFamily(ips)
 
 		if ipList, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ipList) > 0 {
-			klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress ips for given service as they don't match IPFamily", "serviceChangeTracker", sct.ipFamily, "loadBalancerIngressIps", strings.Join(ipList, ","), "service", klog.KObj(service))
-
+			klog.V(4).InfoS("Service change tracker ignored the following load balancer ingress IPs for given Service as they don't match the IP Family",
+				"ipFamily", sct.ipFamily, "loadBalancerIngressIps", strings.Join(ipList, ","), "service", klog.KObj(service))
 		}
 		// Create the LoadBalancerStatus with the filtered IPs
 		for _, ip := range ipFamilyMap[sct.ipFamily] {
