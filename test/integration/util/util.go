@@ -196,9 +196,11 @@ func PodDeleted(c clientset.Interface, podNamespace, podName string) wait.Condit
 // SyncInformerFactory starts informer and waits for caches to be synced
 func SyncInformerFactory(testCtx *TestContext) {
 	testCtx.InformerFactory.Start(testCtx.Ctx.Done())
-	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
 	if testCtx.DynInformerFactory != nil {
 		testCtx.DynInformerFactory.Start(testCtx.Ctx.Done())
+	}
+	testCtx.InformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
+	if testCtx.DynInformerFactory != nil {
 		testCtx.DynInformerFactory.WaitForCacheSync(testCtx.Ctx.Done())
 	}
 }

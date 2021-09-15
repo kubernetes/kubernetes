@@ -180,11 +180,15 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 
 	// Start all informers.
 	cc.InformerFactory.Start(ctx.Done())
+	// DynInformerFactory can be nil in tests.
+	if cc.DynInformerFactory != nil {
+		cc.DynInformerFactory.Start(ctx.Done())
+	}
+
 	// Wait for all caches to sync before scheduling.
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
 	// DynInformerFactory can be nil in tests.
 	if cc.DynInformerFactory != nil {
-		cc.DynInformerFactory.Start(ctx.Done())
 		cc.DynInformerFactory.WaitForCacheSync(ctx.Done())
 	}
 
