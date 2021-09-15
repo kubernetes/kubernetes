@@ -7,6 +7,8 @@
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
   - [Changelog since v1.19.14](#changelog-since-v11914)
+  - [Important Security Information](#important-security-information)
+    - [CVE-2021-25741: Symlink Exchange Can Allow Host Filesystem Access](#cve-2021-25741-symlink-exchange-can-allow-host-filesystem-access)
   - [Changes by Kind](#changes-by-kind)
     - [Bug or Regression](#bug-or-regression)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
@@ -475,6 +477,30 @@ filename | sha512 hash
 [kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.15/kubernetes-node-windows-amd64.tar.gz) | 9b45497de0ffe8d1f40e97a8e483e322faeb06dbac7b7f971bbe73420d2e8e99a06b69f15072815c5f734759407e05dbcd757f8317d2b42bae4188eb5e7e960e
 
 ## Changelog since v1.19.14
+
+## Important Security Information
+
+This release contains changes that address the following vulnerabilities:
+
+### CVE-2021-25741: Symlink Exchange Can Allow Host Filesystem Access
+
+A security issue was discovered in Kubernetes where a user may be able to
+create a container with subpath volume mounts to access files &
+directories outside of the volume, including on the host filesystem.
+**Affected Versions**:
+  - kubelet v1.22.0 - v1.22.1
+  - kubelet v1.21.0 - v1.21.4
+  - kubelet v1.20.0 - v1.20.10
+  - kubelet <= v1.19.14
+**Fixed Versions**:
+  - kubelet v1.22.2
+  - kubelet v1.21.5
+  - kubelet v1.20.11
+  - kubelet v1.19.15
+This vulnerability was reported by Fabricio Voznika and Mark Wolters of Google.
+
+
+**CVSS Rating:** High (8.8) [CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H](https://www.first.org/cvss/calculator/3.0#CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H)
 
 ## Changes by Kind
 
