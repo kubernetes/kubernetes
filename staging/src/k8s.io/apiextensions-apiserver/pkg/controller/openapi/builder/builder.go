@@ -41,6 +41,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/openapi"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/util"
@@ -434,7 +435,7 @@ func withDescription(s spec.Schema, desc string) spec.Schema {
 
 func buildDefinitionsFunc() {
 	namer = openapi.NewDefinitionNamer(runtime.NewScheme())
-	definitions = generatedopenapi.GetOpenAPIDefinitions(func(name string) spec.Ref {
+	definitions = utilopenapi.WrapGetOpenAPIDefinitions(generatedopenapi.GetOpenAPIDefinitions)(func(name string) spec.Ref {
 		defName, _ := namer.GetDefinitionName(name)
 		return spec.MustCreateRef(definitionPrefix + common.EscapeJsonPointer(defName))
 	})
@@ -490,7 +491,7 @@ func (b *builder) getOpenAPIConfig() *common.Config {
 			return namer.GetDefinitionName(name)
 		},
 		GetDefinitions: func(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
-			def := generatedopenapi.GetOpenAPIDefinitions(ref)
+			def := utilopenapi.WrapGetOpenAPIDefinitions(generatedopenapi.GetOpenAPIDefinitions)(ref)
 			def[fmt.Sprintf("%s/%s.%s", b.group, b.version, b.kind)] = common.OpenAPIDefinition{
 				Schema: *b.schema,
 			}
