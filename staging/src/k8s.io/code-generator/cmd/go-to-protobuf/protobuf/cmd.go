@@ -260,7 +260,6 @@ func Run(g *Generator) {
 	if len(g.Conditional) > 0 {
 		fmt.Fprintf(buf, "// +build %s\n\n", g.Conditional)
 	}
-	buf.Write(boilerplate)
 
 	for _, outputPackage := range outputPackages {
 		p := outputPackage.(*protobufPackage)
