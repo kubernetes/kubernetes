@@ -318,6 +318,7 @@ function start-kube-apiserver {
 
     params+=" --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
     authorization_mode+=",ABAC"
+    chown "${KUBE_API_SERVER_RUNASUSER:-0}":"${KUBE_API_SERVER_RUNASGROUP:-0}" /etc/srv/kubernetes/abac-authz-policy.jsonl
   fi
 
   local webhook_config_mount=""
