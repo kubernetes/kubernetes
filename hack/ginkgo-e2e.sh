@@ -132,6 +132,12 @@ if [[ -n "${CONFORMANCE_TEST_SKIP_REGEX:-}" ]]; then
   ginkgo_args+=("--skip=${CONFORMANCE_TEST_SKIP_REGEX}")
   ginkgo_args+=("--seed=1436380640")
 fi
+if [[ -n "${CONFORMANCE_TEST_FOCUS_REGEX:-}" ]]; then
+  ginkgo_args+=("--focus=${CONFORMANCE_TEST_FOCUS_REGEX}")
+fi
+if [[ "${GINKGO_DRYRUN:-}" == true ]]; then
+  ginkgo_args+=("--dryRun=true")
+fi
 if [[ -n "${GINKGO_PARALLEL_NODES:-}" ]]; then
   ginkgo_args+=("--nodes=${GINKGO_PARALLEL_NODES}")
 elif [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
