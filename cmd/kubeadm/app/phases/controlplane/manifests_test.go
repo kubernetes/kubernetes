@@ -938,7 +938,6 @@ func TestGetSchedulerCommand(t *testing.T) {
 			cfg:  &kubeadmapi.ClusterConfiguration{},
 			expected: []string{
 				"kube-scheduler",
-				"--port=0",
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
