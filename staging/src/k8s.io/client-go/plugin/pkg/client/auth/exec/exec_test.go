@@ -39,10 +39,10 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var (
@@ -1421,7 +1421,7 @@ func TestInstallHintRateLimit(t *testing.T) {
 			a.sometimes.threshold = test.threshold
 			a.sometimes.interval = test.interval
 
-			clock := clock.NewFakeClock(time.Now())
+			clock := testingclock.NewFakeClock(time.Now())
 			a.sometimes.clock = clock
 
 			count := 0
