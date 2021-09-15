@@ -24,8 +24,8 @@ import (
 
 	"net/http"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type fakeLock struct {
@@ -91,7 +91,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "healthTest",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current.Add(time.Hour)),
+				clock:        testingclock.NewFakeClock(current.Add(time.Hour)),
 			},
 		},
 		{
@@ -108,7 +108,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "otherServer",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current.Add(time.Hour)),
+				clock:        testingclock.NewFakeClock(current.Add(time.Hour)),
 			},
 		},
 		{
@@ -125,7 +125,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "healthTest",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current),
+				clock:        testingclock.NewFakeClock(current),
 			},
 		},
 		{
@@ -142,7 +142,7 @@ func TestLeaderElectionHealthChecker(t *testing.T) {
 					HolderIdentity: "healthTest",
 				},
 				observedTime: current,
-				clock:        clock.NewFakeClock(current.Add(time.Minute).Add(time.Second)),
+				clock:        testingclock.NewFakeClock(current.Add(time.Minute).Add(time.Second)),
 			},
 		},
 	}
