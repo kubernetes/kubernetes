@@ -64,7 +64,7 @@ func TestEgressSelector(t *testing.T) {
 						},
 					},
 					{
-						Name: "master",
+						Name: "controlplane",
 						Connection: apiserver.Connection{
 							ProxyProtocol: apiserver.ProtocolDirect,
 						},
