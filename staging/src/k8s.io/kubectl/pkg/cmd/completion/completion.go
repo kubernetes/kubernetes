@@ -17,17 +17,11 @@ limitations under the License.
 package completion
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/plugin"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -161,7 +155,6 @@ func RunCompletion(out io.Writer, boilerPlate string, cmd *cobra.Command, args [
 	if !found {
 		return cmdutil.UsageErrorf(cmd, "Unsupported shell type %q.", args[0])
 	}
-	addPluginCommands(cmd.Root())
 
 	return run(out, boilerPlate, cmd.Parent())
 }
@@ -212,48 +205,4 @@ func runCompletionPwsh(out io.Writer, boilerPlate string, kubectl *cobra.Command
 	}
 
 	return kubectl.GenPowerShellCompletionWithDesc(out)
-}
-
-// addPluginCommand adds plugin commands under the given command so that
-// completion includes them
-func addPluginCommands(kubectl *cobra.Command) {
-	streams := genericclioptions.IOStreams{
-		In:     &bytes.Buffer{},
-		Out:    ioutil.Discard,
-		ErrOut: ioutil.Discard,
-	}
-
-	o := &plugin.PluginListOptions{IOStreams: streams}
-	o.Complete(kubectl)
-	plugins, _ := o.ListPlugins()
-
-	for _, plugin := range plugins {
-		plugin = filepath.Base(plugin)
-		args := []string{}
-
-		// Plugins are named "kubectl-<name>" or with more - such as
-		// "kubectl-<name>-<subcmd1>..."
-		for _, arg := range strings.Split(plugin, "-")[1:] {
-			// Underscores (_) in plugin's filename are replaced with dashes(-)
-			// e.g. foo_bar -> foo-bar
-			args = append(args, strings.Replace(arg, "_", "-", -1))
-		}
-
-		// In order to avoid that the same plugin command is added,
-		// find the lowest command given args from the root command
-		parentCmd, remainingArgs, _ := kubectl.Find(args)
-		if parentCmd == nil {
-			parentCmd = kubectl
-		}
-
-		for _, remainingArg := range remainingArgs {
-			cmd := &cobra.Command{
-				Use: remainingArg,
-				// A Run is required for it to be a valid command
-				Run: func(cmd *cobra.Command, args []string) {},
-			}
-			parentCmd.AddCommand(cmd)
-			parentCmd = cmd
-		}
-	}
 }
