@@ -559,8 +559,9 @@ func (p *PriorityQueue) Delete(pod *v1.Pod) error {
 	p.PodNominator.DeleteNominatedPodIfExists(pod)
 	if err := p.activeQ.Delete(newQueuedPodInfoForLookup(pod)); err != nil {
 		// The item was probably not found in the activeQ.
-		p.podBackoffQ.Delete(newQueuedPodInfoForLookup(pod))
-		p.unschedulableQ.delete(pod)
+		if err = p.podBackoffQ.Delete(newQueuedPodInfoForLookup(pod)); err != nil {
+			p.unschedulableQ.delete(pod)
+		}
 	}
 	return nil
 }
