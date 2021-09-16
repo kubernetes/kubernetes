@@ -301,18 +301,17 @@ func writeProjectFiles(fProjects *os.File, fProjid *os.File, writeProjid bool, l
 				}
 			}
 		}
+
+		err = os.Rename(tmpProjects, fProjects.Name())
 		if err == nil {
-			err = os.Rename(tmpProjects, fProjects.Name())
-			if err == nil {
-				return nil
-			}
-			// We're in a bit of trouble here; at this
-			// point we've successfully renamed tmpProjid
-			// to the real thing, but renaming tmpProject
-			// to the real file failed.  There's not much we
-			// can do in this position.  Anything we could do
-			// to try to undo it would itself be likely to fail.
+			return nil
 		}
+		// We're in a bit of trouble here; at this
+		// point we've successfully renamed tmpProjid
+		// to the real thing, but renaming tmpProject
+		// to the real file failed.  There's not much we
+		// can do in this position.  Anything we could do
+		// to try to undo it would itself be likely to fail.
 		os.Remove(tmpProjects)
 	}
 	return fmt.Errorf("unable to write project files: %v", err)
