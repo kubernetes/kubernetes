@@ -578,15 +578,10 @@ func tryIPVSProxy(canUseIPVS bool, kcompat iptables.KernelCompatTester) string {
 
 func tryIPTablesProxy(kcompat iptables.KernelCompatTester) string {
 	// guaranteed false on error, error only necessary for debugging
-	useIPTablesProxy, err := iptables.CanUseIPTablesProxier(kcompat)
+	_, err := iptables.CanUseIPTablesProxier(kcompat)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("can't determine whether to use iptables proxy, using userspace proxier: %v", err))
 		return proxyModeUserspace
 	}
-	if useIPTablesProxy {
-		return proxyModeIPTables
-	}
-	// Fallback.
-	klog.V(1).InfoS("Can't use iptables proxy, using userspace proxier")
-	return proxyModeUserspace
+	return proxyModeIPTables
 }
