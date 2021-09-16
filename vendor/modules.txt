@@ -1935,6 +1935,7 @@ k8s.io/code-generator/pkg/util
 k8s.io/code-generator/third_party/forked/golang/reflect
 # k8s.io/component-base v0.0.0 => ./staging/src/k8s.io/component-base
 ## explicit
+k8s.io/component-base/cli
 k8s.io/component-base/cli/flag
 k8s.io/component-base/cli/globalflag
 k8s.io/component-base/codec
@@ -1952,6 +1953,7 @@ k8s.io/component-base/logs/json
 k8s.io/component-base/logs/json/register
 k8s.io/component-base/logs/logreduction
 k8s.io/component-base/logs/sanitization
+k8s.io/component-base/logs/testinit
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry
 k8s.io/component-base/metrics/prometheus/clientgo
@@ -2148,7 +2150,6 @@ k8s.io/kubectl/pkg/util/fieldpath
 k8s.io/kubectl/pkg/util/hash
 k8s.io/kubectl/pkg/util/i18n
 k8s.io/kubectl/pkg/util/interrupt
-k8s.io/kubectl/pkg/util/logs
 k8s.io/kubectl/pkg/util/openapi
 k8s.io/kubectl/pkg/util/openapi/testing
 k8s.io/kubectl/pkg/util/openapi/validation

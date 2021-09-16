@@ -17,15 +17,12 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/spf13/pflag"
 
+	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo"
 	_ "k8s.io/component-base/metrics/prometheus/version" // for version metric registration
@@ -33,31 +30,9 @@ import (
 )
 
 func main() {
-	if err := runSchedulerCmd(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
-	}
-}
-
-func runSchedulerCmd() error {
-	rand.Seed(time.Now().UnixNano())
-
 	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	command := app.NewSchedulerCommand()
-
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	err := command.ParseFlags(os.Args[1:])
-	if err != nil {
-		// when fail to parse flags, return error with the usage message.
-		return fmt.Errorf("%v\n%s", err, command.UsageString())
-	}
-
-	if err := command.Execute(); err != nil {
-		return err
-	}
-
-	return nil
+	code := cli.Run(command)
+	os.Exit(code)
 }

@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -255,13 +254,11 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+	// From this point and forward we get warnings on flags that contain "_" separators
+	// when adding them with hyphen instead of the original name.
+	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
 	flags := cmds.PersistentFlags()
-	flags.SetNormalizeFunc(cliflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
-
-	// Normalize all flags that are coming from other packages or pre-configurations
-	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
 
@@ -270,11 +267,9 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
-	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	matchVersionKubeConfigFlags.AddFlags(flags)
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
 	addCmdHeaderHooks(cmds, kubeConfigFlags)
-
-	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
@@ -284,9 +279,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// TODO: Consider adding a flag or file preference for setting
 	// the language, instead of just loading from the LANG env. variable.
 	i18n.LoadTranslations("kubectl", nil)
-
-	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 
@@ -392,6 +384,9 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(apiresources.NewCmdAPIResources(f, ioStreams))
 	cmds.AddCommand(options.NewCmdOptions(ioStreams.Out))
 
+	// Stop warning about normalization of flags. That makes it possible to
+	// add the klog flags later.
+	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 	return cmds
 }
 

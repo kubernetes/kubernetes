@@ -20,7 +20,6 @@ import (
 	"errors"
 	goflag "flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"time"
 
@@ -36,8 +35,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
@@ -131,22 +130,11 @@ func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOp
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	command := newHollowNodeCommand()
-
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// cliflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	// cliflag.InitFlags()
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }
 
 // newControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -172,7 +160,11 @@ func newHollowNodeCommand() *cobra.Command {
 			return nil
 		},
 	}
-	s.addFlags(cmd.Flags())
+	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
+
+	fs := cmd.Flags()
+	fs.AddGoFlagSet(goflag.CommandLine) // for flags like --docker-only
+	s.addFlags(fs)
 
 	return cmd
 }

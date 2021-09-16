@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -100,6 +101,7 @@ func NewCmdConvert(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 			cmdutil.CheckErr(o.RunConvert())
 		},
 	}
+	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
 
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, convert will NOT try to contact api-server but run locally.")
 	cmd.Flags().StringVar(&o.OutputVersion, "output-version", o.OutputVersion, i18n.T("Output the formatted object with the given group version (for ex: 'extensions/v1beta1')."))

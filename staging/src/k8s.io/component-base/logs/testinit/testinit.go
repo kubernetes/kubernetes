@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+// Package testinit adds logging flags to a Ginkgo or Go test program during
+// initialization, something that the logs package itself no longer does.
+//
+// Normal commands should not use this and instead manage logging flags with
+// logs.Options and/or cli.Run.
+package testinit
 
 import (
-	"os"
+	"flag"
 
-	"github.com/spf13/pflag"
-
-	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/kubectl/pkg/cmd"
-
-	// Import to initialize client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/component-base/logs"
 )
 
-func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
-	command := cmd.NewDefaultKubectlCommand()
-	code := cli.Run(command)
-	os.Exit(code)
+func init() {
+	logs.AddGoFlags(flag.CommandLine)
 }

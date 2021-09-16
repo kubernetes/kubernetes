@@ -17,23 +17,22 @@ limitations under the License.
 package logs
 
 import (
-	"flag"
 	"fmt"
-	"strings"
-
-	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/config"
 )
 
 func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
 	if c.Format != DefaultLogFormat {
-		allFlags := UnsupportedLoggingFlags(hyphensToUnderscores)
-		for _, fname := range allFlags {
-			if flagIsSet(fname, hyphensToUnderscores) {
-				errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, fmt.Sprintf("Non-default format doesn't honor flag: %s", fname)))
+		// WordSepNormalizeFunc is just a guess. Most commands use it,
+		// but we cannot know for sure.
+		allFlags := UnsupportedLoggingFlags(cliflag.WordSepNormalizeFunc)
+		for _, f := range allFlags {
+			if f.DefValue != f.Value.String() {
+				errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, fmt.Sprintf("Non-default format doesn't honor flag: %s", f.Name)))
 			}
 		}
 	}
@@ -41,28 +40,4 @@ func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
 	}
 	return errs
-}
-
-// hyphensToUnderscores replaces hyphens with underscores
-// we should always use underscores instead of hyphens when validate flags
-func hyphensToUnderscores(s string) string {
-	return strings.Replace(s, "-", "_", -1)
-}
-
-func flagIsSet(name string, normalizeFunc func(name string) string) bool {
-	f := flag.Lookup(name)
-	if f != nil {
-		return f.DefValue != f.Value.String()
-	}
-	if normalizeFunc != nil {
-		f = flag.Lookup(normalizeFunc(name))
-		if f != nil {
-			return f.DefValue != f.Value.String()
-		}
-	}
-	pf := pflag.Lookup(name)
-	if pf != nil {
-		return pf.DefValue != pf.Value.String()
-	}
-	panic("failed to lookup unsupported log flag")
 }

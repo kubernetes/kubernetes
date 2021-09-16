@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package framework
 
 import (
-	"os"
-
-	"github.com/spf13/pflag"
-
-	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/kubectl/pkg/cmd"
-
-	// Import to initialize client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	// All integration tests are expected to have logging flags.
+	_ "k8s.io/component-base/logs/testinit"
 )
-
-func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
-	command := cmd.NewDefaultKubectlCommand()
-	code := cli.Run(command)
-	os.Exit(code)
-}

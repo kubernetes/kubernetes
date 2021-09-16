@@ -20,6 +20,7 @@ package app
 
 import (
 	"errors"
+	goflag "flag"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -509,6 +510,7 @@ with the apiserver API to configure the proxy.`,
 			return nil
 		},
 	}
+	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
 
 	var err error
 	opts.config, err = opts.ApplyDefaults(opts.config)
@@ -518,7 +520,9 @@ with the apiserver API to configure the proxy.`,
 		os.Exit(1)
 	}
 
-	opts.AddFlags(cmd.Flags())
+	fs := cmd.Flags()
+	opts.AddFlags(fs)
+	fs.AddGoFlagSet(goflag.CommandLine) // for --boot-id-file and --machine-id-file
 
 	// TODO handle error
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")

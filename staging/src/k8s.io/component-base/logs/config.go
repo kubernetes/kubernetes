@@ -19,6 +19,7 @@ package logs
 import (
 	"flag"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -36,9 +37,17 @@ const (
 // LogRegistry is new init LogFormatRegistry struct
 var LogRegistry = NewLogFormatRegistry()
 
+// loggingFlags captures the state of the logging flags, in particular their default value
+// before flag parsing. It is used by UnsupportedLoggingFlags.
+var loggingFlags pflag.FlagSet
+
 func init() {
 	// Text format is default klog format
 	LogRegistry.Register(DefaultLogFormat, nil)
+
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	loggingFlags.AddGoFlagSet(&fs)
 }
 
 // List of logs (k8s.io/klog + k8s.io/component-base/logs) flags supported by all logging formats
@@ -49,11 +58,7 @@ var supportedLogsFlags = map[string]struct{}{
 
 // BindLoggingFlags binds the Options struct fields to a flagset
 func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
-	normalizeFunc := func(name string) string {
-		f := fs.GetNormalizeFunc()
-		return string(f(fs, name))
-	}
-	unsupportedFlags := fmt.Sprintf("--%s", strings.Join(UnsupportedLoggingFlags(normalizeFunc), ", --"))
+	unsupportedFlags := strings.Join(unsupportedLoggingFlagNames(fs.GetNormalizeFunc()), ", ")
 	formats := fmt.Sprintf(`"%s"`, strings.Join(LogRegistry.List(), `", "`))
 	fs.StringVar(&c.Format, "logging-format", c.Format, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
 	// No new log formats should be added after generation is of flag options
@@ -62,30 +67,37 @@ func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 }
 
-// UnsupportedLoggingFlags lists unsupported logging flags
-func UnsupportedLoggingFlags(normalizeFunc func(name string) string) []string {
-	allFlags := []string{}
-
-	// k8s.io/klog flags
-	fs := &flag.FlagSet{}
-	klog.InitFlags(fs)
-	fs.VisitAll(func(flag *flag.Flag) {
+// UnsupportedLoggingFlags lists unsupported logging flags. The normalize
+// function is optional.
+func UnsupportedLoggingFlags(normalizeFunc func(f *pflag.FlagSet, name string) pflag.NormalizedName) []*pflag.Flag {
+	// k8s.io/component-base/logs and klog flags
+	pfs := &pflag.FlagSet{}
+	loggingFlags.VisitAll(func(flag *pflag.Flag) {
 		if _, found := supportedLogsFlags[flag.Name]; !found {
-			name := flag.Name
-			if normalizeFunc != nil {
-				name = normalizeFunc(name)
-			}
-			allFlags = append(allFlags, name)
+			// Normalization changes flag.Name, so make a copy.
+			clone := *flag
+			pfs.AddFlag(&clone)
 		}
 	})
 
-	// k8s.io/component-base/logs flags
-	pfs := &pflag.FlagSet{}
-	AddFlags(pfs)
+	// Apply normalization.
+	pfs.SetNormalizeFunc(normalizeFunc)
+
+	var allFlags []*pflag.Flag
 	pfs.VisitAll(func(flag *pflag.Flag) {
-		if _, found := supportedLogsFlags[flag.Name]; !found {
-			allFlags = append(allFlags, flag.Name)
-		}
+		allFlags = append(allFlags, flag)
 	})
 	return allFlags
+}
+
+// unsupportedLoggingFlagNames lists unsupported logging flags by name, with
+// optional normalization and sorted.
+func unsupportedLoggingFlagNames(normalizeFunc func(f *pflag.FlagSet, name string) pflag.NormalizedName) []string {
+	unsupportedFlags := UnsupportedLoggingFlags(normalizeFunc)
+	names := make([]string, 0, len(unsupportedFlags))
+	for _, f := range unsupportedFlags {
+		names = append(names, "--"+f.Name)
+	}
+	sort.Strings(names)
+	return names
 }

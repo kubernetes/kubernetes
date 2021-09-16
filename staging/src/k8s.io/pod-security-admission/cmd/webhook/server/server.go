@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -58,6 +59,7 @@ Security Standards.`,
 		},
 		Args: cobra.NoArgs,
 	}
+	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
 	opts.AddFlags(cmd.Flags())
 
 	return cmd

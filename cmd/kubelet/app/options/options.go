@@ -383,6 +383,7 @@ func (f *KubeletFlags) AddFlags(mainfs *pflag.FlagSet) {
 // AddKubeletConfigFlags adds flags for a specific kubeletconfig.KubeletConfiguration to the specified FlagSet
 func AddKubeletConfigFlags(mainfs *pflag.FlagSet, c *kubeletconfig.KubeletConfiguration) {
 	fs := pflag.NewFlagSet("", pflag.ExitOnError)
+	fs.SetNormalizeFunc(mainfs.GetNormalizeFunc())
 	defer func() {
 		// All KubeletConfiguration flags are now deprecated, and any new flags that point to
 		// KubeletConfiguration fields are deprecated-on-creation. When removing flags at the end

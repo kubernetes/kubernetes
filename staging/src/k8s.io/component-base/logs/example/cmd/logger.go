@@ -22,7 +22,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
+	"k8s.io/component-base/cli"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 
@@ -30,13 +33,14 @@ import (
 )
 
 func main() {
-	command := NewLoggerCommand()
-	logs.InitLogs()
-	defer logs.FlushLogs()
+	// NamedFlagSets use the global pflag.CommandLine. We don't use those
+	// in this command (yet), but set it globally anyway for consistency
+	// with other commands.
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	command := NewLoggerCommand()
+	code := cli.Run(command)
+	os.Exit(code)
 }
 
 func NewLoggerCommand() *cobra.Command {
@@ -52,6 +56,8 @@ func NewLoggerCommand() *cobra.Command {
 			runLogger()
 		},
 	}
+	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
+
 	o.AddFlags(cmd.Flags())
 	return cmd
 }
