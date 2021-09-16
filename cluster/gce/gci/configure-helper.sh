@@ -737,9 +737,6 @@ function create-master-pki {
 
   if [[ -n "${KONNECTIVITY_SERVER_CA_CERT:-}" ]]; then
     mkdir -p "${pki_dir}"/konnectivity-server
-    #KONNECTIVITY_SERVER_CA_KEY_PATH="${pki_dir}/konnectivity-server/ca.key"
-    #write-pki-data "${KONNECTIVITY_SERVER_CA_KEY}" "${KONNECTIVITY_SERVER_CA_KEY_PATH}"
-
     KONNECTIVITY_SERVER_CA_CERT_PATH="${pki_dir}/konnectivity-server/ca.crt"
     write-pki-data "${KONNECTIVITY_SERVER_CA_CERT}" "${KONNECTIVITY_SERVER_CA_CERT_PATH}"
 
@@ -1996,6 +1993,8 @@ function prepare-konnectivity-server-manifest {
   if [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'grpc' ]]; then
     params+=("--uds-name=/etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket")
   elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    # HTTP-CONNECT can work with either UDS or mTLS. 
+    # Linking them here to make sure we get good coverage with two test configurations. 
     params+=("--server-ca-cert=${KONNECTIVITY_SERVER_CA_CERT_PATH}")
     params+=("--server-cert=${KONNECTIVITY_SERVER_CERT_PATH}")
     params+=("--server-key=${KONNECTIVITY_SERVER_KEY_PATH}")
@@ -2010,7 +2009,9 @@ function prepare-konnectivity-server-manifest {
     params+=("--agent-service-account=konnectivity-agent")
     params+=("--authentication-audience=system:konnectivity-server")
     params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
+    params+=("--proxy-strategies=default")
   elif [[ "${KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE:-grpc}" == 'http-connect' ]]; then
+    # GRPC can work with either UDS or mTLS. 
     params+=("--mode=http-connect")
     params+=("--server-port=8131")
     params+=("--agent-namespace=")
@@ -2018,6 +2019,7 @@ function prepare-konnectivity-server-manifest {
     params+=("--authentication-audience=")
     # Need to fix ANP code to allow kubeconfig to be set with mtls.
     params+=("--kubeconfig=")
+    params+=("--proxy-strategies=destHost,default")
   else
     echo "KONNECTIVITY_SERVICE_PROXY_PROTOCOL_MODE must be set to either grpc or http-connect"
     exit 1
@@ -2030,7 +2032,6 @@ function prepare-konnectivity-server-manifest {
   params+=("--kubeconfig-burst=150")
   params+=("--keepalive-time=60s")
   params+=("--frontend-keepalive-time=60s")
-  params+=("--proxy-strategies=destHost,default")
   konnectivity_args=""
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
