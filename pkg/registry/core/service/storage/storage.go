@@ -47,9 +47,8 @@ import (
 	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
-	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
-
 	netutil "k8s.io/utils/net"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type EndpointsStorage interface {
@@ -248,65 +247,59 @@ func (r *REST) defaultOnReadService(service *api.Service) {
 		return
 	}
 
+	// Set ipFamilies and ipFamilyPolicy if needed.
+	r.defaultOnReadIPFamilies(service)
+}
+
+func (r *REST) defaultOnReadIPFamilies(service *api.Service) {
+	// ExternalName does not need this.
+	if !needsClusterIP(service) {
+		return
+	}
+
+	// If IPFamilies is set, we assume IPFamilyPolicy is also set (it should
+	// not be possible to have one and not the other), and therefore we don't
+	// need further defaulting.  Likewise, if IPFamilies is *not* set, we
+	// assume IPFamilyPolicy can't be set either.
 	if len(service.Spec.IPFamilies) > 0 {
-		return // already defaulted
+		return
 	}
 
-	// set clusterIPs based on ClusterIP
-	if len(service.Spec.ClusterIPs) == 0 {
-		if len(service.Spec.ClusterIP) > 0 {
-			service.Spec.ClusterIPs = []string{service.Spec.ClusterIP}
-		}
-	}
-
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	singleStack := api.IPFamilyPolicySingleStack
-	preferDualStack := api.IPFamilyPolicyPreferDualStack
-	// headless services
-	if len(service.Spec.ClusterIPs) == 1 && service.Spec.ClusterIPs[0] == api.ClusterIPNone {
-		service.Spec.IPFamilies = []api.IPFamily{r.primaryIPFamily}
+	requireDualStack := api.IPFamilyPolicyRequireDualStack
 
-		// headless+selectorless
-		// headless+selectorless takes both families. Why?
-		// at this stage we don't know what kind of endpoints (specifically their IPFamilies) the
-		// user has assigned to this selectorless service. We assume it has dualstack and we default
-		// it to PreferDualStack on any cluster (single or dualstack configured).
+	if service.Spec.ClusterIP == api.ClusterIPNone {
+		// Headless.
 		if len(service.Spec.Selector) == 0 {
-			service.Spec.IPFamilyPolicy = &preferDualStack
-			if r.primaryIPFamily == api.IPv4Protocol {
-				service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv6Protocol)
-			} else {
-				service.Spec.IPFamilies = append(service.Spec.IPFamilies, api.IPv4Protocol)
-			}
+			// Headless + selectorless is a special-case.
+			//
+			// At this stage we don't know what kind of endpoints (specifically
+			// their IPFamilies) the user has assigned to this selectorless
+			// service. We assume it has dual-stack and we default it to
+			// RequireDualStack on any cluster (single- or dual-stack
+			// configured).
+			service.Spec.IPFamilyPolicy = &requireDualStack
+			service.Spec.IPFamilies = []api.IPFamily{r.primaryIPFamily, otherFamily(r.primaryIPFamily)}
 		} else {
-			// headless w/ selector
-			// this service type follows cluster configuration. this service (selector based) uses a
-			// selector and will have to follow how the cluster is configured. If the cluster is
-			// configured to dual stack then the service defaults to PreferDualStack. Otherwise we
-			// default it to SingleStack.
-			if r.secondaryIPFamily != "" {
-				service.Spec.IPFamilies = append(service.Spec.IPFamilies, r.secondaryIPFamily)
-				service.Spec.IPFamilyPolicy = &preferDualStack
-			} else {
-				service.Spec.IPFamilyPolicy = &singleStack
-			}
+			// Headless + selector - default to single.
+			service.Spec.IPFamilyPolicy = &singleStack
+			service.Spec.IPFamilies = []api.IPFamily{r.primaryIPFamily}
 		}
 	} else {
-		// headful
-		// make sure a slice exists to receive the families
-		service.Spec.IPFamilies = make([]api.IPFamily, len(service.Spec.ClusterIPs), len(service.Spec.ClusterIPs))
+		// Headful: init ipFamilies from clusterIPs.
+		service.Spec.IPFamilies = make([]api.IPFamily, len(service.Spec.ClusterIPs))
 		for idx, ip := range service.Spec.ClusterIPs {
 			if netutil.IsIPv6String(ip) {
 				service.Spec.IPFamilies[idx] = api.IPv6Protocol
 			} else {
 				service.Spec.IPFamilies[idx] = api.IPv4Protocol
 			}
-
-			if len(service.Spec.IPFamilies) == 1 {
-				service.Spec.IPFamilyPolicy = &singleStack
-			} else if len(service.Spec.IPFamilies) == 2 {
-				service.Spec.IPFamilyPolicy = &requireDualStack
-			}
+		}
+		if len(service.Spec.IPFamilies) == 1 {
+			service.Spec.IPFamilyPolicy = &singleStack
+		} else if len(service.Spec.IPFamilies) == 2 {
+			// It shouldn't be possible to get here, but just in case.
+			service.Spec.IPFamilyPolicy = &requireDualStack
 		}
 	}
 }
