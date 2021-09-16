@@ -170,6 +170,14 @@ const (
 	//
 	// Add support for distributed tracing in the API Server
 	APIServerTracing featuregate.Feature = "APIServerTracing"
+
+	// owner: @jiahuif
+	// kep: http://kep.k8s.io/2887
+	// alpha: v1.23
+	//
+	// Enables populating "enum" field of OpenAPI schemas
+	// in the spec returned from kube-apiserver.
+	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 )
 
 func init() {
@@ -198,4 +206,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.Beta},
 	APIServerIdentity:        {Default: false, PreRelease: featuregate.Alpha},
 	APIServerTracing:         {Default: false, PreRelease: featuregate.Alpha},
+	OpenAPIEnums:             {Default: false, PreRelease: featuregate.Alpha},
 }
