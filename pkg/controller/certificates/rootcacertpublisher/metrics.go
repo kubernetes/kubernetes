@@ -37,7 +37,7 @@ var (
 			Help:           "Number of namespace syncs happened in root ca cert publisher.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "code"},
+		[]string{"code"},
 	)
 	syncLatency = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -47,19 +47,19 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "code"},
+		[]string{"code"},
 	)
 )
 
-func recordMetrics(start time.Time, ns string, err error) {
+func recordMetrics(start time.Time, err error) {
 	code := "500"
 	if err == nil {
 		code = "200"
 	} else if se, ok := err.(*apierrors.StatusError); ok && se.Status().Code != 0 {
 		code = strconv.Itoa(int(se.Status().Code))
 	}
-	syncLatency.WithLabelValues(ns, code).Observe(time.Since(start).Seconds())
-	syncCounter.WithLabelValues(ns, code).Inc()
+	syncLatency.WithLabelValues(code).Observe(time.Since(start).Seconds())
+	syncCounter.WithLabelValues(code).Inc()
 }
 
 var once sync.Once
