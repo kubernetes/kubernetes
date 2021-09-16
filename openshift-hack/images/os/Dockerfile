@@ -21,3 +21,6 @@ RUN set -x && yum install -y ostree rpm-ostree yum-utils selinux-policy-targeted
 
 FROM scratch
 COPY --from=build /srv/ /srv/
+
+LABEL io.openshift.build.version-display-names="machine-os=rhcos image for testing openshift kubernetes kubelet only- if you see this outside of PR runs for openshift kubernetes- you found an urgent blocker bug" \
+      io.openshift.build.versions="machine-os=1.2.3-testing-if-you-see-this-outside-of-PR-runs-for-openshift-kubernetes-you-found-an-urgent-blocker-bug"
