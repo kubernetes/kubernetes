@@ -109,7 +109,7 @@ func WithPriorityAndFairness(
 
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
-			httplog.AddKeyValue(ctx, "apf_d", truncateLogField(flowDistinguisher))
+			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
 		}
 
 		var served bool
