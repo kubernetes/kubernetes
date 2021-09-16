@@ -866,6 +866,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 				}}, metav1.CreateOptions{})
 			framework.ExpectNoError(err, "failed to create pod")
 			framework.Logf("created %v", podTestName)
+			framework.ExpectNoError(e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podTestName, f.Namespace.Name))
+			framework.Logf("running and ready %v", podTestName)
 		}
 
 		// wait as required for all 3 pods to be found
