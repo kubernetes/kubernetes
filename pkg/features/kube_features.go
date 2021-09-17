@@ -156,13 +156,6 @@ const (
 	// to the API server.
 	BoundServiceAccountTokenVolume featuregate.Feature = "BoundServiceAccountTokenVolume"
 
-	// owner: @saad-ali
-	// ga: 	  v1.10
-	//
-	// Allow mounting a subpath of a volume in a container
-	// Do not remove this feature gate even though it's GA
-	VolumeSubpath featuregate.Feature = "VolumeSubpath"
-
 	// owner: @pohly
 	// alpha: v1.14
 	// beta: v1.16
@@ -814,7 +807,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	InTreePluginvSphereUnregister:                  {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationOpenStack:                          {Default: true, PreRelease: featuregate.Beta},
 	InTreePluginOpenStackUnregister:                {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA},
 	ConfigurableFSGroupPolicy:                      {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},

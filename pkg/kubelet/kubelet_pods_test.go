@@ -56,64 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
-
-func TestDisabledSubpath(t *testing.T) {
-	fhu := hostutil.NewFakeHostUtil(nil)
-	fsp := &subpath.FakeSubpath{}
-	pod := v1.Pod{
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-		},
-	}
-	podVolumes := kubecontainer.VolumeMap{
-		"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-	}
-
-	cases := map[string]struct {
-		container   v1.Container
-		expectError bool
-	}{
-		"subpath not specified": {
-			v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			false,
-		},
-		"subpath specified": {
-			v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						SubPath:   "/must/not/be/absolute",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			true,
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
-	for name, test := range cases {
-		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", []string{}, podVolumes, fhu, fsp, nil, false)
-		if err != nil && !test.expectError {
-			t.Errorf("test %v failed: %v", name, err)
-		}
-		if err == nil && test.expectError {
-			t.Errorf("test %v failed: expected error", name)
-		}
-	}
-}
 
 func TestNodeHostsFileContent(t *testing.T) {
 	testCases := []struct {
