@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -606,7 +605,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return volumebinding.New(plArgs, fh, feature.Features{})
 				}),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
@@ -641,7 +640,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with non existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return volumebinding.New(plArgs, fh, feature.Features{})
 				}),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
@@ -692,7 +691,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with deleting PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return volumebinding.New(plArgs, fh, feature.Features{})
 				}),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
@@ -1319,11 +1318,11 @@ func TestZeroRequest(t *testing.T) {
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 				st.RegisterScorePlugin(noderesources.FitName,
-					func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+					func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 						return noderesources.NewFit(plArgs, fh, feature.Features{})
 					},
 					1),
-				st.RegisterScorePlugin(noderesources.BalancedAllocationName, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return noderesources.NewBalancedAllocation(plArgs, fh, feature.Features{})
 				}, 1),
 				st.RegisterScorePlugin(selectorspread.Name, selectorspread.New, 1),
