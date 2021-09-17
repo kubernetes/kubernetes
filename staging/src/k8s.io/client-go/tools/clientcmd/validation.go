@@ -229,7 +229,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 	}
 	if proxyURL := clusterInfo.ProxyURL; proxyURL != "" {
 		if _, err := parseProxyURL(proxyURL); err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("invalid 'proxy-url' %q for cluster %q: %v", proxyURL, clusterName, err))
+			validationErrors = append(validationErrors, fmt.Errorf("invalid 'proxy-url' %q for cluster %q: %w", proxyURL, clusterName, err))
 		}
 	}
 	// Make sure CA data and CA file aren't both specified
@@ -239,7 +239,7 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 	if len(clusterInfo.CertificateAuthority) != 0 {
 		clientCertCA, err := os.Open(clusterInfo.CertificateAuthority)
 		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %v", clusterInfo.CertificateAuthority, clusterName, err))
+			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %w", clusterInfo.CertificateAuthority, clusterName, err))
 		} else {
 			defer clientCertCA.Close()
 		}
@@ -278,7 +278,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		if len(authInfo.ClientCertificate) != 0 {
 			clientCertFile, err := os.Open(authInfo.ClientCertificate)
 			if err != nil {
-				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %v", authInfo.ClientCertificate, authInfoName, err))
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %w", authInfo.ClientCertificate, authInfoName, err))
 			} else {
 				defer clientCertFile.Close()
 			}
@@ -286,7 +286,7 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		if len(authInfo.ClientKey) != 0 {
 			clientKeyFile, err := os.Open(authInfo.ClientKey)
 			if err != nil {
-				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
+				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %w", authInfo.ClientKey, authInfoName, err))
 			} else {
 				defer clientKeyFile.Close()
 			}
