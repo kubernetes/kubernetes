@@ -56,7 +56,6 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 	return FollowContinue(&initialOpts, func(options metav1.ListOptions) (runtime.Object, error) {
 		list, err := helper.List(
 			r.Namespace,
-			r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
 			&options,
 		)
 		if err != nil {
@@ -82,7 +81,7 @@ func (r *Selector) Visit(fn VisitorFunc) error {
 }
 
 func (r *Selector) Watch(resourceVersion string) (watch.Interface, error) {
-	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace, r.ResourceMapping().GroupVersionKind.GroupVersion().String(),
+	return NewHelper(r.Client, r.Mapping).Watch(r.Namespace,
 		&metav1.ListOptions{ResourceVersion: resourceVersion, LabelSelector: r.LabelSelector, FieldSelector: r.FieldSelector})
 }
 

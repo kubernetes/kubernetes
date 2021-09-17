@@ -42,7 +42,6 @@ import (
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}
-var InputExtensions = append(FileExtensions, "stdin")
 
 const defaultHttpGetAttempts int = 3
 
@@ -123,14 +122,6 @@ Example resource specifications include:
    '--filename=rsrc.json'`)
 
 var StdinMultiUseError = errors.New("standard input cannot be used for multiple arguments")
-
-// TODO: expand this to include other errors.
-func IsUsageError(err error) bool {
-	if err == nil {
-		return false
-	}
-	return err == missingResourceError
-}
 
 type FilenameOptions struct {
 	Filenames []string
@@ -400,7 +391,7 @@ func (b *Builder) Stream(r io.Reader, name string) *Builder {
 	return b
 }
 
-// Path accepts a set of paths that may be files, directories (all can containing
+// Path accepts a set of paths that may be files, directories (all can contain
 // one or more resources). Creates a FileVisitor for each file and then each
 // FileVisitor is streaming the content to a StreamVisitor. If ContinueOnError() is set
 // prior to this method being called, objects on the path that are unrecognized will be
@@ -475,7 +466,7 @@ func (b *Builder) LabelSelectorParam(s string) *Builder {
 		return b
 	}
 	if b.selectAll {
-		b.errs = append(b.errs, fmt.Errorf("found non-empty label selector %q with previously set 'all' parameter. ", s))
+		b.errs = append(b.errs, fmt.Errorf("found non-empty label selector %q with previously set 'all' parameter", s))
 		return b
 	}
 	return b.LabelSelector(selector)
@@ -501,7 +492,7 @@ func (b *Builder) FieldSelectorParam(s string) *Builder {
 		return b
 	}
 	if b.selectAll {
-		b.errs = append(b.errs, fmt.Errorf("found non-empty field selector %q with previously set 'all' parameter. ", s))
+		b.errs = append(b.errs, fmt.Errorf("found non-empty field selector %q with previously set 'all' parameter", s))
 		return b
 	}
 	b.fieldSelector = &s
@@ -555,10 +546,10 @@ func (b *Builder) TransformRequests(opts ...RequestTransform) *Builder {
 	return b
 }
 
-// SelectEverythingParam
+// SelectAllParam sets 'all' parameter
 func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 	if selectAll && (b.labelSelector != nil || b.fieldSelector != nil) {
-		b.errs = append(b.errs, fmt.Errorf("setting 'all' parameter but found a non empty selector. "))
+		b.errs = append(b.errs, fmt.Errorf("setting 'all' parameter but found a non empty selector"))
 		return b
 	}
 	b.selectAll = selectAll

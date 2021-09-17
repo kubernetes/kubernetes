@@ -85,7 +85,7 @@ func (m *Helper) Get(namespace, name string) (runtime.Object, error) {
 	return req.Do(context.TODO()).Get()
 }
 
-func (m *Helper) List(namespace, apiVersion string, options *metav1.ListOptions) (runtime.Object, error) {
+func (m *Helper) List(namespace string, options *metav1.ListOptions) (runtime.Object, error) {
 	req := m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
 		Resource(m.Resource).
@@ -141,7 +141,7 @@ func EnhanceListError(err error, opts metav1.ListOptions, subj string) error {
 	return err
 }
 
-func (m *Helper) Watch(namespace, apiVersion string, options *metav1.ListOptions) (watch.Interface, error) {
+func (m *Helper) Watch(namespace string, options *metav1.ListOptions) (watch.Interface, error) {
 	options.Watch = true
 	return m.RESTClient.Get().
 		NamespaceIfScoped(namespace, m.NamespaceScoped).
@@ -223,6 +223,7 @@ func (m *Helper) createResource(c RESTClient, resource, namespace string, obj ru
 		Do(context.TODO()).
 		Get()
 }
+
 func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
 	if options == nil {
 		options = &metav1.PatchOptions{}
