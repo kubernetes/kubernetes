@@ -447,6 +447,7 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 }
 
 func TestGenericScheduler(t *testing.T) {
+	fts := feature.Features{}
 	tests := []struct {
 		name            string
 		registerPlugins []st.RegisterPluginFunc
@@ -605,9 +606,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-					return volumebinding.New(plArgs, fh, feature.Features{})
-				}),
+				st.RegisterPreFilterPlugin(volumebinding.Name, frameworkruntime.FactoryAdapter(fts, volumebinding.New)),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -640,9 +639,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with non existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-					return volumebinding.New(plArgs, fh, feature.Features{})
-				}),
+				st.RegisterPreFilterPlugin(volumebinding.Name, frameworkruntime.FactoryAdapter(fts, volumebinding.New)),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -691,9 +688,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with deleting PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-					return volumebinding.New(plArgs, fh, feature.Features{})
-				}),
+				st.RegisterPreFilterPlugin(volumebinding.Name, frameworkruntime.FactoryAdapter(fts, volumebinding.New)),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -1314,17 +1309,11 @@ func TestZeroRequest(t *testing.T) {
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
 			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
-
+			fts := feature.Features{}
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterScorePlugin(noderesources.FitName,
-					func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-						return noderesources.NewFit(plArgs, fh, feature.Features{})
-					},
-					1),
-				st.RegisterScorePlugin(noderesources.BalancedAllocationName, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-					return noderesources.NewBalancedAllocation(plArgs, fh, feature.Features{})
-				}, 1),
+				st.RegisterScorePlugin(noderesources.FitName, frameworkruntime.FactoryAdapter(fts, noderesources.NewFit), 1),
+				st.RegisterScorePlugin(noderesources.BalancedAllocationName, frameworkruntime.FactoryAdapter(fts, noderesources.NewBalancedAllocation), 1),
 				st.RegisterScorePlugin(selectorspread.Name, selectorspread.New, 1),
 				st.RegisterPreScorePlugin(selectorspread.Name, selectorspread.New),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
