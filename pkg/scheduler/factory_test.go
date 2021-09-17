@@ -422,6 +422,7 @@ func TestCreateFromConfig(t *testing.T) {
 			_, err := New(
 				client,
 				informerFactory,
+				nil,
 				recorderFactory,
 				make(chan struct{}),
 				WithProfiles([]schedulerapi.KubeSchedulerProfile(nil)...),

@@ -90,6 +90,7 @@ func setupScheduler(
 	sched, err := scheduler.New(
 		cs,
 		informerFactory,
+		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
 		ctx.Done(),
 	)

@@ -280,6 +280,7 @@ priorities: []
 
 		sched, err := scheduler.New(clientSet,
 			informerFactory,
+			nil,
 			profile.NewRecorderFactory(eventBroadcaster),
 			nil,
 			scheduler.WithProfiles([]config.KubeSchedulerProfile(nil)...),
@@ -337,6 +338,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 
 	_, err := scheduler.New(clientSet,
 		informerFactory,
+		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
 		nil,
 		scheduler.WithLegacyPolicySource(&config.SchedulerPolicySource{
