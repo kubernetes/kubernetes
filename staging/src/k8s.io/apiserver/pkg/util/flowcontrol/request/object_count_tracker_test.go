@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/util/clock"
+	testclock "k8s.io/utils/clock/testing"
 )
 
 func TestStorageObjectCountTracker(t *testing.T) {
@@ -66,7 +66,7 @@ func TestStorageObjectCountTracker(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClock := &clock.FakePassiveClock{}
+			fakeClock := &testclock.FakePassiveClock{}
 			tracker := &objectCountTracker{
 				clock:  fakeClock,
 				counts: map[string]*timestampedCount{},
@@ -93,7 +93,7 @@ func TestStorageObjectCountTracker(t *testing.T) {
 }
 
 func TestStorageObjectCountTrackerWithPrune(t *testing.T) {
-	fakeClock := &clock.FakePassiveClock{}
+	fakeClock := &testclock.FakePassiveClock{}
 	tracker := &objectCountTracker{
 		clock:  fakeClock,
 		counts: map[string]*timestampedCount{},

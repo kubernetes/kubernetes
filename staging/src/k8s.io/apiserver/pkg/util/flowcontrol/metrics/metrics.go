@@ -22,10 +22,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	basemetricstestutil "k8s.io/component-base/metrics/testutil"
+	"k8s.io/utils/clock"
 )
 
 const (

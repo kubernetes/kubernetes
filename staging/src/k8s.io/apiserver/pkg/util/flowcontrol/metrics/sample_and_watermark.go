@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
