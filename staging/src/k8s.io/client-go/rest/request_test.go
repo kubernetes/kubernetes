@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -2485,7 +2484,7 @@ func TestThrottledLogger(t *testing.T) {
 	defer func() {
 		globalThrottledLogger.clock = oldClock
 	}()
-	clock := clock.NewFakeClock(now)
+	clock := testingclock.NewFakeClock(now)
 	globalThrottledLogger.clock = clock
 
 	logMessages := 0

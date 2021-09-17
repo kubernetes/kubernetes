@@ -32,10 +32,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestParseTimeout(t *testing.T) {
@@ -227,7 +227,7 @@ func TestWithRequestDeadlineWithClock(t *testing.T) {
 	// if the deadline filter uses the clock instead of using the request started timestamp from the context
 	// then we will see a request deadline of about a minute.
 	receivedTimestampExpected := time.Now().Add(time.Minute)
-	fakeClock := utilclock.NewFakeClock(receivedTimestampExpected)
+	fakeClock := testingclock.NewFakeClock(receivedTimestampExpected)
 
 	fakeSink := &fakeAuditSink{}
 	fakeRuleEvaluator := policy.NewFakePolicyRuleEvaluator(auditinternal.LevelRequestResponse, nil)

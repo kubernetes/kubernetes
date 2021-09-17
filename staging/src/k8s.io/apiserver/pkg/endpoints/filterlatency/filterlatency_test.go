@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	utilclock "k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestTrackStartedWithContextAlreadyHasFilterRecord(t *testing.T) {
@@ -41,7 +41,7 @@ func TestTrackStartedWithContextAlreadyHasFilterRecord(t *testing.T) {
 	})
 
 	requestFilterStarted := time.Now()
-	wrapped := trackStarted(handler, filterName, utilclock.NewFakeClock(requestFilterStarted))
+	wrapped := trackStarted(handler, filterName, testingclock.NewFakeClock(requestFilterStarted))
 
 	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestTrackStartedWithContextDoesNotHaveFilterRecord(t *testing.T) {
 	})
 
 	requestFilterStarted := time.Now()
-	wrapped := trackStarted(handler, filterName, utilclock.NewFakeClock(requestFilterStarted))
+	wrapped := trackStarted(handler, filterName, testingclock.NewFakeClock(requestFilterStarted))
 
 	testRequest, err := http.NewRequest(http.MethodGet, "/api/v1/namespaces", nil)
 	if err != nil {
@@ -121,7 +121,7 @@ func TestTrackCompletedContextHasFilterRecord(t *testing.T) {
 	})
 
 	requestFilterEndedAt := time.Now()
-	wrapped := trackCompleted(handler, utilclock.NewFakeClock(requestFilterEndedAt), func(_ context.Context, fr *requestFilterRecord, completedAt time.Time) {
+	wrapped := trackCompleted(handler, testingclock.NewFakeClock(requestFilterEndedAt), func(_ context.Context, fr *requestFilterRecord, completedAt time.Time) {
 		actionCallCount++
 		filterRecordGot = fr
 		filterCompletedAtGot = completedAt
@@ -157,7 +157,7 @@ func TestTrackCompletedContextDoesNotHaveFilterRecord(t *testing.T) {
 		handlerCallCount++
 	})
 
-	wrapped := trackCompleted(handler, utilclock.NewFakeClock(time.Now()), func(_ context.Context, _ *requestFilterRecord, _ time.Time) {
+	wrapped := trackCompleted(handler, testingclock.NewFakeClock(time.Now()), func(_ context.Context, _ *requestFilterRecord, _ time.Time) {
 		actionCallCount++
 	})
 
