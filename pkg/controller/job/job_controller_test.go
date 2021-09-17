@@ -46,8 +46,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
@@ -1461,7 +1463,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				pods = append(pods, buildPod().uid("b").phase(v1.PodFailed).trackingFinalizer().Pod)
 				return pods
 			}(),
-			wantRmFinalizers: 501,
+			wantRmFinalizers: 499,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
@@ -1478,16 +1480,10 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				},
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Succeeded: []types.UID{"499"},
-						Failed:    []types.UID{"b"},
+						Failed: []types.UID{"b"},
 					},
 					Succeeded: 499,
 					Failed:    1,
-				},
-				{
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					Succeeded:               500,
-					Failed:                  2,
 				},
 			},
 		},
@@ -1505,17 +1501,12 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				}
 				return pods
 			}(),
-			wantRmFinalizers: 501,
+			wantRmFinalizers: 500,
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 					CompletedIndexes:        "0-499",
 					Succeeded:               500,
-				},
-				{
-					CompletedIndexes:        "0-500",
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-					Succeeded:               501,
 				},
 			},
 		},
@@ -1525,19 +1516,20 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			clientSet := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 			manager, _ := newControllerFromClient(clientSet, controller.NoResyncPeriodFunc)
 			fakePodControl := controller.FakePodControl{Err: tc.podControlErr}
+			metrics.JobPodsFinished.Reset()
 			manager.podControl = &fakePodControl
 			var statusUpdates []batch.JobStatus
 			manager.updateStatusHandler = func(job *batch.Job) error {
 				statusUpdates = append(statusUpdates, *job.Status.DeepCopy())
 				return tc.statusUpdateErr
 			}
-
-			if tc.job.Status.UncountedTerminatedPods == nil {
-				tc.job.Status.UncountedTerminatedPods = &batch.UncountedTerminatedPods{}
+			job := tc.job.DeepCopy()
+			if job.Status.UncountedTerminatedPods == nil {
+				job.Status.UncountedTerminatedPods = &batch.UncountedTerminatedPods{}
 			}
-			uncounted := newUncountedTerminatedPods(*tc.job.Status.UncountedTerminatedPods)
-			succeededIndexes := succeededIndexesFromJob(&tc.job)
-			err := manager.trackJobStatusAndRemoveFinalizers(&tc.job, tc.pods, succeededIndexes, *uncounted, tc.finishedCond, tc.needsFlush)
+			uncounted := newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods)
+			succeededIndexes := succeededIndexesFromJob(job)
+			err := manager.trackJobStatusAndRemoveFinalizers(job, tc.pods, succeededIndexes, *uncounted, tc.finishedCond, tc.needsFlush)
 			if !errors.Is(err, tc.wantErr) {
 				t.Errorf("Got error %v, want %w", err, tc.wantErr)
 			}
@@ -1547,6 +1539,25 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			rmFinalizers := len(fakePodControl.Patches)
 			if rmFinalizers != tc.wantRmFinalizers {
 				t.Errorf("Removed %d finalizers, want %d", rmFinalizers, tc.wantRmFinalizers)
+			}
+			if tc.wantErr == nil {
+				completionMode := completionModeStr(job)
+				v, err := metricstestutil.GetCounterMetricValue(metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Succeeded))
+				if err != nil {
+					t.Fatalf("Obtaining succeeded job_pods_finished_total: %v", err)
+				}
+				newSucceeded := job.Status.Succeeded - tc.job.Status.Succeeded
+				if float64(newSucceeded) != v {
+					t.Errorf("Metric reports %.0f succeeded pods, want %d", v, newSucceeded)
+				}
+				v, err = metricstestutil.GetCounterMetricValue(metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Failed))
+				if err != nil {
+					t.Fatalf("Obtaining failed job_pods_finished_total: %v", err)
+				}
+				newFailed := job.Status.Failed - tc.job.Status.Failed
+				if float64(newFailed) != v {
+					t.Errorf("Metric reports %.0f failed pods, want %d", v, newFailed)
+				}
 			}
 		})
 	}
