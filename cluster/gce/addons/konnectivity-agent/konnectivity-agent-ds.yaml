@@ -24,8 +24,6 @@ spec:
           operator: "Exists"
         - operator: "Exists"
           effect: "NoExecute"
-        - operator: "Exists"
-          effect: "NoSchedule"
       nodeSelector:
         kubernetes.io/os: linux
       containers:
