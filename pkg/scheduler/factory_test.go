@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -51,6 +50,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 const (
@@ -492,7 +492,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			// Need to add/update/delete testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			queue.Add(testPod)
@@ -566,7 +566,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			// Need to add testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			for i := range tt.nodes {
@@ -607,7 +607,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	// Need to add testPod to the store.
 	podInformer.Informer().GetStore().Add(testPod)
 
-	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
