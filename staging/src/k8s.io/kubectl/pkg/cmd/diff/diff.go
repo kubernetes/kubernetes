@@ -25,6 +25,9 @@ import (
 	"regexp"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/cli-runtime/pkg/printers"
+
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -107,15 +110,25 @@ type DiffOptions struct {
 	FieldManager    string
 	ForceConflicts  bool
 
-	Selector         string
-	OpenAPISchema    openapi.Resources
-	DiscoveryClient  discovery.DiscoveryInterface
-	DynamicClient    dynamic.Interface
-	DryRunVerifier   *resource.DryRunVerifier
-	CmdNamespace     string
-	EnforceNamespace bool
-	Builder          *resource.Builder
-	Diff             *DiffProgram
+	Selector          string
+	OpenAPISchema     openapi.Resources
+	DiscoveryClient   discovery.DiscoveryInterface
+	DynamicClient     dynamic.Interface
+	DryRunVerifier    *resource.DryRunVerifier
+	CmdNamespace      string
+	EnforceNamespace  bool
+	Builder           *resource.Builder
+	Diff              *DiffProgram
+	Mapper            meta.RESTMapper
+	Prune             bool
+	PruneResources    []pruneResource
+	VisitedUids       sets.String
+	VisitedNamespaces sets.String
+	ToPrinter         func(string) (printers.ResourcePrinter, error)
+	PrintFlags        *genericclioptions.PrintFlags
+	All               bool
+	PruneWhitelist    []string
+	genericclioptions.IOStreams
 }
 
 func validateArgs(cmd *cobra.Command, args []string) error {
@@ -131,6 +144,10 @@ func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
 			Exec:      exec.New(),
 			IOStreams: ioStreams,
 		},
+		VisitedUids:       sets.NewString(),
+		VisitedNamespaces: sets.NewString(),
+		PrintFlags:        genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		IOStreams:         ioStreams,
 	}
 }
 
@@ -145,6 +162,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckDiffErr(options.Complete(f, cmd))
 			cmdutil.CheckDiffErr(validateArgs(cmd, args))
+			cmdutil.CheckErr(validatePruneAll(options.Prune, options.All, options.Selector))
 			// `kubectl diff` propagates the error code from
 			// diff or `KUBECTL_EXTERNAL_DIFF`. Also, we
 			// don't want to print an error if diff returns
@@ -170,11 +188,24 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringArrayVar(&options.PruneWhitelist, "prune-whitelist", options.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Automatically diff for possibly will be deleted resource objects, Should be used with either -l or --all.")
+	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources in the namespace of the specified resource types.")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
 
 	return cmd
+}
+
+func validatePruneAll(prune, all bool, selector string) error {
+	if all && len(selector) > 0 {
+		return fmt.Errorf("cannot set --all and --selector at the same time")
+	}
+	if prune && !all && selector == "" {
+		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
+	}
+	return nil
 }
 
 // DiffProgram finds and run the diff program. The value of
@@ -618,6 +649,12 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, cmdutil.DryRunServer)
+		return o.PrintFlags.ToPrinter()
+	}
+
 	if !o.ServerSideApply {
 		o.OpenAPISchema, err = f.OpenAPISchema()
 		if err != nil {
@@ -640,6 +677,18 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.CmdNamespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
+	}
+
+	if o.Prune {
+		o.Mapper, err = f.ToRESTMapper()
+		if err != nil {
+			return err
+		}
+
+		o.PruneResources, err = parsePruneResources(o.Mapper, o.PruneWhitelist)
+		if err != nil {
+			return err
+		}
 	}
 
 	o.Builder = f.NewBuilder()
@@ -708,6 +757,8 @@ func (o *DiffOptions) Run() error {
 			}
 
 			err = differ.Diff(obj, printer)
+			o.MarkNamespaceVisited(info)
+			o.MarkObjectVisited(info)
 			if !isConflict(err) {
 				break
 			}
@@ -717,9 +768,34 @@ func (o *DiffOptions) Run() error {
 
 		return err
 	})
+
+	if o.Prune {
+		prune := newPruner(o)
+		prune.pruneAll(o)
+	}
+
 	if err != nil {
 		return err
 	}
 
 	return differ.Run(o.Diff)
+}
+
+// MarkObjectVisited keeps track of UIDs of the applied
+// objects. Used for pruning.
+func (o *DiffOptions) MarkObjectVisited(info *resource.Info) error {
+	metadata, err := meta.Accessor(info.Object)
+	if err != nil {
+		return err
+	}
+	o.VisitedUids.Insert(string(metadata.GetUID()))
+	return nil
+}
+
+// MarkNamespaceVisited keeps track of which namespaces the applied
+// objects belong to. Used for pruning.
+func (o *DiffOptions) MarkNamespaceVisited(info *resource.Info) {
+	if info.Namespaced() {
+		o.VisitedNamespaces.Insert(info.Namespace)
+	}
 }
