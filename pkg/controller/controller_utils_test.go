@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -52,14 +51,15 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
-func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *clock.FakeClock) {
+func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *testingclock.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := clock.NewFakeClock(fakeTime)
+	fakeClock := testingclock.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{TTL: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
