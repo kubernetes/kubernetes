@@ -2373,15 +2373,19 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.Logf("Service %s has service status updated", testSvcName)
 
 		ginkgo.By("patching the service")
-		servicePatchPayload, err := json.Marshal(v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
-					"test-service": "patched",
+		err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			servicePatchPayload, err := json.Marshal(v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"test-service": "patched",
+					},
 				},
-			},
-		})
+			})
+			framework.ExpectNoError(err, "failed to marshal patch for Service %v in namespace %v", testSvcName, ns)
 
-		_, err = svcClient.Patch(context.TODO(), testSvcName, types.StrategicMergePatchType, []byte(servicePatchPayload), metav1.PatchOptions{})
+			_, err = svcClient.Patch(context.TODO(), testSvcName, types.StrategicMergePatchType, []byte(servicePatchPayload), metav1.PatchOptions{})
+			return err
+		})
 		framework.ExpectNoError(err, "failed to patch service. %v", err)
 
 		ginkgo.By("watching for the Service to be patched")
