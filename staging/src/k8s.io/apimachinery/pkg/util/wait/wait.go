@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/clock"
 )
 
 // For any test of the style:
