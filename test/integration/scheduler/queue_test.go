@@ -139,7 +139,7 @@ func TestServiceAffinityEnqueue(t *testing.T) {
 	}
 
 	// Pop Pod2 out. It should be unschedulable.
-	podInfo := testCtx.Scheduler.NextPod()
+	podInfo := nextPodOrDie(t, testCtx)
 	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
@@ -164,7 +164,7 @@ func TestServiceAffinityEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo = testCtx.Scheduler.NextPod()
+	podInfo = nextPodOrDie(t, testCtx)
 	if podInfo.Attempts != 2 {
 		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}
@@ -304,7 +304,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Pop fake-pod out. It should be unschedulable.
-	podInfo := testCtx.Scheduler.NextPod()
+	podInfo := nextPodOrDie(t, testCtx)
 	fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 	if !ok {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
@@ -336,7 +336,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 	}
 
 	// Now we should be able to pop the Pod from activeQ again.
-	podInfo = testCtx.Scheduler.NextPod()
+	podInfo = nextPodOrDie(t, testCtx)
 	if podInfo.Attempts != 2 {
 		t.Errorf("Expected the Pod to be attempted 2 times, but got %v", podInfo.Attempts)
 	}
