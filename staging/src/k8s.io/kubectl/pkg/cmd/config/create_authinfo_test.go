@@ -171,6 +171,54 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			name: "test11",
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
+				"--exec-api-version=client.authentication.k8s.io/v1",
+				"me",
+			},
+			wantOptions: &createAuthInfoOptions{
+				name:           "me",
+				execCommand:    stringFlagFor("example-client-go-exec-plugin"),
+				execAPIVersion: stringFlagFor("client.authentication.k8s.io/v1"),
+			},
+		},
+		{
+			name: "test12",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"--exec-interactive-mode=ifavailable",
+				"me",
+			},
+			wantOptions: &createAuthInfoOptions{
+				name:                "me",
+				execCommand:         stringFlagFor("example-client-go-exec-plugin"),
+				execInteractiveMode: stringFlagFor("ifavailable"),
+			},
+		},
+		{
+			name: "test13",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"--exec-interactive-mode=invalid", // invalid mode
+				"me",
+			},
+			wantValidateErr: true,
+		},
+		{
+			name: "test14",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
+				"--exec-provide-cluster-info=true",
+				"me",
+			},
+			wantOptions: &createAuthInfoOptions{
+				name:                   "me",
+				execCommand:            stringFlagFor("example-client-go-exec-plugin"),
+				execProvideClusterInfo: cliflag.True,
+			},
+		},
+		{
+			name: "test15",
+			flags: []string{
+				"--exec-command=example-client-go-exec-plugin",
 				"--exec-arg=arg1",
 				"--exec-arg=arg2",
 				"me",
@@ -182,7 +230,7 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "test12",
+			name: "test16",
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
 				"--exec-env=key1=val1",
@@ -274,7 +322,47 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "2. redefine exec args",
+			name: "2. modify interactive mode",
+			flags: []string{
+				"--exec-interactive-mode=ifavailable",
+				"me",
+			},
+			existingAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1",
+				},
+			},
+			wantAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:         "example-client-go-exec-plugin",
+					APIVersion:      "client.authentication.k8s.io/v1",
+					InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
+				},
+			},
+		},
+		{
+			name: "3. modify provide cluster info",
+			flags: []string{
+				"--exec-provide-cluster-info=true",
+				"me",
+			},
+			existingAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:    "example-client-go-exec-plugin",
+					APIVersion: "client.authentication.k8s.io/v1",
+				},
+			},
+			wantAuthInfo: clientcmdapi.AuthInfo{
+				Exec: &clientcmdapi.ExecConfig{
+					Command:            "example-client-go-exec-plugin",
+					APIVersion:         "client.authentication.k8s.io/v1",
+					ProvideClusterInfo: true,
+				},
+			},
+		},
+		{
+			name: "4. redefine exec args",
 			flags: []string{
 				"--exec-arg=new-arg1",
 				"--exec-arg=new-arg2",
@@ -296,7 +384,7 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "3. reset exec args",
+			name: "5. reset exec args",
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
 				"me",
@@ -316,7 +404,7 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "4. modify exec env variables",
+			name: "6. modify exec env variables",
 			flags: []string{
 				"--exec-command=example-client-go-exec-plugin",
 				"--exec-env=name1=value1000",
@@ -347,7 +435,7 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 			},
 		},
 		{
-			name: "5. modify auth provider arguments",
+			name: "7. modify auth provider arguments",
 			flags: []string{
 				"--auth-provider=new-auth-provider",
 				"--auth-provider-arg=key1=val1000",

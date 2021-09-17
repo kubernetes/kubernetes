@@ -49,21 +49,25 @@ type createAuthInfoOptions struct {
 	authProviderArgs         map[string]string
 	authProviderArgsToRemove []string
 
-	execCommand     cliflag.StringFlag
-	execAPIVersion  cliflag.StringFlag
-	execArgs        []string
-	execEnv         map[string]string
-	execEnvToRemove []string
+	execCommand            cliflag.StringFlag
+	execAPIVersion         cliflag.StringFlag
+	execProvideClusterInfo cliflag.Tristate
+	execInteractiveMode    cliflag.StringFlag
+	execArgs               []string
+	execEnv                map[string]string
+	execEnvToRemove        []string
 }
 
 const (
 	flagAuthProvider    = "auth-provider"
 	flagAuthProviderArg = "auth-provider-arg"
 
-	flagExecCommand    = "exec-command"
-	flagExecAPIVersion = "exec-api-version"
-	flagExecArg        = "exec-arg"
-	flagExecEnv        = "exec-env"
+	flagExecCommand            = "exec-command"
+	flagExecAPIVersion         = "exec-api-version"
+	flagExecInteractiveMode    = "exec-interactive-mode"
+	flagExecProvideClusterInfo = "exec-provide-cluster-info"
+	flagExecArg                = "exec-arg"
+	flagExecEnv                = "exec-env"
 )
 
 var (
@@ -106,6 +110,9 @@ var (
 		# Enable new exec auth plugin for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-command=/path/to/the/executable --exec-api-version=client.authentication.k8s.io/v1beta1
 
+		# Define 'interactiveMode' and 'provideClusterInfo' auth plugin config for the "cluster-admin" entry
+		kubectl config set-credentials cluster-admin --exec-interactive-mode=ifavailable --exec-provide-cluster-info=true
+
 		# Define new exec auth plugin args for the "cluster-admin" entry
 		kubectl config set-credentials cluster-admin --exec-arg=arg1 --exec-arg=arg2
 
@@ -134,6 +141,8 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 				"[--%v=key=value] "+
 				"[--%v=exec_command] "+
 				"[--%v=exec_api_version] "+
+				"[--%v=exec_interactive_mode] "+
+				"[--%v=exec_provice_cluster_info] "+
 				"[--%v=arg] "+
 				"[--%v=key=value]",
 			clientcmd.FlagCertFile,
@@ -145,6 +154,8 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 			flagAuthProviderArg,
 			flagExecCommand,
 			flagExecAPIVersion,
+			flagExecInteractiveMode,
+			flagExecProvideClusterInfo,
 			flagExecArg,
 			flagExecEnv,
 		),
@@ -174,6 +185,8 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 	cmd.Flags().StringSlice(flagAuthProviderArg, nil, "'key=value' arguments for the auth provider")
 	cmd.Flags().Var(&options.execCommand, flagExecCommand, "Command for the exec credential plugin for the user entry in kubeconfig")
 	cmd.Flags().Var(&options.execAPIVersion, flagExecAPIVersion, "API version of the exec credential plugin for the user entry in kubeconfig")
+	cmd.Flags().Var(&options.execInteractiveMode, flagExecInteractiveMode, "Interactive Mode of the exec credential plugin for the user entry in kubeconfig. One of (never|ifavailable|always)")
+	cmd.Flags().Var(&options.execProvideClusterInfo, flagExecProvideClusterInfo, "provide cluster information to the exec credential plugin via KUBERNETES_EXEC_INFO")
 	cmd.Flags().StringSlice(flagExecArg, nil, "New arguments for the exec credential plugin command for the user entry in kubeconfig")
 	cmd.Flags().StringArray(flagExecEnv, nil, "'key=value' environment values for the exec credential plugin")
 	f := cmd.Flags().VarPF(&options.embedCertData, clientcmd.FlagEmbedCerts, "", "Embed client cert/key for the user entry in kubeconfig")
@@ -295,6 +308,21 @@ func (o *createAuthInfoOptions) modifyAuthInfo(existingAuthInfo clientcmdapi.Aut
 	if modifiedAuthInfo.Exec != nil {
 		if o.execAPIVersion.Provided() {
 			modifiedAuthInfo.Exec.APIVersion = o.execAPIVersion.Value()
+		}
+
+		if o.execInteractiveMode.Provided() {
+			switch strings.ToLower(o.execInteractiveMode.Value()) {
+			case "never":
+				modifiedAuthInfo.Exec.InteractiveMode = clientcmdapi.NeverExecInteractiveMode
+			case "ifavailable":
+				modifiedAuthInfo.Exec.InteractiveMode = clientcmdapi.IfAvailableExecInteractiveMode
+			case "always":
+				modifiedAuthInfo.Exec.InteractiveMode = clientcmdapi.AlwaysExecInteractiveMode
+			}
+		}
+
+		if o.execProvideClusterInfo.Provided() {
+			modifiedAuthInfo.Exec.ProvideClusterInfo = o.execProvideClusterInfo.Value()
 		}
 
 		// rewrite exec arguments list with new values
@@ -430,6 +458,15 @@ func (o createAuthInfoOptions) validate() error {
 			if _, err := os.Stat(keyPath); err != nil {
 				return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagKeyFile, keyPath, err)
 			}
+		}
+	}
+
+	if o.execInteractiveMode.Provided() {
+		mode := strings.ToLower(o.execInteractiveMode.Value())
+		switch mode {
+		case "never", "ifavailable", "always":
+		default:
+			return fmt.Errorf("interactive mode '%s' not valid, allowed modes are: never,ifavailable,always", mode)
 		}
 	}
 
