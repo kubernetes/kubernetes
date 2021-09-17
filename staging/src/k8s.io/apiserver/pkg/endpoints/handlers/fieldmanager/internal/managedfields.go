@@ -66,15 +66,21 @@ func NewManaged(f fieldpath.ManagedFields, t map[string]*metav1.Time) ManagedInt
 	}
 }
 
-// RemoveObjectManagedFields removes the ManagedFields from the object
-// before we merge so that it doesn't appear in the ManagedFields
-// recursively.
-func RemoveObjectManagedFields(obj runtime.Object) {
+// RemoveAndAddObjectManagedFields removes the ManagedFields from the
+// object before we merge so that it doesn't appear in the ManagedFields
+// recursively. This function returns a function that can be deferred if
+// you want the managed fields to be re-inserted.
+func RemoveAndAddObjectManagedFields(obj runtime.Object) func() {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		panic(fmt.Sprintf("couldn't get accessor: %v", err))
 	}
+	managedFields := accessor.GetManagedFields()
 	accessor.SetManagedFields(nil)
+
+	return func() {
+		accessor.SetManagedFields(managedFields)
+	}
 }
 
 // EncodeObjectManagedFields converts and stores the fieldpathManagedFields into the objects ManagedFields

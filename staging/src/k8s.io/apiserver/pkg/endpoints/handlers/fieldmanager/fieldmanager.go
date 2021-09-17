@@ -173,8 +173,8 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 		return newObj, nil
 	}
 
-	internal.RemoveObjectManagedFields(liveObj)
-	internal.RemoveObjectManagedFields(newObj)
+	defer internal.RemoveAndAddObjectManagedFields(liveObj)()
+	internal.RemoveAndAddObjectManagedFields(newObj)
 
 	if object, managed, err = f.fieldManager.Update(liveObj, newObj, managed, manager); err != nil {
 		return nil, err
@@ -206,7 +206,7 @@ func (f *FieldManager) UpdateNoErrors(liveObj, newObj runtime.Object, manager st
 		})
 		// Explicitly remove managedFields on failure, so that
 		// we can't have garbage in it.
-		internal.RemoveObjectManagedFields(newObj)
+		internal.RemoveAndAddObjectManagedFields(newObj)
 		return newObj
 	}
 	return obj
@@ -242,9 +242,9 @@ func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string,
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
 
-	internal.RemoveObjectManagedFields(liveObj)
+	defer internal.RemoveAndAddObjectManagedFields(liveObj)()
 
-	object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+	object, managed, err = f.fieldManager.Apply(liveObj.DeepCopyObject(), appliedObj, managed, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
 			return nil, internal.NewConflictError(conflicts)

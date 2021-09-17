@@ -237,7 +237,7 @@ func TestCapUpdateManagers(t *testing.T) {
 			t.Fatalf("%v: couldn't get accessor: %v", tc.name, err)
 		}
 		accessor.SetManagedFields(tc.input)
-		if err := f.Update(f.liveObj, "no-op-update"); err != nil {
+		if err := f.Update(f.liveObj.DeepCopyObject(), "no-op-update"); err != nil {
 			t.Fatalf("%v: failed to do no-op update to object: %v", tc.name, err)
 		}
 
