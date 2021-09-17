@@ -18,6 +18,7 @@ package config
 
 import (
 	apiserver "k8s.io/apiserver/pkg/server"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -40,9 +41,10 @@ type Config struct {
 	Authorization  apiserver.AuthorizationInfo
 	SecureServing  *apiserver.SecureServingInfo
 
-	Client          clientset.Interface
-	KubeConfig      *restclient.Config
-	InformerFactory informers.SharedInformerFactory
+	Client             clientset.Interface
+	KubeConfig         *restclient.Config
+	InformerFactory    informers.SharedInformerFactory
+	DynInformerFactory dynamicinformer.DynamicSharedInformerFactory
 
 	//lint:ignore SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.
 	EventBroadcaster events.EventBroadcasterAdapter
