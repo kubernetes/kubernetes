@@ -255,13 +255,7 @@ func getSchedulableCores(nodes []v1.Node) int64 {
 			sc.Add(node.Status.Allocatable[v1.ResourceCPU])
 		}
 	}
-
-	scInt64, scOk := sc.AsInt64()
-	if !scOk {
-		framework.Logf("Unable to compute integer values of schedulable cores in the cluster")
-		return 0
-	}
-	return scInt64
+	return sc.Value()
 }
 
 func fetchDNSScalingConfigMap(c clientset.Interface) (*v1.ConfigMap, error) {
