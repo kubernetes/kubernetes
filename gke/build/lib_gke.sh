@@ -783,6 +783,14 @@ set_global_vars()
   __go_runner_image=$(get_val "build-env.runtime-image.go-runner")
   log.debugvar __go_runner_image
 
+  # This overrides the OSS `kube-proxy` runtime base image.
+  __kube_proxy_base_image=$(get_val "build-env.runtime-image.kube-proxy-base")
+  log.debugvar __kube_proxy_base_image
+
+  # This overrides the OSS `setcap` runtime image.
+  __setcap_image=$(get_val "build-env.runtime-image.setcap")
+  log.debugvar __setcap_image
+
   # Log remaining variables of interest.
   log.debugvar __INJECT_DEV_VERSION_MARKER
   log.debugvar __SKIP_DOCKER
@@ -1036,6 +1044,8 @@ package()
   KUBE_OUTPUT_SUBPATH="${__output_subpath}" \
     KUBE_GIT_VERSION_FILE="${KUBE_ROOT}/${KUBE_GIT_VERSION_FILE}" \
     KUBE_GORUNNER_IMAGE="${__go_runner_image}" \
+    KUBE_PROXY_BASE_IMAGE="${__kube_proxy_base_image}" \
+    KUBE_BUILD_SETCAP_IMAGE="${__setcap_image}" \
     "${KUBE_ROOT}"/gke/build/package-tarballs.sh
 
   # For BoringCrypto, run associated hook for additional processing. This is

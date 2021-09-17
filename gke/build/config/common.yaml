@@ -70,7 +70,10 @@ build-env:
   docker-image:
     name: "gcr.io/cloud-builders/docker"
 
-  # These are the runtime base images for containerized binaries.
+  # These are the runtime base images for containerized binaries. These allow
+  # us to override the images in GKE without modifying the default image
+  # version in common.sh. This prevents merge conflicts when we cherry pick
+  # changes back into our release branches.
   runtime-image:
     # GKE's boringcrypto-patched binaries require glibc, which is not present
     # in the OSS `go-runner` image. Our internal `go-runner` is based on
@@ -82,6 +85,10 @@ build-env:
     # For instructions on updating `go-runner` and creating a new
     # `gke-distroless/go-runner` release, see: http://go/gke-security-compliance#updating-gke-distrolessgo-runner
     go-runner: "gke.gcr.io/gke-distroless/go-runner:20210225_1710_RC0"
+    # The kube-proxy base image to use.
+    kube-proxy-base: "k8s.gcr.io/build-image/debian-iptables:buster-v1.6.7"
+    # The setcap image to use.
+    setcap: "k8s.gcr.io/build-image/setcap:buster-v2.0.4"
 
 compile:
   # This is the VERSION field that is supplied at Golang compilation time. This
