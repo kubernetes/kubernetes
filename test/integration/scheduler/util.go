@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -510,4 +511,40 @@ func createNamespacesWithLabels(cs clientset.Interface, namespaces []string, lab
 		}
 	}
 	return nil
+}
+
+// timeout returns a timeout error if the given `f` function doesn't
+// complete within `d` duration; otherwise it returns nil.
+func timeout(ctx context.Context, d time.Duration, f func()) error {
+	ctx, cancel := context.WithTimeout(ctx, d)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		f()
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// nextPodOrDie returns the next Pod in the scheduler queue.
+// The operation needs to be completed within 15 seconds; otherwise the test gets aborted.
+func nextPodOrDie(t *testing.T, testCtx *testutils.TestContext) *framework.QueuedPodInfo {
+	t.Helper()
+
+	var podInfo *framework.QueuedPodInfo
+	// NextPod() is a blocking operation. Wrap it in timeout() to avoid relying on
+	// default go testing timeout (10m) to abort.
+	if err := timeout(testCtx.Ctx, time.Second*15, func() {
+		podInfo = testCtx.Scheduler.NextPod()
+	}); err != nil {
+		t.Fatalf("Timed out waiting for the Pod to be popped: %v", err)
+	}
+	return podInfo
 }
