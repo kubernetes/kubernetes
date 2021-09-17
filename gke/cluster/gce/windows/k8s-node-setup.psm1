@@ -2417,6 +2417,20 @@ $FLUENTBIT_CONFIG = @'
     Multiline        On
     Parser_Firstline glog
 
+# Example:
+# I0204 07:32:30.020537    3368 agent.go:66] Starting Antrea agent (version v1.2.0)
+[INPUT]
+    Name             tail
+    Alias            antrea-agent
+    Tag              antrea-agent
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             /etc/kubernetes/logs/antrea.log
+    DB               /var/run/google-fluentbit/pos-files/antrea.db
+    Multiline        On
+    Parser_Firstline glog
+
 [FILTER]
     Name        modify
     Match       *
