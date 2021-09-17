@@ -664,11 +664,11 @@ func (swc SwapCheck) Check() (warnings, errorList []error) {
 		buf = append(buf, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, []error{errors.Wrap(err, "error parsing /proc/swaps")}
+		return []error{errors.Wrap(err, "error parsing /proc/swaps")}, nil
 	}
 
 	if len(buf) > 1 {
-		return nil, []error{errors.New("running with swap on is not supported. Please disable swap")}
+		return []error{errors.New("swap is enabled; production deployments should disable swap unless testing the NodeSwap feature gate of the kubelet")}, nil
 	}
 
 	return nil, nil
