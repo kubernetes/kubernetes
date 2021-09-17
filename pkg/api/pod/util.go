@@ -544,27 +544,8 @@ func dropDisabledFields(
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
-		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			for i := range c.VolumeMounts {
-				c.VolumeMounts[i].SubPath = ""
-			}
-			return true
-		})
-	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
 		podSpec.EphemeralContainers = nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathExprInUse(oldPodSpec) {
-		// drop subpath env expansion from the pod if subpath feature is disabled and the old spec did not specify subpath env expansion
-		VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-			for i := range c.VolumeMounts {
-				c.VolumeMounts[i].SubPathExpr = ""
-			}
-			return true
-		})
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProbeTerminationGracePeriod) && !probeGracePeriodInUse(oldPodSpec) {
@@ -728,26 +709,6 @@ func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
-func subpathInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		for i := range c.VolumeMounts {
-			if len(c.VolumeMounts[i].SubPath) > 0 {
-				inUse = true
-				return false
-			}
-		}
-		return true
-	})
-
-	return inUse
-}
-
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set
 func overheadInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
@@ -814,26 +775,6 @@ func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 		}
 	}
 	return false
-}
-
-// subpathExprInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPathExpr feature
-func subpathExprInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-
-	var inUse bool
-	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
-		for i := range c.VolumeMounts {
-			if len(c.VolumeMounts[i].SubPathExpr) > 0 {
-				inUse = true
-				return false
-			}
-		}
-		return true
-	})
-
-	return inUse
 }
 
 // probeGracePeriodInUse returns true if the pod spec is non-nil and has a probe that makes use
