@@ -1539,7 +1539,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			succeededIndexes := succeededIndexesFromJob(&tc.job)
 			err := manager.trackJobStatusAndRemoveFinalizers(&tc.job, tc.pods, succeededIndexes, *uncounted, tc.finishedCond, tc.needsFlush)
 			if !errors.Is(err, tc.wantErr) {
-				t.Errorf("Got error %v, want %w", err, tc.wantErr)
+				t.Errorf("Got error %v, want %v", err, tc.wantErr)
 			}
 			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates); diff != "" {
 				t.Errorf("Unexpected status updates (-want,+got):\n%s", diff)
