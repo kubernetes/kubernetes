@@ -107,12 +107,6 @@ func (al *Allocators) initIPFamilyFields(after After, before Before) error {
 		return nil
 	}
 
-	// gate off. We don't need to validate or default new fields
-	// we totally depend on existing validation in apis/validation
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return nil
-	}
-
 	// We don't want to auto-upgrade (add an IP) or downgrade (remove an IP)
 	// PreferDualStack services following a cluster change to/from
 	// dual-stackness.
@@ -343,10 +337,6 @@ func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[ap
 		return nil, nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return al.allocClusterIP(service, dryRun)
-	}
-
 	toAlloc := make(map[api.IPFamily]string)
 	// at this stage, the only fact we know is that service has correct ip families
 	// assigned to it. It may have partial assigned ClusterIPs (Upgrade to dual stack)
@@ -386,25 +376,6 @@ func (al *Allocators) allocClusterIPs(service *api.Service, dryRun bool) (map[ap
 				}
 			}
 		}
-	}
-
-	return allocated, err
-}
-
-// standard allocator for dualstackgate==Off, hard wired dependency
-// and ignores policy, families and clusterIPs
-func (al *Allocators) allocClusterIP(service *api.Service, dryRun bool) (map[api.IPFamily]string, error) {
-	toAlloc := make(map[api.IPFamily]string)
-
-	// get clusterIP.. empty string if user did not specify an ip
-	toAlloc[al.defaultServiceIPFamily] = service.Spec.ClusterIP
-	// alloc
-	allocated, err := al.allocIPs(service, toAlloc, dryRun)
-
-	// set
-	if err == nil {
-		service.Spec.ClusterIP = allocated[al.defaultServiceIPFamily]
-		service.Spec.ClusterIPs = []string{allocated[al.defaultServiceIPFamily]}
 	}
 
 	return allocated, err
@@ -687,22 +658,10 @@ func (al *Allocators) updateClusterIPs(after After, before Before, dryRun bool) 
 	// Update service from non-ExternalName to ExternalName, should release ClusterIP if exists.
 	if oldService.Spec.Type != api.ServiceTypeExternalName && service.Spec.Type == api.ServiceTypeExternalName {
 		toRelease = make(map[api.IPFamily]string)
-		if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-			// for non dual stack enabled cluster we use clusterIPs
-			toRelease[al.defaultServiceIPFamily] = oldService.Spec.ClusterIP
-		} else {
-			// dual stack is enabled, collect ClusterIPs by families
-			for i, family := range oldService.Spec.IPFamilies {
-				toRelease[family] = oldService.Spec.ClusterIPs[i]
-			}
+		for i, family := range oldService.Spec.IPFamilies {
+			toRelease[family] = oldService.Spec.ClusterIPs[i]
 		}
-
 		return nil, toRelease, nil
-	}
-
-	// upgrade and downgrade are specific to dualstack
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return nil, nil, nil
 	}
 
 	upgraded := len(oldService.Spec.IPFamilies) == 1 && len(service.Spec.IPFamilies) == 2
@@ -909,10 +868,6 @@ func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.
 		return nil, nil
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return al.releaseClusterIP(service)
-	}
-
 	toRelease := make(map[api.IPFamily]string)
 	for _, ip := range service.Spec.ClusterIPs {
 		if netutils.IsIPv6String(ip) {
@@ -921,21 +876,6 @@ func (al *Allocators) releaseClusterIPs(service *api.Service) (released map[api.
 			toRelease[api.IPv4Protocol] = ip
 		}
 	}
-	return al.releaseIPs(toRelease)
-}
-
-// for pre dual stack (gate == off). Hardwired to ClusterIP and ignores all new fields
-func (al *Allocators) releaseClusterIP(service *api.Service) (released map[api.IPFamily]string, err error) {
-	toRelease := make(map[api.IPFamily]string)
-
-	// we need to do that to handle cases where allocator is no longer configured on
-	// cluster
-	if netutils.IsIPv6String(service.Spec.ClusterIP) {
-		toRelease[api.IPv6Protocol] = service.Spec.ClusterIP
-	} else {
-		toRelease[api.IPv4Protocol] = service.Spec.ClusterIP
-	}
-
 	return al.releaseIPs(toRelease)
 }
 

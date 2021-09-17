@@ -36,10 +36,8 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
@@ -241,11 +239,6 @@ func (r *REST) defaultOnReadService(service *api.Service) {
 	// We might find Services that were written before ClusterIP became plural.
 	// We still want to present a consistent view of them.
 	normalizeClusterIPs(After{service}, Before{nil})
-
-	// The rest of this does not apply unless dual-stack is enabled.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return
-	}
 
 	// Set ipFamilies and ipFamilyPolicy if needed.
 	r.defaultOnReadIPFamilies(service)
