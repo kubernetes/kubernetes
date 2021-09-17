@@ -19,7 +19,7 @@ package testing
 import (
 	"os"
 
-	"k8s.io/kubernetes/pkg/util/sysctl"
+	"k8s.io/component-helpers/node/utils/sysctl"
 )
 
 // Fake is a map-backed implementation of sysctl.Interface, for testing/mocking.

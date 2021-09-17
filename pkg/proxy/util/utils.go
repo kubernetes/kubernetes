@@ -30,8 +30,8 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/events"
+	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
