@@ -165,6 +165,12 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			})
 		}
 
+		// Ignore changes that only affect managed fields
+		// timestamps. FieldManager can't know about changes
+		// like normalized fields, defaulted fields and other
+		// mutations.
+		transformers = append(transformers, fieldmanager.DropEqualTransformer)
+
 		createAuthorizerAttributes := authorizer.AttributesRecord{
 			User:            userInfo,
 			ResourceRequest: true,

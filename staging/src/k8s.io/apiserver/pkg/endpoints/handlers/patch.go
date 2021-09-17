@@ -583,7 +583,9 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 	}
 
 	wasCreated := false
-	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer)
+	p.updatedObjectInfo = rest.DefaultUpdatedObjectInfo(nil, p.applyPatch, p.applyAdmission, dedupOwnerReferencesTransformer,
+		fieldmanager.DropEqualTransformer) // Ignore changes that only affect managed fields timestamps.
+
 	requestFunc := func() (runtime.Object, error) {
 		// Pass in UpdateOptions to override UpdateStrategy.AllowUpdateOnCreate
 		options := patchToUpdateOptions(p.options)
