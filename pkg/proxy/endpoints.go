@@ -349,7 +349,7 @@ func getLastChangeTriggerTime(annotations map[string]string) time.Time {
 	}
 	val, err := time.Parse(time.RFC3339Nano, annotations[v1.EndpointsLastChangeTriggerTime])
 	if err != nil {
-		klog.InfoS("Error while parsing EndpointsLastChangeTriggerTimeAnnotation", "error", err,
+		klog.ErrorS(err, "Error while parsing EndpointsLastChangeTriggerTimeAnnotation",
 			"value", annotations[v1.EndpointsLastChangeTriggerTime])
 		// In case of error val = time.Zero, which is ignored in the upstream code.
 	}
@@ -419,7 +419,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 		for i := range ss.Ports {
 			port := &ss.Ports[i]
 			if port.Port == 0 {
-				klog.InfoS("Ignoring invalid endpoint port", "portName", port.Name)
+				klog.ErrorS(nil, "Ignoring invalid endpoint port", "portName", port.Name)
 				continue
 			}
 			svcPortName := ServicePortName{
@@ -430,7 +430,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 			for i := range ss.Addresses {
 				addr := &ss.Addresses[i]
 				if addr.IP == "" {
-					klog.InfoS("Ignoring invalid endpoint port with empty host", "portName", port.Name)
+					klog.ErrorS(nil, "Ignoring invalid endpoint port with empty host", "portName", port.Name)
 					continue
 				}
 

@@ -235,12 +235,12 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 	for _, sliceInfo := range sliceInfoByName {
 		for _, port := range sliceInfo.Ports {
 			if port.Name == nil {
-				klog.InfoS("Ignoring port with nil name", "port", port)
+				klog.ErrorS(nil, "Ignoring port with nil name", "port", port)
 				continue
 			}
 			// TODO: handle nil ports to mean "all"
 			if port.Port == nil || *port.Port == int32(0) {
-				klog.InfoS("Ignoring invalid endpoint port", "portName", *port.Name)
+				klog.ErrorS(nil, "Ignoring invalid endpoint port", "portName", *port.Name)
 				continue
 			}
 
@@ -266,7 +266,7 @@ func (cache *EndpointSliceCache) addEndpoints(serviceNN types.NamespacedName, po
 	// iterate through endpoints to add them to endpointSet.
 	for _, endpoint := range endpoints {
 		if len(endpoint.Addresses) == 0 {
-			klog.InfoS("Ignoring invalid endpoint port with empty address", "endpoint", endpoint)
+			klog.ErrorS(nil, "Ignoring invalid endpoint port with empty address", "endpoint", endpoint)
 			continue
 		}
 
