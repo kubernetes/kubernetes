@@ -3170,7 +3170,7 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should allow creating Pods, Services and NetworkPolicies with SCTP ports", func() {
+	ginkgo.It("should allow creating Pods and Services with SCTP ports", func() {
 		endpointServiceName := "sctp-endpoint-test"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, endpointServiceName)
@@ -3232,26 +3232,6 @@ var _ = common.SIGDescribe("SCTP [LinuxOnly]", func() {
 			err := cs.CoreV1().Pods(f.Namespace.Name).Delete(context.TODO(), podName, metav1.DeleteOptions{})
 			framework.ExpectNoError(err, "failed to delete pod: %s in namespace: %s", podName, f.Namespace.Name)
 		}()
-
-		clusterIPServiceName := "sctp-clusterip"
-		jig = e2eservice.NewTestJig(cs, ns, clusterIPServiceName)
-
-		nodes, err = e2enode.GetReadySchedulableNodes(cs)
-		framework.ExpectNoError(err)
-
-		ginkgo.By("creating service " + clusterIPServiceName + " in namespace " + ns)
-		_, err = jig.CreateSCTPServiceWithPort(func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeClusterIP
-			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolSCTP, Port: 5060}}
-		}, 5060)
-		framework.ExpectNoError(err)
-		defer func() {
-			err := cs.CoreV1().Services(ns).Delete(context.TODO(), clusterIPServiceName, metav1.DeleteOptions{})
-			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", clusterIPServiceName, ns)
-		}()
-
-		err = e2enetwork.WaitForService(f.ClientSet, ns, clusterIPServiceName, true, 5*time.Second, e2eservice.TestTimeout)
-		framework.ExpectNoError(err, fmt.Sprintf("error while waiting for service:%s err: %v", clusterIPServiceName, err))
 
 		ginkgo.By("validating sctp module is still not loaded")
 		sctpLoadedAtEnd := CheckSCTPModuleLoadedOnNodes(f, nodes)
