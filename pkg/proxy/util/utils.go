@@ -181,7 +181,7 @@ func ShouldSkipService(service *v1.Service) bool {
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).InfoS("Skipping service in namespace due to Type=ExternalName", "service", klog.KObj(service))
+		klog.V(3).InfoS("Skipping service due to Type=ExternalName", "service", klog.KObj(service))
 		return true
 	}
 	return false
@@ -274,7 +274,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			klog.ErrorS(nil, "Skipping invalid IP", "IP", ip)
+			klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
 		}
 	}
 	return ipFamilyMap
@@ -288,7 +288,7 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
-			klog.ErrorS(nil, "Skipping invalid CIDR", "CIDR", cidr)
+			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
 		}
 	}
 	return ipFamilyMap
