@@ -122,7 +122,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 		{
 			"NodeStatusUpdateFrequency is not zero",
 			&v1beta1.KubeletConfiguration{
-				NodeStatusUpdateFrequency:                 v1.Duration{Duration: 1 * time.Minute},
+				NodeStatusUpdateFrequency: v1.Duration{Duration: 1 * time.Minute},
 			},
 			&v1beta1.KubeletConfiguration{
 				EnableServer:       utilpointer.BoolPtr(true),
