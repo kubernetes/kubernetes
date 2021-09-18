@@ -17,19 +17,26 @@ limitations under the License.
 package fake
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
 	core "k8s.io/client-go/testing"
+	ref "k8s.io/client-go/tools/reference"
 )
 
+// CreateWithEventNamespace makes a new event. Returns the copy of the event the server returns,
+// or an error. The namespace to create the event within is deduced from the
+// event; it must either match this event client's namespace, or this event
+// client must have been created with the "" namespace.
 func (c *FakeEvents) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
-	action := core.NewRootCreateAction(eventsResource, event)
-	if c.ns != "" {
-		action = core.NewCreateAction(eventsResource, c.ns, event)
+	if c.ns != "" && event.Namespace != c.ns {
+		return nil, fmt.Errorf("can't create an event with namespace '%v' in namespace '%v'", event.Namespace, c.ns)
 	}
+	action := core.NewCreateAction(eventsResource, event.Namespace, event)
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
 		return nil, err
@@ -38,12 +45,12 @@ func (c *FakeEvents) CreateWithEventNamespace(event *v1.Event) (*v1.Event, error
 	return obj.(*v1.Event), err
 }
 
-// Update replaces an existing event. Returns the copy of the event the server returns, or an error.
+// UpdateWithEventNamespace modifies an existing event. It returns the copy of the event that the server returns,
+// or an error. The namespace and key to update the event within is deduced from the event. The
+// namespace must either match this event client's namespace, or this event client must have been
+// created with the "" namespace.
 func (c *FakeEvents) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error) {
-	action := core.NewRootUpdateAction(eventsResource, event)
-	if c.ns != "" {
-		action = core.NewUpdateAction(eventsResource, c.ns, event)
-	}
+	action := core.NewUpdateAction(eventsResource, event.Namespace, event)
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
 		return nil, err
@@ -52,15 +59,19 @@ func (c *FakeEvents) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error
 	return obj.(*v1.Event), err
 }
 
-// PatchWithEventNamespace patches an existing event. Returns the copy of the event the server returns, or an error.
+// PatchWithEventNamespace modifies an existing event. It returns the copy of
+// the event that the server returns, or an error. The namespace and name of the
+// target event is deduced from the incompleteEvent. The namespace must either
+// match this event client's namespace, or this event client must have been
+// created with the "" namespace.
 // TODO: Should take a PatchType as an argument probably.
 func (c *FakeEvents) PatchWithEventNamespace(event *v1.Event, data []byte) (*v1.Event, error) {
+	if c.ns != "" && event.Namespace != c.ns {
+		return nil, fmt.Errorf("can't patch an event with namespace '%v' in namespace '%v'", event.Namespace, c.ns)
+	}
 	// TODO: Should be configurable to support additional patch strategies.
 	pt := types.StrategicMergePatchType
-	action := core.NewRootPatchAction(eventsResource, event.Name, pt, data)
-	if c.ns != "" {
-		action = core.NewPatchAction(eventsResource, c.ns, event.Name, pt, data)
-	}
+	action := core.NewPatchAction(eventsResource, event.Namespace, event.Name, pt, data)
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {
 		return nil, err
@@ -71,10 +82,14 @@ func (c *FakeEvents) PatchWithEventNamespace(event *v1.Event, data []byte) (*v1.
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.EventList, error) {
-	action := core.NewRootListAction(eventsResource, eventsKind, metav1.ListOptions{})
-	if c.ns != "" {
-		action = core.NewListAction(eventsResource, eventsKind, c.ns, metav1.ListOptions{})
+	ref, err := ref.GetReference(scheme, objOrRef)
+	if err != nil {
+		return nil, err
 	}
+	if len(c.ns) > 0 && ref.Namespace != c.ns {
+		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, c.ns)
+	}
+	action := core.NewListAction(eventsResource, eventsKind, ref.Namespace, metav1.ListOptions{})
 	obj, err := c.Fake.Invokes(action, &v1.EventList{})
 	if obj == nil {
 		return nil, err
