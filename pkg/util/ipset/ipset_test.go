@@ -403,7 +403,7 @@ func TestAddEntry(t *testing.T) {
 			t.Errorf("expected success, got %v", err)
 		}
 		if fcmd.CombinedOutputCalls != 2 {
-			t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+			t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 		}
 		if !sets.NewString(fcmd.CombinedOutputLog[1]...).HasAll(testCases[i].addCombinedOutputLog[1]...) {
 			t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[1])
@@ -486,7 +486,7 @@ func TestTestEntry(t *testing.T) {
 		t.Errorf("expected success, got %v", err)
 	}
 	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+		t.Errorf("expected 1 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
 	}
 	if !sets.NewString(fcmd.CombinedOutputLog[0]...).HasAll("ipset", "test", setName, "10.120.7.100,tcp:8080") {
 		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[0])
@@ -1367,7 +1367,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[11]
+		{ // case[12]
 			entry: &Entry{
 				SetType:  HashIPPort,
 				IP:       "10.20.30.40",
@@ -1380,7 +1380,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[12]
+		{ // case[13]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1393,7 +1393,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[13]
+		{ // case[14]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1406,7 +1406,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[14]
+		{ // case[15]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1419,7 +1419,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[15]
+		{ // case[16]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1432,7 +1432,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[16]
+		{ // case[17]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10::40",
@@ -1446,7 +1446,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[17]
+		{ // case[18]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "",
@@ -1459,7 +1459,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[18]
+		{ // case[19]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "1-2-3-4",
@@ -1472,7 +1472,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[19]
+		{ // case[20]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1485,7 +1485,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[20]
+		{ // case[21]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1498,7 +1498,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[21]
+		{ // case[22]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10.20.30.40",
@@ -1511,7 +1511,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[22]
+		{ // case[23]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "11.21.31.41",
@@ -1524,7 +1524,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[23]
+		{ // case[24]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10.20.30.40",
@@ -1537,7 +1537,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[24]
+		{ // case[25]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10.20.30.40",
@@ -1550,7 +1550,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[25]
+		{ // case[26]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10::40",
@@ -1564,7 +1564,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[26]
+		{ // case[27]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "",
@@ -1577,7 +1577,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[27]
+		{ // case[28]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "1-2-3-4",
@@ -1590,7 +1590,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[28]
+		{ // case[29]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1603,7 +1603,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[29]
+		{ // case[30]
 			entry: &Entry{
 				SetType:  HashIPPortIP,
 				IP:       "10.20.30.40",
@@ -1616,7 +1616,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[30]
+		{ // case[31]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10.20.30.40",
@@ -1629,7 +1629,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[31]
+		{ // case[32]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10.20.30.40",
@@ -1642,7 +1642,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: true,
 		},
-		{ // case[32]
+		{ // case[33]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10.20.30.40",
@@ -1655,7 +1655,7 @@ func TestValidateEntry(t *testing.T) {
 			},
 			valid: false,
 		},
-		{ // case[33]
+		{ // case[34]
 			entry: &Entry{
 				SetType:  HashIPPortNet,
 				IP:       "10.20.30.40",
