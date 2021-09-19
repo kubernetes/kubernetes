@@ -56,7 +56,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 
 	nodeAddresses, err := utilproxy.GetNodeAddresses(nodePortAddresses, utilproxy.RealNetwork{})
 	if err != nil || nodeAddresses.Len() == 0 {
-		klog.ErrorS(err, "Health Check Port:Failed to get node ip address matching node port addresses. Health check port will listen to all node addresses", nodePortAddresses)
+		klog.ErrorS(err, "Health Check Port:Failed to get node ip address matching node port addresses. Health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
 		nodeAddresses = sets.NewString()
 		nodeAddresses.Insert(utilproxy.IPv4ZeroCIDR)
 	}
