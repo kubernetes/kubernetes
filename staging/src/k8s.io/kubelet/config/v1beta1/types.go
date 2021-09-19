@@ -937,7 +937,7 @@ type KubeletConfiguration struct {
 	// A comma separated whitelist of unsafe sysctls or sysctl patterns (ending in `*`).
 	// Unsafe sysctl groups are `kernel.shm*`, `kernel.msg*`, `kernel.sem`, `fs.mqueue.*`,
 	// and `net.*`. For example: "`kernel.msg*,net.ipv4.route.min_pmtu`"
-	// Default: []
+	// Default: nil
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
 	// volumePluginDir is the full path of the directory in which to search
