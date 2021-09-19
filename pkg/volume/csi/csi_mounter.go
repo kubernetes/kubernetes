@@ -364,12 +364,12 @@ func (c *csiMountMgr) TearDown() error {
 	return c.TearDownAt(c.GetPath())
 }
 func (c *csiMountMgr) TearDownAt(dir string) error {
-	klog.V(4).Infof(log("Unmounter.TearDown(%s)", dir))
+	klog.V(4).Infof(log("Unmounter.TearDownAt(%s)", dir))
 
 	volID := c.volumeID
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
-		return errors.New(log("mounter.SetUpAt failed to get CSI client: %v", err))
+		return errors.New(log("Unmounter.TearDownAt failed to get CSI client: %v", err))
 	}
 
 	// Could not get spec info on whether this is a migrated operation because c.spec is nil
@@ -377,7 +377,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	defer cancel()
 
 	if err := csi.NodeUnpublishVolume(ctx, volID, dir); err != nil {
-		return errors.New(log("mounter.TearDownAt failed: %v", err))
+		return errors.New(log("Unmounter.TearDownAt failed: %v", err))
 	}
 
 	// Deprecation: Removal of target_path provided in the NodePublish RPC call
@@ -386,9 +386,9 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	// by the kubelet in the future. Kubelet will only be responsible for
 	// removal of json data files it creates and parent directories.
 	if err := removeMountDir(c.plugin, dir); err != nil {
-		return errors.New(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
+		return errors.New(log("Unmounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 	}
-	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
+	klog.V(4).Infof(log("Unmounter.TearDownAt successfully unmounted dir [%s]", dir))
 
 	return nil
 }
