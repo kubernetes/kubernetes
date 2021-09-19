@@ -20,13 +20,14 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/events"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 // NewCmdAlpha creates a command that acts as an alternate root command for features in alpha
-func NewCmdAlpha(streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdAlpha(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: i18n.T("Commands for features in alpha"),
