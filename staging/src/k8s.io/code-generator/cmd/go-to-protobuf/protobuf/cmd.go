@@ -260,16 +260,23 @@ func Run(g *Generator) {
 	if len(g.Conditional) > 0 {
 		fmt.Fprintf(buf, "// +build %s\n\n", g.Conditional)
 	}
+	buf.Write(boilerplate)
 
 	for _, outputPackage := range outputPackages {
 		p := outputPackage.(*protobufPackage)
 
 		path := filepath.Join(g.OutputBase, p.ImportPath())
-		outputPath := filepath.Join(g.OutputBase, p.OutputPath())
 		if p.Vendored {
 			path = filepath.Join(g.VendorOutputBase, p.ImportPath())
-			outputPath = filepath.Join(g.VendorOutputBase, p.OutputPath())
 		}
+		// outputPath is the path where protoc-gen-gogo is expected to output
+		// the file for outputPackage. The output path depends on the go_package
+		// option set in the input proto file. If it is a full Go import path
+		// then it will be generated under this import path within the base
+		// output directory. Note that it is not dependend on the input path
+		// itself. All protobufPackages have their import path as go_package
+		// option set.
+		outputPath := filepath.Join(g.OutputBase, p.OutputPath())
 
 		// generate the gogoprotobuf protoc
 		cmd := exec.Command("protoc", append(args, path)...)
