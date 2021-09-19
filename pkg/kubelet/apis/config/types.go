@@ -326,7 +326,7 @@ type KubeletConfiguration struct {
 	IPTablesDropBit int32
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental
 	// features. This field modifies piecemeal the built-in default values from
-	// "k8s.io/kubernetes/pkg/features/kube_features.go".
+	// "https://github.com/kubernetes/kubernetes/blob/master/pkg/features/kube_features.go".
 	FeatureGates map[string]bool
 	// Tells the Kubelet to fail to start if swap is enabled on the node.
 	FailSwapOn bool
