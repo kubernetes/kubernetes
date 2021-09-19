@@ -474,7 +474,7 @@ func makeVolumeHandle(podUID, volSourceSpecName string) string {
 }
 
 func mergeMap(first, second map[string]string) map[string]string {
-	if first == nil && second != nil {
+	if first == nil {
 		return second
 	}
 	for k, v := range second {
