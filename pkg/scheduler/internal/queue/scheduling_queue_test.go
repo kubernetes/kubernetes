@@ -19,6 +19,7 @@ package queue
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"strings"
 	"sync"
@@ -27,10 +28,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -1994,4 +1994,44 @@ func makeQueuedPodInfos(num int, timestamp time.Time) []*framework.QueuedPodInfo
 		pInfos = append(pInfos, p)
 	}
 	return pInfos
+}
+
+func TestPriorityQueue_calculateBackoffDuration(t *testing.T) {
+	tests := []struct {
+		name                   string
+		initialBackoffDuration time.Duration
+		maxBackoffDuration     time.Duration
+		podInfo                *framework.QueuedPodInfo
+		want                   time.Duration
+	}{
+		{
+			name:                   "normal",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     32 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{Attempts: 16},
+			want:                   32 * time.Nanosecond,
+		},
+		{
+			name:                   "overflow_32bit",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     math.MaxInt32 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{Attempts: 32},
+			want:                   math.MaxInt32 * time.Nanosecond,
+		},
+		{
+			name:                   "overflow_64bit",
+			initialBackoffDuration: 1 * time.Nanosecond,
+			maxBackoffDuration:     math.MaxInt64 * time.Nanosecond,
+			podInfo:                &framework.QueuedPodInfo{Attempts: 64},
+			want:                   math.MaxInt64 * time.Nanosecond,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithPodInitialBackoffDuration(tt.initialBackoffDuration), WithPodMaxBackoffDuration(tt.maxBackoffDuration))
+			if got := q.calculateBackoffDuration(tt.podInfo); got != tt.want {
+				t.Errorf("PriorityQueue.calculateBackoffDuration() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
