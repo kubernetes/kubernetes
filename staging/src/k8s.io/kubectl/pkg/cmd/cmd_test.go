@@ -78,6 +78,19 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			name: "test that a plugin does not execute over an existing command by the same name",
 			args: []string{"kubectl", "version"},
 		},
+		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
+		{
+			name: "test that a plugin does not execute over Cobra's help command",
+			args: []string{"kubectl", "help"},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __complete command",
+			args: []string{"kubectl", cobra.ShellCompRequestCmd},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __completeNoDesc command",
+			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd},
+		},
 	}
 
 	for _, test := range tests {
