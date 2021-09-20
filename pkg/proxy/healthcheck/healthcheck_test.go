@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -379,7 +379,7 @@ func testHandler(hcs *server, nsn types.NamespacedName, status int, endpoints in
 func TestHealthzServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 
 	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})

@@ -25,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 const (
@@ -461,7 +461,7 @@ func TestEventRateLimiting(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			clock := clock.NewFakeClock(time.Now())
+			clock := testingclock.NewFakeClock(time.Now())
 			config := &eventratelimitapi.Configuration{}
 			if tc.serverBurst > 0 {
 				serverLimit := eventratelimitapi.Limit{
