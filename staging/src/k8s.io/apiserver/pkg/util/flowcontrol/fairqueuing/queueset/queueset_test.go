@@ -416,27 +416,39 @@ func TestMain(m *testing.M) {
 // even though that is unfair.
 func TestNoRestraint(t *testing.T) {
 	metrics.Register()
-	now := time.Now()
-	clk, counter := testeventclock.NewFake(now, 0, nil)
-	nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk))
-	if err != nil {
-		t.Fatal(err)
+	testCases := []struct {
+		concurrency int
+		fair        bool
+	}{
+		{concurrency: 10, fair: true},
+		{concurrency: 2, fair: false},
 	}
-	nr := nrc.Complete(fq.DispatchingConfig{})
-	uniformScenario{name: "NoRestraint",
-		qs: nr,
-		clients: []uniformClient{
-			newUniformClient(1001001001, 5, 10, time.Second, time.Second),
-			newUniformClient(2002002002, 2, 10, time.Second, time.Second/2),
-		},
-		concurrencyLimit:       2,
-		evalDuration:           time.Second * 15,
-		expectedFair:           []bool{false},
-		expectedFairnessMargin: []float64{0.1},
-		expectAllRequests:      true,
-		clk:                    clk,
-		counter:                counter,
-	}.exercise(t)
+	for _, testCase := range testCases {
+		subName := fmt.Sprintf("concurrency=%v", testCase.concurrency)
+		t.Run(subName, func(t *testing.T) {
+			now := time.Now()
+			clk, counter := testeventclock.NewFake(now, 0, nil)
+			nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk))
+			if err != nil {
+				t.Fatal(err)
+			}
+			nr := nrc.Complete(fq.DispatchingConfig{})
+			uniformScenario{name: "NoRestraint/" + subName,
+				qs: nr,
+				clients: []uniformClient{
+					newUniformClient(1001001001, 5, 10, time.Second, time.Second),
+					newUniformClient(2002002002, 2, 10, time.Second, time.Second/2),
+				},
+				concurrencyLimit:       testCase.concurrency,
+				evalDuration:           time.Second * 15,
+				expectedFair:           []bool{testCase.fair},
+				expectedFairnessMargin: []float64{0.1},
+				expectAllRequests:      true,
+				clk:                    clk,
+				counter:                counter,
+			}.exercise(t)
+		})
+	}
 }
 
 func TestBaseline(t *testing.T) {
@@ -745,13 +757,30 @@ func TestTooWide(t *testing.T) {
 	}.exercise(t)
 }
 
+// TestWindup exercises a scenario with the windup problem.
+// That is, a flow that can not use all the seats that it is allocated
+// for a while.  During that time, the queues that serve that flow
+// advance their `virtualStart` (that is, R(next dispatch in virtual world))
+// more slowly than the other queues (which are using more seats than they
+// are allocated).  The implementation has a hack that addresses part of
+// this imbalance but not all of it.  In this test, flow 1 can not use all
+// of its allocation during the first half, and *can* (and does) use all of
+// its allocation and more during the second half.
+// Thus we expect the fair (not equal) result
+// in the first half and an unfair result in the second half.
+// This func has two test cases, bounding the amount of unfairness
+// in the second half.
 func TestWindup(t *testing.T) {
 	metrics.Register()
-	for _, testcase := range []struct {
+	testCases := []struct {
 		margin2     float64
 		expectFair2 bool
-	}{{margin2: 0.26, expectFair2: true}, {margin2: 0.1, expectFair2: false}} {
-		subName := fmt.Sprintf("m2=%v", testcase.margin2)
+	}{
+		{margin2: 0.26, expectFair2: true},
+		{margin2: 0.1, expectFair2: false},
+	}
+	for _, testCase := range testCases {
+		subName := fmt.Sprintf("m2=%v", testCase.margin2)
 		t.Run(subName, func(t *testing.T) {
 			now := time.Now()
 			clk, counter := testeventclock.NewFake(now, 0, nil)
@@ -776,8 +805,8 @@ func TestWindup(t *testing.T) {
 				},
 				concurrencyLimit:       3,
 				evalDuration:           time.Second * 40,
-				expectedFair:           []bool{true, testcase.expectFair2},
-				expectedFairnessMargin: []float64{0.1, testcase.margin2},
+				expectedFair:           []bool{true, testCase.expectFair2},
+				expectedFairnessMargin: []float64{0.1, testCase.margin2},
 				expectAllRequests:      true,
 				evalInqueueMetrics:     true,
 				evalExecutingMetrics:   true,
