@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
+	testclocks "k8s.io/utils/clock/testing"
 )
 
 type testEventSink struct {
@@ -438,7 +439,7 @@ func TestWriteEventError(t *testing.T) {
 		},
 	}
 
-	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
+	clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: time.Second}
 	eventCorrelator := NewEventCorrelator(&clock)
 
 	for caseName, ent := range table {
@@ -461,7 +462,7 @@ func TestWriteEventError(t *testing.T) {
 }
 
 func TestUpdateExpiredEvent(t *testing.T) {
-	clock := clock.IntervalClock{Time: time.Now(), Duration: time.Second}
+	clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: time.Second}
 	eventCorrelator := NewEventCorrelator(&clock)
 
 	var createdEvent *v1.Event

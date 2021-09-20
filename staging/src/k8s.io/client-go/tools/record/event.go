@@ -81,7 +81,7 @@ type CorrelatorOptions struct {
 	MaxIntervalInSeconds int
 	// The clock used by the EventAggregator to allow for testing
 	// If not specified (zero value), clock.RealClock{} will be used
-	Clock clock.Clock
+	Clock clock.PassiveClock
 	// The func used by EventFilterFunc, which returns a key for given event, based on which filtering will take place
 	// If not specified (zero value), getSpamKey will be used
 	SpamKeyFunc EventSpamKeyFunc
@@ -323,7 +323,7 @@ type recorderImpl struct {
 	scheme *runtime.Scheme
 	source v1.EventSource
 	*watch.Broadcaster
-	clock clock.Clock
+	clock clock.PassiveClock
 }
 
 func (recorder *recorderImpl) generateEvent(object runtime.Object, annotations map[string]string, eventtype, reason, message string) {
