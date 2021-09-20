@@ -120,7 +120,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Install handler
-	s.openAPIVersionedService, err = handler.NewOpenAPIService(specToServe, s.GetNewOpenAPISpec)
+	s.openAPIVersionedService, err = handler.NewOpenAPIService(specToServe)
 	if err != nil {
 		return nil, err
 	}
@@ -214,9 +214,11 @@ func (s *specAggregator) updateOpenAPISpec() error {
 	if s.openAPIVersionedService == nil {
 		return nil
 	}
-	s.openAPIVersionedService.MarkCacheDirty()
-	// TODO(DangerOnTheRanger): This function could return an error before, but not now - remove error-checking references from callers
-	return nil
+	specToServe, err := s.buildOpenAPISpec()
+	if err != nil {
+		return err
+	}
+	return s.openAPIVersionedService.UpdateSpec(specToServe)
 }
 
 // tryUpdatingServiceSpecs tries updating openAPISpecs map with specified specInfo, and keeps the map intact
