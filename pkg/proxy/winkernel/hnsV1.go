@@ -45,7 +45,7 @@ type hnsV1 struct{}
 func (hns hnsV1) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcsshim.GetHNSNetworkByName(name)
 	if err != nil {
-		klog.ErrorS(err, "failed to get HNS network by name")
+		klog.ErrorS(err, "failed to get HNS network by name", "name", name)
 		return nil, err
 	}
 
@@ -58,7 +58,7 @@ func (hns hnsV1) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 	hnsendpoint, err := hcsshim.GetHNSEndpointByID(id)
 	if err != nil {
-		klog.ErrorS(err, "failed to get HNS endpoint by id")
+		klog.ErrorS(err, "failed to get HNS endpoint by id", "id", id)
 		return nil, err
 	}
 	return &endpointsInfo{
@@ -77,7 +77,7 @@ func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	hnsnetwork, err := hcsshim.GetHNSNetworkByName(networkName)
 	if err != nil {
-		klog.ErrorS(err, "failed to get HNS network by name")
+		klog.ErrorS(err, "failed to get HNS network by name", "name", name)
 		return nil, err
 	}
 
@@ -162,7 +162,7 @@ func (hns hnsV1) deleteEndpoint(hnsID string) error {
 	}
 	_, err = hnsendpoint.Delete()
 	if err == nil {
-		klog.V(3).InfoS("Remote endpoint resource deleted id", "ID", hnsID)
+		klog.V(3).InfoS("Remote endpoint resource deleted id", "id", hnsID)
 	}
 	return err
 }
