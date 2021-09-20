@@ -55,15 +55,6 @@ type OpenAPIService struct {
 
 	lastModified time.Time
 
-	openapiSpec *spec.Swagger
-	specBytes   []byte
-	specPb      []byte
-	specPbGz    []byte
-
-	specBytesETag string
-	specPbETag    string
-	specPbGzETag  string
-
 	jcache    jsonCache
 	pbCache   protobufCache
 	pbgzCache protobufGzipCache
@@ -314,14 +305,13 @@ func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*re
 }
 
 func (c *baseCache) Clear() {
-	c.cacheClean = false
 	c.cacheBytes = nil
 	c.inputBytes = nil
 	c.etag = ""
 }
 
 func (c *baseCache) IsClean() bool {
-	return c.cacheClean
+	return c.cacheBytes != nil
 }
 
 func (c *baseCache) Set(inputBytes []byte) {
@@ -343,7 +333,7 @@ func (c *jsonCache) Set(spec *spec.Swagger) {
 }
 
 func (c *jsonCache) Get() ([]byte, error) {
-	if c.cacheClean {
+	if c.cacheBytes != nil {
 		return c.cacheBytes, nil
 	}
 	specBytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(c.spec)
@@ -351,14 +341,13 @@ func (c *jsonCache) Get() ([]byte, error) {
 		return nil, err
 	}
 	c.cacheBytes = specBytes
-	c.cacheClean = true
 	c.computeETag()
 	return c.cacheBytes, nil
 
 }
 
 func (c *protobufCache) Get() ([]byte, error) {
-	if c.cacheClean {
+	if c.cacheBytes != nil {
 		return c.cacheBytes, nil
 	}
 	specPb, err := ToProtoBinary(c.inputBytes)
@@ -366,18 +355,16 @@ func (c *protobufCache) Get() ([]byte, error) {
 		return nil, err
 	}
 	c.cacheBytes = specPb
-	c.cacheClean = true
 	c.computeETag()
 	return c.cacheBytes, nil
 }
 
 func (c *protobufGzipCache) Get() ([]byte, error) {
-	if c.cacheClean {
+	if c.cacheBytes != nil {
 		return c.cacheBytes, nil
 	}
 	specPbGz := toGzip(c.inputBytes)
 	c.cacheBytes = specPbGz
-	c.cacheClean = true
 	c.computeETag()
 	return c.cacheBytes, nil
 }
