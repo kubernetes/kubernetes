@@ -45,6 +45,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/klog/v2"
 )
 
@@ -365,6 +366,17 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	_, err = client.Do(newServerRequest(tr))
 	if err == nil {
 		t.Fatal("expected to receive an error")
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &baseTimeoutWriter{
+		w: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.w {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }
 
