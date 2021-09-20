@@ -417,6 +417,8 @@ It will also start a UDP server on the indicated UDP port that responds to the f
 - `echo <msg>`: Returns the given `<msg>`
 - `clientip`: Returns the request's IP address
 
+The UDP server can be disabled by setting `--udp-port -1`.
+
 Additionally, if (and only if) `--sctp-port` is passed, it will start an SCTP server on that port,
 responding to the same commands as the UDP server.
 
