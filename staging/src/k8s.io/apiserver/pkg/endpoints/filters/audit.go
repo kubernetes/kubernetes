@@ -140,7 +140,10 @@ func createAuditEventAndAttachToContext(req *http.Request, policy audit.PolicyRu
 		return req, nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
 
-	req = req.WithContext(request.WithAuditEvent(ctx, ev))
+	req = req.WithContext(audit.WithAuditContext(ctx, &audit.AuditContext{
+		RequestAuditConfig: audit.RequestAuditConfig{},
+		Event:              ev,
+	}))
 
 	return req, ev, omitStages, nil
 }

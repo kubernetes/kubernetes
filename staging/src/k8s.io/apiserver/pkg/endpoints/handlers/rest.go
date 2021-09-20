@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
@@ -187,7 +188,7 @@ func ConnectResource(connecter rest.Connecter, scope *RequestScope, admit admiss
 		}
 		ctx := req.Context()
 		ctx = request.WithNamespace(ctx, namespace)
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 
 		opts, subpath, subpathKey := connecter.NewConnectOptions()

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -839,13 +840,15 @@ func TestAuditIDHttpHeader(t *testing.T) {
 	}
 }
 
-func withTestContext(req *http.Request, user user.Info, audit *auditinternal.Event) *http.Request {
+func withTestContext(req *http.Request, user user.Info, ae *auditinternal.Event) *http.Request {
 	ctx := req.Context()
 	if user != nil {
 		ctx = request.WithUser(ctx, user)
 	}
-	if audit != nil {
-		ctx = request.WithAuditEvent(ctx, audit)
+	if ae != nil {
+		ctx = audit.WithAuditContext(ctx, &audit.AuditContext{
+			Event: ae,
+		})
 	}
 	if info, err := newTestRequestInfoResolver().NewRequestInfo(req); err == nil {
 		ctx = request.WithRequestInfo(ctx, info)
