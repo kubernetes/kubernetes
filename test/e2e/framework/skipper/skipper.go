@@ -43,6 +43,25 @@ import (
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
+const ginkgoPanic = `
+Your test failed.
+Ginkgo panics to prevent subsequent assertions from running.
+Normally Ginkgo rescues this panic so you shouldn't see it.
+But, if you make an assertion in a goroutine, Ginkgo can't capture the panic.
+To circumvent this, you should call
+	defer GinkgoRecover()
+at the top of the goroutine that caused this panic.
+`
+
+// New local storage types to support local storage capacity isolation
+var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
+
+var (
+	downwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
+	execProbeTimeout     featuregate.Feature = "ExecProbeTimeout"
+	csiMigration         featuregate.Feature = "CSIMigration"
+)
+
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	framework.Logf(msg)
@@ -58,7 +77,7 @@ type SkipPanic struct {
 }
 
 // String makes SkipPanic look like the old Ginkgo panic when printed.
-func (SkipPanic) String() string { return ginkgo.GINKGO_PANIC }
+func (SkipPanic) String() string { return ginkgoPanic }
 
 // Skip wraps ginkgo.Skip so that it panics with more useful
 // information about why the test is being skipped. This function will

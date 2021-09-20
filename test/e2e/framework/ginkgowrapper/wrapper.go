@@ -29,6 +29,16 @@ import (
 	"github.com/onsi/ginkgo/v2"
 )
 
+const ginkgoPanic = `
+Your test failed.
+Ginkgo panics to prevent subsequent assertions from running.
+Normally Ginkgo rescues this panic so you shouldn't see it.
+But, if you make an assertion in a goroutine, Ginkgo can't capture the panic.
+To circumvent this, you should call
+	defer GinkgoRecover()
+at the top of the goroutine that caused this panic.
+`
+
 // FailurePanic is the value that will be panicked from Fail.
 type FailurePanic struct {
 	Message        string // The failure message passed to Fail
@@ -38,7 +48,7 @@ type FailurePanic struct {
 }
 
 // String makes FailurePanic look like the old Ginkgo panic when printed.
-func (FailurePanic) String() string { return ginkgo.GINKGO_PANIC }
+func (FailurePanic) String() string { return ginkgoPanic }
 
 // Fail wraps ginkgo.Fail so that it panics with more useful
 // information about the failure. This function will panic with a
