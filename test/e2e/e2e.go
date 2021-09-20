@@ -101,10 +101,12 @@ func RunE2ETests(t *testing.T) {
 	defer logs.FlushLogs()
 
 	gomega.RegisterFailHandler(framework.Fail)
+	/* TODO Migrate to labels https://github.com/onsi/ginkgo/blob/ver2/docs/MIGRATING_TO_V2.md#new-spec-labels
 	// Disable skipped tests unless they are explicitly requested.
 	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
 		config.GinkgoConfig.SkipString = `\[Flaky\]|\[Feature:.+\]`
 	}
+	*/
 
 	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
 	var r []ginkgo.Reporter
@@ -114,10 +116,11 @@ func RunE2ETests(t *testing.T) {
 		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix)))
 		}
 	}
 
+	/* TODO migrate to new reporters
 	// Stream the progress to stdout and optionally a URL accepting progress updates.
 	r = append(r, e2ereporters.NewProgressReporter(framework.TestContext.ProgressReportURL))
 
@@ -126,7 +129,7 @@ func RunE2ETests(t *testing.T) {
 	if len(framework.TestContext.SpecSummaryOutput) > 0 {
 		r = append(r, e2ereporters.NewDetailsReporterFile(framework.TestContext.SpecSummaryOutput))
 	}
-
+	*/
 	klog.Infof("Starting e2e run %q on Ginkgo node %d", framework.RunID, config.GinkgoConfig.ParallelNode)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
