@@ -29,6 +29,7 @@ type FlunderList struct {
 }
 
 // ReferenceType defines the type of an object reference.
+// +enum
 type ReferenceType string
 
 const (

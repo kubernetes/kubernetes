@@ -199,6 +199,7 @@ type DeploymentStrategy struct {
 	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }
 
+// +enum
 type DeploymentStrategyType string
 
 const (
@@ -279,6 +280,7 @@ type DeploymentStatus struct {
 	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
 }
 
+// +enum
 type DeploymentConditionType string
 
 // These are valid conditions of a deployment.
@@ -347,6 +349,7 @@ type DaemonSetUpdateStrategy struct {
 	RollingUpdate *RollingUpdateDaemonSet `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }
 
+// +enum
 type DaemonSetUpdateStrategyType string
 
 const (
@@ -756,6 +759,7 @@ type HTTPIngressRuleValue struct {
 }
 
 // PathType represents the type of path referred to by a HTTPIngressPath.
+// +enum
 type PathType string
 
 const (
@@ -947,6 +951,7 @@ type ReplicaSetStatus struct {
 	Conditions []ReplicaSetCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,6,rep,name=conditions"`
 }
 
+// +enum
 type ReplicaSetConditionType string
 
 // These are valid conditions of a replica set.
@@ -1126,6 +1131,7 @@ type AllowedHostPath struct {
 
 // FSType gives strong typing to different file systems that are used by volumes.
 // Deprecated: use FSType from policy API Group instead.
+// +enum
 type FSType string
 
 const (
@@ -1191,6 +1197,7 @@ type SELinuxStrategyOptions struct {
 // SELinuxStrategy denotes strategy types for generating SELinux options for a
 // Security Context.
 // Deprecated: use SELinuxStrategy from policy API Group instead.
+// +enum
 type SELinuxStrategy string
 
 const (
@@ -1236,6 +1243,7 @@ type IDRange struct {
 // RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
 // Security Context.
 // Deprecated: use RunAsUserStrategy from policy API Group instead.
+// +enum
 type RunAsUserStrategy string
 
 const (
@@ -1253,6 +1261,7 @@ const (
 // RunAsGroupStrategy denotes strategy types for generating RunAsGroup values for a
 // Security Context.
 // Deprecated: use RunAsGroupStrategy from policy API Group instead.
+// +enum
 type RunAsGroupStrategy string
 
 const (
@@ -1282,6 +1291,7 @@ type FSGroupStrategyOptions struct {
 // FSGroupStrategyType denotes strategy types for generating FSGroup values for a
 // SecurityContext
 // Deprecated: use FSGroupStrategyType from policy API Group instead.
+// +enum
 type FSGroupStrategyType string
 
 const (
@@ -1308,6 +1318,7 @@ type SupplementalGroupsStrategyOptions struct {
 // SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
 // groups for a SecurityContext.
 // Deprecated: use SupplementalGroupsStrategyType from policy API Group instead.
+// +enum
 type SupplementalGroupsStrategyType string
 
 const (
@@ -1381,6 +1392,7 @@ type NetworkPolicy struct {
 // DEPRECATED 1.9 - This group version of PolicyType is deprecated by networking/v1/PolicyType.
 // Policy Type string describes the NetworkPolicy type
 // This type is beta-level in 1.8
+// +enum
 type PolicyType string
 
 const (

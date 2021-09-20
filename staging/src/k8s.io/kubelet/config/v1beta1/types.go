@@ -42,6 +42,7 @@ const (
 
 // ResourceChangeDetectionStrategy denotes a mode in which internal
 // managers (secret, configmap) are discovering object changes.
+// +enum
 type ResourceChangeDetectionStrategy string
 
 // Enum settings for different strategies of kubelet managers.
@@ -1035,6 +1036,7 @@ type KubeletConfiguration struct {
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
 }
 
+// +enum
 type KubeletAuthorizationMode string
 
 const (

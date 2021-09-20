@@ -28,6 +28,7 @@ type FlunderList struct {
 	Items []Flunder `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// +enum
 type ReferenceType string
 
 const (

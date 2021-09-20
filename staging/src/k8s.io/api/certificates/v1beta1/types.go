@@ -183,6 +183,7 @@ type CertificateSigningRequestStatus struct {
 	Certificate []byte `json:"certificate,omitempty" protobuf:"bytes,2,opt,name=certificate"`
 }
 
+// +enum
 type RequestConditionType string
 
 // These are the possible conditions for a certificate request.
@@ -233,6 +234,7 @@ type CertificateSigningRequestList struct {
 // KeyUsages specifies valid usage contexts for keys.
 // See: https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 //      https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+// +enum
 type KeyUsage string
 
 const (

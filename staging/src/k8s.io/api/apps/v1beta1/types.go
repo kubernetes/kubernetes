@@ -108,6 +108,7 @@ type StatefulSet struct {
 }
 
 // PodManagementPolicyType defines the policy for creating pods under a stateful set.
+// +enum
 type PodManagementPolicyType string
 
 const (
@@ -134,6 +135,7 @@ type StatefulSetUpdateStrategy struct {
 
 // StatefulSetUpdateStrategyType is a string enumeration type that enumerates
 // all possible update strategies for the StatefulSet controller.
+// +enum
 type StatefulSetUpdateStrategyType string
 
 const (
@@ -429,6 +431,7 @@ type DeploymentStrategy struct {
 	RollingUpdate *RollingUpdateDeployment `json:"rollingUpdate,omitempty" protobuf:"bytes,2,opt,name=rollingUpdate"`
 }
 
+// +enum
 type DeploymentStrategyType string
 
 const (
@@ -509,6 +512,7 @@ type DeploymentStatus struct {
 	CollisionCount *int32 `json:"collisionCount,omitempty" protobuf:"varint,8,opt,name=collisionCount"`
 }
 
+// +enum
 type DeploymentConditionType string
 
 // These are valid conditions of a deployment.

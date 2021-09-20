@@ -194,6 +194,7 @@ type HTTPIngressRuleValue struct {
 }
 
 // PathType represents the type of path referred to by a HTTPIngressPath.
+// +enum
 type PathType string
 
 const (

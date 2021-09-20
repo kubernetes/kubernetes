@@ -335,6 +335,7 @@ type AllowedHostPath struct {
 var AllowAllCapabilities v1.Capability = "*"
 
 // FSType gives strong typing to different file systems that are used by volumes.
+// +enum
 type FSType string
 
 const (
@@ -403,6 +404,7 @@ type SELinuxStrategyOptions struct {
 
 // SELinuxStrategy denotes strategy types for generating SELinux options for a
 // Security Context.
+// +enum
 type SELinuxStrategy string
 
 const (
@@ -442,6 +444,7 @@ type IDRange struct {
 
 // RunAsUserStrategy denotes strategy types for generating RunAsUser values for a
 // Security Context.
+// +enum
 type RunAsUserStrategy string
 
 const (
@@ -455,6 +458,7 @@ const (
 
 // RunAsGroupStrategy denotes strategy types for generating RunAsGroup values for a
 // Security Context.
+// +enum
 type RunAsGroupStrategy string
 
 const (
@@ -480,6 +484,7 @@ type FSGroupStrategyOptions struct {
 
 // FSGroupStrategyType denotes strategy types for generating FSGroup values for a
 // SecurityContext
+// +enum
 type FSGroupStrategyType string
 
 const (
@@ -505,6 +510,7 @@ type SupplementalGroupsStrategyOptions struct {
 
 // SupplementalGroupsStrategyType denotes strategy types for determining valid supplemental
 // groups for a SecurityContext.
+// +enum
 type SupplementalGroupsStrategyType string
 
 const (

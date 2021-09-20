@@ -424,6 +424,7 @@ type ListOptions struct {
 //
 // See https://kubernetes.io/docs/reference/using-api/api-concepts/#resource-versions for
 // details.
+// +enum
 type ResourceVersionMatch string
 
 const (
@@ -453,6 +454,7 @@ type GetOptions struct {
 
 // DeletionPropagation decides if a deletion will propagate to the dependents of
 // the object, and how the garbage collector will handle the propagation.
+// +enum
 type DeletionPropagation string
 
 const (
@@ -724,6 +726,7 @@ const (
 // must map to a single HTTP status code, but multiple reasons may map
 // to the same HTTP status code.
 // TODO: move to apiserver
+// +enum
 type StatusReason string
 
 const (
@@ -899,6 +902,7 @@ type StatusCause struct {
 // CauseType is a machine readable value providing more detail about what
 // occurred in a status response. An operation may have multiple causes for a
 // status (whether Failure or Success).
+// +enum
 type CauseType string
 
 const (
@@ -1144,6 +1148,7 @@ type LabelSelectorRequirement struct {
 }
 
 // A label selector operator is the set of operators that can be used in a selector requirement.
+// +enum
 type LabelSelectorOperator string
 
 const (
@@ -1191,6 +1196,7 @@ type ManagedFieldsEntry struct {
 }
 
 // ManagedFieldsOperationType is the type of operation which lead to a ManagedFieldsEntry being created.
+// +enum
 type ManagedFieldsOperationType string
 
 const (
@@ -1306,6 +1312,7 @@ type TableRowCondition struct {
 	Message string `json:"message,omitempty"`
 }
 
+// +enum
 type RowConditionType string
 
 // These are valid conditions of a row. This list is not exhaustive and new conditions may be
@@ -1316,6 +1323,7 @@ const (
 	RowCompleted RowConditionType = "Completed"
 )
 
+// +enum
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
@@ -1329,6 +1337,7 @@ const (
 )
 
 // IncludeObjectPolicy controls which portion of the object is returned with a Table.
+// +enum
 type IncludeObjectPolicy string
 
 const (

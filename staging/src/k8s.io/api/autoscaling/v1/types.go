@@ -150,6 +150,7 @@ type ScaleStatus struct {
 // the types below are used in the alpha metrics annotation
 
 // MetricSourceType indicates the type of metric.
+// +enum
 type MetricSourceType string
 
 const (
@@ -370,6 +371,7 @@ type MetricStatus struct {
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of
 // a HorizontalPodAutoscaler.
+// +enum
 type HorizontalPodAutoscalerConditionType string
 
 const (

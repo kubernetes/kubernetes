@@ -60,6 +60,7 @@ type HorizontalPodAutoscalerSpec struct {
 }
 
 // MetricSourceType indicates the type of metric.
+// +enum
 type MetricSourceType string
 
 const (
@@ -270,6 +271,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of
 // a HorizontalPodAutoscaler.
+// +enum
 type HorizontalPodAutoscalerConditionType string
 
 const (

@@ -23,6 +23,7 @@ import (
 )
 
 // ConversionStrategyType describes different conversion types.
+// +enum
 type ConversionStrategyType string
 
 const (
@@ -252,6 +253,7 @@ type CustomResourceDefinitionNames struct {
 }
 
 // ResourceScope is an enum defining the different scopes available to a custom resource
+// +enum
 type ResourceScope string
 
 const (
@@ -259,6 +261,7 @@ const (
 	NamespaceScoped ResourceScope = "Namespaced"
 )
 
+// +enum
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.
@@ -272,6 +275,7 @@ const (
 )
 
 // CustomResourceDefinitionConditionType is a valid value for CustomResourceDefinitionCondition.Type
+// +enum
 type CustomResourceDefinitionConditionType string
 
 const (

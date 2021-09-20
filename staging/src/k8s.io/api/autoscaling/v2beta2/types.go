@@ -154,6 +154,7 @@ type HorizontalPodAutoscalerBehavior struct {
 }
 
 // ScalingPolicySelect is used to specify which policy should be used while scaling in a certain direction
+// +enum
 type ScalingPolicySelect string
 
 const (
@@ -191,6 +192,7 @@ type HPAScalingRules struct {
 }
 
 // HPAScalingPolicyType is the type of the policy which could be used while making scaling decisions.
+// +enum
 type HPAScalingPolicyType string
 
 const (
@@ -214,6 +216,7 @@ type HPAScalingPolicy struct {
 }
 
 // MetricSourceType indicates the type of metric.
+// +enum
 type MetricSourceType string
 
 const (
@@ -337,6 +340,7 @@ type MetricTarget struct {
 
 // MetricTargetType specifies the type of metric being targeted, and should be either
 // "Value", "AverageValue", or "Utilization"
+// +enum
 type MetricTargetType string
 
 const (
@@ -379,6 +383,7 @@ type HorizontalPodAutoscalerStatus struct {
 
 // HorizontalPodAutoscalerConditionType are the valid conditions of
 // a HorizontalPodAutoscaler.
+// +enum
 type HorizontalPodAutoscalerConditionType string
 
 const (

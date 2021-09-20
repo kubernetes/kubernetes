@@ -164,6 +164,7 @@ type FlowSchemaSpec struct {
 }
 
 // FlowDistinguisherMethodType is the type of flow distinguisher method
+// +enum
 type FlowDistinguisherMethodType string
 
 // These are valid flow-distinguisher methods.
@@ -239,6 +240,7 @@ type Subject struct {
 }
 
 // SubjectKind is the kind of subject.
+// +enum
 type SubjectKind string
 
 // Supported subject's kinds.
@@ -432,6 +434,7 @@ type PriorityLevelConfigurationSpec struct {
 }
 
 // PriorityLevelEnablement indicates whether limits on execution are enabled for the priority level
+// +enum
 type PriorityLevelEnablement string
 
 // Supported priority level enablement values.
@@ -490,6 +493,7 @@ type LimitResponse struct {
 }
 
 // LimitResponseType identifies how a Limited priority level handles a request that can not be executed right now
+// +enum
 type LimitResponseType string
 
 // Supported limit responses.
@@ -564,6 +568,7 @@ type PriorityLevelConfigurationCondition struct {
 }
 
 // ConditionStatus is the status of the condition.
+// +enum
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition.

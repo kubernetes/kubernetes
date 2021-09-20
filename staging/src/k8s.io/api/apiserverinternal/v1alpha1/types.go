@@ -79,6 +79,7 @@ type ServerStorageVersion struct {
 	DecodableVersions []string `json:"decodableVersions,omitempty" protobuf:"bytes,3,opt,name=decodableVersions"`
 }
 
+// +enum
 type StorageVersionConditionType string
 
 const (
@@ -86,6 +87,7 @@ const (
 	AllEncodingVersionsEqual StorageVersionConditionType = "AllEncodingVersionsEqual"
 )
 
+// +enum
 type ConditionStatus string
 
 const (

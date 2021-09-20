@@ -96,6 +96,7 @@ type APIServiceSpec struct {
 }
 
 // ConditionStatus indicates the status of a condition (true, false, or unknown).
+// +enum
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
@@ -109,6 +110,7 @@ const (
 )
 
 // APIServiceConditionType is a valid value for APIServiceCondition.Type
+// +enum
 type APIServiceConditionType string
 
 const (

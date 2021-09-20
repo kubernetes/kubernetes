@@ -39,6 +39,7 @@ const (
 )
 
 // Level defines the amount of information logged during auditing
+// +enum
 type Level string
 
 // Valid audit levels
@@ -56,6 +57,7 @@ const (
 )
 
 // Stage defines the stages in request handling that audit events may be generated.
+// +enum
 type Stage string
 
 // Valid audit stages.

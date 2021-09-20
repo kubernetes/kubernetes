@@ -90,6 +90,7 @@ type StorageClassList struct {
 }
 
 // VolumeBindingMode indicates how PersistentVolumeClaims should be bound.
+// +enum
 type VolumeBindingMode string
 
 const (
@@ -398,6 +399,7 @@ type CSIDriverSpec struct {
 // FSGroupPolicy specifies if a CSI Driver supports modifying
 // volume ownership and permissions of the volume to be mounted.
 // More modes may be added in the future.
+// +enum
 type FSGroupPolicy string
 
 const (
@@ -429,6 +431,7 @@ const (
 
 // VolumeLifecycleMode is an enumeration of possible usage modes for a volume
 // provided by a CSI driver. More modes may be added in the future.
+// +enum
 type VolumeLifecycleMode string
 
 // TokenRequest contains parameters of a service account token.
