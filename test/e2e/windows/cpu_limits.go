@@ -28,7 +28,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var _ = SIGDescribe("[Feature:Windows] Cpu Resources [Serial]", func() {

@@ -45,7 +45,7 @@ import (
 // test/e2e/lifecycle/framework.go
 package lifecycle
 
-import "github.com/onsi/ginkgo"
+import "github.com/onsi/ginkgo/v2"
 
 // SIGDescribe annotates the test with the SIG label.
 func SIGDescribe(text string, body func()) bool {
@@ -58,7 +58,7 @@ func SIGDescribe(text string, body func()) bool {
 package bootstrap
 
 import (
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"k8s.io/kubernetes/test/e2e/lifecycle"
 )
 var _ = lifecycle.SIGDescribe("[Feature:BootstrapTokens]", func() {

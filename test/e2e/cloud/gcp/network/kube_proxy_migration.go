@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/upgrades/network"
 	"k8s.io/kubernetes/test/utils/junit"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 )
 
 var upgradeTests = []upgrades.Test{

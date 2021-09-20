@@ -29,7 +29,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/config"
+	"github.com/onsi/ginkgo/v2/config"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"

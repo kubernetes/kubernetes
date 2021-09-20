@@ -342,6 +342,34 @@ func HaveKeyWithValue(key interface{}, value interface{}) types.GomegaMatcher {
 	}
 }
 
+//HaveField succeeds if actual is a struct and the value at the passed in field
+//matches the passed in matcher.  By default HaveField used Equal() to perform the match,
+//however a matcher can be passed in in stead.
+//
+//The field must be a string that resolves to the name of a field in the struct.  Structs can be traversed
+//using the '.' delimiter.  If the field ends with '()' a method named field is assumed to exist on the struct and is invoked.
+//Such methods must take no arguments and return a single value:
+//
+//    type Book struct {
+//        Title string
+//        Author Person
+//    }
+//    type Person struct {
+//        FirstName string
+//        LastName string
+//		  DOB time.Time
+//    }
+//    Expect(book).To(HaveField("Title", "Les Miserables"))
+//    Expect(book).To(HaveField("Title", ContainSubstring("Les"))
+//    Expect(book).To(HaveField("Person.FirstName", Equal("Victor"))
+//    Expect(book).To(HaveField("Person.DOB.Year()", BeNumerically("<", 1900))
+func HaveField(field string, expected interface{}) types.GomegaMatcher {
+	return &matchers.HaveFieldMatcher{
+		Field:    field,
+		Expected: expected,
+	}
+}
+
 //BeNumerically performs numerical assertions in a type-agnostic way.
 //Actual and expected should be numbers, though the specific type of
 //number is irrelevant (float32, float64, uint8, etc...).
@@ -423,8 +451,27 @@ func BeADirectory() types.GomegaMatcher {
 //Expected must be either an int or a string.
 //  Expect(resp).Should(HaveHTTPStatus(http.StatusOK))   // asserts that resp.StatusCode == 200
 //  Expect(resp).Should(HaveHTTPStatus("404 Not Found")) // asserts that resp.Status == "404 Not Found"
-func HaveHTTPStatus(expected interface{}) types.GomegaMatcher {
+//  Expect(resp).Should(HaveHTTPStatus(http.StatusOK, http.StatusNoContent))   // asserts that resp.StatusCode == 200 || resp.StatusCode == 204
+func HaveHTTPStatus(expected ...interface{}) types.GomegaMatcher {
 	return &matchers.HaveHTTPStatusMatcher{Expected: expected}
+}
+
+// HaveHTTPHeaderWithValue succeeds if the header is found and the value matches.
+// Actual must be either a *http.Response or *httptest.ResponseRecorder.
+// Expected must be a string header name, followed by a header value which
+// can be a string, or another matcher.
+func HaveHTTPHeaderWithValue(header string, value interface{}) types.GomegaMatcher {
+	return &matchers.HaveHTTPHeaderWithValueMatcher{
+		Header: header,
+		Value:  value,
+	}
+}
+
+// HaveHTTPBody matches if the body matches.
+// Actual must be either a *http.Response or *httptest.ResponseRecorder.
+// Expected must be either a string, []byte, or other matcher
+func HaveHTTPBody(expected interface{}) types.GomegaMatcher {
+	return &matchers.HaveHTTPBodyMatcher{Expected: expected}
 }
 
 //And succeeds only if all of the given matchers succeed.
@@ -466,11 +513,24 @@ func Not(matcher types.GomegaMatcher) types.GomegaMatcher {
 }
 
 //WithTransform applies the `transform` to the actual value and matches it against `matcher`.
-//The given transform must be a function of one parameter that returns one value.
+//The given transform must be either a function of one parameter that returns one value or a
+// function of one parameter that returns two values, where the second value must be of the
+// error type.
 //  var plus1 = func(i int) int { return i + 1 }
 //  Expect(1).To(WithTransform(plus1, Equal(2))
+//
+//   var failingplus1 = func(i int) (int, error) { return 42, "this does not compute" }
+//   Expect(1).To(WithTransform(failingplus1, Equal(2)))
 //
 //And(), Or(), Not() and WithTransform() allow matchers to be composed into complex expressions.
 func WithTransform(transform interface{}, matcher types.GomegaMatcher) types.GomegaMatcher {
 	return matchers.NewWithTransformMatcher(transform, matcher)
+}
+
+//Satisfy matches the actual value against the `predicate` function.
+//The given predicate must be a function of one paramter that returns bool.
+//  var isEven = func(i int) bool { return i%2 == 0 }
+//  Expect(2).To(Satisfy(isEven))
+func Satisfy(predicate interface{}) types.GomegaMatcher {
+	return matchers.NewSatisfyMatcher(predicate)
 }
