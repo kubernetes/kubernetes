@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -48,6 +49,8 @@ type Executor interface {
 	// is set, the stderr stream is not used (raw TTY manages stdout and stderr over the
 	// stdout stream).
 	Stream(options StreamOptions) error
+	// StreamContext initiates the transport of the standard shell streams through Context.
+	StreamContext(ctx context.Context, options StreamOptions) error
 }
 
 type streamCreator interface {
@@ -110,7 +113,6 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 	if err != nil {
 		return fmt.Errorf("error creating request: %v", err)
 	}
-
 	conn, protocol, err := spdy.Negotiate(
 		e.upgrader,
 		&http.Client{Transport: e.transport},
@@ -121,6 +123,53 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 		return err
 	}
 	defer conn.Close()
+
+	var streamer streamProtocolHandler
+
+	switch protocol {
+	case remotecommand.StreamProtocolV4Name:
+		streamer = newStreamProtocolV4(options)
+	case remotecommand.StreamProtocolV3Name:
+		streamer = newStreamProtocolV3(options)
+	case remotecommand.StreamProtocolV2Name:
+		streamer = newStreamProtocolV2(options)
+	case "":
+		klog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
+		fallthrough
+	case remotecommand.StreamProtocolV1Name:
+		streamer = newStreamProtocolV1(options)
+	}
+
+	return streamer.stream(conn)
+}
+
+// StreamContext opens a protocol streamer to the server and streams until a client closes
+// the connection or the server disconnects, but it can be closed through the Context.
+func (e *streamExecutor) StreamContext(ctx context.Context, options StreamOptions) error {
+	req, err := http.NewRequestWithContext(ctx, e.method, e.url.String(), nil)
+	//req, err := http.NewRequest(e.method, e.url.String(), nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %v", err)
+	}
+	conn, protocol, err := spdy.Negotiate(
+		e.upgrader,
+		&http.Client{Transport: e.transport},
+		req,
+		e.protocols...,
+	)
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		select {
+		case <-conn.CloseChan():
+			return
+		case <-ctx.Done():
+			conn.Close()
+			return
+		}
+	}()
 
 	var streamer streamProtocolHandler
 
