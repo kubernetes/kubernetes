@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 func TestCleanVerb(t *testing.T) {
@@ -179,5 +180,16 @@ func TestCleanScope(t *testing.T) {
 				t.Errorf("failed to clean scope: %v", test.requestInfo)
 			}
 		})
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &ResponseWriterDelegator{
+		ResponseWriter: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.ResponseWriter {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }

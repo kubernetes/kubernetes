@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/util/wsstream"
 )
 
@@ -95,7 +95,7 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *Opti
 		},
 	})
 	conn.SetIdleTimeout(idleTimeout)
-	negotiatedProtocol, streams, err := conn.Open(httplog.Unlogged(req, w), req)
+	negotiatedProtocol, streams, err := conn.Open(responsewriter.GetOriginal(w), req)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("unable to upgrade websocket connection: %v", err))
 		return nil, false
