@@ -28,7 +28,6 @@ import (
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	fcboot "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
@@ -41,6 +40,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	fcclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 // Some tests print a lot of debug logs which slows down tests considerably,

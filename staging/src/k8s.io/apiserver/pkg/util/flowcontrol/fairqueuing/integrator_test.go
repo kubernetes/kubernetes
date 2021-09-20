@@ -21,12 +21,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	testclock "k8s.io/utils/clock/testing"
 )
 
 func TestIntegrator(t *testing.T) {
 	now := time.Now()
-	clk := clock.NewFakeClock(now)
+	clk := testclock.NewFakeClock(now)
 	igr := NewIntegrator(clk)
 	igr.Add(3)
 	clk.Step(time.Second)
