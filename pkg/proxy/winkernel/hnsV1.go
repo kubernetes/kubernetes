@@ -77,7 +77,7 @@ func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
 	hnsnetwork, err := hcsshim.GetHNSNetworkByName(networkName)
 	if err != nil {
-		klog.ErrorS(err, "failed to get HNS network by name", "name", name)
+		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
 		return nil, err
 	}
 
