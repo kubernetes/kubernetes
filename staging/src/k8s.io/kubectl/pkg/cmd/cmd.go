@@ -105,7 +105,15 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 			// Also check the commands that will be added by Cobra.
 			// These commands are only added once rootCmd.Execute() is called, so we
 			// need to check them explicitly here.
-			switch cmdPathPieces[0] {
+			var cmdName string // first "non-flag" arguments
+			for _, arg := range cmdPathPieces {
+				if !strings.HasPrefix(arg, "-") {
+					cmdName = arg
+					break
+				}
+			}
+
+			switch cmdName {
 			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
 				// Don't search for a plugin
 			default:
