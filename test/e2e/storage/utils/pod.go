@@ -81,7 +81,7 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		framework.ExpectNoError(err, "create pod log directory")
 		f, err := os.Create(path.Join(logDir, "pod-event.log"))
 		framework.ExpectNoError(err, "create pod events log file")
-		podEventLog = f
+		podEventLog.TeeTo(f)
 		podEventLogCloser = f
 	}
 	podlogs.CopyAllLogs(ctx, cs, ns, to)
