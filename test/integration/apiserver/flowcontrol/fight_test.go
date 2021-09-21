@@ -26,7 +26,6 @@ import (
 	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
-	"k8s.io/apimachinery/pkg/util/clock"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilfc "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -37,6 +36,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/utils/clock"
+	testclocks "k8s.io/utils/clock/testing"
 )
 
 /* fightTest configures a test of how API Priority and Fairness config
@@ -63,7 +64,7 @@ type fightTest struct {
 	teamSize       int
 	stopCh         chan struct{}
 	now            time.Time
-	clk            *clock.FakeClock
+	clk            *testclocks.FakeClock
 	ctlrs          map[bool][]utilfc.Interface
 
 	countsMutex sync.Mutex
@@ -81,7 +82,7 @@ func newFightTest(t *testing.T, loopbackConfig *rest.Config, teamSize int) *figh
 		teamSize:       teamSize,
 		stopCh:         make(chan struct{}),
 		now:            now,
-		clk:            clock.NewFakeClock(now),
+		clk:            testclocks.NewFakeClock(now),
 		ctlrs: map[bool][]utilfc.Interface{
 			false: make([]utilfc.Interface, teamSize),
 			true:  make([]utilfc.Interface, teamSize)},
