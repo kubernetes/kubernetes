@@ -300,24 +300,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	var versionedDeleteOptions runtime.Object
 	var versionedDeleterObject interface{}
-	deleteReturnsDeletedObject := false
 	if isGracefulDeleter {
 		versionedDeleteOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind("DeleteOptions"))
 		if err != nil {
 			return nil, nil, err
 		}
+
 		versionedDeleterObject = indirectArbitraryPointer(versionedDeleteOptions)
-
-		if mayReturnFullObjectDeleter, ok := storage.(rest.MayReturnFullObjectDeleter); ok {
-			deleteReturnsDeletedObject = mayReturnFullObjectDeleter.DeleteReturnsDeletedObject()
-		}
 	}
 
-	versionedStatusPtr, err := a.group.Creater.New(optionsExternalVersion.WithKind("Status"))
-	if err != nil {
-		return nil, nil, err
-	}
-	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var (
 		getOptions             runtime.Object
 		versionedGetOptions    runtime.Object
@@ -844,10 +835,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isSubresource {
 				doc = "delete " + subresource + " of" + article + kind
 			}
-			deleteReturnType := versionedStatus
-			if deleteReturnsDeletedObject {
-				deleteReturnType = producedObject
-			}
+
+			deleteReturnType := producedObject
 			handler := metrics.InstrumentRouteFunc(action.Verb, group, version, resource, subresource, requestScope, metrics.APIServerComponent, deprecated, removedRelease, restfulDeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit))
 			handler = utilwarning.AddWarningsHandler(handler, warnings)
 			route := ws.DELETE(action.Path).To(handler).
@@ -879,8 +868,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Param(ws.QueryParameter("pretty", "If 'true', then the output is pretty printed.")).
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
-				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus)
+				Writes(producedObject).
+				Returns(http.StatusOK, "OK", producedObject)
 			if isCollectionDeleter {
 				route.Reads(versionedDeleterObject)
 				route.ParameterNamed("body").Required(false)
