@@ -38,7 +38,7 @@ func (pm PatchMeta) GetPatchStrategies() []string {
 	return pm.patchStrategies
 }
 
-func (pm PatchMeta) SetPatchStrategies(ps []string) {
+func (pm *PatchMeta) SetPatchStrategies(ps []string) {
 	pm.patchStrategies = ps
 }
 
@@ -46,7 +46,7 @@ func (pm PatchMeta) GetPatchMergeKey() string {
 	return pm.patchMergeKey
 }
 
-func (pm PatchMeta) SetPatchMergeKey(pmk string) {
+func (pm *PatchMeta) SetPatchMergeKey(pmk string) {
 	pm.patchMergeKey = pmk
 }
 
