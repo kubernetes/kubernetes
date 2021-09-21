@@ -30,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -54,16 +55,16 @@ type PauseOptions struct {
 
 var (
 	pauseLong = templates.LongDesc(i18n.T(`
-		Mark the provided resource as paused
+		Mark the provided resource as paused.
 
 		Paused resources will not be reconciled by a controller.
 		Use "kubectl rollout resume" to resume a paused resource.
 		Currently only deployments support being paused.`))
 
 	pauseExample = templates.Examples(`
-		# Mark the nginx deployment as paused. Any current state of
-		# the deployment will continue its function, new updates to the deployment will not
-		# have an effect as long as the deployment is paused.
+		# Mark the nginx deployment as paused
+		# Any current state of the deployment will continue its function; new updates
+		# to the deployment will not have an effect as long as the deployment is paused
 		kubectl rollout pause deployment/nginx`)
 )
 
@@ -82,12 +83,12 @@ func NewCmdRolloutPause(f cmdutil.Factory, streams genericclioptions.IOStreams) 
 		Short:                 i18n.T("Mark the provided resource as paused"),
 		Long:                  pauseLong,
 		Example:               pauseExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunPause())
 		},
-		ValidArgs: validArgs,
 	}
 
 	o.PrintFlags.AddFlags(cmd)

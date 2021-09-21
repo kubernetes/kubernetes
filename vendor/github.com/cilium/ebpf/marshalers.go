@@ -13,14 +13,12 @@ import (
 	"github.com/cilium/ebpf/internal"
 )
 
+// marshalPtr converts an arbitrary value into a pointer suitable
+// to be passed to the kernel.
+//
+// As an optimization, it returns the original value if it is an
+// unsafe.Pointer.
 func marshalPtr(data interface{}, length int) (internal.Pointer, error) {
-	if data == nil {
-		if length == 0 {
-			return internal.NewPointer(nil), nil
-		}
-		return internal.Pointer{}, errors.New("can't use nil as key of map")
-	}
-
 	if ptr, ok := data.(unsafe.Pointer); ok {
 		return internal.NewPointer(ptr), nil
 	}
@@ -33,6 +31,13 @@ func marshalPtr(data interface{}, length int) (internal.Pointer, error) {
 	return internal.NewSlicePointer(buf), nil
 }
 
+// marshalBytes converts an arbitrary value into a byte buffer.
+//
+// Prefer using Map.marshalKey and Map.marshalValue if possible, since
+// those have special cases that allow more types to be encoded.
+//
+// Returns an error if the given value isn't representable in exactly
+// length bytes.
 func marshalBytes(data interface{}, length int) (buf []byte, err error) {
 	switch value := data.(type) {
 	case encoding.BinaryMarshaler:
@@ -43,6 +48,8 @@ func marshalBytes(data interface{}, length int) (buf []byte, err error) {
 		buf = value
 	case unsafe.Pointer:
 		err = errors.New("can't marshal from unsafe.Pointer")
+	case Map, *Map, Program, *Program:
+		err = fmt.Errorf("can't marshal %T", value)
 	default:
 		var wr bytes.Buffer
 		err = binary.Write(&wr, internal.NativeEndian, value)
@@ -70,10 +77,16 @@ func makeBuffer(dst interface{}, length int) (internal.Pointer, []byte) {
 	return internal.NewSlicePointer(buf), buf
 }
 
+// unmarshalBytes converts a byte buffer into an arbitrary value.
+//
+// Prefer using Map.unmarshalKey and Map.unmarshalValue if possible, since
+// those have special cases that allow more types to be encoded.
 func unmarshalBytes(data interface{}, buf []byte) error {
 	switch value := data.(type) {
 	case unsafe.Pointer:
-		sh := &reflect.SliceHeader{
+		// This could be solved in Go 1.17 by unsafe.Slice instead. (https://github.com/golang/go/issues/19367)
+		// We could opt for removing unsafe.Pointer support in the lib as well.
+		sh := &reflect.SliceHeader{ //nolint:govet
 			Data: uintptr(value),
 			Len:  len(buf),
 			Cap:  len(buf),
@@ -83,6 +96,8 @@ func unmarshalBytes(data interface{}, buf []byte) error {
 		copy(dst, buf)
 		runtime.KeepAlive(value)
 		return nil
+	case Map, *Map, Program, *Program:
+		return fmt.Errorf("can't unmarshal into %T", value)
 	case encoding.BinaryUnmarshaler:
 		return value.UnmarshalBinary(buf)
 	case *string:

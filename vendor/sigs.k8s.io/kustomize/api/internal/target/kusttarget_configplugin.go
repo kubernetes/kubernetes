@@ -57,6 +57,7 @@ func (kt *KustTarget) configureBuiltinTransformers(
 		builtinhelpers.PatchJson6902Transformer,
 		builtinhelpers.ReplicaCountTransformer,
 		builtinhelpers.ImageTagTransformer,
+		builtinhelpers.ReplacementTransformer,
 	} {
 		r, err := transformerConfigurators[bpt](
 			kt, bpt, builtinhelpers.TransformerFactories[bpt], tc)
@@ -322,6 +323,21 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 			result = append(result, p)
 		}
 		return
+	},
+	builtinhelpers.ReplacementTransformer: func(
+		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, _ *builtinconfig.TransformerConfig) (
+		result []resmap.Transformer, err error) {
+		var c struct {
+			Replacements []types.ReplacementField
+		}
+		c.Replacements = kt.kustomization.Replacements
+		p := f()
+		err = kt.configureBuiltinPlugin(p, c, bpt)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, p)
+		return result, nil
 	},
 	builtinhelpers.ReplicaCountTransformer: func(
 		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, tc *builtinconfig.TransformerConfig) (

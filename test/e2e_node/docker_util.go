@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/blang/semver"
-	systemdutil "github.com/coreos/go-systemd/util"
+	systemdutil "github.com/coreos/go-systemd/v22/util"
 )
 
 // getDockerAPIVersion returns the Docker's API version.

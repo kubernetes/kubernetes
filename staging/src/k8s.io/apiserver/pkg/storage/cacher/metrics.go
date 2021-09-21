@@ -86,10 +86,10 @@ func init() {
 
 // recordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
 func recordsWatchCacheCapacityChange(objType string, old, new int) {
+	watchCacheCapacity.WithLabelValues(objType).Set(float64(new))
 	if old < new {
 		watchCacheCapacityIncreaseTotal.WithLabelValues(objType).Inc()
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(objType).Inc()
-	watchCacheCapacity.WithLabelValues(objType).Set(float64(new))
 }

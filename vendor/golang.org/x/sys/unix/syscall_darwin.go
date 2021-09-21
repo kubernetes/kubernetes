@@ -13,6 +13,7 @@
 package unix
 
 import (
+	"fmt"
 	"runtime"
 	"syscall"
 	"unsafe"
@@ -378,6 +379,17 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 	return
 }
 
+func GetsockoptIPMreqn(fd, level, opt int) (*IPMreqn, error) {
+	var value IPMreqn
+	vallen := _Socklen(SizeofIPMreqn)
+	errno := getsockopt(fd, level, opt, unsafe.Pointer(&value), &vallen)
+	return &value, errno
+}
+
+func SetsockoptIPMreqn(fd, level, opt int, mreq *IPMreqn) (err error) {
+	return setsockopt(fd, level, opt, unsafe.Pointer(mreq), unsafe.Sizeof(*mreq))
+}
+
 // GetsockoptXucred is a getsockopt wrapper that returns an Xucred struct.
 // The usual level and opt are SOL_LOCAL and LOCAL_PEERCRED, respectively.
 func GetsockoptXucred(fd, level, opt int) (*Xucred, error) {
@@ -385,6 +397,38 @@ func GetsockoptXucred(fd, level, opt int) (*Xucred, error) {
 	vallen := _Socklen(SizeofXucred)
 	err := getsockopt(fd, level, opt, unsafe.Pointer(x), &vallen)
 	return x, err
+}
+
+func SysctlKinfoProcSlice(name string) ([]KinfoProc, error) {
+	mib, err := sysctlmib(name)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find size.
+	n := uintptr(0)
+	if err := sysctl(mib, nil, &n, nil, 0); err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, nil
+	}
+	if n%SizeofKinfoProc != 0 {
+		return nil, fmt.Errorf("sysctl() returned a size of %d, which is not a multiple of %d", n, SizeofKinfoProc)
+	}
+
+	// Read into buffer of that size.
+	buf := make([]KinfoProc, n/SizeofKinfoProc)
+	if err := sysctl(mib, (*byte)(unsafe.Pointer(&buf[0])), &n, nil, 0); err != nil {
+		return nil, err
+	}
+	if n%SizeofKinfoProc != 0 {
+		return nil, fmt.Errorf("sysctl() returned a size of %d, which is not a multiple of %d", n, SizeofKinfoProc)
+	}
+
+	// The actual call may return less than the original reported required
+	// size so ensure we deal with that.
+	return buf[:n/SizeofKinfoProc], nil
 }
 
 //sys	sendfile(infd int, outfd int, offset int64, len *int64, hdtr unsafe.Pointer, flags int) (err error)

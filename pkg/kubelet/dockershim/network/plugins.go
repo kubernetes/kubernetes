@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -16,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=plugins.go  -destination=testing/mock_network_plugin.go -package=testing NetworkPlugin
 package network
 
 import (
@@ -29,13 +31,14 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/metrics"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
@@ -248,7 +251,7 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 	if len(fields) < 4 {
 		return nil, fmt.Errorf("unexpected address output %s ", lines[0])
 	}
-	ip, _, err := net.ParseCIDR(fields[3])
+	ip, _, err := netutils.ParseCIDRSloppy(fields[3])
 	if err != nil {
 		return nil, fmt.Errorf("CNI failed to parse ip from output %s due to %v", output, err)
 	}

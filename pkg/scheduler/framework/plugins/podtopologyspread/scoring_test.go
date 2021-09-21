@@ -22,7 +22,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	appsv1 "k8s.io/api/apps/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
@@ -115,16 +116,20 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			},
 		},
 		{
-			name: "system defaults constraints and a replica set",
-			pod:  st.MakePod().Name("p").Label("foo", "tar").Label("baz", "sup").Obj(),
+			name: "system default constraints and a replicaset",
+			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "tar").Label("baz", "sup").OwnerReference("rs1", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
 			config: config.PodTopologySpreadArgs{
 				DefaultingType: config.SystemDefaulting,
 			},
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Label(v1.LabelTopologyZone, "mars").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Label(v1.LabelTopologyZone, "mars").Obj(),
+				// Nodes with no zone are not excluded. They are considered a separate zone.
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
 			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
@@ -142,13 +147,14 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				IgnoredNodes: sets.NewString(),
 				TopologyPairToPodCounts: map[topologyPair]*int64{
 					{key: v1.LabelTopologyZone, value: "mars"}: pointer.Int64Ptr(0),
+					{key: v1.LabelTopologyZone, value: ""}:     pointer.Int64Ptr(0),
 				},
-				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(1), topologyNormalizingWeight(1)},
+				TopologyNormalizingWeight: []float64{topologyNormalizingWeight(4), topologyNormalizingWeight(2)},
 			},
 		},
 		{
-			name: "defaults constraints and a replica set",
-			pod:  st.MakePod().Name("p").Label("foo", "tar").Label("baz", "sup").Obj(),
+			name: "default constraints and a replicaset",
+			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "tar").Label("baz", "sup").OwnerReference("rs1", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
 			config: config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{MaxSkew: 1, TopologyKey: v1.LabelHostname, WhenUnsatisfiable: v1.ScheduleAnyway},
@@ -161,7 +167,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("rack", "rack1").Label(v1.LabelHostname, "node-a").Label("planet", "mars").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
 			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
@@ -184,8 +190,8 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			},
 		},
 		{
-			name: "defaults constraints and a replica set that doesn't match",
-			pod:  st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").Obj(),
+			name: "default constraints and a replicaset that doesn't match",
+			pod:  st.MakePod().Name("p").Namespace("default").Label("foo", "bar").Label("baz", "sup").OwnerReference("rs2", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).Obj(),
 			config: config.PodTopologySpreadArgs{
 				DefaultConstraints: []v1.TopologySpreadConstraint{
 					{MaxSkew: 2, TopologyKey: "planet", WhenUnsatisfiable: v1.ScheduleAnyway},
@@ -196,15 +202,16 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("planet", "mars").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("tar").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("tar").Obj()}},
 			},
 			want: &preScoreState{
 				TopologyPairToPodCounts: make(map[topologyPair]*int64),
 			},
 		},
 		{
-			name: "defaults constraints and a replica set, but pod has constraints",
-			pod: st.MakePod().Name("p").Label("foo", "bar").Label("baz", "sup").
+			name: "default constraints and a replicaset, but pod has constraints",
+			pod: st.MakePod().Name("p").Namespace("default").Label("foo", "bar").Label("baz", "sup").
+				OwnerReference("rs1", appsv1.SchemeGroupVersion.WithKind("ReplicaSet")).
 				SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Label("foo", "bar").Obj()).
 				SpreadConstraint(2, "planet", v1.ScheduleAnyway, st.MakeLabelSelector().Label("baz", "sup").Obj()).Obj(),
 			config: config.PodTopologySpreadArgs{
@@ -217,7 +224,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("planet", "mars").Label("galaxy", "andromeda").Obj(),
 			},
 			objs: []runtime.Object{
-				&appsv1.ReplicaSet{Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
+				&appsv1.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "rs1"}, Spec: appsv1.ReplicaSetSpec{Selector: st.MakeLabelSelector().Exists("foo").Obj()}},
 			},
 			want: &preScoreState{
 				Constraints: []topologySpreadConstraint{
@@ -275,6 +282,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 		existingPods []*v1.Pod
 		nodes        []*v1.Node
 		failedNodes  []*v1.Node // nodes + failedNodes = all nodes
+		objs         []runtime.Object
 		want         framework.NodeScoreList
 	}{
 		// Explanation on the Legend:
@@ -422,6 +430,40 @@ func TestPodTopologySpreadScore(t *testing.T) {
 				{Name: "node-a", Score: 33}, // +19 compared to maxSkew=1
 				{Name: "node-b", Score: 55}, // +13 compared to maxSkew=1
 				{Name: "node-c", Score: 77}, // +6 compared to maxSkew=1
+				{Name: "node-d", Score: 100},
+			},
+		},
+		{
+			name: "system defaulting, nodes don't have zone, pods match service",
+			pod:  st.MakePod().Name("p").Label("foo", "").Obj(),
+			existingPods: []*v1.Pod{
+				// matching pods spread as 4/3/2/1.
+				st.MakePod().Name("p-a1").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a2").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a3").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-a4").Node("node-a").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b1").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b2").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-b3").Node("node-b").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c1").Node("node-c").Label("foo", "").Obj(),
+				st.MakePod().Name("p-c2").Node("node-c").Label("foo", "").Obj(),
+				st.MakePod().Name("p-d1").Node("node-d").Label("foo", "").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label(v1.LabelHostname, "node-a").Obj(),
+				st.MakeNode().Name("node-b").Label(v1.LabelHostname, "node-b").Obj(),
+				st.MakeNode().Name("node-c").Label(v1.LabelHostname, "node-c").Obj(),
+				st.MakeNode().Name("node-d").Label(v1.LabelHostname, "node-d").Obj(),
+			},
+			failedNodes: []*v1.Node{},
+			objs: []runtime.Object{
+				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
+			},
+			want: []framework.NodeScore{
+				// Same scores as if we were using one spreading constraint.
+				{Name: "node-a", Score: 33},
+				{Name: "node-b", Score: 55},
+				{Name: "node-c", Score: 77},
 				{Name: "node-d", Score: 100},
 			},
 		},
@@ -684,10 +726,12 @@ func TestPodTopologySpreadScore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes))
+			pl := plugintesting.SetupPluginWithInformers(ctx, t, New, &config.PodTopologySpreadArgs{DefaultingType: config.SystemDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes), tt.objs)
 			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
@@ -698,14 +742,14 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			var gotList framework.NodeScoreList
 			for _, n := range tt.nodes {
 				nodeName := n.Name
-				score, status := p.Score(context.Background(), state, tt.pod, nodeName)
+				score, status := p.Score(ctx, state, tt.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			status = p.NormalizeScore(context.Background(), state, tt.pod, gotList)
+			status = p.NormalizeScore(ctx, state, tt.pod, gotList)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
 			}

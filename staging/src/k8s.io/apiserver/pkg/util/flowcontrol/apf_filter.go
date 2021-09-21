@@ -21,17 +21,17 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/server/mux"
-	"k8s.io/apiserver/pkg/util/flowcontrol/counter"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
+	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
 	fqs "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 )
 
 // ConfigConsumerAsFieldManager is how the config consuminng
@@ -49,9 +49,11 @@ type Interface interface {
 	// that the request should be executed then `execute()` will be
 	// invoked once to execute the request; otherwise `execute()` will
 	// not be invoked.
+	// Handle() should never return while execute() is running, even if
+	// ctx is cancelled or times out.
 	Handle(ctx context.Context,
 		requestDigest RequestDigest,
-		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+		noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 		queueNoteFn fq.QueueNoteFn,
 		execFn func(),
 	)
@@ -66,6 +68,9 @@ type Interface interface {
 
 	// Install installs debugging endpoints to the web-server.
 	Install(c *mux.PathRecorderMux)
+
+	// WatchTracker provides the WatchTracker interface.
+	WatchTracker
 }
 
 // This request filter implements https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/1040-priority-and-fairness/README.md
@@ -73,12 +78,11 @@ type Interface interface {
 // New creates a new instance to implement API priority and fairness
 func New(
 	informerFactory kubeinformers.SharedInformerFactory,
-	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
+	flowcontrolClient flowcontrolclient.FlowcontrolV1beta2Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
 ) Interface {
-	grc := counter.NoOp{}
-	clk := clock.RealClock{}
+	clk := eventclock.Real{}
 	return NewTestable(TestableConfig{
 		Name:                   "Controller",
 		Clock:                  clk,
@@ -89,7 +93,7 @@ func New(
 		ServerConcurrencyLimit: serverConcurrencyLimit,
 		RequestWaitLimit:       requestWaitLimit,
 		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
-		QueueSetFactory:        fqs.NewQueueSetFactory(clk, grc),
+		QueueSetFactory:        fqs.NewQueueSetFactory(clk),
 	})
 }
 
@@ -119,7 +123,7 @@ type TestableConfig struct {
 	InformerFactory kubeinformers.SharedInformerFactory
 
 	// FlowcontrolClient to use for manipulating config objects
-	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface
+	FlowcontrolClient flowcontrolclient.FlowcontrolV1beta2Interface
 
 	// ServerConcurrencyLimit for the controller to enforce
 	ServerConcurrencyLimit int
@@ -140,12 +144,12 @@ func NewTestable(config TestableConfig) Interface {
 }
 
 func (cfgCtlr *configController) Handle(ctx context.Context, requestDigest RequestDigest,
-	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+	noteFn func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration, flowDistinguisher string),
 	queueNoteFn fq.QueueNoteFn,
 	execFn func()) {
-	fs, pl, isExempt, req, startWaitingTime := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
+	fs, pl, isExempt, req, startWaitingTime, flowDistinguisher := cfgCtlr.startRequest(ctx, requestDigest, queueNoteFn)
 	queued := startWaitingTime != time.Time{}
-	noteFn(fs, pl)
+	noteFn(fs, pl, flowDistinguisher)
 	if req == nil {
 		if queued {
 			metrics.ObserveWaitingDuration(ctx, pl.Name, fs.Name, strconv.FormatBool(req != nil), time.Since(startWaitingTime))

@@ -86,12 +86,16 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	if err != nil {
 		return TestServer{}, err
 	}
+
 	namedFlagSets := opts.Flags()
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
-
 	fs.Parse(customFlags)
+
+	if err := opts.Complete(&namedFlagSets); err != nil {
+		return TestServer{}, err
+	}
 
 	if opts.SecureServing.BindPort != 0 {
 		opts.SecureServing.Listener, opts.SecureServing.BindPort, err = createListenerOnFreePort()
@@ -101,17 +105,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		opts.SecureServing.ServerCert.CertDirectory = result.TmpDir
 
 		t.Logf("kube-scheduler will listen securely on port %d...", opts.SecureServing.BindPort)
-	}
-
-	if opts.CombinedInsecureServing.BindPort != 0 {
-		listener, port, err := createListenerOnFreePort()
-		if err != nil {
-			return result, fmt.Errorf("failed to create listener: %v", err)
-		}
-		opts.CombinedInsecureServing.BindPort = port
-		opts.CombinedInsecureServing.Healthz.Listener = listener
-		opts.CombinedInsecureServing.Metrics.Listener = listener
-		t.Logf("kube-scheduler will listen insecurely on port %d...", opts.CombinedInsecureServing.BindPort)
 	}
 
 	cc, sched, err := app.Setup(ctx, opts)

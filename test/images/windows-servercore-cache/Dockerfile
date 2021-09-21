@@ -1,4 +1,4 @@
-# Copyright 2020 The Kubernetes Authors.
+# Copyright 2021 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG OS_VERSION
-FROM --platform=windows/amd64 mcr.microsoft.com/windows/servercore:$OS_VERSION as prep
+ARG BASEIMAGE
+FROM --platform=windows/amd64 $BASEIMAGE as prep
 FROM scratch
 
 COPY --from=prep /Windows/System32/en-US/nltest.exe.mui /Windows/System32/en-US/nltest.exe.mui

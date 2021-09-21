@@ -126,6 +126,9 @@ function gce-metadata-fw-helper {
   iptables -w ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
 }
 
+# WARNING: DO NOT USE THE FILTER TABLE! Some implementations of network policy
+# think they own it and will stomp all over your changes. At this time, the
+# mangle table is less contentious so use that if possible.
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
 
@@ -623,6 +626,8 @@ function append_or_replace_prefixed_line {
 function write-pki-data {
   local data="${1}"
   local path="${2}"
+  # remove the path if it exists
+  rm -f "${path}"
   if [[ -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
     (umask 027; echo "${data}" | base64 --decode > "${path}")
     chgrp "${KUBE_PKI_READERS_GROUP:-}" "${path}"
@@ -932,7 +937,7 @@ egressSelections:
     transport:
       uds:
         udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
-- name: master
+- name: controlplane
   connection:
     proxyProtocol: Direct
 - name: etcd
@@ -950,7 +955,7 @@ egressSelections:
     transport:
       uds:
         udsName: /etc/srv/kubernetes/konnectivity-server/konnectivity-server.socket
-- name: master
+- name: controlplane
   connection:
     proxyProtocol: Direct
 - name: etcd
@@ -1209,12 +1214,12 @@ rules:
     omitStages:
       - "RequestReceived"
 
-  # Secrets, ConfigMaps, and TokenReviews can contain sensitive & binary data,
+  # Secrets, ConfigMaps, TokenRequest and TokenReviews can contain sensitive & binary data,
   # so only log at the Metadata level.
   - level: Metadata
     resources:
       - group: "" # core
-        resources: ["secrets", "configmaps"]
+        resources: ["secrets", "configmaps", "serviceaccounts/token"]
       - group: authentication.k8s.io
         resources: ["tokenreviews"]
     omitStages:
@@ -1484,6 +1489,13 @@ EOF
 	fi
 }
 
+function disable_aufs() {
+  # disable aufs module if aufs is loaded
+  if lsmod | grep "aufs" &> /dev/null ; then 
+    sudo modprobe -r aufs
+  fi
+}
+
 function set_docker_options_non_ubuntu() {
   # set docker options mtu and storage driver for non-ubuntu
   # as it is default for ubuntu
@@ -1494,11 +1506,12 @@ function set_docker_options_non_ubuntu() {
 
    addockeropt "\"mtu\": 1460,"
    addockeropt "\"storage-driver\": \"overlay2\","
-
    echo "setting live restore"
    # Disable live-restore if the environment variable is set.
    if [[ "${DISABLE_DOCKER_LIVE_RESTORE:-false}" == "true" ]]; then
-      addockeropt "\"live-restore\": \"false\","
+      addockeropt "\"live-restore\": false,"
+   else
+      addockeropt "\"live-restore\": true,"
    fi
 }
 
@@ -1542,8 +1555,10 @@ addockeropt "\"pidfile\": \"/var/run/docker.pid\",
   if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
       docker_opts+="--registry-mirror=${DOCKER_REGISTRY_MIRROR_URL} "
   fi
-
+  
+  disable_aufs
   set_docker_options_non_ubuntu
+
 
   echo "setting docker logging options"
   # Configure docker logging
@@ -1744,7 +1759,7 @@ function prepare-kube-proxy-manifest-variables {
   sed -i -e "s@{{container_env}}@${container_env}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_name}}@${kube_cache_mutation_detector_env_name}@g" "${src_file}"
   sed -i -e "s@{{kube_cache_mutation_detector_env_value}}@${kube_cache_mutation_detector_env_value}@g" "${src_file}"
-  sed -i -e "s@{{ cpurequest }}@100m@g" "${src_file}"
+  sed -i -e "s@{{ cpurequest }}@${KUBE_PROXY_CPU_REQUEST:-100m}@g" "${src_file}"
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" "${src_file}"
   sed -i -e "s@{{kubernetes_service_host_env_value}}@${KUBERNETES_MASTER_NAME}@g" "${src_file}"
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
@@ -1771,7 +1786,27 @@ function start-kube-proxy {
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
-  local -r host_ip=$(python3 -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
+
+  local resolve_host_script_py='
+import socket
+import time
+import sys
+
+timeout_sec=300
+
+def resolve(host):
+  for attempt in range(timeout_sec):
+    try:
+      print(socket.gethostbyname(host))
+      break
+    except Exception as e:
+      sys.stderr.write("error: resolving host %s to IP failed: %s\n" % (host, e))
+      time.sleep(1)
+      continue
+
+'
+
+  local -r host_ip=$(python3 -c "${resolve_host_script_py}"$'\n'"resolve(\"${host_name}\")")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -1929,6 +1964,10 @@ function prepare-konnectivity-server-manifest {
   params+=("--agent-service-account=konnectivity-agent")
   params+=("--kubeconfig=/etc/srv/kubernetes/konnectivity-server/kubeconfig")
   params+=("--authentication-audience=system:konnectivity-server")
+  params+=("--kubeconfig-qps=75")
+  params+=("--kubeconfig-burst=150")
+  params+=("--keepalive-time=60s")
+  params+=("--frontend-keepalive-time=60s")
   konnectivity_args=""
   for param in "${params[@]}"; do
     konnectivity_args+=", \"${param}\""
@@ -1938,6 +1977,26 @@ function prepare-konnectivity-server-manifest {
   sed -i -e "s@{{ *health_port *}}@$2@g" "${temp_file}"
   sed -i -e "s@{{ *admin_port *}}@$3@g" "${temp_file}"
   sed -i -e "s@{{ *liveness_probe_initial_delay *}}@30@g" "${temp_file}"
+  if [[ -n "${KONNECTIVITY_SERVER_RUNASUSER:-}" && -n "${KONNECTIVITY_SERVER_RUNASGROUP:-}" && -n "${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP:-}" ]]; then
+    sed -i -e "s@{{ *run_as_user *}}@runAsUser: ${KONNECTIVITY_SERVER_RUNASUSER}@g" "${temp_file}"
+    sed -i -e "s@{{ *run_as_group *}}@runAsGroup: ${KONNECTIVITY_SERVER_RUNASGROUP}@g" "${temp_file}"
+    sed -i -e "s@{{ *supplemental_groups *}}@supplementalGroups: [${KUBE_PKI_READERS_GROUP}]@g" "${temp_file}"
+    sed -i -e "s@{{ *container_security_context *}}@securityContext:@g" "${temp_file}"
+    sed -i -e "s@{{ *capabilities *}}@capabilities:@g" "${temp_file}"
+    sed -i -e "s@{{ *drop_capabilities *}}@drop: [ ALL ]@g" "${temp_file}"
+    sed -i -e "s@{{ *disallow_privilege_escalation *}}@allowPrivilegeEscalation: false@g" "${temp_file}"
+    mkdir -p /etc/srv/kubernetes/konnectivity-server/
+    chown -R "${KONNECTIVITY_SERVER_RUNASUSER}":"${KONNECTIVITY_SERVER_RUNASGROUP}" /etc/srv/kubernetes/konnectivity-server
+    chmod g+w /etc/srv/kubernetes/konnectivity-server
+  else
+    sed -i -e "s@{{ *run_as_user *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *run_as_group *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *supplemental_groups *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *container_security_context *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *capabilities *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *drop_capabilities *}}@@g" "${temp_file}"
+    sed -i -e "s@{{ *disallow_privilege_escalation *}}@@g" "${temp_file}"
+  fi
   mv "${temp_file}" /etc/kubernetes/manifests
 }
 
@@ -1946,7 +2005,7 @@ function prepare-konnectivity-server-manifest {
 # in the manifests, and copies them to /etc/kubernetes/manifests.
 function start-konnectivity-server {
   echo "Start konnectivity server pods"
-  prepare-log-file /var/log/konnectivity-server.log
+  prepare-log-file /var/log/konnectivity-server.log "${KONNECTIVITY_SERVER_RUNASUSER:-0}"
   prepare-konnectivity-server-manifest "8132" "8133" "8134"
 }
 
@@ -2101,12 +2160,6 @@ function start-kube-controller-manager {
   if [[ -n "${CLUSTER_SIGNING_DURATION:-}" ]]; then
     params+=("--cluster-signing-duration=$CLUSTER_SIGNING_DURATION")
   fi
-  # Disable using HPA metrics REST clients if metrics-server isn't enabled,
-  # or if we want to explicitly disable it by setting HPA_USE_REST_CLIENT.
-  if [[ "${ENABLE_METRICS_SERVER:-}" != "true" ]] ||
-     [[ "${HPA_USE_REST_CLIENTS:-}" == "false" ]]; then
-    params+=("--horizontal-pod-autoscaler-use-rest-clients=false")
-  fi
   if [[ -n "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
     params+=("--pv-recycler-pod-template-filepath-nfs=$PV_RECYCLER_OVERRIDE_TEMPLATE")
     params+=("--pv-recycler-pod-template-filepath-hostpath=$PV_RECYCLER_OVERRIDE_TEMPLATE")
@@ -2183,9 +2236,6 @@ function start-kube-scheduler {
     params+=("--config=/etc/srv/kubernetes/kube-scheduler/config")
   else
     params+=("--kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig")
-    if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
-      params+=("--algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}")
-    fi
     if [[ -n "${SCHEDULER_POLICY_CONFIG:-}" ]]; then
       create-kubescheduler-policy-config
       params+=("--use-legacy-policy-config")
@@ -2265,12 +2315,6 @@ function setup-addon-manifests {
     if [[ -d "${psp_dir}" ]]; then
       copy-manifests "${psp_dir}" "${dst_dir}"
     fi
-  fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
-      local -r nth_dir="${src_dir}/${3:-$2}/node-termination-handler"
-      if [[ -d "${nth_dir}" ]]; then
-          copy-manifests "${nth_dir}" "${dst_dir}"
-      fi
   fi
 }
 
@@ -2679,10 +2723,6 @@ EOF
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "node-termination-handler"
-      setup-node-termination-handler-manifest ''
-  fi
   # Setting up the konnectivity-agent daemonset
   if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "konnectivity-agent"
@@ -2789,13 +2829,6 @@ EOF
   sed -i -e "s@{{runAsUser}}@${KUBE_ADDON_MANAGER_RUNASUSER:-2002}@g" "${src_file}"
   sed -i -e "s@{{runAsGroup}}@${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
-}
-
-function setup-node-termination-handler-manifest {
-    local -r nth_manifest="/etc/kubernetes/$1/$2/daemonset.yaml"
-    if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
-        sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
-    fi
 }
 
 function setup-konnectivity-agent-manifest {

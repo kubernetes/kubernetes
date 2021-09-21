@@ -177,7 +177,13 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 				Kind:      rbacv1.ServiceAccountKind,
 				Namespace: namespace,
 				Name:      "default",
-			})
+			},
+			rbacv1.Subject{
+				Kind:     rbacv1.GroupKind,
+				APIGroup: rbacv1.GroupName,
+				Name:     "system:serviceaccounts:" + namespace,
+			},
+		)
 		ExpectNoError(err)
 		ExpectNoError(e2eauth.WaitForNamedAuthorizationUpdate(kubeClient.AuthorizationV1(),
 			serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,

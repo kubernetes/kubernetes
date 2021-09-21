@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -203,6 +204,95 @@ func configFromEnvOrSim() (VSphereConfig, func()) {
 		return cfg, func() {}
 	}
 	return configFromSim()
+}
+
+func TestSecretUpdated(t *testing.T) {
+	datacenter := "0.0.0.0"
+	secretName := "vccreds"
+	secretNamespace := "kube-system"
+	username := "test-username"
+	password := "test-password"
+	basicSecret := fakeSecret(secretName, secretNamespace, datacenter, username, password)
+
+	cfg, cleanup := configFromSim()
+	defer cleanup()
+
+	cfg.Global.User = username
+	cfg.Global.Password = password
+	cfg.Global.Datacenter = datacenter
+	cfg.Global.SecretName = secretName
+	cfg.Global.SecretNamespace = secretNamespace
+
+	vsphere, err := buildVSphereFromConfig(cfg)
+	if err != nil {
+		t.Fatalf("Should succeed when a valid config is provided: %s", err)
+	}
+	klog.Flush()
+
+	klog.InitFlags(nil)
+	flag.Set("logtostderr", "false")
+	flag.Set("alsologtostderr", "false")
+	flag.Set("v", "9")
+	flag.Parse()
+
+	testcases := []struct {
+		name            string
+		oldSecret       *v1.Secret
+		secret          *v1.Secret
+		expectOutput    bool
+		expectErrOutput bool
+	}{
+		{
+			name:         "Secrets are equal",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       basicSecret.DeepCopy(),
+			expectOutput: false,
+		},
+		{
+			name:         "Secret with a different name",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       fakeSecret("different", secretNamespace, datacenter, username, password),
+			expectOutput: false,
+		},
+		{
+			name:         "Secret with a different data",
+			oldSecret:    basicSecret.DeepCopy(),
+			secret:       fakeSecret(secretName, secretNamespace, datacenter, "...", "..."),
+			expectOutput: true,
+		},
+		{
+			name:            "Secret being nil",
+			oldSecret:       basicSecret.DeepCopy(),
+			secret:          nil,
+			expectOutput:    true,
+			expectErrOutput: true,
+		},
+	}
+
+	for _, testcase := range testcases {
+		t.Run(testcase.name, func(t *testing.T) {
+			buf := new(buffer)
+			errBuf := new(buffer)
+
+			klog.SetOutputBySeverity("INFO", buf)
+			klog.SetOutputBySeverity("WARNING", errBuf)
+
+			vsphere.SecretUpdated(testcase.oldSecret, testcase.secret)
+
+			klog.Flush()
+			if testcase.expectOutput && len(buf.String()) == 0 {
+				t.Fatalf("Expected log secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
+			} else if !testcase.expectOutput && len(buf.String()) > 0 {
+				t.Fatalf("Unexpected log messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, buf.String())
+			}
+
+			if testcase.expectErrOutput && len(errBuf.String()) == 0 {
+				t.Fatalf("Expected log error output on secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
+			} else if !testcase.expectErrOutput && len(errBuf.String()) > 0 {
+				t.Fatalf("Unexpected log error messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, errBuf.String())
+			}
+		})
+	}
 }
 
 func TestReadConfig(t *testing.T) {
@@ -1181,93 +1271,4 @@ func (b *buffer) Write(p []byte) (n int, err error) {
 	b.rw.Lock()
 	defer b.rw.Unlock()
 	return b.b.Write(p)
-}
-
-func TestSecretUpdated(t *testing.T) {
-	datacenter := "0.0.0.0"
-	secretName := "vccreds"
-	secretNamespace := "kube-system"
-	username := "test-username"
-	password := "test-password"
-	basicSecret := fakeSecret(secretName, secretNamespace, datacenter, username, password)
-
-	cfg, cleanup := configFromSim()
-	defer cleanup()
-
-	cfg.Global.User = username
-	cfg.Global.Password = password
-	cfg.Global.Datacenter = datacenter
-	cfg.Global.SecretName = secretName
-	cfg.Global.SecretNamespace = secretNamespace
-
-	vsphere, err := buildVSphereFromConfig(cfg)
-	if err != nil {
-		t.Fatalf("Should succeed when a valid config is provided: %s", err)
-	}
-	klog.Flush()
-
-	klog.InitFlags(nil)
-	flag.Set("logtostderr", "false")
-	flag.Set("alsologtostderr", "false")
-	flag.Set("v", "9")
-	flag.Parse()
-
-	testcases := []struct {
-		name            string
-		oldSecret       *v1.Secret
-		secret          *v1.Secret
-		expectOutput    bool
-		expectErrOutput bool
-	}{
-		{
-			name:         "Secrets are equal",
-			oldSecret:    basicSecret.DeepCopy(),
-			secret:       basicSecret.DeepCopy(),
-			expectOutput: false,
-		},
-		{
-			name:         "Secret with a different name",
-			oldSecret:    basicSecret.DeepCopy(),
-			secret:       fakeSecret("different", secretNamespace, datacenter, username, password),
-			expectOutput: false,
-		},
-		{
-			name:         "Secret with a different data",
-			oldSecret:    basicSecret.DeepCopy(),
-			secret:       fakeSecret(secretName, secretNamespace, datacenter, "...", "..."),
-			expectOutput: true,
-		},
-		{
-			name:            "Secret being nil",
-			oldSecret:       basicSecret.DeepCopy(),
-			secret:          nil,
-			expectOutput:    true,
-			expectErrOutput: true,
-		},
-	}
-
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			buf := new(buffer)
-			errBuf := new(buffer)
-
-			klog.SetOutputBySeverity("INFO", buf)
-			klog.SetOutputBySeverity("WARNING", errBuf)
-
-			vsphere.SecretUpdated(testcase.oldSecret, testcase.secret)
-
-			klog.Flush()
-			if testcase.expectOutput && len(buf.String()) == 0 {
-				t.Fatalf("Expected log secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
-			} else if !testcase.expectOutput && len(buf.String()) > 0 {
-				t.Fatalf("Unexpected log messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, buf.String())
-			}
-
-			if testcase.expectErrOutput && len(errBuf.String()) == 0 {
-				t.Fatalf("Expected log error output on secret update for secrets:\nOld:\n\t%+v\nNew\n\t%+v", testcase.oldSecret, testcase.secret)
-			} else if !testcase.expectErrOutput && len(errBuf.String()) > 0 {
-				t.Fatalf("Unexpected log error messages for secrets:\nOld:\n\t%+v\n\nNew:\n\t%+v\nMessage:%s", testcase.oldSecret, testcase.secret, errBuf.String())
-			}
-		})
-	}
 }

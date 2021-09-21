@@ -159,9 +159,17 @@ func (p *ecrProvider) Provide(image string) credentialprovider.DockerConfig {
 	// (see https://github.com/kubernetes/kubernetes/issues/92162)
 	once.Do(func() {
 		isEC2 = p.isEC2()
+
+		if isEC2 && credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
+			klog.V(4).Infof("AWS credential provider is now disabled. Please refer to sig-cloud-provider for guidance on external credential provider integration for AWS")
+		}
 	})
 
 	if !isEC2 {
+		return credentialprovider.DockerConfig{}
+	}
+
+	if credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
 		return credentialprovider.DockerConfig{}
 	}
 

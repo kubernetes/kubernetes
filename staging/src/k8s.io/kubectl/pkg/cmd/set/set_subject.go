@@ -38,16 +38,16 @@ import (
 
 var (
 	subjectLong = templates.LongDesc(i18n.T(`
-	Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding.`))
+	Update the user, group, or service account in a role binding or cluster role binding.`))
 
 	subjectExample = templates.Examples(`
-	# Update a ClusterRoleBinding for serviceaccount1
+	# Update a cluster role binding for serviceaccount1
 	kubectl set subject clusterrolebinding admin --serviceaccount=namespace:serviceaccount1
 
-	# Update a RoleBinding for user1, user2, and group1
+	# Update a role binding for user1, user2, and group1
 	kubectl set subject rolebinding admin --user=user1 --user=user2 --group=group1
 
-	# Print the result (in yaml format) of updating rolebinding subjects from a local, without hitting the server
+	# Print the result (in YAML format) of updating rolebinding subjects from a local, without hitting the server
 	kubectl create rolebinding admin --role=admin --user=admin -o yaml --dry-run=client | kubectl set subject --local -f - --user=foo -o yaml`)
 )
 
@@ -96,7 +96,7 @@ func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	cmd := &cobra.Command{
 		Use:                   "subject (-f FILENAME | TYPE NAME) [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Update User, Group or ServiceAccount in a RoleBinding/ClusterRoleBinding"),
+		Short:                 i18n.T("Update the user, group, or service account in a role binding or cluster role binding"),
 		Long:                  subjectLong,
 		Example:               subjectExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -109,8 +109,8 @@ func NewCmdSubject(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobr
 	o.PrintFlags.AddFlags(cmd)
 
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "the resource to update the subjects")
-	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, including uninitialized ones, in the namespace of the specified resource types")
-	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources, in the namespace of the specified resource types")
+	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, set subject will NOT contact api-server but run locally.")
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringArrayVar(&o.Users, "user", o.Users, "Usernames to bind to the role")

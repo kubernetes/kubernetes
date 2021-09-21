@@ -30,7 +30,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/audit"
-	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -39,7 +38,7 @@ import (
 // requests coming to the server. Audit level is decided according to requests'
 // attributes and audit policy. Logs are emitted to the audit sink to
 // process events. If sink or audit policy is nil, no decoration takes place.
-func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, longRunningCheck request.LongRunningRequestCheck) http.Handler {
+func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEvaluator, longRunningCheck request.LongRunningRequestCheck) http.Handler {
 	if sink == nil || policy == nil {
 		return handler
 	}
@@ -117,7 +116,7 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy policy.Checker, lon
 // - context with audit event attached to it
 // - created audit event
 // - error if anything bad happened
-func createAuditEventAndAttachToContext(req *http.Request, policy policy.Checker) (*http.Request, *auditinternal.Event, []auditinternal.Stage, error) {
+func createAuditEventAndAttachToContext(req *http.Request, policy audit.PolicyRuleEvaluator) (*http.Request, *auditinternal.Event, []auditinternal.Stage, error) {
 	ctx := req.Context()
 
 	attribs, err := GetAuthorizerAttributes(ctx)
@@ -173,6 +172,7 @@ func decorateResponseWriter(ctx context.Context, responseWriter http.ResponseWri
 
 	// check if the ResponseWriter we're wrapping is the fancy one we need
 	// or if the basic is sufficient
+	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
 	_, cn := responseWriter.(http.CloseNotifier)
 	_, fl := responseWriter.(http.Flusher)
 	_, hj := responseWriter.(http.Hijacker)

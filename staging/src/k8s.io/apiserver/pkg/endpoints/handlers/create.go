@@ -123,8 +123,10 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			scope.err(err, w, req)
 			return
 		}
-		if !scope.AcceptsGroupVersion(gvk.GroupVersion()) {
-			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), gv.String()))
+
+		objGV := gvk.GroupVersion()
+		if !scope.AcceptsGroupVersion(objGV) {
+			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", objGV.String(), gv.String()))
 			scope.err(err, w, req)
 			return
 		}
@@ -141,7 +143,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
-		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
+		audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 
 		userInfo, _ := request.UserFrom(ctx)
 

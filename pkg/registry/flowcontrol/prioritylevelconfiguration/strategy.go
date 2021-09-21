@@ -53,6 +53,9 @@ func (priorityLevelConfigurationStrategy) GetResetFields() map[fieldpath.APIVers
 		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
+		"flowcontrol.apiserver.k8s.io/v1beta2": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
 	}
 
 	return fields
@@ -82,6 +85,11 @@ func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runt
 	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (priorityLevelConfigurationStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (priorityLevelConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -100,6 +108,11 @@ func (priorityLevelConfigurationStrategy) ValidateUpdate(ctx context.Context, ob
 	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (priorityLevelConfigurationStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 type priorityLevelConfigurationStatusStrategy struct {
 	priorityLevelConfigurationStrategy
 }
@@ -116,6 +129,10 @@ func (priorityLevelConfigurationStatusStrategy) GetResetFields() map[fieldpath.A
 			fieldpath.MakePathOrDie("metadata"),
 		),
 		"flowcontrol.apiserver.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata"),
+		),
+		"flowcontrol.apiserver.k8s.io/v1beta2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 			fieldpath.MakePathOrDie("metadata"),
 		),
@@ -138,4 +155,9 @@ func (priorityLevelConfigurationStatusStrategy) PrepareForUpdate(ctx context.Con
 
 func (priorityLevelConfigurationStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePriorityLevelConfigurationStatusUpdate(old.(*flowcontrol.PriorityLevelConfiguration), obj.(*flowcontrol.PriorityLevelConfiguration))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (priorityLevelConfigurationStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

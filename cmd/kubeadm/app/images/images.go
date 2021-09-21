@@ -20,7 +20,9 @@ import (
 	"fmt"
 
 	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -46,8 +48,12 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	if cfg.DNS.ImageRepository != "" {
 		dnsImageRepository = cfg.DNS.ImageRepository
 	}
+	// Handle the renaming of the official image from "k8s.gcr.io/coredns" to "k8s.gcr.io/coredns/coredns
+	if dnsImageRepository == kubeadmapiv1beta2.DefaultImageRepository {
+		dnsImageRepository = fmt.Sprintf("%s/coredns", dnsImageRepository)
+	}
 	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version
-	dnsImageTag := constants.GetDNSVersion(cfg.DNS.Type)
+	dnsImageTag := constants.CoreDNSVersion
 
 	// unless an override is specified
 	if cfg.DNS.ImageTag != "" {
@@ -99,9 +105,7 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	}
 
 	// Append the appropriate DNS images
-	if cfg.DNS.Type == kubeadmapi.CoreDNS {
-		imgs = append(imgs, GetDNSImage(cfg))
-	}
+	imgs = append(imgs, GetDNSImage(cfg))
 
 	return imgs
 }

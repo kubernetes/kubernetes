@@ -24,8 +24,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/clock"
 )
 
 // For any test of the style:
@@ -166,6 +166,9 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 		// of every loop to prevent extra executions of f().
 		select {
 		case <-stopCh:
+			if !t.Stop() {
+				<-t.C()
+			}
 			return
 		case <-t.C():
 		}

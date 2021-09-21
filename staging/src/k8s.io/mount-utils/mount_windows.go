@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -61,6 +62,12 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 // MountSensitiveWithoutSystemd is the same as MountSensitive() but disable using ssytemd mount.
 // Windows not supported systemd mount, this function degrades to MountSensitive().
 func (mounter *Mounter) MountSensitiveWithoutSystemd(source string, target string, fstype string, options []string, sensitiveOptions []string) error {
+	return mounter.MountSensitive(source, target, fstype, options, sensitiveOptions /* sensitiveOptions */)
+}
+
+// MountSensitiveWithoutSystemdWithMountFlags is the same as MountSensitiveWithoutSystemd with additional mount flags
+// Windows not supported systemd mount, this function degrades to MountSensitive().
+func (mounter *Mounter) MountSensitiveWithoutSystemdWithMountFlags(source string, target string, fstype string, options []string, sensitiveOptions []string, mountFlags []string) error {
 	return mounter.MountSensitive(source, target, fstype, options, sensitiveOptions /* sensitiveOptions */)
 }
 

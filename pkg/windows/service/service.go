@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -29,10 +30,6 @@ import (
 	"golang.org/x/sys/windows/svc"
 )
 
-var (
-	service *handler
-)
-
 type handler struct {
 	tosvc   chan bool
 	fromsvc chan error
@@ -47,7 +44,6 @@ func InitService(serviceName string) error {
 		fromsvc: make(chan error),
 	}
 
-	service = h
 	var err error
 	go func() {
 		err = svc.Run(serviceName, h)

@@ -21,6 +21,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +35,11 @@ func TestCreateConfigMap(t *testing.T) {
 		appendHash    bool
 		fromLiteral   []string
 		fromFile      []string
-		fromEnvFile   string
+		fromEnvFile   []string
 		setup         func(t *testing.T, configMapOptions *ConfigMapOptions) func()
 
 		expected  *corev1.ConfigMap
-		expectErr bool
+		expectErr string
 	}{
 		"create_foo_configmap": {
 			configMapName: "foo",
@@ -52,7 +54,6 @@ func TestCreateConfigMap(t *testing.T) {
 				Data:       map[string]string{},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_hash_configmap": {
 			configMapName: "foo",
@@ -68,7 +69,6 @@ func TestCreateConfigMap(t *testing.T) {
 				Data:       map[string]string{},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_type_configmap": {
 			configMapName: "foo",
@@ -84,7 +84,6 @@ func TestCreateConfigMap(t *testing.T) {
 				Data:       map[string]string{},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_type_hash_configmap": {
 			configMapName: "foo",
@@ -101,7 +100,6 @@ func TestCreateConfigMap(t *testing.T) {
 				Data:       map[string]string{},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_two_literal_configmap": {
 			configMapName: "foo",
@@ -120,7 +118,6 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_two_literal_hash_configmap": {
 			configMapName: "foo",
@@ -140,7 +137,6 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_key1_=value1_configmap": {
 			configMapName: "foo",
@@ -158,7 +154,6 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_key1_=value1_hash_configmap": {
 			configMapName: "foo",
@@ -177,11 +172,10 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_from_file_foo1_foo2_configmap": {
 			configMapName: "foo",
-			setup:         setupBinaryFile([]byte{0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64}, "foo1", "foo2"),
+			setup:         setupBinaryFile([]byte{0x68, 0x65, 0x6c, 0x6c, 0x6f, 0x20, 0x77, 0x6f, 0x72, 0x6c, 0x64}),
 			fromFile:      []string{"foo1", "foo2"},
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
@@ -197,11 +191,10 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_foo_from_file_foo1_foo2_and_configmap": {
 			configMapName: "foo",
-			setup:         setupBinaryFile([]byte{0xff, 0xfd}, "foo1", "foo2"),
+			setup:         setupBinaryFile([]byte{0xff, 0xfd}),
 			fromFile:      []string{"foo1", "foo2"},
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
@@ -217,12 +210,11 @@ func TestCreateConfigMap(t *testing.T) {
 					"foo2": {0xff, 0xfd},
 				},
 			},
-			expectErr: false,
 		},
 		"create_valid_env_from_env_file_configmap": {
 			configMapName: "valid_env",
-			setup:         setupEnvFile("key1=value1", "#", "", "key2=value2"),
-			fromEnvFile:   "file.env",
+			setup:         setupEnvFile([][]string{{"key1=value1", "#", "", "key2=value2"}}),
+			fromEnvFile:   []string{"file.env"},
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -237,12 +229,31 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
+		},
+		"create_two_valid_env_from_env_file_configmap": {
+			configMapName: "two_valid_env",
+			setup:         setupEnvFile([][]string{{"key1=value1", "#", "", "key2=value2"}, {"key3=value3"}}),
+			fromEnvFile:   []string{"file1.env", "file2.env"},
+			expected: &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "two_valid_env",
+				},
+				Data: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+				BinaryData: map[string][]byte{},
+			},
 		},
 		"create_valid_env_from_env_file_hash_configmap": {
 			configMapName: "valid_env",
-			setup:         setupEnvFile("key1=value1", "#", "", "key2=value2"),
-			fromEnvFile:   "file.env",
+			setup:         setupEnvFile([][]string{{"key1=value1", "#", "", "key2=value2"}}),
+			fromEnvFile:   []string{"file.env"},
 			appendHash:    true,
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
@@ -258,16 +269,36 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
+		},
+		"create_two_valid_env_from_env_file_hash_configmap": {
+			configMapName: "two_valid_env",
+			setup:         setupEnvFile([][]string{{"key1=value1", "#", "", "key2=value2"}, {"key3=value3"}}),
+			fromEnvFile:   []string{"file1.env", "file2.env"},
+			appendHash:    true,
+			expected: &corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "ConfigMap",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "two_valid_env-2m5tm82522",
+				},
+				Data: map[string]string{
+					"key1": "value1",
+					"key2": "value2",
+					"key3": "value3",
+				},
+				BinaryData: map[string][]byte{},
+			},
 		},
 		"create_get_env_from_env_file_configmap": {
 			configMapName: "get_env",
 			setup: func() func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
 				os.Setenv("g_key1", "1")
 				os.Setenv("g_key2", "2")
-				return setupEnvFile("g_key1", "g_key2=")
+				return setupEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
-			fromEnvFile: "file.env",
+			fromEnvFile: []string{"file.env"},
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -282,16 +313,15 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_get_env_from_env_file_hash_configmap": {
 			configMapName: "get_env",
 			setup: func() func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
 				os.Setenv("g_key1", "1")
 				os.Setenv("g_key2", "2")
-				return setupEnvFile("g_key1", "g_key2=")
+				return setupEnvFile([][]string{{"g_key1", "g_key2="}})
 			}(),
-			fromEnvFile: "file.env",
+			fromEnvFile: []string{"file.env"},
 			appendHash:  true,
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
@@ -307,12 +337,11 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_value_with_space_from_env_file_configmap": {
 			configMapName: "value_with_space",
-			setup:         setupEnvFile("key1=  value1"),
-			fromEnvFile:   "file.env",
+			setup:         setupEnvFile([][]string{{"key1=  value1"}}),
+			fromEnvFile:   []string{"file.env"},
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -326,12 +355,11 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_value_with_space_from_env_file_hash_configmap": {
 			configMapName: "valid_with_space",
-			setup:         setupEnvFile("key1=  value1"),
-			fromEnvFile:   "file.env",
+			setup:         setupEnvFile([][]string{{"key1=  value1"}}),
+			fromEnvFile:   []string{"file.env"},
 			appendHash:    true,
 			expected: &corev1.ConfigMap{
 				TypeMeta: metav1.TypeMeta{
@@ -346,67 +374,67 @@ func TestCreateConfigMap(t *testing.T) {
 				},
 				BinaryData: map[string][]byte{},
 			},
-			expectErr: false,
 		},
 		"create_invalid_configmap_filepath_contains_=": {
 			configMapName: "foo",
 			fromFile:      []string{"key1=/file=2"},
-			expectErr:     true,
+			expectErr:     `key names or file paths cannot contain '='`,
 		},
 		"create_invalid_configmap_filepath_key_contains_=": {
 			configMapName: "foo",
 			fromFile:      []string{"=key=/file1"},
-			expectErr:     true,
+			expectErr:     `key names or file paths cannot contain '='`,
 		},
 		"create_invalid_configmap_literal_key_contains_=": {
 			configMapName: "foo",
 			fromFile:      []string{"=key=value1"},
-			expectErr:     true,
+			expectErr:     `key names or file paths cannot contain '='`,
 		},
 		"create_invalid_configmap_duplicate_key1": {
 			configMapName: "foo",
 			fromLiteral:   []string{"key1=value1", "key1=value2"},
-			expectErr:     true,
+			expectErr:     `cannot add key "key1", another key by that name already exists in Data for ConfigMap "foo"`,
 		},
 		"create_invalid_configmap_no_file": {
 			configMapName: "foo",
 			fromFile:      []string{"key1=/file1"},
-			expectErr:     true,
+			expectErr:     `error reading /file1: no such file or directory`,
 		},
 		"create_invalid_configmap_invalid_literal": {
 			configMapName: "foo",
 			fromLiteral:   []string{"key1value1"},
-			expectErr:     true,
+			expectErr:     `invalid literal source key1value1, expected key=value`,
 		},
 		"create_invalid_configmap_invalid_filepath": {
 			configMapName: "foo",
 			fromFile:      []string{"key1==file1"},
-			expectErr:     true,
+			expectErr:     `key names or file paths cannot contain '='`,
 		},
 		"create_invalid_configmap_too_many_args": {
 			configMapName: "too_many_args",
 			fromFile:      []string{"key1=/file1"},
-			fromEnvFile:   "foo",
-			expectErr:     true,
+			fromEnvFile:   []string{"file.env"},
+			expectErr:     `from-env-file cannot be combined with from-file or from-literal`,
 		},
 		"create_invalid_configmap_too_many_args_1": {
 			configMapName: "too_many_args_1",
 			fromLiteral:   []string{"key1=value1"},
-			fromEnvFile:   "foo",
-			expectErr:     true,
+			fromEnvFile:   []string{"file.env"},
+			expectErr:     `from-env-file cannot be combined with from-file or from-literal`,
 		},
 	}
 
 	// run all the tests
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			var configMap *corev1.ConfigMap = nil
 			configMapOptions := ConfigMapOptions{
 				Name:           test.configMapName,
 				Type:           test.configMapType,
 				AppendHash:     test.appendHash,
 				FileSources:    test.fromFile,
 				LiteralSources: test.fromLiteral,
-				EnvFileSource:  test.fromEnvFile,
+				EnvFileSources: test.fromEnvFile,
 			}
 
 			if test.setup != nil {
@@ -414,42 +442,55 @@ func TestCreateConfigMap(t *testing.T) {
 					defer teardown()
 				}
 			}
+			err := configMapOptions.Validate()
 
-			configMap, err := configMapOptions.createConfigMap()
-			if !test.expectErr && err != nil {
-				t.Errorf("test %s, unexpected error: %v", name, err)
+			if err == nil {
+				configMap, err = configMapOptions.createConfigMap()
 			}
-			if test.expectErr && err == nil {
-				t.Errorf("test %s was expecting an error but no error occurred", name)
-			}
-			if !apiequality.Semantic.DeepEqual(configMap, test.expected) {
-				t.Errorf("test %s expected:\n%#v\ngot:\n%#v", name, test.expected, configMap)
+			if test.expectErr == "" {
+				require.NoError(t, err)
+				if !apiequality.Semantic.DeepEqual(configMap, test.expected) {
+					t.Errorf("\nexpected:\n%#v\ngot:\n%#v", test.expected, configMap)
+				}
+			} else {
+				require.Error(t, err)
+				require.EqualError(t, err, test.expectErr)
 			}
 		})
 	}
 }
 
-func setupEnvFile(lines ...string) func(*testing.T, *ConfigMapOptions) func() {
+func setupEnvFile(lines [][]string) func(*testing.T, *ConfigMapOptions) func() {
 	return func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
-		f, err := ioutil.TempFile("", "cme")
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+		files := []*os.File{}
+		filenames := configMapOptions.EnvFileSources
+		for _, filename := range filenames {
+			file, err := ioutil.TempFile("", filename)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			files = append(files, file)
 		}
-		for _, l := range lines {
-			f.WriteString(l)
-			f.WriteString("\r\n")
+		for i, f := range files {
+			for _, l := range lines[i] {
+				f.WriteString(l)
+				f.WriteString("\r\n")
+			}
+			f.Close()
+			configMapOptions.EnvFileSources[i] = f.Name()
 		}
-		f.Close()
-		configMapOptions.EnvFileSource = f.Name()
 		return func() {
-			os.Remove(f.Name())
+			for _, f := range files {
+				os.Remove(f.Name())
+			}
 		}
 	}
 }
 
-func setupBinaryFile(data []byte, files ...string) func(*testing.T, *ConfigMapOptions) func() {
+func setupBinaryFile(data []byte) func(*testing.T, *ConfigMapOptions) func() {
 	return func(t *testing.T, configMapOptions *ConfigMapOptions) func() {
 		tmp, _ := ioutil.TempDir("", "")
+		files := configMapOptions.FileSources
 		for i, file := range files {
 			f := tmp + "/" + file
 			ioutil.WriteFile(f, data, 0644)

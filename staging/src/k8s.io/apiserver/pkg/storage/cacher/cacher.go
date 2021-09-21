@@ -31,15 +31,16 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -341,7 +342,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		},
 		// TODO: Figure out the correct value for the buffer size.
 		incoming:              make(chan watchCacheEvent, 100),
-		dispatchTimeoutBudget: newTimeBudget(stopCh),
+		dispatchTimeoutBudget: newTimeBudget(),
 		// We need to (potentially) stop both:
 		// - wait.Until go-routine
 		// - reflector.ListAndWatch
@@ -592,20 +593,29 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	return nil
 }
 
-// GetToList implements storage.Interface.
-func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+// NOTICE: Keep in sync with shouldListFromStorage function in
+//  staging/src/k8s.io/apiserver/pkg/util/flowcontrol/request/list_work_estimator.go
+func shouldDelegateList(opts storage.ListOptions) bool {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
 	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
 	hasContinuation := pagingEnabled && len(pred.Continue) > 0
 	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
-	if resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
-		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility). If a continuation is
-		// requested, serve it from the underlying storage as well.
-		// Limits are only sent to storage when resourceVersion is non-zero
-		// since the watch cache isn't able to perform continuations, and
-		// limits are ignored when resource version is zero
+
+	// If resourceVersion is not specified, serve it from underlying
+	// storage (for backward compatibility). If a continuation is
+	// requested, serve it from the underlying storage as well.
+	// Limits are only sent to storage when resourceVersion is non-zero
+	// since the watch cache isn't able to perform continuations, and
+	// limits are ignored when resource version is zero
+	return resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact
+}
+
+// GetToList implements storage.Interface.
+func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
+	resourceVersion := opts.ResourceVersion
+	pred := opts.Predicate
+	if shouldDelegateList(opts) {
 		return c.storage.GetToList(ctx, key, opts, listObj)
 	}
 
@@ -670,16 +680,7 @@ func (c *Cacher) GetToList(ctx context.Context, key string, opts storage.ListOpt
 func (c *Cacher) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	resourceVersion := opts.ResourceVersion
 	pred := opts.Predicate
-	pagingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking)
-	hasContinuation := pagingEnabled && len(pred.Continue) > 0
-	hasLimit := pagingEnabled && pred.Limit > 0 && resourceVersion != "0"
-	if resourceVersion == "" || hasContinuation || hasLimit || opts.ResourceVersionMatch == metav1.ResourceVersionMatchExact {
-		// If resourceVersion is not specified, serve it from underlying
-		// storage (for backward compatibility). If a continuation is
-		// requested, serve it from the underlying storage as well.
-		// Limits are only sent to storage when resourceVersion is non-zero
-		// since the watch cache isn't able to perform continuations, and
-		// limits are ignored when resource version is zero.
+	if shouldDelegateList(opts) {
 		return c.storage.List(ctx, key, opts, listObj)
 	}
 
@@ -1412,6 +1413,14 @@ func (c *cacheWatcher) process(ctx context.Context, initEvents []*watchCacheEven
 	if processingTime > initProcessThreshold {
 		klog.V(2).Infof("processing %d initEvents of %s (%s) took %v", len(initEvents), objType, c.identifier, processingTime)
 	}
+
+	// At this point we already start processing incoming watch events.
+	// However, the init event can still be processed because their serialization
+	// and sending to the client happens asynchrnously.
+	// TODO: As describe in the KEP, we would like to estimate that by delaying
+	//   the initialization signal proportionally to the number of events to
+	//   process, but we're leaving this to the tuning phase.
+	utilflowcontrol.WatchInitialized(ctx)
 
 	defer close(c.result)
 	defer c.Stop()

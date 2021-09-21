@@ -112,7 +112,12 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		for name, v := range blockVolumes {
 			// Only add the blockVolume if it implements the MetricsProvider interface
 			if _, ok := v.(volume.MetricsProvider); ok {
-				metricVolumes[name] = v
+				// Some drivers inherit the MetricsProvider interface from Filesystem
+				// mode volumes, but do not implement it for Block mode. Checking
+				// SupportsMetrics() will prevent panics in that case.
+				if v.SupportsMetrics() {
+					metricVolumes[name] = v
+				}
 			}
 		}
 	}

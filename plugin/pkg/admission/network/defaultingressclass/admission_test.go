@@ -43,7 +43,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default1",
 			Annotations: map[string]string{
-				networkingv1beta1.AnnotationIsDefaultIngressClass: "true",
+				networkingv1.AnnotationIsDefaultIngressClass: "true",
 			},
 		},
 	}
@@ -51,7 +51,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "default2",
 			Annotations: map[string]string{
-				networkingv1beta1.AnnotationIsDefaultIngressClass: "true",
+				networkingv1.AnnotationIsDefaultIngressClass: "true",
 			},
 		},
 	}
@@ -63,7 +63,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nondefault1",
 			Annotations: map[string]string{
-				networkingv1beta1.AnnotationIsDefaultIngressClass: "false",
+				networkingv1.AnnotationIsDefaultIngressClass: "false",
 			},
 		},
 	}
@@ -84,7 +84,7 @@ func TestAdmission(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "nondefault2",
 			Annotations: map[string]string{
-				networkingv1beta1.AnnotationIsDefaultIngressClass: "",
+				networkingv1.AnnotationIsDefaultIngressClass: "",
 			},
 		},
 	}

@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
-	"k8s.io/kubernetes/pkg/volume/gcepd"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -351,17 +350,18 @@ func attachDetachRecoveryTestCase(t *testing.T, extraPods1 []*v1.Pod, extraPods2
 }
 
 type vaTest struct {
-	testName          string
-	volName           string
-	podName           string
-	podNodeName       string
-	pvName            string
-	vaName            string
-	vaNodeName        string
-	vaAttachStatus    bool
-	csiMigration      bool
-	expected_attaches map[string][]string
-	expected_detaches map[string][]string
+	testName               string
+	volName                string
+	podName                string
+	podNodeName            string
+	pvName                 string
+	vaName                 string
+	vaNodeName             string
+	vaAttachStatus         bool
+	csiMigration           bool
+	expected_attaches      map[string][]string
+	expected_detaches      map[string][]string
+	expectedASWAttachState cache.AttachState
 }
 
 func Test_ADC_VolumeAttachmentRecovery(t *testing.T) {
@@ -398,15 +398,26 @@ func Test_ADC_VolumeAttachmentRecovery(t *testing.T) {
 			expected_attaches: map[string][]string{},
 			expected_detaches: map[string][]string{"mynode-1": {"vol1"}},
 		},
-		{
-			testName:       "CSI Migration",
-			volName:        "vol1",
-			podNodeName:    "mynode-1",
-			pvName:         "pv1",
-			vaName:         "va1",
-			vaNodeName:     "mynode-1",
-			vaAttachStatus: false,
-			csiMigration:   true,
+		{ // pod is scheduled, volume is migrated, attach status:false, verify volume is marked as attached
+			testName:               "Scheduled Pod with migrated PV",
+			volName:                "vol1",
+			podNodeName:            "mynode-1",
+			pvName:                 "pv1",
+			vaName:                 "va1",
+			vaNodeName:             "mynode-1",
+			vaAttachStatus:         false,
+			csiMigration:           true,
+			expectedASWAttachState: cache.AttachStateAttached,
+		},
+		{ // pod is deleted, volume is migrated, attach status:false, verify volume is marked as uncertain
+			testName:               "Deleted Pod with migrated PV",
+			volName:                "vol1",
+			pvName:                 "pv1",
+			vaName:                 "va1",
+			vaNodeName:             "mynode-1",
+			vaAttachStatus:         false,
+			csiMigration:           true,
+			expectedASWAttachState: cache.AttachStateUncertain,
 		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
@@ -424,7 +435,7 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationGCE, tc.csiMigration)()
 		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InTreePluginGCEUnregister, tc.csiMigration)()
 
-		plugins = gcepd.ProbeVolumePlugins()
+		// if InTreePluginGCEUnregister is enabled, only the CSI plugin is registered but not the in-tree one
 		plugins = append(plugins, csi.ProbeVolumePlugins()...)
 	} else {
 		plugins = controllervolumetesting.CreateTestPlugin()
@@ -569,8 +580,8 @@ func verifyExpectedVolumeState(t *testing.T, adc *attachDetachController, tc vaT
 	// Since csi migration is turned on, the attach state for the PV should be in CSI format.
 	attachedState := adc.actualStateOfWorld.GetAttachState(
 		v1.UniqueVolumeName(csiPDUniqueNamePrefix+tc.volName), types.NodeName(tc.vaNodeName))
-	if attachedState != cache.AttachStateAttached {
-		t.Fatalf("Expected attachedState %v, but it is %v", cache.AttachStateAttached, attachedState)
+	if attachedState != tc.expectedASWAttachState {
+		t.Fatalf("Expected attachedState %v, but it is %v", tc.expectedASWAttachState, attachedState)
 	}
 
 	// kubernetes.io/gce-pd/<volName> should not be marked when CSI Migration is on

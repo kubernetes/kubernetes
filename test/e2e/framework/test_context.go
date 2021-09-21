@@ -19,6 +19,7 @@ package framework
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -29,7 +30,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/config"
-	"github.com/pkg/errors"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -135,7 +135,6 @@ type TestContextType struct {
 	GatherMetricsAfterTest            string
 	GatherSuiteMetricsAfterTest       bool
 	MaxNodesToGather                  int
-	AllowGatheringProfiles            bool
 	// If set to 'true' framework will gather ClusterAutoscaler metrics when gathering them for other components.
 	IncludeClusterAutoscalerMetrics bool
 	// Currently supported values are 'hr' for human-readable and 'json'. It's a comma separated list.
@@ -182,6 +181,16 @@ type TestContextType struct {
 
 	// DockerConfigFile is a file that contains credentials which can be used to pull images from certain private registries, needed for a test.
 	DockerConfigFile string
+
+	// SnapshotControllerPodName is the name used for identifying the snapshot controller pod.
+	SnapshotControllerPodName string
+
+	// SnapshotControllerHTTPPort the port used for communicating with the snapshot controller HTTP endpoint.
+	SnapshotControllerHTTPPort int
+
+	// RequireDevices makes mandatory on the environment on which tests are run 1+ devices exposed through device plugins.
+	// With this enabled The e2e tests requiring devices for their operation can assume that if devices aren't reported, the test can fail
+	RequireDevices bool
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -223,6 +232,8 @@ type NodeTestContextType struct {
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.
 	SystemSpecName string
+	// RestartKubelet restarts Kubelet unit when the process is killed.
+	RestartKubelet bool
 	// ExtraEnvs is a map of environment names to values.
 	ExtraEnvs map[string]string
 }
@@ -284,7 +295,6 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.IntVar(&TestContext.MaxNodesToGather, "max-nodes-to-gather-from", 20, "The maximum number of nodes to gather extended info from on test failure.")
 	flags.StringVar(&TestContext.GatherMetricsAfterTest, "gather-metrics-at-teardown", "false", "If set to 'true' framework will gather metrics from all components after each test. If set to 'master' only master component metrics would be gathered.")
 	flags.BoolVar(&TestContext.GatherSuiteMetricsAfterTest, "gather-suite-metrics-at-teardown", false, "If set to true framwork will gather metrics from all components after the whole test suite completes.")
-	flags.BoolVar(&TestContext.AllowGatheringProfiles, "allow-gathering-profiles", true, "If set to true framework will allow to gather CPU/memory allocation pprof profiles from the master.")
 	flags.BoolVar(&TestContext.IncludeClusterAutoscalerMetrics, "include-cluster-autoscaler", false, "If set to true, framework will include Cluster Autoscaler when gathering metrics.")
 	flags.StringVar(&TestContext.OutputPrintType, "output-print-type", "json", "Format in which summaries should be printed: 'hr' for human readable, 'json' for JSON ones.")
 	flags.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
@@ -315,6 +325,9 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 	flags.StringVar(&TestContext.SpecSummaryOutput, "spec-dump", "", "The file to dump all ginkgo.SpecSummary to after tests run. If empty, no objects are saved/printed.")
 	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A file that contains credentials which can be used to pull images from certain private registries, needed for a test.")
+
+	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
+	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
@@ -473,7 +486,7 @@ func AfterReadingAllFlags(t *TestContextType) {
 	var err error
 	TestContext.CloudConfig.Provider, err = SetupProviderConfig(TestContext.Provider)
 	if err != nil {
-		if os.IsNotExist(errors.Cause(err)) {
+		if os.IsNotExist(errors.Unwrap(err)) {
 			// Provide a more helpful error message when the provider is unknown.
 			var providers []string
 			for _, name := range GetProviders() {

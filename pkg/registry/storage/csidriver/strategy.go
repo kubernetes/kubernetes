@@ -56,16 +56,17 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
 		csiDriver.Spec.FSGroupPolicy = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		csiDriver.Spec.TokenRequests = nil
-		csiDriver.Spec.RequiresRepublish = nil
-	}
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiDriver := obj.(*storage.CSIDriver)
 
 	return validation.ValidateCSIDriver(csiDriver)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csiDriverStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -95,14 +96,6 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 		!utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeFSGroupPolicy) {
 		newCSIDriver.Spec.FSGroupPolicy = nil
 	}
-	if oldCSIDriver.Spec.TokenRequests == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		newCSIDriver.Spec.TokenRequests = nil
-	}
-	if oldCSIDriver.Spec.RequiresRepublish == nil &&
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
-		newCSIDriver.Spec.RequiresRepublish = nil
-	}
 
 	// Any changes to the mutable fields increment the generation number.
 	if !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.TokenRequests, newCSIDriver.Spec.TokenRequests) || !apiequality.Semantic.DeepEqual(oldCSIDriver.Spec.RequiresRepublish, newCSIDriver.Spec.RequiresRepublish) {
@@ -114,6 +107,11 @@ func (csiDriverStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	newCSIDriverObj := obj.(*storage.CSIDriver)
 	oldCSIDriverObj := old.(*storage.CSIDriver)
 	return validation.ValidateCSIDriverUpdate(newCSIDriverObj, oldCSIDriverObj)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csiDriverStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (csiDriverStrategy) AllowUnconditionalUpdate() bool {

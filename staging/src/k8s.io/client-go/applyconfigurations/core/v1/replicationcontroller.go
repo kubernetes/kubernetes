@@ -50,7 +50,7 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 // ExtractReplicationController extracts the applied configuration owned by fieldManager from
 // replicationController. If no managedFields are found in replicationController for fieldManager, a
 // ReplicationControllerApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // replicationController must be a unmodified ReplicationController API object that was retrieved from the Kubernetes API.

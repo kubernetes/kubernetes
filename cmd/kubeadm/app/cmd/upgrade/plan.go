@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
@@ -79,7 +80,7 @@ func runPlan(flags *planFlags, args []string) error {
 
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, cfg.DNS.Type, client, constants.GetStaticPodDirectory())
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, isExternalEtcd, client, constants.GetStaticPodDirectory())
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -90,10 +91,6 @@ func runPlan(flags *planFlags, args []string) error {
 	if err != nil {
 		return errors.WithMessage(err, "[upgrade/versions] FATAL")
 	}
-
-	// Warn if the kubelet component config is missing an explicit 'cgroupDriver'.
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2376
-	componentconfigs.WarnCgroupDriver(&cfg.ClusterConfiguration)
 
 	// No upgrades available
 	if len(availUpgrades) == 0 {
@@ -133,14 +130,9 @@ func newComponentUpgradePlan(name, currentVersion, newVersion string) outputapi.
 
 // TODO There is currently no way to cleanly output upgrades that involve adding, removing, or changing components
 // https://github.com/kubernetes/kubeadm/issues/810 was created to track addressing this.
-func appendDNSComponent(components []outputapi.ComponentUpgradePlan, up *upgrade.Upgrade, DNSType kubeadmapi.DNSAddOnType, name string) []outputapi.ComponentUpgradePlan {
-	beforeVersion, afterVersion := "", ""
-	if up.Before.DNSType == DNSType {
-		beforeVersion = up.Before.DNSVersion
-	}
-	if up.After.DNSType == DNSType {
-		afterVersion = up.After.DNSVersion
-	}
+func appendDNSComponent(components []outputapi.ComponentUpgradePlan, up *upgrade.Upgrade, name string) []outputapi.ComponentUpgradePlan {
+	beforeVersion := up.Before.DNSVersion
+	afterVersion := up.After.DNSVersion
 
 	if beforeVersion != "" || afterVersion != "" {
 		components = append(components, newComponentUpgradePlan(name, beforeVersion, afterVersion))
@@ -180,7 +172,7 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.Upgrad
 	components = append(components, newComponentUpgradePlan(constants.KubeScheduler, up.Before.KubeVersion, up.After.KubeVersion))
 	components = append(components, newComponentUpgradePlan(constants.KubeProxy, up.Before.KubeVersion, up.After.KubeVersion))
 
-	components = appendDNSComponent(components, up, kubeadmapi.CoreDNS, constants.CoreDNS)
+	components = appendDNSComponent(components, up, constants.CoreDNS)
 
 	if !isExternalEtcd {
 		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))

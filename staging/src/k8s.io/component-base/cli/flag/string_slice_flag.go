@@ -18,6 +18,7 @@ package flag
 
 import (
 	goflag "flag"
+	"fmt"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -45,9 +46,11 @@ func (s *StringSlice) String() string {
 }
 
 func (s *StringSlice) Set(val string) error {
-	if s.value == nil || !s.changed {
-		v := make([]string, 0)
-		s.value = &v
+	if s.value == nil {
+		return fmt.Errorf("no target (nil pointer to []string)")
+	}
+	if !s.changed {
+		*s.value = make([]string, 0)
 	}
 	*s.value = append(*s.value, val)
 	s.changed = true

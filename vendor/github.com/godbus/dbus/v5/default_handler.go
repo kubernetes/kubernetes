@@ -126,14 +126,28 @@ func (m exportedMethod) Call(args ...interface{}) ([]interface{}, error) {
 	}
 
 	ret := m.Value.Call(params)
-
-	err := ret[t.NumOut()-1].Interface().(*Error)
-	ret = ret[:t.NumOut()-1]
+	var err error
+	nilErr := false // The reflection will find almost-nils, let's only pass back clean ones!
+	if t.NumOut() > 0 {
+		if e, ok := ret[t.NumOut()-1].Interface().(*Error); ok { // godbus *Error
+			nilErr = ret[t.NumOut()-1].IsNil()
+			ret = ret[:t.NumOut()-1]
+			err = e
+		} else if ret[t.NumOut()-1].Type().Implements(errType) { // Go error
+			i := ret[t.NumOut()-1].Interface()
+			if i == nil {
+				nilErr = ret[t.NumOut()-1].IsNil()
+			} else {
+				err = i.(error)
+			}
+			ret = ret[:t.NumOut()-1]
+		}
+	}
 	out := make([]interface{}, len(ret))
 	for i, val := range ret {
 		out[i] = val.Interface()
 	}
-	if err == nil {
+	if nilErr || err == nil {
 		//concrete type to interface nil is a special case
 		return out, nil
 	}

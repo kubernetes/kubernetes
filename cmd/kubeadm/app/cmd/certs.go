@@ -86,7 +86,7 @@ var (
 `)
 	generateCSRExample = cmdutil.Examples(`
 	# The following command will generate keys and CSRs for all control-plane certificates and kubeconfig files:
-	kubeadm alpha certs generate-csr --kubeconfig-dir /tmp/etc-k8s --cert-dir /tmp/etc-k8s/pki
+	kubeadm certs generate-csr --kubeconfig-dir /tmp/etc-k8s --cert-dir /tmp/etc-k8s/pki
 `)
 )
 
@@ -277,7 +277,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 			// Get a renewal manager for a actual Cluster configuration
 			rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
 			if err != nil {
-				return nil
+				return err
 			}
 
 			// Renew certificates
@@ -301,8 +301,6 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	options.AddConfigFlag(cmd.Flags(), &flags.cfgPath)
 	options.AddCertificateDirFlag(cmd.Flags(), &flags.cfg.CertificatesDir)
 	options.AddKubeConfigFlag(cmd.Flags(), &flags.kubeconfigPath)
-	options.AddCSRFlag(cmd.Flags(), &flags.csrOnly)
-	options.AddCSRDirFlag(cmd.Flags(), &flags.csrPath)
 }
 
 func renewCert(flags *renewFlags, kdir string, internalcfg *kubeadmapi.InitConfiguration, handler *renewal.CertificateRenewHandler) error {

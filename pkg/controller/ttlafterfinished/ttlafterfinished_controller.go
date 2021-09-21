@@ -27,7 +27,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	jobutil "k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/controller/ttlafterfinished/metrics"
+	"k8s.io/utils/clock"
 )
 
 // Controller watches for changes of Jobs API objects. Triggered by Job creation

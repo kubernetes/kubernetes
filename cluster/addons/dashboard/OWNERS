@@ -2,11 +2,15 @@
 
 approvers:
 - floreks
-- jeefy
 - maciaszczykm
+- shu-mutou
 reviewers:
-- danielromlein
-- ianlewis
-- rf232
+- floreks
+- maciaszczykm
+- shu-mutou
 emeritus_approvers:
 - bryk
+- danielromlein
+- ianlewis
+- jeefy
+- rf232

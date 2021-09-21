@@ -19,6 +19,7 @@ package endpoint
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -78,6 +79,11 @@ const (
 	// This field is deprecated. v1.Service.PublishNotReadyAddresses will replace it
 	// subsequent releases.  It will be removed no sooner than 1.13.
 	TolerateUnreadyEndpointsAnnotation = "service.alpha.kubernetes.io/tolerate-unready-endpoints"
+
+	// truncated is a possible value for `endpoints.kubernetes.io/over-capacity` annotation on an
+	// endpoint resource and indicates that the number of endpoints have been truncated to
+	// maxCapacity
+	truncated = "truncated"
 )
 
 // NewEndpointController returns a new *Controller.
@@ -245,7 +251,7 @@ func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointA
 				// pod cidr list order is same as service cidr list order). The expectation is
 				// this is *most probably* the case.
 
-				// if the family was incorrectly indentified then this will be corrected once the
+				// if the family was incorrectly identified then this will be corrected once the
 				// the upgrade is completed (controller connects to api-server that correctly defaults services)
 				if utilnet.IsIPv6String(pod.Status.PodIP) {
 					ipFamily = v1.IPv6Protocol
@@ -529,13 +535,13 @@ func (e *Controller) syncService(key string) error {
 
 	if !endpointsLastChangeTriggerTime.IsZero() {
 		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
-			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
+			endpointsLastChangeTriggerTime.UTC().Format(time.RFC3339Nano)
 	} else { // No new trigger time, clear the annotation.
 		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
 	}
 
-	if overCapacity(newEndpoints.Subsets) {
-		newEndpoints.Annotations[v1.EndpointsOverCapacity] = "warning"
+	if truncateEndpoints(newEndpoints) {
+		newEndpoints.Annotations[v1.EndpointsOverCapacity] = truncated
 	} else {
 		delete(newEndpoints.Annotations, v1.EndpointsOverCapacity)
 	}
@@ -659,23 +665,85 @@ func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.E
 	return epp
 }
 
-// overCapacity returns true if there are more addresses in the provided subsets
-// than the maxCapacity.
-func overCapacity(subsets []v1.EndpointSubset) bool {
+// capacityAnnotationSetCorrectly returns false if number of endpoints is greater than maxCapacity or
+// returns true if underCapacity and the annotation is not set.
+func capacityAnnotationSetCorrectly(annotations map[string]string, subsets []v1.EndpointSubset) bool {
 	numEndpoints := 0
 	for _, subset := range subsets {
 		numEndpoints += len(subset.Addresses) + len(subset.NotReadyAddresses)
 	}
-	return numEndpoints > maxCapacity
+	if numEndpoints > maxCapacity {
+		// If subsets are over capacity, they must be truncated so consider
+		// the annotation as not set correctly
+		return false
+	}
+	_, ok := annotations[v1.EndpointsOverCapacity]
+	return !ok
 }
 
-// capacityAnnotationSetCorrectly returns true if overCapacity() is true and the
-// EndpointsOverCapacity annotation is set to "warning" or if overCapacity()
-// is false and the annotation is not set.
-func capacityAnnotationSetCorrectly(annotations map[string]string, subsets []v1.EndpointSubset) bool {
-	val, ok := annotations[v1.EndpointsOverCapacity]
-	if overCapacity(subsets) {
-		return ok && val == "warning"
+// truncateEndpoints by best effort will distribute the endpoints over the subsets based on the proportion
+// of endpoints per subset and will prioritize Ready Endpoints over NotReady Endpoints.
+func truncateEndpoints(endpoints *v1.Endpoints) bool {
+	totalReady := 0
+	totalNotReady := 0
+	for _, subset := range endpoints.Subsets {
+		totalReady += len(subset.Addresses)
+		totalNotReady += len(subset.NotReadyAddresses)
 	}
-	return !ok
+
+	if totalReady+totalNotReady <= maxCapacity {
+		return false
+	}
+
+	truncateReady := false
+	max := maxCapacity - totalReady
+	numTotal := totalNotReady
+	if totalReady > maxCapacity {
+		truncateReady = true
+		max = maxCapacity
+		numTotal = totalReady
+	}
+	canBeAdded := max
+
+	for i := range endpoints.Subsets {
+		subset := endpoints.Subsets[i]
+		numInSubset := len(subset.Addresses)
+		if !truncateReady {
+			numInSubset = len(subset.NotReadyAddresses)
+		}
+
+		// The number of endpoints per subset will be based on the propotion of endpoints
+		// in this subset versus the total number of endpoints. The proportion of endpoints
+		// will be rounded up which most likely will lead to the last subset having less
+		// endpoints than the expected proportion.
+		toBeAdded := int(math.Ceil((float64(numInSubset) / float64(numTotal)) * float64(max)))
+		// If there is not enough endpoints for the last subset, ensure only the number up
+		// to the capacity are added
+		if toBeAdded > canBeAdded {
+			toBeAdded = canBeAdded
+		}
+
+		if truncateReady {
+			// Truncate ready Addresses to allocated proportion and truncate all not ready
+			// addresses
+			subset.Addresses = addressSubset(subset.Addresses, toBeAdded)
+			subset.NotReadyAddresses = []v1.EndpointAddress{}
+			canBeAdded -= len(subset.Addresses)
+		} else {
+			// Only truncate the not ready addresses
+			subset.NotReadyAddresses = addressSubset(subset.NotReadyAddresses, toBeAdded)
+			canBeAdded -= len(subset.NotReadyAddresses)
+		}
+		endpoints.Subsets[i] = subset
+	}
+	return true
+}
+
+// addressSubset takes a list of addresses and returns a subset if the length is greater
+// than the maxNum. If less than the maxNum, the entire list is returned.
+func addressSubset(addresses []v1.EndpointAddress, maxNum int) []v1.EndpointAddress {
+	if len(addresses) <= maxNum {
+		return addresses
+	}
+	return addresses[0:maxNum]
 }

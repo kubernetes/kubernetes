@@ -17,23 +17,19 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"fmt"
 	"path/filepath"
 
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubelet/config/v1beta1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
-	utilsexec "k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 )
 
 const (
@@ -203,19 +199,9 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
 	kc.config.RotateCertificates = kubeletRotateCertificates
 
-	// TODO: Conditionally set CgroupDriver to either `systemd` or `cgroupfs` for CRI other than Docker
-	if nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket {
-		driver, err := kubeadmutil.GetCgroupDriverDocker(utilsexec.New())
-		if err != nil {
-			klog.Warningf("cannot automatically set CgroupDriver when starting the Kubelet: %v", err)
-		} else {
-			// if we can parse the right cgroup driver from docker info,
-			// we should always override CgroupDriver here no matter user specifies this value explicitly or not
-			if kc.config.CgroupDriver != "" && kc.config.CgroupDriver != driver {
-				klog.Warningf("detected %q as the Docker cgroup driver, the provided value %q in %q will be overrided", driver, kc.config.CgroupDriver, kind)
-			}
-			kc.config.CgroupDriver = driver
-		}
+	if len(kc.config.CgroupDriver) == 0 {
+		klog.V(1).Infof("the value of KubeletConfiguration.cgroupDriver is empty; setting it to %q", constants.CgroupDriverSystemd)
+		kc.config.CgroupDriver = constants.CgroupDriverSystemd
 	}
 
 	ok, err := isServiceActive("systemd-resolved")
@@ -223,11 +209,11 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 		klog.Warningf("cannot determine if systemd-resolved is active: %v", err)
 	}
 	if ok {
-		if kc.config.ResolverConfig == "" {
-			kc.config.ResolverConfig = kubeletSystemdResolverConfig
+		if kc.config.ResolverConfig == nil {
+			kc.config.ResolverConfig = utilpointer.String(kubeletSystemdResolverConfig)
 		} else {
-			if kc.config.ResolverConfig != kubeletSystemdResolverConfig {
-				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, kc.config.ResolverConfig)
+			if kc.config.ResolverConfig != utilpointer.String(kubeletSystemdResolverConfig) {
+				warnDefaultComponentConfigValue(kind, "resolvConf", kubeletSystemdResolverConfig, *kc.config.ResolverConfig)
 			}
 		}
 	}
@@ -240,55 +226,4 @@ func isServiceActive(name string) (bool, error) {
 		return false, err
 	}
 	return initSystem.ServiceIsActive(name), nil
-}
-
-// TODO: https://github.com/kubernetes/kubeadm/issues/2376
-const cgroupDriverSystemd = "systemd"
-
-// MutateCgroupDriver can be called to set the KubeletConfiguration cgroup driver to systemd.
-// Currently this cannot be as part of Default() because the function is called for
-// upgrades too, which can break existing nodes after a kubelet restart.
-// TODO: https://github.com/kubernetes/kubeadm/issues/2376
-func MutateCgroupDriver(cfg *kubeadmapi.ClusterConfiguration) {
-	cc, k, err := getKubeletConfig(cfg)
-	if err != nil {
-		klog.Warningf(err.Error())
-		return
-	}
-	if len(k.CgroupDriver) == 0 {
-		klog.V(1).Infof("setting the KubeletConfiguration cgroupDriver to %q", cgroupDriverSystemd)
-		k.CgroupDriver = cgroupDriverSystemd
-		cc.Set(k)
-	}
-}
-
-// WarnCgroupDriver prints a warning in case the user is not explicit
-// about the cgroupDriver value in the KubeletConfiguration.
-// TODO: https://github.com/kubernetes/kubeadm/issues/2376
-func WarnCgroupDriver(cfg *kubeadmapi.ClusterConfiguration) {
-	_, k, err := getKubeletConfig(cfg)
-	if err != nil {
-		klog.Warningf(err.Error())
-		return
-	}
-	if len(k.CgroupDriver) == 0 {
-		klog.Warningf("The 'cgroupDriver' value in the KubeletConfiguration is empty. " +
-			"Starting from 1.22, 'kubeadm upgrade' will default an empty value to the 'systemd' cgroup driver. " +
-			"The cgroup driver between the container runtime and the kubelet must match! " +
-			"To learn more about this see: https://kubernetes.io/docs/setup/production-environment/container-runtimes/")
-	}
-}
-
-// TODO: https://github.com/kubernetes/kubeadm/issues/2376
-func getKubeletConfig(cfg *kubeadmapi.ClusterConfiguration) (kubeadmapi.ComponentConfig, *kubeletconfig.KubeletConfiguration, error) {
-	errStr := fmt.Sprintf("setting the KubeletConfiguration cgroupDriver to %q failed unexpectedly", cgroupDriverSystemd)
-	cc, ok := cfg.ComponentConfigs[KubeletGroup]
-	if !ok {
-		return nil, nil, errors.Errorf("%s: %s", errStr, "missing kubelet component config")
-	}
-	k, ok := cc.Get().(*kubeletconfig.KubeletConfiguration)
-	if !ok {
-		return nil, nil, errors.Errorf("%s: %s", errStr, "incompatible KubeletConfiguration")
-	}
-	return cc, k, nil
 }

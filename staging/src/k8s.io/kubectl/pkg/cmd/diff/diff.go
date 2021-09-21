@@ -51,17 +51,17 @@ import (
 
 var (
 	diffLong = templates.LongDesc(i18n.T(`
-		Diff configurations specified by filename or stdin between the current online
+		Diff configurations specified by file name or stdin between the current online
 		configuration, and the configuration as it would be if applied.
 
-		Output is always YAML.
+		The output is always YAML.
 
 		KUBECTL_EXTERNAL_DIFF environment variable can be used to select your own
 		diff command. Users can use external commands with params too, example:
 		KUBECTL_EXTERNAL_DIFF="colordiff -N -u"
 
 		By default, the "diff" command available in your path will be
-		run with "-u" (unified diff) and "-N" (treat absent files as empty) options.
+		run with the "-u" (unified diff) and "-N" (treat absent files as empty) options.
 
 		Exit status:
 		 0
@@ -74,7 +74,7 @@ var (
 		Note: KUBECTL_EXTERNAL_DIFF, if used, is expected to follow that convention.`))
 
 	diffExample = templates.Examples(i18n.T(`
-		# Diff resources included in pod.json.
+		# Diff resources included in pod.json
 		kubectl diff -f pod.json
 
 		# Diff file read from stdin
@@ -139,7 +139,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd := &cobra.Command{
 		Use:                   "diff -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Diff live version against would-be applied version"),
+		Short:                 i18n.T("Diff the live version against a would-be applied version"),
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -25,6 +25,7 @@ rules:
   - list
   - update
   - watch
+  - patch
 - nonResourceURLs:
   - /metrics
   verbs:

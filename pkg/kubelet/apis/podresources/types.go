@@ -43,3 +43,10 @@ type CPUsProvider interface {
 	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
 	GetAllocatableCPUs() []int64
 }
+
+type MemoryProvider interface {
+	// GetMemory returns information about the memory assigned to containers
+	GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory
+	// GetAllocatableMemory returns the allocatable memory from the node
+	GetAllocatableMemory() []*podresourcesapi.ContainerMemory
+}

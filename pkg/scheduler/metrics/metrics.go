@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	volumeschedulingmetrics "k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
+	volumebindingmetrics "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 )
 
 const (
@@ -189,7 +189,7 @@ func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		RegisterMetrics(metricsList...)
-		volumeschedulingmetrics.RegisterVolumeSchedulingMetrics()
+		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 	})
 }
 

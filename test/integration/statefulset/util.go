@@ -157,10 +157,10 @@ func newStatefulSetPVC(name string) v1.PersistentVolumeClaim {
 	}
 }
 
-// scSetup sets up necessities for Statefulset integration test, including master, apiserver, informers, and clientset
+// scSetup sets up necessities for Statefulset integration test, including control plane, apiserver, informers, and clientset
 func scSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *statefulset.StatefulSetController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, s, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)

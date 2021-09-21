@@ -288,9 +288,9 @@ func findSuites(args []string, recurseForAll bool, skipPackage string, allowPrec
 }
 
 func goFmt(path string) {
-	err := exec.Command("go", "fmt", path).Run()
+	out, err := exec.Command("go", "fmt", path).CombinedOutput()
 	if err != nil {
-		complainAndQuit("Could not fmt: " + err.Error())
+		complainAndQuit("Could not fmt: " + err.Error() + "\n" + string(out))
 	}
 }
 

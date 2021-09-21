@@ -14,11 +14,16 @@ import "strings"
 // stop: true if parsing should be stopped after the entry.
 type FilterFunc func(*Info) (skip, stop bool)
 
-// PrefixFilter discards all entries whose mount points
-// do not start with a specific prefix.
+// PrefixFilter discards all entries whose mount points do not start with, or
+// are equal to the path specified in prefix. The prefix path must be absolute,
+// have all symlinks resolved, and cleaned (i.e. no extra slashes or dots).
+//
+// PrefixFilter treats prefix as a path, not a partial prefix, which means that
+// given "/foo", "/foo/bar" and "/foobar" entries, PrefixFilter("/foo") returns
+// "/foo" and "/foo/bar", and discards "/foobar".
 func PrefixFilter(prefix string) FilterFunc {
 	return func(m *Info) (bool, bool) {
-		skip := !strings.HasPrefix(m.Mountpoint, prefix)
+		skip := !strings.HasPrefix(m.Mountpoint+"/", prefix+"/")
 		return skip, false
 	}
 }

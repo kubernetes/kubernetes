@@ -50,7 +50,7 @@ func CronJob(name, namespace string) *CronJobApplyConfiguration {
 // ExtractCronJob extracts the applied configuration owned by fieldManager from
 // cronJob. If no managedFields are found in cronJob for fieldManager, a
 // CronJobApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // cronJob must be a unmodified CronJob API object that was retrieved from the Kubernetes API.

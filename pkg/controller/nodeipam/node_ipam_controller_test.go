@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -89,8 +90,8 @@ func TestNewNodeIpamControllerWithCIDRMasks(t *testing.T) {
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			clusterCidrs, _ := netutils.ParseCIDRs(strings.Split(tc.clusterCIDR, ","))
-			_, serviceCIDRIpNet, _ := net.ParseCIDR(tc.serviceCIDR)
-			_, secondaryServiceCIDRIpNet, _ := net.ParseCIDR(tc.secondaryServiceCIDR)
+			_, serviceCIDRIpNet, _ := netutils.ParseCIDRSloppy(tc.serviceCIDR)
+			_, secondaryServiceCIDRIpNet, _ := netutils.ParseCIDRSloppy(tc.secondaryServiceCIDR)
 
 			if os.Getenv("EXIT_ON_FATAL") == "1" {
 				// This is the subprocess which runs the actual code.

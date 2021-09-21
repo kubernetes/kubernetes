@@ -49,7 +49,7 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // ExtractImageReview extracts the applied configuration owned by fieldManager from
 // imageReview. If no managedFields are found in imageReview for fieldManager, a
 // ImageReviewApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // imageReview must be a unmodified ImageReview API object that was retrieved from the Kubernetes API.

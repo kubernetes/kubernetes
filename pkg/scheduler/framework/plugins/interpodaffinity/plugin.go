@@ -27,12 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 )
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
-	Name = "InterPodAffinity"
+	Name = names.InterPodAffinity
 )
 
 var _ framework.PreFilterPlugin = &InterPodAffinity{}

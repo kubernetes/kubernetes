@@ -3,6 +3,7 @@
 package patchbpf
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"os"
@@ -114,14 +115,26 @@ func disassembleFilter(filter *libseccomp.ScmpFilter) ([]bpf.Instruction, error)
 	defer wtr.Close()
 	defer rdr.Close()
 
+	readerBuffer := new(bytes.Buffer)
+	errChan := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(readerBuffer, rdr)
+		errChan <- err
+		close(errChan)
+	}()
+
 	if err := filter.ExportBPF(wtr); err != nil {
 		return nil, errors.Wrap(err, "exporting BPF")
 	}
 	// Close so that the reader actually gets EOF.
 	_ = wtr.Close()
 
+	if copyErr := <-errChan; copyErr != nil {
+		return nil, errors.Wrap(copyErr, "reading from ExportBPF pipe")
+	}
+
 	// Parse the instructions.
-	rawProgram, err := parseProgram(rdr)
+	rawProgram, err := parseProgram(readerBuffer)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing generated BPF filter")
 	}
@@ -311,7 +324,8 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(sysno),
-						SkipTrue: uint8(baseJumpEnosys + 1)},
+						SkipTrue: uint8(baseJumpEnosys + 1),
+					},
 					// ja [baseJumpFilter]
 					bpf.Jump{Skip: baseJumpFilter},
 				}
@@ -340,16 +354,20 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				case libseccomp.ArchAMD64:
 					sectionTail = append([]bpf.Instruction{
 						// jset (1<<30),[len(tail)-1]
-						bpf.JumpIf{Cond: bpf.JumpBitsSet,
+						bpf.JumpIf{
+							Cond:     bpf.JumpBitsSet,
 							Val:      1 << 30,
-							SkipTrue: uint8(len(sectionTail) - 1)},
+							SkipTrue: uint8(len(sectionTail) - 1),
+						},
 					}, sectionTail...)
 				case libseccomp.ArchX32:
 					sectionTail = append([]bpf.Instruction{
 						// jset (1<<30),0,[len(tail)-1]
-						bpf.JumpIf{Cond: bpf.JumpBitsNotSet,
+						bpf.JumpIf{
+							Cond:     bpf.JumpBitsNotSet,
 							Val:      1 << 30,
-							SkipTrue: uint8(len(sectionTail) - 1)},
+							SkipTrue: uint8(len(sectionTail) - 1),
+						},
 					}, sectionTail...)
 				default:
 					return nil, errors.Errorf("unknown amd64 native architecture %#x", scmpArch)
@@ -389,12 +407,14 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(x86sysno),
-						SkipTrue: uint8(baseJumpEnosys + 2), SkipFalse: 1},
+						SkipTrue: uint8(baseJumpEnosys + 2), SkipFalse: 1,
+					},
 					// jgt [x32 syscall],[baseJumpEnosys]
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(x32sysno),
-						SkipTrue: uint8(baseJumpEnosys + 1)},
+						SkipTrue: uint8(baseJumpEnosys + 1),
+					},
 					// ja [baseJumpFilter]
 					bpf.Jump{Skip: baseJumpFilter},
 				}...)
@@ -413,12 +433,14 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 					bpf.JumpIf{
 						Cond:     bpf.JumpGreaterThan,
 						Val:      uint32(x86sysno),
-						SkipTrue: 1, SkipFalse: 2},
+						SkipTrue: 1, SkipFalse: 2,
+					},
 					// jle [x32 syscall],[baseJumpEnosys]
 					bpf.JumpIf{
 						Cond:     bpf.JumpLessOrEqual,
 						Val:      uint32(x32sysno),
-						SkipTrue: 1},
+						SkipTrue: 1,
+					},
 					// ja [baseJumpEnosys+1]
 					bpf.Jump{Skip: baseJumpEnosys + 1},
 					// ja [baseJumpFilter]
@@ -465,7 +487,8 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				bpf.JumpIf{
 					Cond:     bpf.JumpEqual,
 					Val:      uint32(nativeArch),
-					SkipTrue: uint8(jump)},
+					SkipTrue: uint8(jump),
+				},
 			}, programTail...)
 		} else {
 			programTail = append([]bpf.Instruction{
@@ -473,7 +496,8 @@ func generateEnosysStub(lastSyscalls lastSyscallMap) ([]bpf.Instruction, error) 
 				bpf.JumpIf{
 					Cond:     bpf.JumpNotEqual,
 					Val:      uint32(nativeArch),
-					SkipTrue: 1},
+					SkipTrue: 1,
+				},
 				// ja [jump]
 				bpf.Jump{Skip: jump},
 			}, programTail...)
@@ -510,6 +534,11 @@ func assemble(program []bpf.Instruction) ([]unix.SockFilter, error) {
 }
 
 func generatePatch(config *configs.Seccomp) ([]bpf.Instruction, error) {
+	// Patch the generated cBPF only when there is not a defaultErrnoRet set
+	// and it is different from ENOSYS
+	if config.DefaultErrnoRet != nil && *config.DefaultErrnoRet == uint(retErrnoEnosys) {
+		return nil, nil
+	}
 	// We only add the stub if the default action is not permissive.
 	if isAllowAction(config.DefaultAction) {
 		logrus.Debugf("seccomp: skipping -ENOSYS stub filter generation")
@@ -584,9 +613,12 @@ func sysSeccompSetFilter(flags uint, filter []unix.SockFilter) (err error) {
 			unix.SECCOMP_MODE_FILTER,
 			uintptr(unsafe.Pointer(&fprog)), 0, 0)
 	} else {
-		_, _, err = unix.RawSyscall(unix.SYS_SECCOMP,
+		_, _, errno := unix.RawSyscall(unix.SYS_SECCOMP,
 			uintptr(C.C_SET_MODE_FILTER),
 			uintptr(flags), uintptr(unsafe.Pointer(&fprog)))
+		if errno != 0 {
+			err = errno
+		}
 	}
 	runtime.KeepAlive(filter)
 	runtime.KeepAlive(fprog)

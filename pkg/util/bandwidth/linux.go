@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 )
@@ -103,7 +105,7 @@ func (t *tcShaper) nextClassID() (int, error) {
 // Convert a CIDR from text to a hex representation
 // Strips any masked parts of the IP, so 1.2.3.4/16 becomes hex(1.2.0.0)/ffffffff
 func hexCIDR(cidr string) (string, error) {
-	ip, ipnet, err := net.ParseCIDR(cidr)
+	ip, ipnet, err := netutils.ParseCIDRSloppy(cidr)
 	if err != nil {
 		return "", err
 	}

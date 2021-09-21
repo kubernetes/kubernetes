@@ -45,6 +45,14 @@ const (
 	// scrape a target.
 	MetricsPathLabel = "__metrics_path__"
 
+	// ScrapeIntervalLabel is the name of the label that holds the scrape interval
+	// used to scrape a target.
+	ScrapeIntervalLabel = "__scrape_interval__"
+
+	// ScrapeTimeoutLabel is the name of the label that holds the scrape
+	// timeout used to scrape a target.
+	ScrapeTimeoutLabel = "__scrape_timeout__"
+
 	// ReservedLabelPrefix is a prefix which is not legal in user-supplied
 	// label names.
 	ReservedLabelPrefix = "__"

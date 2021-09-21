@@ -71,8 +71,9 @@ var (
 
 		VERB is a logical Kubernetes API verb like 'get', 'list', 'watch', 'delete', etc.
 		TYPE is a Kubernetes resource. Shortcuts and groups will be resolved.
-		NONRESOURCEURL is a partial URL starts with "/".
-		NAME is the name of a particular Kubernetes resource.`)
+		NONRESOURCEURL is a partial URL that starts with "/".
+		NAME is the name of a particular Kubernetes resource.
+		This command pairs nicely with impersonation. See --as global flag.`)
 
 	canIExample = templates.Examples(`
 		# Check to see if I can create pods in any namespace

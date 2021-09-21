@@ -96,15 +96,14 @@ func main() {
 		}
 	case "kubectl":
 		// generate manpage for kubectl
-		// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-		kubectl := kubectlcmd.NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
+		kubectl := kubectlcmd.NewKubectlCommand(bytes.NewReader(nil), ioutil.Discard, ioutil.Discard)
 		genMarkdown(kubectl, "", outDir)
 		for _, c := range kubectl.Commands() {
 			genMarkdown(c, "kubectl", outDir)
 		}
 	case "kubeadm":
-		// generate manpage for kubelet
-		kubeadm := kubeadmapp.NewKubeadmCommand(os.Stdin, os.Stdout, os.Stderr)
+		// generate manpage for kubeadm
+		kubeadm := kubeadmapp.NewKubeadmCommand(bytes.NewReader(nil), ioutil.Discard, ioutil.Discard)
 		genMarkdown(kubeadm, "", outDir)
 		for _, c := range kubeadm.Commands() {
 			genMarkdown(c, "kubeadm", outDir)

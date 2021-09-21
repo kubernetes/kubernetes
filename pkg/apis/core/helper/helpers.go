@@ -303,18 +303,21 @@ func IsStandardFinalizerName(str string) bool {
 }
 
 // GetAccessModesAsString returns a string representation of an array of access modes.
-// modes, when present, are always in the same order: RWO,ROX,RWX.
+// modes, when present, are always in the same order: RWO,ROX,RWX,RWOP.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
 	modes = removeDuplicateAccessModes(modes)
 	modesStr := []string{}
-	if containsAccessMode(modes, core.ReadWriteOnce) {
+	if ContainsAccessMode(modes, core.ReadWriteOnce) {
 		modesStr = append(modesStr, "RWO")
 	}
-	if containsAccessMode(modes, core.ReadOnlyMany) {
+	if ContainsAccessMode(modes, core.ReadOnlyMany) {
 		modesStr = append(modesStr, "ROX")
 	}
-	if containsAccessMode(modes, core.ReadWriteMany) {
+	if ContainsAccessMode(modes, core.ReadWriteMany) {
 		modesStr = append(modesStr, "RWX")
+	}
+	if ContainsAccessMode(modes, core.ReadWriteOncePod) {
+		modesStr = append(modesStr, "RWOP")
 	}
 	return strings.Join(modesStr, ",")
 }
@@ -332,6 +335,8 @@ func GetAccessModesFromString(modes string) []core.PersistentVolumeAccessMode {
 			accessModes = append(accessModes, core.ReadOnlyMany)
 		case s == "RWX":
 			accessModes = append(accessModes, core.ReadWriteMany)
+		case s == "RWOP":
+			accessModes = append(accessModes, core.ReadWriteOncePod)
 		}
 	}
 	return accessModes
@@ -341,14 +346,14 @@ func GetAccessModesFromString(modes string) []core.PersistentVolumeAccessMode {
 func removeDuplicateAccessModes(modes []core.PersistentVolumeAccessMode) []core.PersistentVolumeAccessMode {
 	accessModes := []core.PersistentVolumeAccessMode{}
 	for _, m := range modes {
-		if !containsAccessMode(accessModes, m) {
+		if !ContainsAccessMode(accessModes, m) {
 			accessModes = append(accessModes, m)
 		}
 	}
 	return accessModes
 }
 
-func containsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.PersistentVolumeAccessMode) bool {
+func ContainsAccessMode(modes []core.PersistentVolumeAccessMode, mode core.PersistentVolumeAccessMode) bool {
 	for _, m := range modes {
 		if m == mode {
 			return true

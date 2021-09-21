@@ -27,12 +27,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmcmdoptions "k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
@@ -40,7 +44,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	utilnet "k8s.io/utils/net"
 )
 
 // ValidateInitConfiguration validates an InitConfiguration object and collects all encountered errors
@@ -203,7 +206,7 @@ func ValidateDiscoveryKubeConfigPath(discoveryFile string, fldPath *field.Path) 
 }
 
 // ValidateBootstrapTokens validates a slice of BootstrapToken objects
-func ValidateBootstrapTokens(bts []kubeadm.BootstrapToken, fldPath *field.Path) field.ErrorList {
+func ValidateBootstrapTokens(bts []bootstraptokenv1.BootstrapToken, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, bt := range bts {
 		btPath := fldPath.Child(fmt.Sprintf("%d", i))
@@ -316,7 +319,7 @@ func ValidateCertSANs(altnames []string, fldPath *field.Path) field.ErrorList {
 	for _, altname := range altnames {
 		if errs := validation.IsDNS1123Subdomain(altname); len(errs) != 0 {
 			if errs2 := validation.IsWildcardDNS1123Subdomain(altname); len(errs2) != 0 {
-				if net.ParseIP(altname) == nil {
+				if netutils.ParseIPSloppy(altname) == nil {
 					allErrs = append(allErrs, field.Invalid(fldPath, altname, fmt.Sprintf("altname is not a valid IP address, DNS label or a DNS label with subdomain wildcards: %s; %s", strings.Join(errs, "; "), strings.Join(errs2, "; "))))
 				}
 			}
@@ -347,7 +350,7 @@ func ValidateURLs(urls []string, requireHTTPS bool, fldPath *field.Path) field.E
 // ValidateIPFromString validates ip address
 func ValidateIPFromString(ipaddr string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if net.ParseIP(ipaddr) == nil {
+	if netutils.ParseIPSloppy(ipaddr) == nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, ipaddr, "ip address is not valid"))
 	}
 	return allErrs
@@ -374,7 +377,7 @@ func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
 // ValidateIPNetFromString validates network portion of ip address
 func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	subnets, err := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	subnets, err := netutils.ParseCIDRs(strings.Split(subnetStr, ","))
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "couldn't parse subnet"))
 		return allErrs
@@ -385,7 +388,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
 	// if DualStack and there are 2 CIDRs validate if there is at least one of each IP family
 	case isDualStack && len(subnets) == 2:
-		areDualStackCIDRs, err := utilnet.IsDualStackCIDRs(subnets)
+		areDualStackCIDRs, err := netutils.IsDualStackCIDRs(subnets)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, err.Error()))
 		} else if !areDualStackCIDRs {
@@ -397,13 +400,13 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 	}
 	// validate the subnet/s
 	for _, s := range subnets {
-		numAddresses := utilnet.RangeSize(s)
+		numAddresses := netutils.RangeSize(s)
 		if numAddresses < minAddrs {
 			allErrs = append(allErrs, field.Invalid(fldPath, s.String(), fmt.Sprintf("subnet with %d address(es) is too small, the minimum is %d", numAddresses, minAddrs)))
 		}
 
 		// Warn when the subnet is in site-local range - i.e. contains addresses that belong to fec0::/10
-		_, siteLocalNet, _ := net.ParseCIDR("fec0::/10")
+		_, siteLocalNet, _ := netutils.ParseCIDRSloppy("fec0::/10")
 		if siteLocalNet.Contains(s.IP) || s.Contains(siteLocalNet.IP) {
 			klog.Warningf("the subnet %v contains IPv6 site-local addresses that belong to fec0::/10 which has been deprecated by rfc3879", s)
 		}
@@ -419,7 +422,7 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 func ValidateServiceSubnetSize(subnetStr string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// subnets were already validated
-	subnets, _ := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	subnets, _ := netutils.ParseCIDRs(strings.Split(subnetStr, ","))
 	for _, serviceSubnet := range subnets {
 		ones, bits := serviceSubnet.Mask.Size()
 		if bits-ones > constants.MaximumBitsForServiceSubnet {
@@ -434,13 +437,13 @@ func ValidateServiceSubnetSize(subnetStr string, fldPath *field.Path) field.Erro
 func ValidatePodSubnetNodeMask(subnetStr string, c *kubeadm.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	// subnets were already validated
-	subnets, _ := utilnet.ParseCIDRs(strings.Split(subnetStr, ","))
+	subnets, _ := netutils.ParseCIDRs(strings.Split(subnetStr, ","))
 	for _, podSubnet := range subnets {
 		// obtain podSubnet mask
 		mask := podSubnet.Mask
 		maskSize, _ := mask.Size()
 		// obtain node-cidr-mask
-		nodeMask, err := getClusterNodeMask(c, utilnet.IsIPv6(podSubnet.IP))
+		nodeMask, err := getClusterNodeMask(c, netutils.IsIPv6(podSubnet.IP))
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, podSubnet.String(), err.Error()))
 			continue
@@ -493,6 +496,7 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 }
 
 // ValidateDNS validates the DNS object and collects all encountered errors
+// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	const kubeDNSType = "kube-dns"
@@ -559,17 +563,15 @@ func ValidateMixedArguments(flag *pflag.FlagSet) error {
 }
 
 func isAllowedFlag(flagName string) bool {
-	knownFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
+	allowedFlags := sets.NewString(kubeadmcmdoptions.CfgPath,
 		kubeadmcmdoptions.IgnorePreflightErrors,
 		kubeadmcmdoptions.DryRun,
 		kubeadmcmdoptions.KubeconfigPath,
 		kubeadmcmdoptions.NodeName,
-		kubeadmcmdoptions.NodeCRISocket,
 		kubeadmcmdoptions.KubeconfigDir,
 		kubeadmcmdoptions.UploadCerts,
-		kubeadmcmdoptions.Patches,
-		"print-join-command", "rootfs", "v")
-	if knownFlags.Has(flagName) {
+		"print-join-command", "rootfs", "v", "log-file")
+	if allowedFlags.Has(flagName) {
 		return true
 	}
 	return strings.HasPrefix(flagName, "skip-")

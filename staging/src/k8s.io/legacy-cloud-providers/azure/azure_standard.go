@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -381,7 +382,7 @@ func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, serv
 			return false, isPrimaryService, nil
 		}
 
-		return false, isPrimaryService, fmt.Errorf("serviceOwnsFrontendIP: wrong parameters")
+		return false, isPrimaryService, nil
 	}
 
 	// for internal secondary service the private IP address on the frontend IP config should be checked
@@ -502,6 +503,20 @@ func (as *availabilitySet) GetPowerStatusByNodeName(name string) (powerState str
 	// vm.InstanceView or vm.InstanceView.Statuses are nil when the VM is under deleting.
 	klog.V(3).Infof("InstanceView for node %q is nil, assuming it's stopped", name)
 	return vmPowerStateStopped, nil
+}
+
+// GetProvisioningStateByNodeName returns the provisioningState for the specified node.
+func (as *availabilitySet) GetProvisioningStateByNodeName(name string) (provisioningState string, err error) {
+	vm, err := as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeDefault)
+	if err != nil {
+		return provisioningState, err
+	}
+
+	if vm.VirtualMachineProperties == nil || vm.VirtualMachineProperties.ProvisioningState == nil {
+		return provisioningState, nil
+	}
+
+	return to.String(vm.VirtualMachineProperties.ProvisioningState), nil
 }
 
 // GetNodeNameByProviderID gets the node name by provider ID.
@@ -1034,6 +1049,11 @@ func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backend
 }
 
 func getAvailabilitySetNameByID(asID string) (string, error) {
+	// for standalone VM
+	if asID == "" {
+		return "", nil
+	}
+
 	matches := vmasIDRE.FindStringSubmatch(asID)
 	if len(matches) != 2 {
 		return "", fmt.Errorf("getAvailabilitySetNameByID: failed to parse the VMAS ID %s", asID)

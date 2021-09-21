@@ -20,10 +20,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 )
 
 // Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "PrioritySort"
+const Name = names.PrioritySort
 
 // PrioritySort is a plugin that implements Priority based sorting.
 type PrioritySort struct{}

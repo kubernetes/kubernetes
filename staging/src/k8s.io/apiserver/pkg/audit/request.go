@@ -111,7 +111,7 @@ func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
 
 // LogRequestObject fills in the request object into an audit event. The passed runtime.Object
 // will be converted to the given gv.
-func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
+func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, objGV schema.GroupVersion, gvr schema.GroupVersionResource, subresource string, s runtime.NegotiatedSerializer) {
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
@@ -153,7 +153,7 @@ func LogRequestObject(ae *auditinternal.Event, obj runtime.Object, gvr schema.Gr
 
 	// TODO(audit): hook into the serializer to avoid double conversion
 	var err error
-	ae.RequestObject, err = encodeObject(obj, gvr.GroupVersion(), s)
+	ae.RequestObject, err = encodeObject(obj, objGV, s)
 	if err != nil {
 		// TODO(audit): add error slice to audit event struct
 		klog.Warningf("Auditing failed of %v request: %v", reflect.TypeOf(obj).Name(), err)

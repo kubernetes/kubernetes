@@ -715,33 +715,45 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 			klog.Errorf("Unable to lookup pv object for: %q, err: %v", *pvName, err)
 			continue
 		}
+
+		var plugin volume.AttachableVolumePlugin
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
-		plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
-		if err != nil || plugin == nil {
-			// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
-			klog.Warningf(
-				"Skipping processing the volume %q on nodeName: %q, no attacher interface found. err=%v",
-				*pvName,
-				nodeName,
-				err)
-			continue
+
+		// Consult csiMigratedPluginManager first before querying the plugins registered during runtime in volumePluginMgr.
+		// In-tree plugins that provisioned PVs will not be registered anymore after migration to CSI, once the respective
+		// feature gate is enabled.
+		if inTreePluginName, err := adc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(pv, nil); err == nil {
+			if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(inTreePluginName) {
+				// PV is migrated and should be handled by the CSI plugin instead of the in-tree one
+				plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+				// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace
+				volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
+				if err != nil {
+					klog.Errorf(
+						"Failed to translate intree volumeSpec to CSI volumeSpec for volume:%q, va.Name:%q, nodeName:%q: %s. Error: %v",
+						*pvName,
+						va.Name,
+						nodeName,
+						inTreePluginName,
+						err)
+					continue
+				}
+			}
 		}
-		pluginName := plugin.GetPluginName()
-		if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(pluginName) {
-			plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
-			// podNamespace is not needed here for Azurefile as the volumeName generated will be the same with or without podNamespace
-			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, "" /* podNamespace */, adc.intreeToCSITranslator)
-			if err != nil {
-				klog.Errorf(
-					"Failed to translate intree volumeSpec to CSI volumeSpec for volume:%q, va.Name:%q, nodeName:%q: %v",
+
+		if plugin == nil {
+			plugin, err = adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
+			if err != nil || plugin == nil {
+				// Currently VA objects are created for CSI volumes only. nil plugin is unexpected, generate a warning
+				klog.Warningf(
+					"Skipping processing the volume %q on nodeName: %q, no attacher interface found. err=%v",
 					*pvName,
-					va.Name,
 					nodeName,
-					pluginName,
 					err)
 				continue
 			}
 		}
+
 		volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
 			klog.Errorf(

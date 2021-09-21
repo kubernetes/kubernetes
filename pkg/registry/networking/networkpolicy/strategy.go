@@ -77,6 +77,11 @@ func (networkPolicyStrategy) Validate(ctx context.Context, obj runtime.Object) f
 	return validation.ValidateNetworkPolicy(networkPolicy)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (networkPolicyStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (networkPolicyStrategy) Canonicalize(obj runtime.Object) {}
 
@@ -90,6 +95,11 @@ func (networkPolicyStrategy) ValidateUpdate(ctx context.Context, obj, old runtim
 	validationErrorList := validation.ValidateNetworkPolicy(obj.(*networking.NetworkPolicy))
 	updateErrorList := validation.ValidateNetworkPolicyUpdate(obj.(*networking.NetworkPolicy), old.(*networking.NetworkPolicy))
 	return append(validationErrorList, updateErrorList...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (networkPolicyStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for NetworkPolicy objects.

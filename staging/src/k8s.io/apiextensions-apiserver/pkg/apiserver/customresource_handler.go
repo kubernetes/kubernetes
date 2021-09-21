@@ -76,6 +76,7 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/pkg/warning"
@@ -958,12 +959,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		if v.Deprecated {
 			deprecated[v.Name] = true
-			if utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders) {
-				if v.DeprecationWarning != nil {
-					warnings[v.Name] = append(warnings[v.Name], *v.DeprecationWarning)
-				} else {
-					warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
-				}
+			if v.DeprecationWarning != nil {
+				warnings[v.Name] = append(warnings[v.Name], *v.DeprecationWarning)
+			} else {
+				warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
 			}
 		}
 	}
@@ -1136,23 +1135,25 @@ func (d unstructuredDefaulter) Default(in runtime.Object) {
 }
 
 type CRDRESTOptionsGetter struct {
-	StorageConfig           storagebackend.Config
-	StoragePrefix           string
-	EnableWatchCache        bool
-	DefaultWatchCacheSize   int
-	EnableGarbageCollection bool
-	DeleteCollectionWorkers int
-	CountMetricPollPeriod   time.Duration
+	StorageConfig             storagebackend.Config
+	StoragePrefix             string
+	EnableWatchCache          bool
+	DefaultWatchCacheSize     int
+	EnableGarbageCollection   bool
+	DeleteCollectionWorkers   int
+	CountMetricPollPeriod     time.Duration
+	StorageObjectCountTracker flowcontrolrequest.StorageObjectCountTracker
 }
 
 func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
 	ret := generic.RESTOptions{
-		StorageConfig:           &t.StorageConfig,
-		Decorator:               generic.UndecoratedStorage,
-		EnableGarbageCollection: t.EnableGarbageCollection,
-		DeleteCollectionWorkers: t.DeleteCollectionWorkers,
-		ResourcePrefix:          resource.Group + "/" + resource.Resource,
-		CountMetricPollPeriod:   t.CountMetricPollPeriod,
+		StorageConfig:             t.StorageConfig.ForResource(resource),
+		Decorator:                 generic.UndecoratedStorage,
+		EnableGarbageCollection:   t.EnableGarbageCollection,
+		DeleteCollectionWorkers:   t.DeleteCollectionWorkers,
+		ResourcePrefix:            resource.Group + "/" + resource.Resource,
+		CountMetricPollPeriod:     t.CountMetricPollPeriod,
+		StorageObjectCountTracker: t.StorageObjectCountTracker,
 	}
 	if t.EnableWatchCache {
 		ret.Decorator = genericregistry.StorageWithCacher()

@@ -18,6 +18,7 @@ package eviction
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"reflect"
 	"sort"
 	"testing"
@@ -450,6 +451,187 @@ func TestParseThresholdConfig(t *testing.T) {
 		if !thresholdsEqual(testCase.expectThresholds, thresholds) {
 			t.Errorf("thresholds not as expected, test: %v, expected: %v, actual: %v", testName, testCase.expectThresholds, thresholds)
 		}
+	}
+}
+
+func TestAddAllocatableThresholds(t *testing.T) {
+	// About func addAllocatableThresholds, only someone threshold that "Signal" is "memory.available" and "GracePeriod" is 0,
+	// append this threshold(changed "Signal" to "allocatableMemory.available") to thresholds
+	testCases := map[string]struct {
+		thresholds []evictionapi.Threshold
+		expected   []evictionapi.Threshold
+	}{
+		"non-memory-signal": {
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalImageFsAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+			},
+		},
+		"memory-signal-with-grace": {
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 10,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 10,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+			},
+		},
+		"memory-signal-without-grace": {
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+			},
+		},
+		"memory-signal-without-grace-two-thresholds": {
+			thresholds: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+			},
+			expected: []evictionapi.Threshold{
+				{
+					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("0"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalAllocatableMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+				{
+					Signal:   evictionapi.SignalMemoryAvailable,
+					Operator: evictionapi.OpLessThan,
+					Value: evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					GracePeriod: 0,
+					MinReclaim: &evictionapi.ThresholdValue{
+						Quantity: quantityMustParse("1Gi"),
+					},
+				},
+			},
+		},
+	}
+	for testName, testCase := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			if !thresholdsEqual(testCase.expected, addAllocatableThresholds(testCase.thresholds)) {
+				t.Errorf("Err not as expected, test: %v, Unexpected data: %s", testName, diff.ObjectDiff(testCase.expected, addAllocatableThresholds(testCase.thresholds)))
+			}
+		})
 	}
 }
 

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -149,12 +150,17 @@ func (d *delayedRouteUpdater) updateRoutes() {
 	}
 
 	// reconcile routes.
-	dirty := false
+	dirty, onlyUpdateTags := false, true
 	routes := []network.Route{}
 	if routeTable.Routes != nil {
 		routes = *routeTable.Routes
 	}
-	onlyUpdateTags := true
+
+	routes, dirty = d.cleanupOutdatedRoutes(routes)
+	if dirty {
+		onlyUpdateTags = false
+	}
+
 	for _, rt := range d.routesToUpdate {
 		if rt.operation == routeTableOperationUpdateTags {
 			routeTable.Tags = rt.routeTableTags
@@ -202,6 +208,34 @@ func (d *delayedRouteUpdater) updateRoutes() {
 			return
 		}
 	}
+}
+
+// cleanupOutdatedRoutes deletes all non-dualstack routes when dualstack is enabled,
+// and deletes all dualstack routes when dualstack is not enabled.
+func (d *delayedRouteUpdater) cleanupOutdatedRoutes(existingRoutes []network.Route) (routes []network.Route, changed bool) {
+	for i := len(existingRoutes) - 1; i >= 0; i-- {
+		existingRouteName := to.String(existingRoutes[i].Name)
+		split := strings.Split(existingRouteName, routeNameSeparator)
+
+		// filter out unmanaged routes
+		deleteRoute := false
+		if d.az.nodeNames.Has(split[0]) {
+			if d.az.ipv6DualStackEnabled && len(split) == 1 {
+				klog.V(2).Infof("cleanupOutdatedRoutes: deleting outdated non-dualstack route %s", existingRouteName)
+				deleteRoute = true
+			} else if !d.az.ipv6DualStackEnabled && len(split) == 2 {
+				klog.V(2).Infof("cleanupOutdatedRoutes: deleting outdated dualstack route %s", existingRouteName)
+				deleteRoute = true
+			}
+
+			if deleteRoute {
+				existingRoutes = append(existingRoutes[:i], existingRoutes[i+1:]...)
+				changed = true
+			}
+		}
+	}
+
+	return existingRoutes, changed
 }
 
 // addRouteOperation adds the routeOperation to delayedRouteUpdater and returns a delayedRouteOperation.
@@ -508,16 +542,13 @@ func (az *Cloud) ensureRouteTableTagged(rt *network.RouteTable) (map[string]*str
 	if az.Tags == "" {
 		return nil, false
 	}
-	changed := false
 	tags := parseTags(az.Tags)
 	if rt.Tags == nil {
 		rt.Tags = make(map[string]*string)
 	}
-	for k, v := range tags {
-		if vv, ok := rt.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			rt.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(rt.Tags, tags)
+	rt.Tags = tags
+
 	return rt.Tags, changed
 }

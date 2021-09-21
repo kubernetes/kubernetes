@@ -28,11 +28,12 @@ import (
 	"strings"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -69,6 +70,7 @@ type store struct {
 	versioner     storage.Versioner
 	transformer   value.Transformer
 	pathPrefix    string
+	groupResource schema.GroupResource
 	watcher       *watcher
 	pagingEnabled bool
 	leaseManager  *leaseManager
@@ -83,11 +85,11 @@ type objState struct {
 }
 
 // New returns an etcd3 implementation of storage.Interface.
-func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
-	return newStore(c, codec, newFunc, prefix, transformer, pagingEnabled, leaseManagerConfig)
+func New(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) storage.Interface {
+	return newStore(c, codec, newFunc, prefix, groupResource, transformer, pagingEnabled, leaseManagerConfig)
 }
 
-func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
+func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Object, prefix string, groupResource schema.GroupResource, transformer value.Transformer, pagingEnabled bool, leaseManagerConfig LeaseManagerConfig) *store {
 	versioner := APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -98,9 +100,10 @@ func newStore(c *clientv3.Client, codec runtime.Codec, newFunc func() runtime.Ob
 		// for compatibility with etcd2 impl.
 		// no-op for default prefix of '/registry'.
 		// keeps compatibility with etcd2 impl for custom prefixes that don't start with '/'
-		pathPrefix:   path.Join("/", prefix),
-		watcher:      newWatcher(c, codec, newFunc, versioner, transformer),
-		leaseManager: newDefaultLeaseManager(c, leaseManagerConfig),
+		pathPrefix:    path.Join("/", prefix),
+		groupResource: groupResource,
+		watcher:       newWatcher(c, codec, newFunc, versioner, transformer),
+		leaseManager:  newDefaultLeaseManager(c, leaseManagerConfig),
 	}
 	return result
 }
@@ -230,12 +233,22 @@ func (s *store) conditionalDelete(
 				}
 
 				// It's possible we're working with stale data.
+				// Remember the revision of the potentially stale data and the resulting update error
+				cachedRev := origState.rev
+				cachedUpdateErr := err
+
 				// Actually fetch
 				origState, err = getCurrentState()
 				if err != nil {
 					return err
 				}
 				origStateIsCurrent = true
+
+				// it turns out our cached data was not stale, return the error
+				if cachedRev == origState.rev {
+					return cachedUpdateErr
+				}
+
 				// Retry
 				continue
 			}
@@ -246,12 +259,22 @@ func (s *store) conditionalDelete(
 			}
 
 			// It's possible we're working with stale data.
+			// Remember the revision of the potentially stale data and the resulting update error
+			cachedRev := origState.rev
+			cachedUpdateErr := err
+
 			// Actually fetch
 			origState, err = getCurrentState()
 			if err != nil {
 				return err
 			}
 			origStateIsCurrent = true
+
+			// it turns out our cached data was not stale, return the error
+			if cachedRev == origState.rev {
+				return cachedUpdateErr
+			}
+
 			// Retry
 			continue
 		}
@@ -345,12 +368,22 @@ func (s *store) GuaranteedUpdate(
 			}
 
 			// It's possible we were working with stale data
+			// Remember the revision of the potentially stale data and the resulting update error
+			cachedRev := origState.rev
+			cachedUpdateErr := err
+
 			// Actually fetch
 			origState, err = getCurrentState()
 			if err != nil {
 				return err
 			}
 			origStateIsCurrent = true
+
+			// it turns out our cached data was not stale, return the error
+			if cachedRev == origState.rev {
+				return cachedUpdateErr
+			}
+
 			// Retry
 			continue
 		}

@@ -49,7 +49,7 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // ExtractPriorityLevelConfiguration extracts the applied configuration owned by fieldManager from
 // priorityLevelConfiguration. If no managedFields are found in priorityLevelConfiguration for fieldManager, a
 // PriorityLevelConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // priorityLevelConfiguration must be a unmodified PriorityLevelConfiguration API object that was retrieved from the Kubernetes API.

@@ -20,10 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"time"
-
-	"github.com/pkg/errors"
 
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -168,7 +167,7 @@ func AddDriverDefinition(filename string) error {
 		return err
 	}
 	if driver.DriverInfo.Name == "" {
-		return errors.Errorf("%q: DriverInfo.Name not set", filename)
+		return fmt.Errorf("%q: DriverInfo.Name not set", filename)
 	}
 
 	description := "External Storage " + storageframework.GetDriverNameWithFeatureTags(driver)
@@ -181,7 +180,7 @@ func AddDriverDefinition(filename string) error {
 
 func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
-		return nil, errors.New("missing file name")
+		return nil, fmt.Errorf("missing file name")
 	}
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -201,7 +200,15 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
 	// or something similar is merged.
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, driver); err != nil {
-		return nil, errors.Wrap(err, filename)
+		return nil, fmt.Errorf("%s: %w", filename, err)
+	}
+
+	// to ensure backward compatibility if controller expansion is enabled then set online expansion to true
+	if _, ok := driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion]; !ok &&
+		driver.GetDriverInfo().Capabilities[storageframework.CapControllerExpansion] {
+		caps := driver.DriverInfo.Capabilities
+		caps[storageframework.CapOnlineExpansion] = true
+		driver.DriverInfo.Capabilities = caps
 	}
 	return driver, nil
 }
@@ -339,7 +346,7 @@ func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
 	snapshotClass := &unstructured.Unstructured{}
 
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), data, snapshotClass); err != nil {
-		return nil, errors.Wrap(err, filename)
+		return nil, fmt.Errorf("%s: %w", filename, err)
 	}
 
 	return snapshotClass, nil

@@ -51,7 +51,7 @@ type parentProcess interface {
 
 	setExternalDescriptors(fds []string)
 
-	forwardChildLogs()
+	forwardChildLogs() chan error
 }
 
 type filePair struct {
@@ -65,6 +65,7 @@ type setnsProcess struct {
 	logFilePair     filePair
 	cgroupPaths     map[string]string
 	rootlessCgroups bool
+	manager         cgroups.Manager
 	intelRdtPath    string
 	config          *initConfig
 	fds             []string
@@ -88,6 +89,8 @@ func (p *setnsProcess) signal(sig os.Signal) error {
 
 func (p *setnsProcess) start() (retErr error) {
 	defer p.messageSockPair.parent.Close()
+	// get the "before" value of oom kill count
+	oom, _ := p.manager.OOMKillCount()
 	err := p.cmd.Start()
 	// close the write-side of the pipes (controlled by child)
 	p.messageSockPair.child.Close()
@@ -95,18 +98,33 @@ func (p *setnsProcess) start() (retErr error) {
 	if err != nil {
 		return newSystemErrorWithCause(err, "starting setns process")
 	}
+
+	waitInit := initWaiter(p.messageSockPair.parent)
 	defer func() {
 		if retErr != nil {
+			if newOom, err := p.manager.OOMKillCount(); err == nil && newOom != oom {
+				// Someone in this cgroup was killed, this _might_ be us.
+				retErr = newSystemErrorWithCause(retErr, "possibly OOM-killed")
+			}
+			werr := <-waitInit
+			if werr != nil {
+				logrus.WithError(werr).Warn()
+			}
 			err := ignoreTerminateErrors(p.terminate())
 			if err != nil {
 				logrus.WithError(err).Warn("unable to terminate setnsProcess")
 			}
 		}
 	}()
+
 	if p.bootstrapData != nil {
 		if _, err := io.Copy(p.messageSockPair.parent, p.bootstrapData); err != nil {
 			return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 		}
+	}
+	err = <-waitInit
+	if err != nil {
+		return err
 	}
 	if err := p.execSetns(); err != nil {
 		return newSystemErrorWithCause(err, "executing setns process")
@@ -170,7 +188,7 @@ func (p *setnsProcess) start() (retErr error) {
 	}
 	// Must be done after Shutdown so the child will exit and we can wait for it.
 	if ierr != nil {
-		p.wait()
+		_, _ = p.wait()
 		return ierr
 	}
 	return nil
@@ -183,16 +201,16 @@ func (p *setnsProcess) start() (retErr error) {
 func (p *setnsProcess) execSetns() error {
 	status, err := p.cmd.Process.Wait()
 	if err != nil {
-		p.cmd.Wait()
+		_ = p.cmd.Wait()
 		return newSystemErrorWithCause(err, "waiting on setns process to finish")
 	}
 	if !status.Success() {
-		p.cmd.Wait()
+		_ = p.cmd.Wait()
 		return newSystemError(&exec.ExitError{ProcessState: status})
 	}
 	var pid *pid
 	if err := json.NewDecoder(p.messageSockPair.parent).Decode(&pid); err != nil {
-		p.cmd.Wait()
+		_ = p.cmd.Wait()
 		return newSystemErrorWithCause(err, "reading pid from init pipe")
 	}
 
@@ -244,8 +262,8 @@ func (p *setnsProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *setnsProcess) forwardChildLogs() {
-	go logs.ForwardLogs(p.logFilePair.parent)
+func (p *setnsProcess) forwardChildLogs() chan error {
+	return logs.ForwardLogs(p.logFilePair.parent)
 }
 
 type initProcess struct {
@@ -274,7 +292,7 @@ func (p *initProcess) externalDescriptors() []string {
 func (p *initProcess) getChildPid() (int, error) {
 	var pid pid
 	if err := json.NewDecoder(p.messageSockPair.parent).Decode(&pid); err != nil {
-		p.cmd.Wait()
+		_ = p.cmd.Wait()
 		return -1, err
 	}
 
@@ -291,11 +309,11 @@ func (p *initProcess) getChildPid() (int, error) {
 func (p *initProcess) waitForChildExit(childPid int) error {
 	status, err := p.cmd.Process.Wait()
 	if err != nil {
-		p.cmd.Wait()
+		_ = p.cmd.Wait()
 		return err
 	}
 	if !status.Success() {
-		p.cmd.Wait()
+		_ = p.cmd.Wait()
 		return &exec.ExitError{ProcessState: status}
 	}
 
@@ -309,26 +327,53 @@ func (p *initProcess) waitForChildExit(childPid int) error {
 }
 
 func (p *initProcess) start() (retErr error) {
-	defer p.messageSockPair.parent.Close()
+	defer p.messageSockPair.parent.Close() //nolint: errcheck
 	err := p.cmd.Start()
 	p.process.ops = p
 	// close the write-side of the pipes (controlled by child)
-	p.messageSockPair.child.Close()
-	p.logFilePair.child.Close()
+	_ = p.messageSockPair.child.Close()
+	_ = p.logFilePair.child.Close()
 	if err != nil {
 		p.process.ops = nil
 		return newSystemErrorWithCause(err, "starting init process command")
 	}
+
+	waitInit := initWaiter(p.messageSockPair.parent)
 	defer func() {
 		if retErr != nil {
-			// terminate the process to ensure we can remove cgroups
+			// Find out if init is killed by the kernel's OOM killer.
+			// Get the count before killing init as otherwise cgroup
+			// might be removed by systemd.
+			oom, err := p.manager.OOMKillCount()
+			if err != nil {
+				logrus.WithError(err).Warn("unable to get oom kill count")
+			} else if oom > 0 {
+				// Does not matter what the particular error was,
+				// its cause is most probably OOM, so report that.
+				const oomError = "container init was OOM-killed (memory limit too low?)"
+
+				if logrus.GetLevel() >= logrus.DebugLevel {
+					// Only show the original error if debug is set,
+					// as it is not generally very useful.
+					retErr = newSystemErrorWithCause(retErr, oomError)
+				} else {
+					retErr = newSystemError(errors.New(oomError))
+				}
+			}
+
+			werr := <-waitInit
+			if werr != nil {
+				logrus.WithError(werr).Warn()
+			}
+
+			// Terminate the process to ensure we can remove cgroups.
 			if err := ignoreTerminateErrors(p.terminate()); err != nil {
 				logrus.WithError(err).Warn("unable to terminate initProcess")
 			}
 
-			p.manager.Destroy()
+			_ = p.manager.Destroy()
 			if p.intelRdtManager != nil {
-				p.intelRdtManager.Destroy()
+				_ = p.intelRdtManager.Destroy()
 			}
 		}
 	}()
@@ -347,6 +392,11 @@ func (p *initProcess) start() (retErr error) {
 	if _, err := io.Copy(p.messageSockPair.parent, p.bootstrapData); err != nil {
 		return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 	}
+	err = <-waitInit
+	if err != nil {
+		return err
+	}
+
 	childPid, err := p.getChildPid()
 	if err != nil {
 		return newSystemErrorWithCause(err, "getting the final child's pid from pipe")
@@ -398,7 +448,7 @@ func (p *initProcess) start() (retErr error) {
 			// call prestart and CreateRuntime hooks
 			if !p.config.Config.Namespaces.Contains(configs.NEWNS) {
 				// Setup cgroup before the hook, so that the prestart and CreateRuntime hook could apply cgroup permissions.
-				if err := p.manager.Set(p.config.Config); err != nil {
+				if err := p.manager.Set(p.config.Config.Cgroups.Resources); err != nil {
 					return newSystemErrorWithCause(err, "setting cgroup config for ready process")
 				}
 				if p.intelRdtManager != nil {
@@ -454,7 +504,7 @@ func (p *initProcess) start() (retErr error) {
 			sentRun = true
 		case procHooks:
 			// Setup cgroup before prestart hook, so that the prestart hook could apply cgroup permissions.
-			if err := p.manager.Set(p.config.Config); err != nil {
+			if err := p.manager.Set(p.config.Config.Cgroups.Resources); err != nil {
 				return newSystemErrorWithCause(err, "setting cgroup config for procHooks process")
 			}
 			if p.intelRdtManager != nil {
@@ -503,7 +553,7 @@ func (p *initProcess) start() (retErr error) {
 
 	// Must be done after Shutdown so the child will exit and we can wait for it.
 	if ierr != nil {
-		p.wait()
+		_, _ = p.wait()
 		return ierr
 	}
 	return nil
@@ -513,7 +563,7 @@ func (p *initProcess) wait() (*os.ProcessState, error) {
 	err := p.cmd.Wait()
 	// we should kill all processes in cgroup when init is died if we use host PID namespace
 	if p.sharePidns {
-		signalAllProcesses(p.manager, unix.SIGKILL)
+		_ = signalAllProcesses(p.manager, unix.SIGKILL)
 	}
 	return p.cmd.ProcessState, err
 }
@@ -580,8 +630,8 @@ func (p *initProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *initProcess) forwardChildLogs() {
-	go logs.ForwardLogs(p.logFilePair.parent)
+func (p *initProcess) forwardChildLogs() chan error {
+	return logs.ForwardLogs(p.logFilePair.parent)
 }
 
 func getPipeFds(pid int) ([]string, error) {
@@ -618,7 +668,7 @@ func (p *Process) InitializeIO(rootuid, rootgid int) (i *IO, err error) {
 	defer func() {
 		if err != nil {
 			for _, fd := range fds {
-				unix.Close(int(fd))
+				_ = unix.Close(int(fd))
 			}
 		}
 	}()
@@ -648,4 +698,29 @@ func (p *Process) InitializeIO(rootuid, rootgid int) (i *IO, err error) {
 		}
 	}
 	return i, nil
+}
+
+// initWaiter returns a channel to wait on for making sure
+// runc init has finished the initial setup.
+func initWaiter(r io.Reader) chan error {
+	ch := make(chan error, 1)
+	go func() {
+		defer close(ch)
+
+		inited := make([]byte, 1)
+		n, err := r.Read(inited)
+		if err == nil {
+			if n < 1 {
+				err = errors.New("short read")
+			} else if inited[0] != 0 {
+				err = fmt.Errorf("unexpected %d != 0", inited[0])
+			} else {
+				ch <- nil
+				return
+			}
+		}
+		ch <- newSystemErrorWithCause(err, "waiting for init preliminary setup")
+	}()
+
+	return ch
 }

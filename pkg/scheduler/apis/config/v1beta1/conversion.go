@@ -25,7 +25,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/utils/pointer"
 )
 
 var (
@@ -142,7 +141,6 @@ func Convert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigura
 	if err := autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in, out, s); err != nil {
 		return err
 	}
-	out.AlgorithmSource.Provider = pointer.StringPtr(v1beta1.SchedulerDefaultProviderName)
 	return convertToInternalPluginConfigArgs(out)
 }
 
@@ -151,20 +149,20 @@ func Convert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigura
 func convertToInternalPluginConfigArgs(out *config.KubeSchedulerConfiguration) error {
 	scheme := getPluginArgConversionScheme()
 	for i := range out.Profiles {
-		for j := range out.Profiles[i].PluginConfig {
-			args := out.Profiles[i].PluginConfig[j].Args
+		prof := &out.Profiles[i]
+		for j := range prof.PluginConfig {
+			args := prof.PluginConfig[j].Args
 			if args == nil {
 				continue
 			}
 			if _, isUnknown := args.(*runtime.Unknown); isUnknown {
 				continue
 			}
-			scheme.Default(args)
 			internalArgs, err := scheme.ConvertToVersion(args, config.SchemeGroupVersion)
 			if err != nil {
 				return fmt.Errorf("converting .Profiles[%d].PluginConfig[%d].Args into internal type: %w", i, j, err)
 			}
-			out.Profiles[i].PluginConfig[j].Args = internalArgs
+			prof.PluginConfig[j].Args = internalArgs
 		}
 	}
 	return nil

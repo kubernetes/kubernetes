@@ -57,6 +57,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	netutils "k8s.io/utils/net"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -72,7 +73,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 			APIServerServicePort:    443,
 			MasterCount:             1,
 			EndpointReconcilerType:  reconcilers.MasterCountReconcilerType,
-			ServiceIPRange:          net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
+			ServiceIPRange:          net.IPNet{IP: netutils.ParseIPSloppy("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
 		},
 	}
 
@@ -101,7 +102,7 @@ func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertio
 	config.GenericConfig.Version = &kubeVersion
 	config.ExtraConfig.StorageFactory = storageFactory
 	config.GenericConfig.LoopbackClientConfig = &restclient.Config{APIPath: "/api", ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
-	config.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
+	config.GenericConfig.PublicAddress = netutils.ParseIPSloppy("192.168.10.4")
 	config.GenericConfig.LegacyAPIGroupPrefixes = sets.NewString("/api")
 	config.ExtraConfig.KubeletClientConfig = kubeletclient.KubeletClientConfig{Port: 10250}
 	config.ExtraConfig.ProxyTransport = utilnet.SetTransportDefaults(&http.Transport{
@@ -317,31 +318,13 @@ func TestAPIVersionOfDiscoveryEndpoints(t *testing.T) {
 	assert.NoError(decodeResponse(resp, &groupList))
 	assert.Equal(groupList.APIVersion, "")
 
-	// /apis/extensions exists in release-1.1
-	resp, err = http.Get(server.URL + "/apis/extensions")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	group := metav1.APIGroup{}
-	assert.NoError(decodeResponse(resp, &group))
-	assert.Equal(group.APIVersion, "")
-
-	// /apis/extensions/v1beta1 exists in release-1.1
-	resp, err = http.Get(server.URL + "/apis/extensions/v1beta1")
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	resourceList = metav1.APIResourceList{}
-	assert.NoError(decodeResponse(resp, &resourceList))
-	assert.Equal(resourceList.APIVersion, "")
-
 	// /apis/autoscaling doesn't exist in release-1.1, so the APIVersion field
 	// should be non-empty in the results returned by the server.
 	resp, err = http.Get(server.URL + "/apis/autoscaling")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	group = metav1.APIGroup{}
+	group := metav1.APIGroup{}
 	assert.NoError(decodeResponse(resp, &group))
 	assert.Equal(group.APIVersion, "v1")
 
@@ -376,8 +359,10 @@ func TestStorageVersionHashes(t *testing.T) {
 		t.Error(err)
 	}
 	var count int
+	apiResources := sets.NewString()
 	for _, g := range all {
 		for _, r := range g.APIResources {
+			apiResources.Insert(g.GroupVersion + "/" + r.Name)
 			if strings.Contains(r.Name, "/") ||
 				storageversionhashdata.NoStorageVersionHash.Has(g.GroupVersion+"/"+r.Name) {
 				if r.StorageVersionHash != "" {
@@ -399,7 +384,8 @@ func TestStorageVersionHashes(t *testing.T) {
 		}
 	}
 	if count != len(storageversionhashdata.GVRToStorageVersionHash) {
-		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash")
+		knownResources := sets.StringKeySet(storageversionhashdata.GVRToStorageVersionHash)
+		t.Errorf("please remove the redundant entries from GVRToStorageVersionHash: %v", knownResources.Difference(apiResources).List())
 	}
 }
 

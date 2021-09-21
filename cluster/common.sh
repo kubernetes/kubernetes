@@ -292,7 +292,7 @@ function set_binary_version() {
     if [[ "${path[0]}" == "release" ]]; then
       KUBE_VERSION=$(gsutil cat "gs://kubernetes-release/${1}.txt")
     else
-      KUBE_VERSION=$(gsutil cat "gs://kubernetes-release-dev/${1}.txt")
+      KUBE_VERSION=$(gsutil cat "gs://k8s-release-dev/${1}.txt")
     fi
   else
     KUBE_VERSION=${1}

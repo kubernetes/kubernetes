@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -140,7 +140,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.UnschedulableAndUnresolvable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -164,7 +163,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.UnschedulableAndUnresolvable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -243,7 +241,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.UnschedulableAndUnresolvable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -366,7 +363,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -421,7 +417,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonExistingAntiAffinityRulesNotMatch,
 			),
 		},
@@ -446,7 +441,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.UnschedulableAndUnresolvable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -477,7 +471,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonExistingAntiAffinityRulesNotMatch,
 			),
 		},
@@ -553,7 +546,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -603,7 +595,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -653,7 +644,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonExistingAntiAffinityRulesNotMatch,
 			),
 		},
@@ -714,7 +704,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -775,7 +764,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -912,7 +900,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.UnschedulableAndUnresolvable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAffinityRulesNotMatch,
 			),
 		},
@@ -946,7 +933,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -972,7 +958,6 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 			node: &node1,
 			wantStatus: framework.NewStatus(
 				framework.Unschedulable,
-				ErrReasonAffinityNotMatch,
 				ErrReasonAntiAffinityRulesNotMatch,
 			),
 		},
@@ -1085,7 +1070,6 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 				nil,
 				framework.NewStatus(
 					framework.UnschedulableAndUnresolvable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAffinityRulesNotMatch,
 				),
 			},
@@ -1164,12 +1148,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.UnschedulableAndUnresolvable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.UnschedulableAndUnresolvable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAffinityRulesNotMatch,
 				),
 			},
@@ -1201,12 +1183,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -1250,12 +1230,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -1288,12 +1266,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -1348,12 +1324,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -1458,12 +1432,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 			},
@@ -1516,12 +1488,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -1565,7 +1535,6 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -1616,7 +1585,6 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -1661,12 +1629,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 			},
@@ -1713,12 +1679,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAntiAffinityRulesNotMatch,
 				),
 			},
@@ -1788,12 +1752,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.Unschedulable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonExistingAntiAffinityRulesNotMatch,
 				),
 				nil,
@@ -1888,12 +1850,10 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 			wantStatuses: []*framework.Status{
 				framework.NewStatus(
 					framework.UnschedulableAndUnresolvable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAffinityRulesNotMatch,
 				),
 				framework.NewStatus(
 					framework.UnschedulableAndUnresolvable,
-					ErrReasonAffinityNotMatch,
 					ErrReasonAffinityRulesNotMatch,
 				),
 			},

@@ -166,7 +166,7 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 	if podConfig.NS == "" {
 		return nil, fmt.Errorf("Cannot create pod with empty namespace")
 	}
-	if len(podConfig.Command) == 0 && !NodeOSDistroIs("windows") {
+	if len(podConfig.Command) == 0 {
 		podConfig.Command = "trap exit TERM; while true; do sleep 1; done"
 	}
 

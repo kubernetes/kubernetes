@@ -31,6 +31,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/clientcmd"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
@@ -157,13 +159,13 @@ func TestRunCreateToken(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			bts, err := kubeadmapiv1.NewBootstrapTokenString(tc.token)
+			bts, err := bootstraptokenv1.NewBootstrapTokenString(tc.token)
 			if err != nil && len(tc.token) != 0 { // if tc.token is "" it's okay as it will be generated later at runtime
 				t.Fatalf("token couldn't be parsed for testing: %v", err)
 			}
 
 			cfg := &kubeadmapiv1.InitConfiguration{
-				BootstrapTokens: []kubeadmapiv1.BootstrapToken{
+				BootstrapTokens: []bootstraptokenv1.BootstrapToken{
 					{
 						Token:  bts,
 						TTL:    &metav1.Duration{Duration: 0},

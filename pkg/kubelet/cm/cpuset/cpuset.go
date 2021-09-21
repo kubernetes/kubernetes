@@ -297,11 +297,11 @@ func Parse(s string) (CPUSet, error) {
 	}
 
 	// Split CPU list string:
-	// "0-5,34,46-48 => ["0-5", "34", "46-48"]
+	// "0-5,34,46-48" => ["0-5", "34", "46-48"]
 	ranges := strings.Split(s, ",")
 
 	for _, r := range ranges {
-		boundaries := strings.Split(r, "-")
+		boundaries := strings.SplitN(r, "-", 2)
 		if len(boundaries) == 1 {
 			// Handle ranges that consist of only one element like "34".
 			elem, err := strconv.Atoi(boundaries[0])
@@ -319,6 +319,11 @@ func Parse(s string) (CPUSet, error) {
 			if err != nil {
 				return NewCPUSet(), err
 			}
+			if start > end {
+				return NewCPUSet(), fmt.Errorf("invalid range %q (%d >= %d)", r, start, end)
+			}
+			// start == end is acceptable (1-1 -> 1)
+
 			// Add all elements to the result.
 			// e.g. "0-5", "46-48" => [0, 1, 2, 3, 4, 5, 46, 47, 48].
 			for e := start; e <= end; e++ {

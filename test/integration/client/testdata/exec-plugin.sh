@@ -18,4 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "$EXEC_PLUGIN_OUTPUT"
+if [[ -n "${EXEC_PLUGIN_OUTPUT_FILE-""}" ]]; then
+  cat "$EXEC_PLUGIN_OUTPUT_FILE"
+  exit
+fi
+
+echo "${EXEC_PLUGIN_OUTPUT-""}"
+
+exit "${EXEC_PLUGIN_EXEC_CODE-0}"

@@ -139,6 +139,18 @@ func (cm *containerManagerStub) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
+func (cm *containerManagerStub) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+	return nil
+}
+
+func (cm *containerManagerStub) GetAllocatableMemory() []*podresourcesapi.ContainerMemory {
+	return nil
+}
+
+func (cm *containerManagerStub) GetNodeAllocatableAbsolute() v1.ResourceList {
+	return nil
+}
+
 func NewStubContainerManager() ContainerManager {
 	return &containerManagerStub{shouldResetExtendedResourceCapacity: false}
 }

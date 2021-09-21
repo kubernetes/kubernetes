@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -1060,9 +1061,6 @@ func TestEnsureInternalLoadBalancerSubsetting(t *testing.T) {
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.EqualError(t, err, cloudprovider.ImplementedElsewhere.Error())
-	expectedEvent := fmt.Sprintf("Normal SkippingEnsureInternalLoadBalancer Skipped ensureInternalLoadBalancer"+
-		" since %s feature is enabled.", AlphaFeatureILBSubsets)
-	checkEvent(t, recorder, expectedEvent, true)
 	// No loadbalancer resources will be created due to the ILB Feature Gate
 	assert.Empty(t, status)
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
@@ -1105,6 +1103,60 @@ func TestEnsureInternalLoadBalancerDeletedSubsetting(t *testing.T) {
 	assert.NoError(t, err)
 	// ensure that the status has the new IP
 	assert.Equal(t, status.Ingress[0].IP, "1.2.3.4")
+	// Invoked when service is deleted.
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	assert.NoError(t, err)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+// TestEnsureInternalLoadBalancerUpdateSubsetting verifies that updates of existing ILB instance groups
+// continue to work, even if ILBSubsets feature is enabled.
+func TestEnsureInternalLoadBalancerUpdateSubsetting(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	assert.NoError(t, err)
+	recorder := record.NewFakeRecorder(1024)
+	gce.eventRecorder = recorder
+
+	nodeNames := []string{"test-node-1"}
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	assert.NoError(t, err)
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+
+	assert.NoError(t, err)
+	assert.NotEmpty(t, status.Ingress)
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+	assert.NoError(t, err)
+	if !hasFinalizer(svc, ILBFinalizerV1) {
+		t.Errorf("Expected finalizer '%s' not found in Finalizer list - %v", ILBFinalizerV1, svc.Finalizers)
+	}
+	// Enable FeatureGate after service has been created.
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureILBSubsets})
+	// mock scenario where user adds more nodes, this should be updated in the ILB.
+	nodeNames = []string{"test-node-1", "test-node-2"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	assert.NoError(t, err)
+	err = gce.UpdateLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	assert.NoError(t, err)
+	// Ensure that the backend service/Instance group has both nodes.
+	igName := makeInstanceGroupName(vals.ClusterID)
+	instances, err := gce.ListInstancesInInstanceGroup(igName, vals.ZoneName, allInstances)
+	assert.NoError(t, err)
+	var instanceNames []string
+	for _, inst := range instances {
+		resourceID, err := cloud.ParseResourceURL(inst.Instance)
+		if err != nil || resourceID == nil || resourceID.Key == nil {
+			t.Errorf("Failed to parse instance url - %q, error - %v", inst.Instance, err)
+			continue
+		}
+		instanceNames = append(instanceNames, resourceID.Key.Name)
+	}
+	if !equalStringSets(instanceNames, nodeNames) {
+		t.Errorf("Got instances - %v, want %v", instanceNames, nodeNames)
+	}
 	// Invoked when service is deleted.
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
 	assert.NoError(t, err)
@@ -1610,8 +1662,6 @@ func TestEnsureLoadBalancerSkipped(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
-	recorder := record.NewFakeRecorder(1024)
-	gce.eventRecorder = recorder
 
 	nodeNames := []string{"test-node-1"}
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
@@ -1621,10 +1671,6 @@ func TestEnsureLoadBalancerSkipped(t *testing.T) {
 	require.NoError(t, err)
 	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.EqualError(t, err, cloudprovider.ImplementedElsewhere.Error())
-	expectedEvent := fmt.Sprintf("Normal SkippingEnsureInternalLoadBalancer Skipped ensureInternalLoadBalancer"+
-		" as service contains '%s' finalizer",
-		ILBFinalizerV2)
-	checkEvent(t, recorder, expectedEvent, true)
 	// No loadbalancer resources will be created due to the ILB Feature Gate
 	assert.Empty(t, status)
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)

@@ -31,9 +31,10 @@ type IDMap struct {
 // for syscalls. Additional architectures can be added by specifying them in
 // Architectures.
 type Seccomp struct {
-	DefaultAction Action     `json:"default_action"`
-	Architectures []string   `json:"architectures"`
-	Syscalls      []*Syscall `json:"syscalls"`
+	DefaultAction   Action     `json:"default_action"`
+	Architectures   []string   `json:"architectures"`
+	Syscalls        []*Syscall `json:"syscalls"`
+	DefaultErrnoRet *uint      `json:"default_errno_ret"`
 }
 
 // Action is taken upon rule match in Seccomp
@@ -207,9 +208,11 @@ type Config struct {
 	RootlessCgroups bool `json:"rootless_cgroups,omitempty"`
 }
 
-type HookName string
-type HookList []Hook
-type Hooks map[HookName]HookList
+type (
+	HookName string
+	HookList []Hook
+	Hooks    map[HookName]HookList
+)
 
 const (
 	// Prestart commands are executed after the container namespaces are created,
@@ -222,25 +225,25 @@ const (
 	// the runtime environment has been created but before the pivot_root has been executed.
 	// CreateRuntime is called immediately after the deprecated Prestart hook.
 	// CreateRuntime commands are called in the Runtime Namespace.
-	CreateRuntime = "createRuntime"
+	CreateRuntime HookName = "createRuntime"
 
 	// CreateContainer commands MUST be called as part of the create operation after
 	// the runtime environment has been created but before the pivot_root has been executed.
 	// CreateContainer commands are called in the Container namespace.
-	CreateContainer = "createContainer"
+	CreateContainer HookName = "createContainer"
 
 	// StartContainer commands MUST be called as part of the start operation and before
 	// the container process is started.
 	// StartContainer commands are called in the Container namespace.
-	StartContainer = "startContainer"
+	StartContainer HookName = "startContainer"
 
 	// Poststart commands are executed after the container init process starts.
 	// Poststart commands are called in the Runtime Namespace.
-	Poststart = "poststart"
+	Poststart HookName = "poststart"
 
 	// Poststop commands are executed after the container init process exits.
 	// Poststop commands are called in the Runtime Namespace.
-	Poststop = "poststop"
+	Poststop HookName = "poststop"
 )
 
 type Capabilities struct {
@@ -386,8 +389,8 @@ func (c Command) Run(s *specs.State) error {
 	case err := <-errC:
 		return err
 	case <-timerCh:
-		cmd.Process.Kill()
-		cmd.Wait()
+		_ = cmd.Process.Kill()
+		<-errC
 		return fmt.Errorf("hook ran past specified timeout of %.1fs", c.Timeout.Seconds())
 	}
 }

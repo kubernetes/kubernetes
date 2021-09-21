@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ejob "k8s.io/kubernetes/test/e2e/framework/job"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -59,10 +58,6 @@ var _ = SIGDescribe("CronJob", func() {
 	// Pod will complete instantly
 	successCommand := []string{"/bin/true"}
 	failureCommand := []string{"/bin/false"}
-
-	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceBeta, f.Namespace.Name)
-	})
 
 	/*
 	   Release: v1.21

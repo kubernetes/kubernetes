@@ -7,7 +7,7 @@ BENCH_FLAGS ?= -cpuprofile=cpu.pprof -memprofile=mem.pprof -benchmem
 # Directories containing independent Go modules.
 #
 # We track coverage only for the main module.
-MODULE_DIRS = . ./benchmarks
+MODULE_DIRS = . ./benchmarks ./zapgrpc/internal/test
 
 # Many Go tools take file globs or directories as arguments instead of packages.
 GO_FILES := $(shell \
@@ -33,12 +33,18 @@ lint: $(GOLINT) $(STATICCHECK)
 	@echo "Checking for license headers..."
 	@./checklicense.sh | tee -a lint.log
 	@[ ! -s lint.log ]
+	@echo "Checking 'go mod tidy'..."
+	@make tidy
+	@if ! git diff --quiet; then \
+		echo "'go mod tidy' resulted in changes or working tree is dirty:"; \
+		git --no-pager diff; \
+	fi
 
 $(GOLINT):
-	go install golang.org/x/lint/golint
+	cd tools && go install golang.org/x/lint/golint
 
 $(STATICCHECK):
-	go install honnef.co/go/tools/cmd/staticcheck
+	cd tools && go install honnef.co/go/tools/cmd/staticcheck
 
 .PHONY: test
 test:
@@ -61,3 +67,7 @@ bench:
 updatereadme:
 	rm -f README.md
 	cat .readme.tmpl | go run internal/readme/readme.go > README.md
+
+.PHONY: tidy
+tidy:
+	@$(foreach dir,$(MODULE_DIRS),(cd $(dir) && go mod tidy) &&) true

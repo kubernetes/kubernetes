@@ -26,7 +26,6 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -44,8 +43,8 @@ const (
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
 
-	csiNodeIDMaxLength       = 128
-	csiNodeIDLongerMaxLength = 192
+	csiNodeIDMaxLength       = 192
+	csiNodeIDLongerMaxLength = 256
 )
 
 // CSINodeValidationOptions contains the validation options for validating CSINode
@@ -91,9 +90,7 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 		allErrs = append(allErrs, field.Required(fldPath, provisioner))
 	}
 	if len(provisioner) > 0 {
-		for _, msg := range validation.IsQualifiedName(strings.ToLower(provisioner)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, provisioner, msg))
-		}
+		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(strings.ToLower(provisioner), fldPath)...)
 	}
 	return allErrs
 }
@@ -195,7 +192,8 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 			allErrs = append(allErrs, field.Required(fldPath.Child("persistentVolumeName"), "must specify non empty persistentVolumeName"))
 		}
 	case source.InlineVolumeSpec != nil:
-		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
+		opts := apivalidation.PersistentVolumeSpecValidationOptions{}
+		allErrs = append(allErrs, apivalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"), opts)...)
 	}
 	return allErrs
 }
@@ -354,7 +352,7 @@ func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path, validationO
 		maxLength = csiNodeIDLongerMaxLength
 	}
 	if len(nodeID) > maxLength {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", csiNodeIDMaxLength)))
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", maxLength)))
 	}
 	return allErrs
 }
@@ -401,9 +399,7 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 		}
 		topoKeys.Insert(key)
 
-		for _, msg := range validation.IsQualifiedName(key) {
-			allErrs = append(allErrs, field.Invalid(fldPath, driver.TopologyKeys, msg))
-		}
+		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(key, fldPath)...)
 	}
 
 	return allErrs
@@ -424,13 +420,13 @@ func ValidateCSIDriver(csiDriver *storage.CSIDriver) field.ErrorList {
 // ValidateCSIDriverUpdate validates a CSIDriver.
 func ValidateCSIDriverUpdate(new, old *storage.CSIDriver) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateCSIDriverSpec(&new.Spec, field.NewPath("spec"))...)
 
 	// immutable fields should not be mutated.
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.AttachRequired, old.Spec.AttachRequired, field.NewPath("spec", "attachedRequired"))...)
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.FSGroupPolicy, old.Spec.FSGroupPolicy, field.NewPath("spec", "fsGroupPolicy"))...)
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.PodInfoOnMount, old.Spec.PodInfoOnMount, field.NewPath("spec", "podInfoOnMount"))...)
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.VolumeLifecycleModes, old.Spec.VolumeLifecycleModes, field.NewPath("spec", "volumeLifecycleModes"))...)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec.StorageCapacity, old.Spec.StorageCapacity, field.NewPath("spec", "storageCapacity"))...)
 
 	allErrs = append(allErrs, validateTokenRequests(new.Spec.TokenRequests, field.NewPath("spec", "tokenRequests"))...)
 	return allErrs

@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2020-09-14
+### Added
+- Support JSON serialization and deserialization of primitive atomic types.
+- Support Text marshalling and unmarshalling for string atomics.
+
+### Changed
+- Disallow incorrect comparison of atomic values in a non-atomic way.
+
+### Removed
+- Remove dependency on `golang.org/x/{lint, tools}`.
+
 ## [1.6.0] - 2020-02-24
 ### Changed
 - Drop library dependency on `golang.org/x/{lint, tools}`.
@@ -52,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release.
 
+[1.7.0]: https://github.com/uber-go/atomic/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/uber-go/atomic/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/uber-go/atomic/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/uber-go/atomic/compare/v1.4.0...v1.5.0

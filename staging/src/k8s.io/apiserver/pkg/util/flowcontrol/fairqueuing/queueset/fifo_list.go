@@ -45,8 +45,15 @@ type fifo interface {
 	// Dequeue pulls out the oldest request from the list.
 	Dequeue() (*request, bool)
 
+	// Peek returns the oldest request without removing it.
+	Peek() (*request, bool)
+
 	// Length returns the number of requests in the list.
 	Length() int
+
+	// SeatsSum returns the total number of seats of all requests
+	// in this list.
+	SeatsSum() int
 
 	// Walk iterates through the list in order of oldest -> newest
 	// and executes the specified walkFunc for each request in that order.
@@ -60,6 +67,8 @@ type fifo interface {
 // goroutines without additional locking or coordination.
 type requestFIFO struct {
 	*list.List
+
+	seatsSum int
 }
 
 func newRequestFIFO() fifo {
@@ -72,22 +81,49 @@ func (l *requestFIFO) Length() int {
 	return l.Len()
 }
 
+func (l *requestFIFO) SeatsSum() int {
+	return l.seatsSum
+}
+
 func (l *requestFIFO) Enqueue(req *request) removeFromFIFOFunc {
 	e := l.PushBack(req)
+	l.seatsSum += req.Seats()
+
 	return func() *request {
-		l.Remove(e)
+		if e.Value != nil {
+			l.Remove(e)
+			e.Value = nil
+			l.seatsSum -= req.Seats()
+		}
 		return req
 	}
 }
 
 func (l *requestFIFO) Dequeue() (*request, bool) {
+	return l.getFirst(true)
+}
+
+func (l *requestFIFO) Peek() (*request, bool) {
+	return l.getFirst(false)
+}
+
+func (l *requestFIFO) getFirst(remove bool) (*request, bool) {
 	e := l.Front()
 	if e == nil {
 		return nil, false
 	}
-	defer l.Remove(e)
+
+	if remove {
+		defer func() {
+			l.Remove(e)
+			e.Value = nil
+		}()
+	}
 
 	request, ok := e.Value.(*request)
+	if remove && ok {
+		l.seatsSum -= request.Seats()
+	}
 	return request, ok
 }
 

@@ -1,10 +1,36 @@
-Generated from https://github.com/Azure/azure-rest-api-specs/tree/3c764635e7d442b3e74caf593029fcd440b3ef82//specification/storage/resource-manager/readme.md tag: `package-2019-06`
+# Change History
 
-Code generator @microsoft.azure/autorest.go@2.1.178
-
+## Additive Changes
 
 ### New Funcs
 
-1. *AccountsCreateFuture.UnmarshalJSON([]byte) error
-1. *AccountsFailoverFuture.UnmarshalJSON([]byte) error
-1. *AccountsRestoreBlobRangesFuture.UnmarshalJSON([]byte) error
+1. AccountInternetEndpoints.MarshalJSON() ([]byte, error)
+1. AccountKey.MarshalJSON() ([]byte, error)
+1. AccountListKeysResult.MarshalJSON() ([]byte, error)
+1. AccountListResult.MarshalJSON() ([]byte, error)
+1. AccountMicrosoftEndpoints.MarshalJSON() ([]byte, error)
+1. AzureEntityResource.MarshalJSON() ([]byte, error)
+1. BlobRestoreStatus.MarshalJSON() ([]byte, error)
+1. BlobServiceItems.MarshalJSON() ([]byte, error)
+1. CheckNameAvailabilityResult.MarshalJSON() ([]byte, error)
+1. EncryptionScopeListResult.MarshalJSON() ([]byte, error)
+1. FileServiceItems.MarshalJSON() ([]byte, error)
+1. FileShareItems.MarshalJSON() ([]byte, error)
+1. GeoReplicationStats.MarshalJSON() ([]byte, error)
+1. ListAccountSasResponse.MarshalJSON() ([]byte, error)
+1. ListContainerItems.MarshalJSON() ([]byte, error)
+1. ListQueueResource.MarshalJSON() ([]byte, error)
+1. ListQueueServices.MarshalJSON() ([]byte, error)
+1. ListServiceSasResponse.MarshalJSON() ([]byte, error)
+1. ListTableResource.MarshalJSON() ([]byte, error)
+1. ListTableServices.MarshalJSON() ([]byte, error)
+1. PrivateEndpoint.MarshalJSON() ([]byte, error)
+1. ProxyResource.MarshalJSON() ([]byte, error)
+1. Resource.MarshalJSON() ([]byte, error)
+1. SKUCapability.MarshalJSON() ([]byte, error)
+1. SkuListResult.MarshalJSON() ([]byte, error)
+1. TableProperties.MarshalJSON() ([]byte, error)
+1. TagProperty.MarshalJSON() ([]byte, error)
+1. UpdateHistoryProperty.MarshalJSON() ([]byte, error)
+1. Usage.MarshalJSON() ([]byte, error)
+1. UsageName.MarshalJSON() ([]byte, error)

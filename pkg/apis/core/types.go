@@ -111,7 +111,7 @@ type VolumeSource struct {
 	// +optional
 	FlexVolume *FlexVolumeSource
 
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
+	// Cinder represents a cinder volume attached and mounted on kubelet's host machine.
 	// +optional
 	Cinder *CinderVolumeSource
 
@@ -135,17 +135,17 @@ type VolumeSource struct {
 	// ConfigMap represents a configMap that should populate this volume
 	// +optional
 	ConfigMap *ConfigMapVolumeSource
-	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+	// VsphereVolume represents a vSphere volume attached and mounted on kubelet's host machine
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource
-	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
+	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelet's host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
 	// Items for all in one resources secrets, configmaps, and downward API
 	Projected *ProjectedVolumeSource
-	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// PortworxVolume represents a portworx volume attached and mounted on kubelet's host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -226,7 +226,7 @@ type PersistentVolumeSource struct {
 	// provisioned/attached using an exec based plugin.
 	// +optional
 	FlexVolume *FlexPersistentVolumeSource
-	// Cinder represents a cinder volume attached and mounted on kubelets host machine.
+	// Cinder represents a cinder volume attached and mounted on kubelet's host machine.
 	// +optional
 	Cinder *CinderPersistentVolumeSource
 	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
@@ -241,15 +241,15 @@ type PersistentVolumeSource struct {
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	// +optional
 	AzureFile *AzureFilePersistentVolumeSource
-	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+	// VsphereVolume represents a vSphere volume attached and mounted on kubelet's host machine
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource
-	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelets host machine
+	// PhotonPersistentDisk represents a Photon Controller persistent disk attached and mounted on kubelet's host machine
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource
-	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// PortworxVolume represents a portworx volume attached and mounted on kubelet's host machine
 	// +optional
 	PortworxVolume *PortworxVolumeSource
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -450,13 +450,31 @@ type PersistentVolumeClaimSpec struct {
 	// This field can be used to specify either:
 	// * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
 	// * An existing PVC (PersistentVolumeClaim)
-	// * An existing custom resource that implements data population (Alpha)
-	// In order to use custom resource types that implement data population,
-	// the AnyVolumeDataSource feature gate must be enabled.
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
+	// If the AnyVolumeDataSource feature gate is enabled, this field will always have
+	// the same contents as the DataSourceRef field.
 	// +optional
 	DataSource *TypedLocalObjectReference
+	// Specifies the object from which to populate the volume with data, if a non-empty
+	// volume is desired. This may be any local object from a non-empty API group (non
+	// core object) or a PersistentVolumeClaim object.
+	// When this field is specified, volume binding will only succeed if the type of
+	// the specified object matches some installed volume populator or dynamic
+	// provisioner.
+	// This field will replace the functionality of the DataSource field and as such
+	// if both fields are non-empty, they must have the same value. For backwards
+	// compatibility, both fields (DataSource and DataSourceRef) will be set to the same
+	// value automatically if one of them is empty and the other is non-empty.
+	// There are two important differences between DataSource and DataSourceRef:
+	// * While DataSource only allows two specific types of objects, DataSourceRef
+	//   allows any non-core object, as well as PersistentVolumeClaim objects.
+	// * While DataSource ignores disallowed values (dropping them), DataSourceRef
+	//   preserves all values, and generates an error if a disallowed value is
+	//   specified.
+	// (Alpha) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+	// +optional
+	DataSourceRef *TypedLocalObjectReference
 }
 
 // PersistentVolumeClaimConditionType defines the condition of PV claim.
@@ -511,6 +529,9 @@ const (
 	ReadOnlyMany PersistentVolumeAccessMode = "ReadOnlyMany"
 	// can be mounted in read/write mode to many hosts
 	ReadWriteMany PersistentVolumeAccessMode = "ReadWriteMany"
+	// can be mounted read/write mode to exactly 1 pod
+	// cannot be used in combination with other access modes
+	ReadWriteOncePod PersistentVolumeAccessMode = "ReadWriteOncePod"
 )
 
 // PersistentVolumePhase defines the phase in which a PV is
@@ -1599,7 +1620,7 @@ type LocalVolumeSource struct {
 	// Filesystem type to mount.
 	// It applies only when the Path is a block device.
 	// Must be a filesystem type supported by the host operating system.
-	// Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a fileystem if unspecified.
+	// Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a filesystem if unspecified.
 	// +optional
 	FSType *string
 }
@@ -1826,12 +1847,13 @@ type EnvVar struct {
 	Name string
 	// Optional: no more than one of the following may be specified.
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
-	// using the previous defined environment variables in the container and
+	// using the previously defined environment variables in the container and
 	// any service environment variables.  If a variable cannot be resolved,
-	// the reference in the input string will be unchanged.  The $(VAR_NAME)
-	// syntax can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped
-	// references will never be expanded, regardless of whether the variable
-	// exists or not.
+	// the reference in the input string will be unchanged.  Double $$ are
+	// reduced to a single $, which allows for escaping the $(VAR_NAME)
+	// syntax: i.e. "$$(VAR_NAME)" will produce the string literal
+	// "$(VAR_NAME)".  Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
 	// +optional
 	Value string
 	// Optional: Specifies a source the value of this var should come from.
@@ -2028,7 +2050,7 @@ type Probe struct {
 	// value overrides the value provided by the pod spec.
 	// Value must be non-negative integer. The value zero indicates stop immediately via
 	// the kill signal (no opportunity to shut down).
-	// This is an alpha field and requires enabling ProbeTerminationGracePeriod feature gate.
+	// This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
 	// +optional
 	TerminationGracePeriodSeconds *int64
 }
@@ -2102,16 +2124,18 @@ type Container struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Args []string
 	// Optional: Defaults to Docker's default.
@@ -2580,7 +2604,7 @@ type PodAffinityTerm struct {
 	// and the ones listed in the namespaces field.
 	// null selector and null or empty namespaces list means "this pod's namespace".
 	// An empty selector ({}) matches all namespaces.
-	// This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
+	// This field is beta-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
 }
@@ -3079,16 +3103,18 @@ type EphemeralContainerCommon struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Args []string
 	// Optional: Defaults to Docker's default.
@@ -3135,7 +3161,8 @@ type EphemeralContainerCommon struct {
 	TerminationMessagePolicy TerminationMessagePolicy
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy
-	// SecurityContext is not allowed for ephemeral containers.
+	// Optional: SecurityContext defines the security options the ephemeral container should be run with.
+	// If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
 	// +optional
 	SecurityContext *SecurityContext
 
@@ -3555,11 +3582,6 @@ type LoadBalancerIngress struct {
 	Ports []PortStatus
 }
 
-const (
-	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
-	MaxServiceTopologyKeys = 16
-)
-
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
 // to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
 type IPFamily string
@@ -3727,29 +3749,14 @@ type ServiceSpec struct {
 	// +optional
 	PublishNotReadyAddresses bool
 
-	// topologyKeys is a preference-order list of topology keys which
-	// implementations of services should use to preferentially sort endpoints
-	// when accessing this Service, it can not be used at the same time as
-	// externalTrafficPolicy=Local.
-	// Topology keys must be valid label keys and at most 16 keys may be specified.
-	// Endpoints are chosen based on the first topology key with available backends.
-	// If this field is specified and all entries have no backends that match
-	// the topology of the client, the service has no backends for that client
-	// and connections should fail.
-	// The special value "*" may be used to mean "any topology". This catch-all
-	// value, if used, only makes sense as the last value in the list.
-	// If this is not specified or empty, no topology constraints will be applied.
-	// This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
-	// This field is deprecated and will be removed in a future version.
-	// +optional
-	TopologyKeys []string
-
 	// allocateLoadBalancerNodePorts defines if NodePorts will be automatically
-	// allocated for services with type LoadBalancer.  Default is "true". It may be
-	// set to "false" if the cluster load-balancer does not rely on NodePorts.
-	// allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
-	// and will be cleared if the type is changed to any other type.
-	// This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+	// allocated for services with type LoadBalancer.  Default is "true". It
+	// may be set to "false" if the cluster load-balancer does not rely on
+	// NodePorts.  If the caller requests specific NodePorts (by specifying a
+	// value), those requests will be respected, regardless of this field.
+	// This field may only be set for services with type LoadBalancer and will
+	// be cleared if the type is changed to any other type.
+	// This field is beta-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
 	// +optional
 	AllocateLoadBalancerNodePorts *bool
 
@@ -4201,6 +4208,7 @@ type PodSignature struct {
 // ContainerImage describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
+	// +optional
 	Names []string
 	// The size of the image in bytes.
 	// +optional
@@ -4256,11 +4264,44 @@ type NodeAddressType string
 
 // These are valid values of node address type
 const (
-	NodeHostName    NodeAddressType = "Hostname"
-	NodeExternalIP  NodeAddressType = "ExternalIP"
-	NodeInternalIP  NodeAddressType = "InternalIP"
-	NodeExternalDNS NodeAddressType = "ExternalDNS"
+	// NodeHostName identifies a name of the node. Although every node can be assumed
+	// to have a NodeAddress of this type, its exact syntax and semantics are not
+	// defined, and are not consistent between different clusters.
+	NodeHostName NodeAddressType = "Hostname"
+
+	// NodeInternalIP identifies an IP address which is assigned to one of the node's
+	// network interfaces. Every node should have at least one address of this type.
+	//
+	// An internal IP is normally expected to be reachable from every other node, but
+	// may not be visible to hosts outside the cluster. By default it is assumed that
+	// kube-apiserver can reach node internal IPs, though it is possible to configure
+	// clusters where this is not the case.
+	//
+	// NodeInternalIP is the default type of node IP, and does not necessarily imply
+	// that the IP is ONLY reachable internally. If a node has multiple internal IPs,
+	// no specific semantics are assigned to the additional IPs.
+	NodeInternalIP NodeAddressType = "InternalIP"
+
+	// NodeExternalIP identifies an IP address which is, in some way, intended to be
+	// more usable from outside the cluster then an internal IP, though no specific
+	// semantics are defined. It may be a globally routable IP, though it is not
+	// required to be.
+	//
+	// External IPs may be assigned directly to an interface on the node, like a
+	// NodeInternalIP, or alternatively, packets sent to the external IP may be NAT'ed
+	// to an internal node IP rather than being delivered directly (making the IP less
+	// efficient for node-to-node traffic than a NodeInternalIP).
+	NodeExternalIP NodeAddressType = "ExternalIP"
+
+	// NodeInternalDNS identifies a DNS name which resolves to an IP address which has
+	// the characteristics of a NodeInternalIP. The IP it resolves to may or may not
+	// be a listed NodeInternalIP address.
 	NodeInternalDNS NodeAddressType = "InternalDNS"
+
+	// NodeExternalDNS identifies a DNS name which resolves to an IP address which has
+	// the characteristics of a NodeExternalIP. The IP it resolves to may or may not
+	// be a listed NodeExternalIP address.
+	NodeExternalDNS NodeAddressType = "ExternalDNS"
 )
 
 // NodeAddress represents node's address
@@ -4887,7 +4928,7 @@ const (
 	// Match all pod objects that have priority class mentioned
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned
-	// This is an alpha feature enabled by the PodAffinityNamespaceSelector feature flag.
+	// This is a beta feature enabled by the PodAffinityNamespaceSelector feature flag.
 	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
 )
 
@@ -5351,6 +5392,16 @@ type WindowsSecurityContextOptions struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsUserName *string
+
+	// HostProcess determines if a container should be run as a 'Host Process' container.
+	// This field is alpha-level and will only be honored by components that enable the
+	// WindowsHostProcessContainers feature flag. Setting this field without the feature
+	// flag will result in errors when validating the Pod. All of a Pod's containers must
+	// have the same effective HostProcess value (it is not allowed to have a mix of HostProcess
+	// containers and non-HostProcess containers).  In addition, if HostProcess is true
+	// then HostNetwork must also be set to true.
+	// +optional
+	HostProcess *bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -5433,7 +5484,7 @@ type TopologySpreadConstraint struct {
 	//   but giving higher precedence to topologies that would help reduce the
 	//   skew.
 	// A constraint is considered "Unsatisfiable" for an incoming pod
-	// if and only if every possible node assigment for that pod would violate
+	// if and only if every possible node assignment for that pod would violate
 	// "MaxSkew" on some topology.
 	// For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
 	// labelSelector spread as 3/1/1:

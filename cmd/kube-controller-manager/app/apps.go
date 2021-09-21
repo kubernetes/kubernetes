@@ -22,21 +22,17 @@ package app
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
-func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
-		return nil, false, nil
-	}
+func startDaemonSetController(ctx ControllerContext) (controller.Interface, bool, error) {
 	dsc, err := daemon.NewDaemonSetsController(
 		ctx.InformerFactory.Apps().V1().DaemonSets(),
 		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
@@ -52,10 +48,7 @@ func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error)
 	return nil, true, nil
 }
 
-func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}] {
-		return nil, false, nil
-	}
+func startStatefulSetController(ctx ControllerContext) (controller.Interface, bool, error) {
 	go statefulset.NewStatefulSetController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Apps().V1().StatefulSets(),
@@ -66,10 +59,7 @@ func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, erro
 	return nil, true, nil
 }
 
-func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}] {
-		return nil, false, nil
-	}
+func startReplicaSetController(ctx ControllerContext) (controller.Interface, bool, error) {
 	go replicaset.NewReplicaSetController(
 		ctx.InformerFactory.Apps().V1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
@@ -79,10 +69,7 @@ func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error
 	return nil, true, nil
 }
 
-func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
-		return nil, false, nil
-	}
+func startDeploymentController(ctx ControllerContext) (controller.Interface, bool, error) {
 	dc, err := deployment.NewDeploymentController(
 		ctx.InformerFactory.Apps().V1().Deployments(),
 		ctx.InformerFactory.Apps().V1().ReplicaSets(),

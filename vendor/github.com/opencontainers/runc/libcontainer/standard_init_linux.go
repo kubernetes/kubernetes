@@ -16,6 +16,7 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -24,6 +25,7 @@ type linuxStandardInit struct {
 	consoleSocket *os.File
 	parentPid     int
 	fifoFd        int
+	logFd         int
 	config        *initConfig
 }
 
@@ -50,7 +52,7 @@ func (l *linuxStandardInit) Init() error {
 		if err := selinux.SetKeyLabel(l.config.ProcessLabel); err != nil {
 			return err
 		}
-		defer selinux.SetKeyLabel("")
+		defer selinux.SetKeyLabel("") //nolint: errcheck
 		ringname, keepperms, newperms := l.getSessionRingParams()
 
 		// Do not inherit the parent's session keyring.
@@ -149,7 +151,7 @@ func (l *linuxStandardInit) Init() error {
 	if err := selinux.SetExecLabel(l.config.ProcessLabel); err != nil {
 		return errors.Wrap(err, "set process label")
 	}
-	defer selinux.SetExecLabel("")
+	defer selinux.SetExecLabel("") //nolint: errcheck
 	// Without NoNewPrivileges seccomp is a privileged operation, so we need to
 	// do this before dropping capabilities; otherwise do it as late as possible
 	// just before execve so as few syscalls take place after it as possible.
@@ -180,7 +182,14 @@ func (l *linuxStandardInit) Init() error {
 		return err
 	}
 	// Close the pipe to signal that we have completed our init.
-	l.pipe.Close()
+	logrus.Debugf("init: closing the pipe to signal completion")
+	_ = l.pipe.Close()
+
+	// Close the log pipe fd so the parent's ForwardLogs can exit.
+	if err := unix.Close(l.logFd); err != nil {
+		return newSystemErrorWithCause(err, "closing log pipe fd")
+	}
+
 	// Wait for the FIFO to be opened on the other side before exec-ing the
 	// user process. We open it through /proc/self/fd/$fd, because the fd that
 	// was given to us was an O_PATH fd to the fifo itself. Linux allows us to
@@ -198,7 +207,7 @@ func (l *linuxStandardInit) Init() error {
 	// N.B. the core issue itself (passing dirfds to the host filesystem) has
 	// since been resolved.
 	// https://github.com/torvalds/linux/blob/v4.9/fs/exec.c#L1290-L1318
-	unix.Close(l.fifoFd)
+	_ = unix.Close(l.fifoFd)
 	// Set seccomp as close to execve as possible, so as few syscalls take
 	// place afterward (reducing the amount of syscalls that users need to
 	// enable in their seccomp profiles).
@@ -215,7 +224,7 @@ func (l *linuxStandardInit) Init() error {
 		return err
 	}
 
-	if err := unix.Exec(name, l.config.Args[0:], os.Environ()); err != nil {
+	if err := system.Exec(name, l.config.Args[0:], os.Environ()); err != nil {
 		return newSystemErrorWithCause(err, "exec user process")
 	}
 	return nil

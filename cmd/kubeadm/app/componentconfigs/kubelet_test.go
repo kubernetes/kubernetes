@@ -50,10 +50,10 @@ func testKubeletConfigMap(contents string) *v1.ConfigMap {
 }
 
 func TestKubeletDefault(t *testing.T) {
-	var resolverConfig string
+	var resolverConfig *string
 	if isSystemdResolvedActive, _ := isServiceActive("systemd-resolved"); isSystemdResolvedActive {
 		// If systemd-resolved is active, we need to set the default resolver config
-		resolverConfig = kubeletSystemdResolverConfig
+		resolverConfig = utilpointer.String(kubeletSystemdResolverConfig)
 	}
 
 	tests := []struct {
@@ -87,6 +87,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -120,6 +121,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -158,6 +160,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -196,6 +199,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -230,6 +234,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},
@@ -261,6 +266,7 @@ func TestKubeletDefault(t *testing.T) {
 					HealthzPort:        utilpointer.Int32Ptr(constants.KubeletHealthzPort),
 					RotateCertificates: kubeletRotateCertificates,
 					ResolverConfig:     resolverConfig,
+					CgroupDriver:       constants.CgroupDriverSystemd,
 				},
 			},
 		},

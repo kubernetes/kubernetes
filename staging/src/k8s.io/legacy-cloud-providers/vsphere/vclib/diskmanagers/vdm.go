@@ -97,7 +97,7 @@ func (diskManager virtualDiskManager) Delete(ctx context.Context, datacenter *vc
 	}
 	err = task.Wait(ctx)
 	vclib.RecordvSphereMetric(vclib.APIDeleteVolume, requestTime, err)
-	if err != nil {
+	if err != nil && !types.IsFileNotFound(err) {
 		klog.Errorf("Failed to delete virtual disk. err: %v", err)
 		return err
 	}

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -98,11 +99,6 @@ const (
 	// ServiceAnnotationLoadBalancerEnableHighAvailabilityPorts is the annotation used on the service
 	// to enable the high availability ports on the standard internal load balancer.
 	ServiceAnnotationLoadBalancerEnableHighAvailabilityPorts = "service.beta.kubernetes.io/azure-load-balancer-enable-high-availability-ports"
-
-	// ServiceAnnotationLoadBalancerDisableTCPReset is the annotation used on the service
-	// to set enableTcpReset to false in load balancer rule. This only works for Azure standard load balancer backed service.
-	// TODO(feiskyer): disable-tcp-reset annotations has been depracated since v1.18, it would removed on v1.20.
-	ServiceAnnotationLoadBalancerDisableTCPReset = "service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset"
 
 	// ServiceAnnotationLoadBalancerHealthProbeProtocol determines the network protocol that the load balancer health probe use.
 	// If not set, the local service would use the HTTP and the cluster service would use the TCP by default.
@@ -1258,13 +1254,6 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			// construct FrontendIPConfigurationPropertiesFormat
 			var fipConfigurationProperties *network.FrontendIPConfigurationPropertiesFormat
 			if isInternal {
-				// azure does not support ILB for IPv6 yet.
-				// TODO: remove this check when ILB supports IPv6 *and* the SDK
-				// have been rev'ed to 2019* version
-				if utilnet.IsIPv6String(service.Spec.ClusterIP) {
-					return nil, fmt.Errorf("ensure(%s): lb(%s) - internal load balancers does not support IPv6", serviceName, lbName)
-				}
-
 				subnetName := subnet(service)
 				if subnetName == nil {
 					subnetName = &az.SubnetName
@@ -1280,6 +1269,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 				configProperties := network.FrontendIPConfigurationPropertiesFormat{
 					Subnet: &subnet,
+				}
+
+				if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+					configProperties.PrivateIPAddressVersion = network.IPv6
 				}
 
 				loadBalancerIP := service.Spec.LoadBalancerIP
@@ -1627,9 +1620,6 @@ func (az *Cloud) reconcileLoadBalancerRule(
 	var enableTCPReset *bool
 	if az.useStandardLoadBalancer() {
 		enableTCPReset = to.BoolPtr(true)
-		if _, ok := service.Annotations[ServiceAnnotationLoadBalancerDisableTCPReset]; ok {
-			klog.Warning("annotation service.beta.kubernetes.io/azure-load-balancer-disable-tcp-reset has been removed as of Kubernetes 1.20. TCP Resets are always enabled on Standard SKU load balancers.")
-		}
 	}
 
 	var expectedProbes []network.Probe
@@ -1869,18 +1859,18 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 				sharedRuleName := az.getSecurityRuleName(service, port, sourceAddressPrefix)
 				sharedIndex, sharedRule, sharedRuleFound := findSecurityRuleByName(updatedRules, sharedRuleName)
 				if !sharedRuleFound {
-					klog.V(4).Infof("Expected to find shared rule %s for service %s being deleted, but did not", sharedRuleName, service.Name)
-					return nil, fmt.Errorf("expected to find shared rule %s for service %s being deleted, but did not", sharedRuleName, service.Name)
+					klog.V(4).Infof("Didn't find shared rule %s for service %s", sharedRuleName, service.Name)
+					continue
 				}
 				if sharedRule.DestinationAddressPrefixes == nil {
-					klog.V(4).Infof("Expected to have array of destinations in shared rule for service %s being deleted, but did not", service.Name)
-					return nil, fmt.Errorf("expected to have array of destinations in shared rule for service %s being deleted, but did not", service.Name)
+					klog.V(4).Infof("Didn't find DestinationAddressPrefixes in shared rule for service %s", service.Name)
+					continue
 				}
 				existingPrefixes := *sharedRule.DestinationAddressPrefixes
 				addressIndex, found := findIndex(existingPrefixes, destinationIPAddress)
 				if !found {
-					klog.V(4).Infof("Expected to find destination address %s in shared rule %s for service %s being deleted, but did not", destinationIPAddress, sharedRuleName, service.Name)
-					return nil, fmt.Errorf("expected to find destination address %s in shared rule %s for service %s being deleted, but did not", destinationIPAddress, sharedRuleName, service.Name)
+					klog.V(4).Infof("Didn't find destination address %v in shared rule %s for service %s", destinationIPAddress, sharedRuleName, service.Name)
+					continue
 				}
 				if len(existingPrefixes) == 1 {
 					updatedRules = append(updatedRules[:sharedIndex], updatedRules[sharedIndex+1:]...)
@@ -2142,15 +2132,13 @@ func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lb
 
 //  ensurePIPTagged ensures the public IP of the service is tagged as configured
 func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddress) bool {
-	changed := false
 	configTags := parseTags(az.Tags)
 	annotationTags := make(map[string]*string)
 	if _, ok := service.Annotations[ServiceAnnotationAzurePIPTags]; ok {
 		annotationTags = parseTags(service.Annotations[ServiceAnnotationAzurePIPTags])
 	}
-	for k, v := range annotationTags {
-		configTags[k] = v
-	}
+	configTags, _ = reconcileTags(configTags, annotationTags)
+
 	// include the cluster name and service names tags when comparing
 	var clusterName, serviceNames *string
 	if v, ok := pip.Tags[clusterNameKey]; ok {
@@ -2165,12 +2153,10 @@ func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddre
 	if serviceNames != nil {
 		configTags[serviceTagKey] = serviceNames
 	}
-	for k, v := range configTags {
-		if vv, ok := pip.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			pip.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(pip.Tags, configTags)
+	pip.Tags = tags
+
 	return changed
 }
 
@@ -2437,7 +2423,7 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 		if !strings.EqualFold(to.String(existingRule.Name), to.String(rule.Name)) {
 			continue
 		}
-		if existingRule.Protocol != rule.Protocol {
+		if !strings.EqualFold(string(existingRule.Protocol), string(rule.Protocol)) {
 			continue
 		}
 		if !strings.EqualFold(to.String(existingRule.SourcePortRange), to.String(rule.SourcePortRange)) {
@@ -2454,10 +2440,10 @@ func findSecurityRule(rules []network.SecurityRule, rule network.SecurityRule) b
 				continue
 			}
 		}
-		if existingRule.Access != rule.Access {
+		if !strings.EqualFold(string(existingRule.Access), string(rule.Access)) {
 			continue
 		}
-		if existingRule.Direction != rule.Direction {
+		if !strings.EqualFold(string(existingRule.Direction), string(rule.Direction)) {
 			continue
 		}
 		return true
@@ -2731,7 +2717,6 @@ func unbindServiceFromPIP(pip *network.PublicIPAddress, serviceName string) erro
 
 // ensureLoadBalancerTagged ensures every load balancer in the resource group is tagged as configured
 func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
-	changed := false
 	if az.Tags == "" {
 		return false
 	}
@@ -2739,18 +2724,15 @@ func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
 	if lb.Tags == nil {
 		lb.Tags = make(map[string]*string)
 	}
-	for k, v := range tags {
-		if vv, ok := lb.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			lb.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(lb.Tags, tags)
+	lb.Tags = tags
+
 	return changed
 }
 
 // ensureSecurityGroupTagged ensures the security group is tagged as configured
 func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
-	changed := false
 	if az.Tags == "" {
 		return false
 	}
@@ -2758,11 +2740,9 @@ func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
 	if sg.Tags == nil {
 		sg.Tags = make(map[string]*string)
 	}
-	for k, v := range tags {
-		if vv, ok := sg.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			sg.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(sg.Tags, tags)
+	sg.Tags = tags
+
 	return changed
 }

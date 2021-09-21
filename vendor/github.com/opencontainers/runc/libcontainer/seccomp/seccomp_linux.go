@@ -3,11 +3,8 @@
 package seccomp
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/seccomp/patchbpf"
@@ -39,7 +36,7 @@ func InitSeccomp(config *configs.Seccomp) error {
 		return errors.New("cannot initialize Seccomp - nil config passed")
 	}
 
-	defaultAction, err := getAction(config.DefaultAction, nil)
+	defaultAction, err := getAction(config.DefaultAction, config.DefaultErrnoRet)
 	if err != nil {
 		return errors.New("error initializing seccomp - invalid default action")
 	}
@@ -70,7 +67,7 @@ func InitSeccomp(config *configs.Seccomp) error {
 		if call == nil {
 			return errors.New("encountered nil syscall while initializing Seccomp")
 		}
-		if err := matchCall(filter, call); err != nil {
+		if err := matchCall(filter, call, defaultAction); err != nil {
 			return err
 		}
 	}
@@ -78,24 +75,6 @@ func InitSeccomp(config *configs.Seccomp) error {
 		return fmt.Errorf("error loading seccomp filter into kernel: %s", err)
 	}
 	return nil
-}
-
-// IsEnabled returns if the kernel has been configured to support seccomp.
-func IsEnabled() bool {
-	// Try to read from /proc/self/status for kernels > 3.8
-	s, err := parseStatusFile("/proc/self/status")
-	if err != nil {
-		// Check if Seccomp is supported, via CONFIG_SECCOMP.
-		if err := unix.Prctl(unix.PR_GET_SECCOMP, 0, 0, 0, 0); err != unix.EINVAL {
-			// Make sure the kernel has CONFIG_SECCOMP_FILTER.
-			if err := unix.Prctl(unix.PR_SET_SECCOMP, unix.SECCOMP_MODE_FILTER, 0, 0, 0); err != unix.EINVAL {
-				return true
-			}
-		}
-		return false
-	}
-	_, ok := s["Seccomp"]
-	return ok
 }
 
 // Convert Libcontainer Action to Libseccomp ScmpAction
@@ -163,7 +142,7 @@ func getCondition(arg *configs.Arg) (libseccomp.ScmpCondition, error) {
 }
 
 // Add a rule to match a single syscall
-func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
+func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall, defAct libseccomp.ScmpAction) error {
 	if call == nil || filter == nil {
 		return errors.New("cannot use nil as syscall to block")
 	}
@@ -172,17 +151,22 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 		return errors.New("empty string is not a valid syscall")
 	}
 
+	// Convert the call's action to the libseccomp equivalent
+	callAct, err := getAction(call.Action, call.ErrnoRet)
+	if err != nil {
+		return fmt.Errorf("action in seccomp profile is invalid: %w", err)
+	}
+	if callAct == defAct {
+		// This rule is redundant, silently skip it
+		// to avoid error from AddRule.
+		return nil
+	}
+
 	// If we can't resolve the syscall, assume it's not supported on this kernel
 	// Ignore it, don't error out
 	callNum, err := libseccomp.GetSyscallFromName(call.Name)
 	if err != nil {
 		return nil
-	}
-
-	// Convert the call's action to the libseccomp equivalent
-	callAct, err := getAction(call.Action, call.ErrnoRet)
-	if err != nil {
-		return fmt.Errorf("action in seccomp profile is invalid: %s", err)
 	}
 
 	// Unconditional match - just add the rule
@@ -235,33 +219,6 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 	}
 
 	return nil
-}
-
-func parseStatusFile(path string) (map[string]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	s := bufio.NewScanner(f)
-	status := make(map[string]string)
-
-	for s.Scan() {
-		text := s.Text()
-		parts := strings.Split(text, ":")
-
-		if len(parts) <= 1 {
-			continue
-		}
-
-		status[parts[0]] = parts[1]
-	}
-	if err := s.Err(); err != nil {
-		return nil, err
-	}
-
-	return status, nil
 }
 
 // Version returns major, minor, and micro.

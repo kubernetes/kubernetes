@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
@@ -51,6 +50,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 const (
@@ -64,13 +64,12 @@ func TestCreate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	factory := newConfigFactory(client, stopCh)
-	if _, err := factory.createFromProvider(schedulerapi.SchedulerDefaultProviderName); err != nil {
+	if _, err := factory.create(); err != nil {
 		t.Error(err)
 	}
 }
 
-// createAlgorithmSourceFromPolicy creates the schedulerAlgorithmSource from policy string
-func createAlgorithmSourceFromPolicy(configData []byte, clientSet clientset.Interface) schedulerapi.SchedulerAlgorithmSource {
+func createPolicySource(configData []byte, clientSet clientset.Interface) *schedulerapi.SchedulerPolicySource {
 	configPolicyName := "scheduler-custom-policy-config"
 	policyConfigMap := v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -82,12 +81,10 @@ func createAlgorithmSourceFromPolicy(configData []byte, clientSet clientset.Inte
 
 	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
 
-	return schedulerapi.SchedulerAlgorithmSource{
-		Policy: &schedulerapi.SchedulerPolicySource{
-			ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
-				Namespace: policyConfigMap.Namespace,
-				Name:      policyConfigMap.Name,
-			},
+	return &schedulerapi.SchedulerPolicySource{
+		ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
+			Namespace: policyConfigMap.Namespace,
+			Name:      policyConfigMap.Name,
 		},
 	}
 }
@@ -128,8 +125,22 @@ func TestCreateFromConfig(t *testing.T) {
 					Args: &schedulerapi.NodeAffinityArgs{},
 				},
 				{
+					Name: noderesources.BalancedAllocationName,
+					Args: &schedulerapi.NodeResourcesBalancedAllocationArgs{
+						Resources: []schedulerapi.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					},
+				},
+				{
 					Name: noderesources.FitName,
-					Args: &schedulerapi.NodeResourcesFitArgs{},
+					Args: &schedulerapi.NodeResourcesFitArgs{
+						ScoringStrategy: &schedulerapi.ScoringStrategy{
+							Type: schedulerapi.LeastAllocated,
+							Resources: []schedulerapi.ResourceSpec{
+								{Name: "cpu", Weight: 1},
+								{Name: "memory", Weight: 1},
+							},
+						},
+					},
 				},
 				{
 					Name: noderesources.LeastAllocatedName,
@@ -345,7 +356,15 @@ func TestCreateFromConfig(t *testing.T) {
 				},
 				{
 					Name: "NodeResourcesFit",
-					Args: &schedulerapi.NodeResourcesFitArgs{},
+					Args: &schedulerapi.NodeResourcesFitArgs{
+						ScoringStrategy: &schedulerapi.ScoringStrategy{
+							Type: schedulerapi.LeastAllocated,
+							Resources: []schedulerapi.ResourceSpec{
+								{Name: "cpu", Weight: 1},
+								{Name: "memory", Weight: 1},
+							},
+						},
+					},
 				},
 			},
 			wantPlugins: &schedulerapi.Plugins{
@@ -403,9 +422,11 @@ func TestCreateFromConfig(t *testing.T) {
 			_, err := New(
 				client,
 				informerFactory,
+				nil,
 				recorderFactory,
 				make(chan struct{}),
-				WithAlgorithmSource(createAlgorithmSourceFromPolicy(tc.configData, client)),
+				WithProfiles([]schedulerapi.KubeSchedulerProfile(nil)...),
+				WithLegacyPolicySource(createPolicySource(tc.configData, client)),
 				WithBuildFrameworkCapturer(func(p schedulerapi.KubeSchedulerProfile) {
 					if p.SchedulerName != v1.DefaultSchedulerName {
 						t.Errorf("unexpected scheduler name: want %q, got %q", v1.DefaultSchedulerName, p.SchedulerName)
@@ -471,7 +492,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			// Need to add/update/delete testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			queue.Add(testPod)
@@ -545,7 +566,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			// Need to add testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			for i := range tt.nodes {
@@ -586,7 +607,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	// Need to add testPod to the store.
 	podInformer.Informer().GetStore().Add(testPod)
 
-	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(testingclock.NewFakeClock(time.Now())))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
@@ -644,10 +665,17 @@ func newConfigFactoryWithFrameworkRegistry(
 		StopEverything:           stopCh,
 		registry:                 registry,
 		profiles: []schedulerapi.KubeSchedulerProfile{
-			{SchedulerName: testSchedulerName},
+			{
+				SchedulerName: testSchedulerName,
+				Plugins: &schedulerapi.Plugins{
+					QueueSort: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "PrioritySort"}}},
+					Bind:      schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
+				},
+			},
 		},
 		recorderFactory:  recorderFactory,
 		nodeInfoSnapshot: snapshot,
+		clusterEventMap:  make(map[framework.ClusterEvent]sets.String),
 	}
 }
 

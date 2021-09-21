@@ -15,8 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
-	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
@@ -37,7 +36,7 @@ func IsCgroup2UnifiedMode() bool {
 		var st unix.Statfs_t
 		err := unix.Statfs(unifiedMountpoint, &st)
 		if err != nil {
-			if os.IsNotExist(err) && system.RunningInUserNS() {
+			if os.IsNotExist(err) && userns.RunningInUserNS() {
 				// ignore the "not found" error if running in userns
 				logrus.WithError(err).Debugf("%s missing, assuming cgroup v1", unifiedMountpoint)
 				isUnified = false
@@ -88,7 +87,7 @@ func GetAllSubsystems() ([]string, error) {
 		// - freezer: implemented in kernel 5.2
 		// We assume these are always available, as it is hard to detect availability.
 		pseudo := []string{"devices", "freezer"}
-		data, err := fscommon.ReadFile("/sys/fs/cgroup", "cgroup.controllers")
+		data, err := ReadFile("/sys/fs/cgroup", "cgroup.controllers")
 		if err != nil {
 			return nil, err
 		}
@@ -267,7 +266,6 @@ func RemovePaths(paths map[string]string) (err error) {
 				case retries - 1:
 					logrus.WithError(err).Error("Failed to remove cgroup")
 				}
-
 			}
 			_, err := os.Stat(p)
 			// We need this strange way of checking cgroups existence because
@@ -376,7 +374,7 @@ func WriteCgroupProc(dir string, pid int) error {
 		return nil
 	}
 
-	file, err := fscommon.OpenFile(dir, CgroupProcesses, os.O_WRONLY)
+	file, err := OpenFile(dir, CgroupProcesses, os.O_WRONLY)
 	if err != nil {
 		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
 	}
@@ -398,17 +396,6 @@ func WriteCgroupProc(dir string, pid int) error {
 		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
 	}
 	return err
-}
-
-// Since the OCI spec is designed for cgroup v1, in some cases
-// there is need to convert from the cgroup v1 configuration to cgroup v2
-// the formula for BlkIOWeight is y = (1 + (x - 10) * 9999 / 990)
-// convert linearly from [10-1000] to [1-10000]
-func ConvertBlkIOToCgroupV2Value(blkIoWeight uint16) uint64 {
-	if blkIoWeight == 0 {
-		return 0
-	}
-	return uint64(1 + (uint64(blkIoWeight)-10)*9999/990)
 }
 
 // Since the OCI spec is designed for cgroup v1, in some cases
@@ -449,4 +436,15 @@ func ConvertMemorySwapToCgroupV2Value(memorySwap, memory int64) (int64, error) {
 	}
 
 	return memorySwap - memory, nil
+}
+
+// Since the OCI spec is designed for cgroup v1, in some cases
+// there is need to convert from the cgroup v1 configuration to cgroup v2
+// the formula for BlkIOWeight to IOWeight is y = (1 + (x - 10) * 9999 / 990)
+// convert linearly from [10-1000] to [1-10000]
+func ConvertBlkIOToIOWeightValue(blkIoWeight uint16) uint64 {
+	if blkIoWeight == 0 {
+		return 0
+	}
+	return uint64(1 + (uint64(blkIoWeight)-10)*9999/990)
 }

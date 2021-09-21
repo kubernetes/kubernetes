@@ -17,10 +17,8 @@ limitations under the License.
 package plugins
 
 import (
-	apiruntime "k8s.io/apimachinery/pkg/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -50,8 +48,13 @@ import (
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
-		EnablePodAffinityNamespaceSelector: utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
-		EnablePodDisruptionBudget:          utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
+		EnablePodAffinityNamespaceSelector: feature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
+		EnablePodDisruptionBudget:          feature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
+		EnablePodOverhead:                  feature.DefaultFeatureGate.Enabled(features.PodOverhead),
+		EnableReadWriteOncePod:             feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
+		EnableVolumeCapacityPriority:       feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
+		EnableCSIStorageCapacity:           feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
+		EnableGenericEphemeralVolume:       feature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	}
 
 	return runtime.Registry{
@@ -64,28 +67,24 @@ func NewInTreeRegistry() runtime.Registry {
 		nodeaffinity.Name:                          nodeaffinity.New,
 		podtopologyspread.Name:                     podtopologyspread.New,
 		nodeunschedulable.Name:                     nodeunschedulable.New,
-		noderesources.FitName:                      noderesources.NewFit,
-		noderesources.BalancedAllocationName:       noderesources.NewBalancedAllocation,
-		noderesources.MostAllocatedName:            noderesources.NewMostAllocated,
-		noderesources.LeastAllocatedName:           noderesources.NewLeastAllocated,
-		noderesources.RequestedToCapacityRatioName: noderesources.NewRequestedToCapacityRatio,
-		volumebinding.Name:                         volumebinding.New,
-		volumerestrictions.Name:                    volumerestrictions.New,
+		noderesources.FitName:                      runtime.FactoryAdapter(fts, noderesources.NewFit),
+		noderesources.BalancedAllocationName:       runtime.FactoryAdapter(fts, noderesources.NewBalancedAllocation),
+		noderesources.MostAllocatedName:            runtime.FactoryAdapter(fts, noderesources.NewMostAllocated),
+		noderesources.LeastAllocatedName:           runtime.FactoryAdapter(fts, noderesources.NewLeastAllocated),
+		noderesources.RequestedToCapacityRatioName: runtime.FactoryAdapter(fts, noderesources.NewRequestedToCapacityRatio),
+		volumebinding.Name:                         runtime.FactoryAdapter(fts, volumebinding.New),
+		volumerestrictions.Name:                    runtime.FactoryAdapter(fts, volumerestrictions.New),
 		volumezone.Name:                            volumezone.New,
 		nodevolumelimits.CSIName:                   nodevolumelimits.NewCSI,
 		nodevolumelimits.EBSName:                   nodevolumelimits.NewEBS,
 		nodevolumelimits.GCEPDName:                 nodevolumelimits.NewGCEPD,
 		nodevolumelimits.AzureDiskName:             nodevolumelimits.NewAzureDisk,
 		nodevolumelimits.CinderName:                nodevolumelimits.NewCinder,
-		interpodaffinity.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return interpodaffinity.New(plArgs, fh, fts)
-		},
-		nodelabel.Name:       nodelabel.New,
-		serviceaffinity.Name: serviceaffinity.New,
-		queuesort.Name:       queuesort.New,
-		defaultbinder.Name:   defaultbinder.New,
-		defaultpreemption.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return defaultpreemption.New(plArgs, fh, fts)
-		},
+		interpodaffinity.Name:                      runtime.FactoryAdapter(fts, interpodaffinity.New),
+		nodelabel.Name:                             nodelabel.New,
+		serviceaffinity.Name:                       serviceaffinity.New,
+		queuesort.Name:                             queuesort.New,
+		defaultbinder.Name:                         defaultbinder.New,
+		defaultpreemption.Name:                     runtime.FactoryAdapter(fts, defaultpreemption.New),
 	}
 }

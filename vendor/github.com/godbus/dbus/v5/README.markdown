@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/godbus/dbus.svg?branch=master)](https://travis-ci.org/godbus/dbus)
+![Build Status](https://github.com/godbus/dbus/workflows/Go/badge.svg)
 
 dbus
 ----
@@ -32,6 +32,8 @@ gives a short overview over the basic usage.
 #### Projects using godbus
 - [notify](https://github.com/esiqveland/notify) provides desktop notifications over dbus into a library.
 - [go-bluetooth](https://github.com/muka/go-bluetooth) provides a bluetooth client over bluez dbus API.
+- [playerbm](https://github.com/altdesktop/playerbm) a bookmark utility for media players.
+- [iwd](https://github.com/shibumi/iwd) go bindings for the internet wireless daemon "iwd".
 
 Please note that the API is considered unstable for now and may change without
 further notice.

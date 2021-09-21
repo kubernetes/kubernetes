@@ -1,3 +1,4 @@
+//go:build linux || darwin || windows
 // +build linux darwin windows
 
 /*
@@ -83,6 +84,37 @@ func getBlockPlugin(t *testing.T) (string, volume.BlockVolumePlugin) {
 	return tmpDir, plug
 }
 
+func getNodeExpandablePlugin(t *testing.T, isBlockDevice bool) (string, volume.NodeExpandableVolumePlugin) {
+	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+
+	plugMgr := volume.VolumePluginMgr{}
+	var pathToFSType map[string]hostutil.FileType
+	if isBlockDevice {
+		pathToFSType = map[string]hostutil.FileType{
+			tmpDir: hostutil.FileTypeBlockDev,
+		}
+	} else {
+		pathToFSType = map[string]hostutil.FileType{
+			tmpDir: hostutil.FileTypeDirectory,
+		}
+	}
+
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeKubeletVolumeHostWithMounterFSType(t, tmpDir, nil, nil, pathToFSType))
+
+	plug, err := plugMgr.FindNodeExpandablePluginByName(localVolumePluginName)
+	if err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("Can't find the plugin by name")
+	}
+	if plug.GetPluginName() != localVolumePluginName {
+		t.Errorf("Wrong name: %s", plug.GetPluginName())
+	}
+	return tmpDir, plug
+}
+
 func getPersistentPlugin(t *testing.T) (string, volume.PersistentVolumePlugin) {
 	tmpDir, err := utiltesting.MkTmpdir("localVolumeTest")
 	if err != nil {
@@ -148,6 +180,9 @@ func getTestVolume(readOnly bool, path string, isBlock bool, mountOptions []stri
 	if isBlock {
 		blockMode := v1.PersistentVolumeBlock
 		pv.Spec.VolumeMode = &blockMode
+	} else {
+		fsMode := v1.PersistentVolumeFilesystem
+		pv.Spec.VolumeMode = &fsMode
 	}
 	return volume.NewSpecFromPersistentVolume(pv, readOnly)
 }
@@ -231,7 +266,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 
 	fmt.Println("expected global path is:", expectedGlobalPath)
 
-	err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath)
+	err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath, volume.DeviceMounterArgs{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +311,7 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 	}
 
 	// Actually, we will do nothing if the local path is FS type
-	err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath)
+	err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath, volume.DeviceMounterArgs{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,6 +321,28 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 		} else {
 			t.Errorf("DeviceMounter.MountDevice() failed: %v", err)
 		}
+	}
+}
+
+func TestNodeExpand(t *testing.T) {
+	// FS global path testing
+	tmpFSDir, plug := getNodeExpandablePlugin(t, false)
+	defer os.RemoveAll(tmpFSDir)
+
+	pvSpec := getTestVolume(false, tmpFSDir, false, nil)
+
+	resizeOptions := volume.NodeResizeOptions{
+		VolumeSpec: pvSpec,
+		DevicePath: tmpFSDir,
+	}
+
+	// Actually, we will do no volume expansion if volume is of type dir
+	resizeDone, err := plug.NodeExpand(resizeOptions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !resizeDone {
+		t.Errorf("expected resize to be done")
 	}
 }
 

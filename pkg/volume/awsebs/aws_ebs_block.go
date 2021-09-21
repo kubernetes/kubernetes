@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -98,7 +99,7 @@ func (plugin *awsElasticBlockStorePlugin) newBlockVolumeMapperInternal(spec *vol
 		partition = strconv.Itoa(int(ebs.Partition))
 	}
 
-	return &awsElasticBlockStoreMapper{
+	mapper := &awsElasticBlockStoreMapper{
 		awsElasticBlockStore: &awsElasticBlockStore{
 			podUID:    podUID,
 			volName:   spec.Name(),
@@ -108,7 +109,16 @@ func (plugin *awsElasticBlockStorePlugin) newBlockVolumeMapperInternal(spec *vol
 			mounter:   mounter,
 			plugin:    plugin,
 		},
-		readOnly: readOnly}, nil
+		readOnly: readOnly,
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {
@@ -155,4 +165,10 @@ func (ebs *awsElasticBlockStore) GetGlobalMapPath(spec *volume.Spec) (string, er
 func (ebs *awsElasticBlockStore) GetPodDeviceMapPath() (string, string) {
 	name := awsElasticBlockStorePluginName
 	return ebs.plugin.host.GetPodVolumeDeviceDir(ebs.podUID, utilstrings.EscapeQualifiedName(name)), ebs.volName
+}
+
+// SupportsMetrics returns true for awsElasticBlockStore as it initializes the
+// MetricsProvider.
+func (ebs *awsElasticBlockStore) SupportsMetrics() bool {
+	return true
 }

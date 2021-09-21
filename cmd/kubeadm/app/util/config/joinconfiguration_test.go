@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/lithammer/dedent"
+
 	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 )
 

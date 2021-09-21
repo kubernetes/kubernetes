@@ -17,13 +17,11 @@ limitations under the License.
 package alpha
 
 import (
-	"io"
-
 	"github.com/spf13/cobra"
 )
 
 // NewCmdAlpha returns "kubeadm alpha" command.
-func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
+func NewCmdAlpha() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: "Kubeadm experimental sub-commands",

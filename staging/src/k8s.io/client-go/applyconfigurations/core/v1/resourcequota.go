@@ -50,7 +50,7 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 // ExtractResourceQuota extracts the applied configuration owned by fieldManager from
 // resourceQuota. If no managedFields are found in resourceQuota for fieldManager, a
 // ResourceQuotaApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // resourceQuota must be a unmodified ResourceQuota API object that was retrieved from the Kubernetes API.

@@ -652,100 +652,6 @@ func TestDropFSGroupFields(t *testing.T) {
 
 }
 
-func TestDropSubPath(t *testing.T) {
-	podWithSubpaths := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				RestartPolicy:  api.RestartPolicyNever,
-				Containers:     []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: "foo"}, {Name: "a", SubPath: "foo2"}, {Name: "a", SubPath: "foo3"}}}},
-				InitContainers: []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: "foo"}, {Name: "a", SubPath: "foo2"}}}},
-				Volumes:        []api.Volume{{Name: "a", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/dev/xvdc"}}}},
-			},
-		}
-	}
-	podWithoutSubpaths := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				RestartPolicy:  api.RestartPolicyNever,
-				Containers:     []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: ""}, {Name: "a", SubPath: ""}, {Name: "a", SubPath: ""}}}},
-				InitContainers: []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPath: ""}, {Name: "a", SubPath: ""}}}},
-				Volumes:        []api.Volume{{Name: "a", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/dev/xvdc"}}}},
-			},
-		}
-	}
-
-	podInfo := []struct {
-		description string
-		hasSubpaths bool
-		pod         func() *api.Pod
-	}{
-		{
-			description: "has subpaths",
-			hasSubpaths: true,
-			pod:         podWithSubpaths,
-		},
-		{
-			description: "does not have subpaths",
-			hasSubpaths: false,
-			pod:         podWithoutSubpaths,
-		},
-		{
-			description: "is nil",
-			hasSubpaths: false,
-			pod:         func() *api.Pod { return nil },
-		},
-	}
-
-	for _, enabled := range []bool{true, false} {
-		for _, oldPodInfo := range podInfo {
-			for _, newPodInfo := range podInfo {
-				oldPodHasSubpaths, oldPod := oldPodInfo.hasSubpaths, oldPodInfo.pod()
-				newPodHasSubpaths, newPod := newPodInfo.hasSubpaths, newPodInfo.pod()
-				if newPod == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, enabled)()
-
-					var oldPodSpec *api.PodSpec
-					if oldPod != nil {
-						oldPodSpec = &oldPod.Spec
-					}
-					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-					// old pod should never be changed
-					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-					}
-
-					switch {
-					case enabled || oldPodHasSubpaths:
-						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					case newPodHasSubpaths:
-						// new pod should be changed
-						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod was not changed")
-						}
-						// new pod should not have subpaths
-						if !reflect.DeepEqual(newPod, podWithoutSubpaths()) {
-							t.Errorf("new pod had subpaths: %v", cmp.Diff(newPod, podWithoutSubpaths()))
-						}
-					default:
-						// new pod should not need to be changed
-						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-						}
-					}
-				})
-			}
-		}
-	}
-}
-
 func TestDropProcMount(t *testing.T) {
 	procMount := api.UnmaskedProcMount
 	defaultProcMount := api.DefaultProcMount
@@ -1046,106 +952,16 @@ func TestDropAppArmor(t *testing.T) {
 	}
 }
 
-func TestDropSubPathExpr(t *testing.T) {
-	podWithSubpaths := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				RestartPolicy:  api.RestartPolicyNever,
-				Containers:     []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPathExpr: "foo"}, {Name: "a", SubPathExpr: "foo2"}, {Name: "a", SubPathExpr: "foo3"}}}},
-				InitContainers: []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPathExpr: "foo"}, {Name: "a", SubPathExpr: "foo2"}}}},
-				Volumes:        []api.Volume{{Name: "a", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/dev/xvdc"}}}},
-			},
-		}
-	}
-	podWithoutSubpaths := func() *api.Pod {
-		return &api.Pod{
-			Spec: api.PodSpec{
-				RestartPolicy:  api.RestartPolicyNever,
-				Containers:     []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPathExpr: ""}, {Name: "a", SubPathExpr: ""}, {Name: "a", SubPathExpr: ""}}}},
-				InitContainers: []api.Container{{Name: "container1", Image: "testimage", VolumeMounts: []api.VolumeMount{{Name: "a", SubPathExpr: ""}, {Name: "a", SubPathExpr: ""}}}},
-				Volumes:        []api.Volume{{Name: "a", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/dev/xvdc"}}}},
-			},
-		}
-	}
-
-	podInfo := []struct {
-		description string
-		hasSubpaths bool
-		pod         func() *api.Pod
-	}{
-		{
-			description: "has subpaths",
-			hasSubpaths: true,
-			pod:         podWithSubpaths,
-		},
-		{
-			description: "does not have subpaths",
-			hasSubpaths: false,
-			pod:         podWithoutSubpaths,
-		},
-		{
-			description: "is nil",
-			hasSubpaths: false,
-			pod:         func() *api.Pod { return nil },
-		},
-	}
-
-	enabled := true
-	for _, oldPodInfo := range podInfo {
-		for _, newPodInfo := range podInfo {
-			oldPodHasSubpaths, oldPod := oldPodInfo.hasSubpaths, oldPodInfo.pod()
-			newPodHasSubpaths, newPod := newPodInfo.hasSubpaths, newPodInfo.pod()
-			if newPod == nil {
-				continue
-			}
-
-			t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-
-				var oldPodSpec *api.PodSpec
-				if oldPod != nil {
-					oldPodSpec = &oldPod.Spec
-				}
-				dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-				// old pod should never be changed
-				if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-					t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-				}
-
-				switch {
-				case enabled || oldPodHasSubpaths:
-					// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-					}
-				case newPodHasSubpaths:
-					// new pod should be changed
-					if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod was not changed")
-					}
-					// new pod should not have subpaths
-					if !reflect.DeepEqual(newPod, podWithoutSubpaths()) {
-						t.Errorf("new pod had subpaths: %v", cmp.Diff(newPod, podWithoutSubpaths()))
-					}
-				default:
-					// new pod should not need to be changed
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-					}
-				}
-			})
-		}
-	}
-}
-
 func TestDropProbeGracePeriod(t *testing.T) {
-	gracePeriod := int64(10)
-	probe := api.Probe{TerminationGracePeriodSeconds: &gracePeriod}
 	podWithProbeGracePeriod := func() *api.Pod {
+		livenessGracePeriod := int64(10)
+		livenessProbe := api.Probe{TerminationGracePeriodSeconds: &livenessGracePeriod}
+		startupGracePeriod := int64(10)
+		startupProbe := api.Probe{TerminationGracePeriodSeconds: &startupGracePeriod}
 		return &api.Pod{
 			Spec: api.PodSpec{
 				RestartPolicy: api.RestartPolicyNever,
-				Containers:    []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &probe, StartupProbe: &probe}},
+				Containers:    []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &livenessProbe, StartupProbe: &startupProbe}},
 			},
 		}
 	}
@@ -1187,50 +1003,52 @@ func TestDropProbeGracePeriod(t *testing.T) {
 		},
 	}
 
-	enabled := true
-	for _, oldPodInfo := range podInfo {
-		for _, newPodInfo := range podInfo {
-			oldPodHasGracePeriod, oldPod := oldPodInfo.hasGracePeriod, oldPodInfo.pod()
-			newPodHasGracePeriod, newPod := newPodInfo.hasGracePeriod, newPodInfo.pod()
-			if newPod == nil {
-				continue
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasGracePeriod, oldPod := oldPodInfo.hasGracePeriod, oldPodInfo.pod()
+				newPodHasGracePeriod, newPod := newPodInfo.hasGracePeriod, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProbeTerminationGracePeriod, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasGracePeriod:
+						// new pod should not be changed if the feature is enabled, or if the old pod had terminationGracePeriod
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasGracePeriod:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have terminationGracePeriod
+						if !reflect.DeepEqual(newPod, podWithoutProbeGracePeriod()) {
+							t.Errorf("new pod had probe-level terminationGracePeriod: %v", cmp.Diff(newPod, podWithoutProbeGracePeriod()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
 			}
-
-			t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
-
-				var oldPodSpec *api.PodSpec
-				if oldPod != nil {
-					oldPodSpec = &oldPod.Spec
-				}
-				dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
-
-				// old pod should never be changed
-				if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
-					t.Errorf("old pod changed: %v", cmp.Diff(oldPod, oldPodInfo.pod()))
-				}
-
-				switch {
-				case enabled || oldPodHasGracePeriod:
-					// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-					}
-				case newPodHasGracePeriod:
-					// new pod should be changed
-					if reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod was not changed")
-					}
-					// new pod should not have subpaths
-					if !reflect.DeepEqual(newPod, podWithoutProbeGracePeriod()) {
-						t.Errorf("new pod had probe-level terminationGracePeriod: %v", cmp.Diff(newPod, podWithoutProbeGracePeriod()))
-					}
-				default:
-					// new pod should not need to be changed
-					if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
-						t.Errorf("new pod changed: %v", cmp.Diff(newPod, newPodInfo.pod()))
-					}
-				}
-			})
 		}
 	}
 }
@@ -1359,12 +1177,12 @@ func TestDropEphemeralContainers(t *testing.T) {
 		pod                    func() *api.Pod
 	}{
 		{
-			description:            "has subpaths",
+			description:            "has ephemeral containers",
 			hasEphemeralContainers: true,
 			pod:                    podWithEphemeralContainers,
 		},
 		{
-			description:            "does not have subpaths",
+			description:            "does not have ephemeral containers",
 			hasEphemeralContainers: false,
 			pod:                    podWithoutEphemeralContainers,
 		},
@@ -1469,6 +1287,365 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 			gotOptions := GetValidationOptionsFromPodSpecAndMeta(nil, nil, nil, tc.oldPodMeta)
 			if tc.wantAllowInvalidPodDeletionCost != gotOptions.AllowInvalidPodDeletionCost {
 				t.Errorf("unexpected diff, want: %v, got: %v", tc.wantAllowInvalidPodDeletionCost, gotOptions.AllowInvalidPodDeletionCost)
+			}
+		})
+	}
+}
+
+func TestHaveSameExpandedDNSConfig(t *testing.T) {
+	testCases := []struct {
+		desc       string
+		podSpec    *api.PodSpec
+		oldPodSpec *api.PodSpec
+		want       bool
+	}{
+		{
+			desc:       "nil DNSConfig",
+			podSpec:    &api.PodSpec{},
+			oldPodSpec: &api.PodSpec{},
+			want:       false,
+		},
+		{
+			desc: "empty DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{},
+			},
+			want: false,
+		},
+		{
+			desc: "same legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"baz.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "same expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: true,
+		},
+		{
+			desc: "update expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"baz.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update to legacy DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"baz.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"7.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			desc: "update to expanded DNSConfig",
+			podSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+						"baz.expanded.com",
+						"8.expanded.com",
+						"9.expanded.com",
+						"10.expanded.com",
+						"11.expanded.com",
+						"12.expanded.com",
+						"13.expanded.com",
+						"14.expanded.com",
+						"15.expanded.com",
+						"16.expanded.com",
+						"17.expanded.com",
+						"18.expanded.com",
+						"19.expanded.com",
+						"20.expanded.com",
+						"21.expanded.com",
+						"22.expanded.com",
+						"23.expanded.com",
+						"24.expanded.com",
+						"25.expanded.com",
+						"26.expanded.com",
+						"27.expanded.com",
+						"28.expanded.com",
+						"29.expanded.com",
+						"30.expanded.com",
+						"31.expanded.com",
+						"32.expanded.com",
+					},
+				},
+			},
+			oldPodSpec: &api.PodSpec{
+				DNSConfig: &api.PodDNSConfig{
+					Searches: []string{
+						"foo.com",
+						"bar.io",
+						"3.com",
+						"4.com",
+						"5.com",
+						"6.com",
+					},
+				},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			got := haveSameExpandedDNSConfig(tc.podSpec, tc.oldPodSpec)
+			if tc.want != got {
+				t.Errorf("unexpected diff, want: %v, got: %v", tc.want, got)
 			}
 		})
 	}

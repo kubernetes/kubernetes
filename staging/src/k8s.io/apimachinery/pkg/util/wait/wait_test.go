@@ -26,8 +26,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestUntil(t *testing.T) {
@@ -422,6 +423,7 @@ func TestPollImmediateError(t *testing.T) {
 
 func TestPollForever(t *testing.T) {
 	ch := make(chan struct{})
+	errc := make(chan error, 1)
 	done := make(chan struct{}, 1)
 	complete := make(chan struct{})
 	go func() {
@@ -436,7 +438,7 @@ func TestPollForever(t *testing.T) {
 		})
 
 		if err := PollInfinite(time.Microsecond, f); err != nil {
-			t.Fatalf("unexpected error %v", err)
+			errc <- fmt.Errorf("unexpected error %v", err)
 		}
 
 		close(ch)
@@ -451,7 +453,10 @@ func TestPollForever(t *testing.T) {
 		select {
 		case _, open := <-ch:
 			if !open {
-				t.Fatalf("did not expect channel to be closed")
+				if len(errc) != 0 {
+					t.Fatalf("did not expect channel to be closed, %v", <-errc)
+				}
+				t.Fatal("did not expect channel to be closed")
 			}
 		case <-time.After(ForeverTestTimeout):
 			t.Fatalf("channel did not return at least once within the poll interval")
@@ -467,9 +472,13 @@ func TestPollForever(t *testing.T) {
 				return
 			}
 		}
-		t.Fatalf("expected closed channel after two iterations")
+		t.Error("expected closed channel after two iterations")
 	}()
 	<-complete
+
+	if len(errc) != 0 {
+		t.Fatal(<-errc)
+	}
 }
 
 func TestWaitFor(t *testing.T) {
@@ -705,7 +714,7 @@ func TestContextForChannel(t *testing.T) {
 }
 
 func TestExponentialBackoffManagerGetNextBackoff(t *testing.T) {
-	fc := clock.NewFakeClock(time.Now())
+	fc := testingclock.NewFakeClock(time.Now())
 	backoff := NewExponentialBackoffManager(1, 10, 10, 2.0, 0.0, fc)
 	durations := []time.Duration{1, 2, 4, 8, 10, 10, 10}
 	for i := 0; i < len(durations); i++ {
@@ -724,7 +733,7 @@ func TestExponentialBackoffManagerGetNextBackoff(t *testing.T) {
 
 func TestJitteredBackoffManagerGetNextBackoff(t *testing.T) {
 	// positive jitter
-	backoffMgr := NewJitteredBackoffManager(1, 1, clock.NewFakeClock(time.Now()))
+	backoffMgr := NewJitteredBackoffManager(1, 1, testingclock.NewFakeClock(time.Now()))
 	for i := 0; i < 5; i++ {
 		backoff := backoffMgr.(*jitteredBackoffManagerImpl).getNextBackoff()
 		if backoff < 1 || backoff > 2 {
@@ -733,7 +742,7 @@ func TestJitteredBackoffManagerGetNextBackoff(t *testing.T) {
 	}
 
 	// negative jitter, shall be a fixed backoff
-	backoffMgr = NewJitteredBackoffManager(1, -1, clock.NewFakeClock(time.Now()))
+	backoffMgr = NewJitteredBackoffManager(1, -1, testingclock.NewFakeClock(time.Now()))
 	backoff := backoffMgr.(*jitteredBackoffManagerImpl).getNextBackoff()
 	if backoff != 1 {
 		t.Errorf("backoff should be 1, but got %d", backoff)

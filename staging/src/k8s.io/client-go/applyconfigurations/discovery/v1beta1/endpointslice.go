@@ -51,7 +51,7 @@ func EndpointSlice(name, namespace string) *EndpointSliceApplyConfiguration {
 // ExtractEndpointSlice extracts the applied configuration owned by fieldManager from
 // endpointSlice. If no managedFields are found in endpointSlice for fieldManager, a
 // EndpointSliceApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // endpointSlice must be a unmodified EndpointSlice API object that was retrieved from the Kubernetes API.

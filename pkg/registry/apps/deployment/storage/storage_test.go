@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 
@@ -321,8 +322,6 @@ func TestStatusUpdate(t *testing.T) {
 }
 
 func TestEtcdCreateDeploymentRollback(t *testing.T) {
-	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace)
-
 	testCases := map[string]struct {
 		rollback apps.DeploymentRollback
 		errOK    func(error) bool
@@ -350,11 +349,16 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 			errOK: func(err error) bool { return err != nil },
 		},
 	}
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	for k, test := range testCases {
-		storage, server := newStorage(t)
 		rollbackStorage := storage.Rollback
+		deployment := validNewDeployment()
+		deployment.Namespace = fmt.Sprintf("namespace-%s", strings.ToLower(k))
+		ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), deployment.Namespace)
 
-		if _, err := storage.Deployment.Create(ctx, validNewDeployment(), rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
+		if _, err := storage.Deployment.Create(ctx, deployment, rest.ValidateAllObjectFunc, &metav1.CreateOptions{}); err != nil {
 			t.Fatalf("%s: unexpected error: %v", k, err)
 		}
 		rollbackRespStatus, err := rollbackStorage.Create(ctx, test.rollback.Name, &test.rollback, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -369,15 +373,13 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 			if status.Code != http.StatusOK || status.Status != metav1.StatusSuccess {
 				t.Errorf("%s: unexpected response, code: %d, status: %s", k, status.Code, status.Status)
 			}
-			d, err := storage.Deployment.Get(ctx, validNewDeployment().ObjectMeta.Name, &metav1.GetOptions{})
+			d, err := storage.Deployment.Get(ctx, deployment.ObjectMeta.Name, &metav1.GetOptions{})
 			if err != nil {
 				t.Errorf("%s: unexpected error: %v", k, err)
 			} else if !reflect.DeepEqual(*d.(*apps.Deployment).Spec.RollbackTo, test.rollback.RollbackTo) {
 				t.Errorf("%s: expected: %v, got: %v", k, *d.(*apps.Deployment).Spec.RollbackTo, test.rollback.RollbackTo)
 			}
 		}
-		storage.Deployment.Store.DestroyFunc()
-		server.Terminate(t)
 	}
 }
 

@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/test/utils/harness"
 )
@@ -70,7 +70,7 @@ func TestMountDevice(tt *testing.T) {
 	)
 
 	a, _ := plugin.NewAttacher()
-	a.MountDevice(spec, "/dev/sdx", rootDir+"/mount-dir")
+	a.MountDevice(spec, "/dev/sdx", rootDir+"/mount-dir", volume.DeviceMounterArgs{})
 }
 
 func TestIsVolumeAttached(tt *testing.T) {

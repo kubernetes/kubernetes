@@ -81,6 +81,7 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 
 func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	//lint:file-ignore SA1019 Keep validation for deprecated OrphanDependents option until it's being removed
 	if options.OrphanDependents != nil && options.PropagationPolicy != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("propagationPolicy"), options.PropagationPolicy, "orphanDependents and deletionPropagation cannot be both set"))
 	}

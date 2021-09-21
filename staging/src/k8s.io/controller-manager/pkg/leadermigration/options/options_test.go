@@ -27,6 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/controller-manager/config"
 	"k8s.io/controller-manager/pkg/features"
+	migrationconfig "k8s.io/controller-manager/pkg/leadermigration/config"
 )
 
 func TestLeaderMigrationOptions(t *testing.T) {
@@ -53,11 +54,12 @@ func TestLeaderMigrationOptions(t *testing.T) {
 			expectErr:         true,
 		},
 		{
-			name:              "enabled, but missing configuration file",
+			name:              "enabled, with default configuration",
 			flags:             []string{"--enable-leader-migration"},
 			enableFeatureGate: true,
 			expectEnabled:     true,
-			expectErr:         true,
+			expectErr:         false,
+			expectConfig:      migrationconfig.DefaultLeaderMigrationConfiguration(),
 		},
 		{
 			name:              "enabled, with custom configuration file",
@@ -66,6 +68,25 @@ func TestLeaderMigrationOptions(t *testing.T) {
 			expectEnabled:     true,
 			configContent: `
 apiVersion: controllermanager.config.k8s.io/v1alpha1
+kind: LeaderMigrationConfiguration
+leaderName: test-leader-migration
+resourceLock: leases
+controllerLeaders: []
+`,
+			expectErr: false,
+			expectConfig: &config.LeaderMigrationConfiguration{
+				LeaderName:        "test-leader-migration",
+				ResourceLock:      "leases",
+				ControllerLeaders: []config.ControllerLeaderConfiguration{},
+			},
+		},
+		{
+			name:              "enabled, with custom configuration file (version v1beta1)",
+			flags:             []string{"--enable-leader-migration"},
+			enableFeatureGate: true,
+			expectEnabled:     true,
+			configContent: `
+apiVersion: controllermanager.config.k8s.io/v1beta1
 kind: LeaderMigrationConfiguration
 leaderName: test-leader-migration
 resourceLock: leases

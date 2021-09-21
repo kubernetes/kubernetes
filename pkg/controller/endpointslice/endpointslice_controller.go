@@ -45,6 +45,7 @@ import (
 	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -141,7 +142,7 @@ func NewController(podInformer coreinformers.PodInformer,
 
 	c.endpointSliceLister = endpointSliceInformer.Lister()
 	c.endpointSlicesSynced = endpointSliceInformer.Informer().HasSynced
-	c.endpointSliceTracker = newEndpointSliceTracker()
+	c.endpointSliceTracker = endpointsliceutil.NewEndpointSliceTracker()
 
 	c.maxEndpointsPerSlice = maxEndpointsPerSlice
 
@@ -204,7 +205,7 @@ type Controller struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Service. It can help determine if a
 	// cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
 
 	// nodeLister is able to list/get nodes and is populated by the
 	// shared informer passed to NewController
@@ -368,7 +369,7 @@ func (c *Controller) syncService(key string) error {
 	}
 
 	if c.endpointSliceTracker.StaleSlices(service, endpointSlices) {
-		return &StaleInformerCache{"EndpointSlice informer cache is out of date"}
+		return endpointsliceutil.NewStaleInformerCache("EndpointSlice informer cache is out of date")
 	}
 
 	// We call ComputeEndpointLastChangeTriggerTime here to make sure that the
@@ -542,6 +543,7 @@ func (c *Controller) checkNodeTopologyDistribution() {
 	c.topologyCache.SetNodes(nodes)
 	serviceKeys := c.topologyCache.GetOverloadedServices()
 	for _, serviceKey := range serviceKeys {
+		klog.V(2).Infof("Queuing %s Service after Node change due to overloading", serviceKey)
 		c.queue.Add(serviceKey)
 	}
 }
@@ -550,7 +552,7 @@ func (c *Controller) checkNodeTopologyDistribution() {
 func trackSync(err error) {
 	metricLabel := "success"
 	if err != nil {
-		if isStaleInformerCacheErr(err) {
+		if endpointsliceutil.IsStaleInformerCacheErr(err) {
 			metricLabel = "stale"
 		} else {
 			metricLabel = "error"

@@ -29,10 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
+	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
 )
@@ -50,7 +50,7 @@ var (
 	ErrAddressNotAllowed = errors.New("address not allowed")
 
 	// ErrNoAddresses indicates there are no addresses for the hostname
-	ErrNoAddresses = errors.New("No addresses for hostname")
+	ErrNoAddresses = errors.New("no addresses for hostname")
 )
 
 // isValidEndpoint checks that the given host / port pair are valid endpoint
@@ -88,7 +88,7 @@ func IsZeroCIDR(cidr string) bool {
 
 // IsProxyableIP checks if a given IP address is permitted to be proxied
 func IsProxyableIP(ip string) error {
-	netIP := net.ParseIP(ip)
+	netIP := netutils.ParseIPSloppy(ip)
 	if netIP == nil {
 		return ErrAddressNotAllowed
 	}
@@ -146,7 +146,7 @@ func GetLocalAddrs() ([]net.IP, error) {
 	}
 
 	for _, addr := range addrs {
-		ip, _, err := net.ParseCIDR(addr.String())
+		ip, _, err := netutils.ParseCIDRSloppy(addr.String())
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +159,7 @@ func GetLocalAddrs() ([]net.IP, error) {
 
 // GetLocalAddrSet return a local IPSet.
 // If failed to get local addr, will assume no local ips.
-func GetLocalAddrSet() utilnet.IPSet {
+func GetLocalAddrSet() netutils.IPSet {
 	localAddrs, err := GetLocalAddrs()
 	if err != nil {
 		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs")
@@ -167,7 +167,7 @@ func GetLocalAddrSet() utilnet.IPSet {
 		klog.InfoS("No local addresses were found")
 	}
 
-	localAddrSet := utilnet.IPSet{}
+	localAddrSet := netutils.IPSet{}
 	localAddrSet.Insert(localAddrs...)
 	return localAddrSet
 }
@@ -176,12 +176,12 @@ func GetLocalAddrSet() utilnet.IPSet {
 func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).Infof("Skipping service %s in namespace %s due to clusterIP = %q", service.Name, service.Namespace, service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service due to cluster IP", "service", klog.KObj(service), "clusterIP", service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).Infof("Skipping service %s in namespace %s due to Type=ExternalName", service.Name, service.Namespace)
+		klog.V(3).InfoS("Skipping service due to Type=ExternalName", "service", klog.KObj(service))
 		return true
 	}
 	return false
@@ -209,9 +209,9 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 		}
 	}
 
-	itfs, err := nw.Interfaces()
+	addrs, err := nw.InterfaceAddrs()
 	if err != nil {
-		return nil, fmt.Errorf("error listing all interfaces from host, error: %v", err)
+		return nil, fmt.Errorf("error listing all interfaceAddrs from host, error: %v", err)
 	}
 
 	// Second round of iteration to parse IPs based on cidr.
@@ -220,30 +220,25 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 			continue
 		}
 
-		_, ipNet, _ := net.ParseCIDR(cidr)
-		for _, itf := range itfs {
-			addrs, err := nw.Addrs(&itf)
-			if err != nil {
-				return nil, fmt.Errorf("error getting address from interface %s, error: %v", itf.Name, err)
+		_, ipNet, _ := netutils.ParseCIDRSloppy(cidr)
+		for _, addr := range addrs {
+			var ip net.IP
+			// nw.InterfaceAddrs may return net.IPAddr or net.IPNet on windows, and it will return net.IPNet on linux.
+			switch v := addr.(type) {
+			case *net.IPAddr:
+				ip = v.IP
+			case *net.IPNet:
+				ip = v.IP
+			default:
+				continue
 			}
 
-			for _, addr := range addrs {
-				if addr == nil {
-					continue
+			if ipNet.Contains(ip) {
+				if netutils.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
+					uniqueAddressList.Insert(ip.String())
 				}
-
-				ip, _, err := net.ParseCIDR(addr.String())
-				if err != nil {
-					return nil, fmt.Errorf("error parsing CIDR for interface %s, error: %v", itf.Name, err)
-				}
-
-				if ipNet.Contains(ip) {
-					if utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv6ZeroCIDR) {
-						uniqueAddressList.Insert(ip.String())
-					}
-					if !utilnet.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
-						uniqueAddressList.Insert(ip.String())
-					}
+				if !netutils.IsIPv6(ip) && !uniqueAddressList.Has(IPv4ZeroCIDR) {
+					uniqueAddressList.Insert(ip.String())
 				}
 			}
 		}
@@ -257,9 +252,9 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 }
 
 // LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
-func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
+func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
 	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	klog.Errorf("%s (service %s/%s).", errMsg, svcNamespace, svcName)
+	klog.ErrorS(nil, "Incorrect IP version", "service", klog.KRef(svcNamespace, svcName), "field", fieldName, "value", fieldValue)
 	if recorder != nil {
 		recorder.Eventf(
 			&v1.ObjectReference{
@@ -267,7 +262,7 @@ func LogAndEmitIncorrectIPVersionEvent(recorder record.EventRecorder, fieldName,
 				Name:      svcName,
 				Namespace: svcNamespace,
 				UID:       svcUID,
-			}, v1.EventTypeWarning, "KubeProxyIncorrectIPVersion", errMsg)
+			}, nil, v1.EventTypeWarning, "KubeProxyIncorrectIPVersion", "GatherEndpoints", errMsg)
 	}
 }
 
@@ -279,7 +274,7 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			klog.Errorf("Skipping invalid IP: %s", ip)
+			klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
 		}
 	}
 	return ipFamilyMap
@@ -293,30 +288,30 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
-			klog.Errorf("Skipping invalid cidr: %s", cidr)
+			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
 		}
 	}
 	return ipFamilyMap
 }
 
 func getIPFamilyFromIP(ipStr string) (v1.IPFamily, error) {
-	netIP := net.ParseIP(ipStr)
+	netIP := netutils.ParseIPSloppy(ipStr)
 	if netIP == nil {
 		return "", ErrAddressNotAllowed
 	}
 
-	if utilnet.IsIPv6(netIP) {
+	if netutils.IsIPv6(netIP) {
 		return v1.IPv6Protocol, nil
 	}
 	return v1.IPv4Protocol, nil
 }
 
 func getIPFamilyFromCIDR(cidrStr string) (v1.IPFamily, error) {
-	_, netCIDR, err := net.ParseCIDR(cidrStr)
+	_, netCIDR, err := netutils.ParseCIDRSloppy(cidrStr)
 	if err != nil {
 		return "", ErrAddressNotAllowed
 	}
-	if utilnet.IsIPv6CIDR(netCIDR) {
+	if netutils.IsIPv6CIDR(netCIDR) {
 		return v1.IPv6Protocol, nil
 	}
 	return v1.IPv4Protocol, nil
@@ -340,7 +335,7 @@ func AppendPortIfNeeded(addr string, port int32) string {
 	}
 
 	// Simply return for invalid case. This should be caught by validation instead.
-	ip := net.ParseIP(addr)
+	ip := netutils.ParseIPSloppy(addr)
 	if ip == nil {
 		return addr
 	}
@@ -372,7 +367,7 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 		if err := sysctl.SetSysctl(name, newVal); err != nil {
 			return fmt.Errorf("can't set sysctl %s to %d: %v", name, newVal, err)
 		}
-		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
+		klog.V(1).InfoS("Changed sysctl", "name", name, "before", oldVal, "after", newVal)
 	}
 	return nil
 }
@@ -446,7 +441,7 @@ func GetClusterIPByFamily(ipFamily v1.IPFamily, service *v1.Service) string {
 		}
 
 		IsIPv6Family := (ipFamily == v1.IPv6Protocol)
-		if IsIPv6Family == utilnet.IsIPv6String(service.Spec.ClusterIP) {
+		if IsIPv6Family == netutils.IsIPv6String(service.Spec.ClusterIP) {
 			return service.Spec.ClusterIP
 		}
 
@@ -497,11 +492,11 @@ func WriteBytesLine(buf *bytes.Buffer, bytes []byte) {
 
 // RevertPorts is closing ports in replacementPortsMap but not in originalPortsMap. In other words, it only
 // closes the ports opened in this sync.
-func RevertPorts(replacementPortsMap, originalPortsMap map[utilnet.LocalPort]utilnet.Closeable) {
+func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]netutils.Closeable) {
 	for k, v := range replacementPortsMap {
 		// Only close newly opened local ports - leave ones that were open before this update
 		if originalPortsMap[k] == nil {
-			klog.V(2).Infof("Closing local port %s", k.String())
+			klog.V(2).InfoS("Closing local port", "port", k.String())
 			v.Close()
 		}
 	}

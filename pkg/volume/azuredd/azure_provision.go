@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -185,7 +186,7 @@ func (p *azureDiskProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 	supportedModes := p.plugin.GetAccessModes()
 	if maxShares < 2 {
 		// only do AccessModes validation when maxShares < 2
-		if !util.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+		if !util.ContainsAllAccessModes(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 			return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported with maxShares(%d) < 2", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes(), maxShares)
 		}
 

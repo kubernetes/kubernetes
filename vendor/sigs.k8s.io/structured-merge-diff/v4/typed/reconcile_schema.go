@@ -124,13 +124,6 @@ func ReconcileFieldSetWithSchema(fieldset *fieldpath.Set, tv *TypedValue) (*fiel
 	v.schema = tv.schema
 	v.typeRef = tv.typeRef
 
-	// We don't reconcile deduced types, which are primarily for use by unstructured CRDs. Deduced
-	// types do not support atomic or granular tags. Nor does the dynamic schema deduction
-	// interact well with the reconcile logic.
-	if v.schema == DeducedParseableType.Schema {
-		return nil, nil
-	}
-
 	defer v.finished()
 	errs := v.reconcile()
 
@@ -229,6 +222,12 @@ func (v *reconcileWithSchemaWalker) visitMapItems(t *schema.Map, element *fieldp
 }
 
 func (v *reconcileWithSchemaWalker) doMap(t *schema.Map) (errs ValidationErrors) {
+	// We don't currently reconcile deduced types (unstructured CRDs) or maps that contain only unknown
+	// fields since deduced types do not yet support atomic or granular tags.
+	if isUntypedDeducedMap(t) {
+		return errs
+	}
+
 	// reconcile maps and structs changed from granular to atomic.
 	// Note that migrations from atomic to granular are not recommended and will
 	// be treated as if they were always granular.
@@ -273,4 +272,19 @@ func typeRefAtPath(t *schema.Map, pe fieldpath.PathElement) (schema.TypeRef, boo
 		}
 	}
 	return tr, tr != schema.TypeRef{}
+}
+
+// isUntypedDeducedMap returns true if m has no fields defined, but allows untyped elements.
+// This is equivalent to a openAPI object that has x-kubernetes-preserve-unknown-fields=true
+// but does not have any properties defined on the object.
+func isUntypedDeducedMap(m *schema.Map) bool {
+	return isUntypedDeducedRef(m.ElementType) && m.Fields == nil
+}
+
+func isUntypedDeducedRef(t schema.TypeRef) bool {
+	if t.NamedType != nil {
+		return *t.NamedType == "__untyped_deduced_"
+	}
+	atom := t.Inlined
+	return atom.Scalar != nil && *atom.Scalar == "untyped"
 }

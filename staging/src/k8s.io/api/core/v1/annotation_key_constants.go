@@ -23,9 +23,6 @@ const (
 	// webhook backend fails.
 	ImagePolicyFailedOpenKey string = "alpha.image-policy.k8s.io/failed-open"
 
-	// PodPresetOptOutAnnotationKey represents the annotation key for a pod to exempt itself from pod preset manipulation
-	PodPresetOptOutAnnotationKey string = "podpreset.admission.kubernetes.io/exclude"
-
 	// MirrorAnnotationKey represents the annotation key set by kubelets when creating mirror pods
 	MirrorPodAnnotationKey string = "kubernetes.io/config.mirror"
 
@@ -124,7 +121,7 @@ const (
 	EndpointsLastChangeTriggerTime = "endpoints.kubernetes.io/last-change-trigger-time"
 
 	// EndpointsOverCapacity will be set on an Endpoints resource when it
-	// exceeds the maximum capacity of 1000 addresses. Inititially the Endpoints
+	// exceeds the maximum capacity of 1000 addresses. Initially the Endpoints
 	// controller will set this annotation with a value of "warning". In a
 	// future release, the controller may set this annotation with a value of
 	// "truncated" to indicate that any addresses exceeding the limit of 1000

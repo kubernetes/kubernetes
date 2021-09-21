@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -116,7 +117,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 	labels, err := cloud.GetVolumeLabels(name)
 	if err != nil {
 		// We don't really want to leak the volume here...
-		klog.Errorf("error building labels for new EBS volume %q: %v", name, err)
+		klog.Errorf("Error building labels for new EBS volume %q: %v", name, err)
 	}
 
 	fstype := ""
@@ -232,14 +233,14 @@ func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, deviceP
 	// and we have to get the volume id from the nvme interface
 	awsVolumeID, err := volumeID.MapToAWSVolumeID()
 	if err != nil {
-		klog.Warningf("error mapping volume %q to AWS volume: %v", volumeID, err)
+		klog.Warningf("Error mapping volume %q to AWS volume: %v", volumeID, err)
 	} else {
 		// This is the magic name on which AWS presents NVME devices under /dev/disk/by-id/
 		// For example, vol-0fab1d5e3f72a5e23 creates a symlink at /dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol0fab1d5e3f72a5e23
 		nvmeName := "nvme-Amazon_Elastic_Block_Store_" + strings.Replace(string(awsVolumeID), "-", "", -1)
 		nvmePath, err := findNvmeVolume(nvmeName)
 		if err != nil {
-			klog.Warningf("error looking for nvme volume %q: %v", volumeID, err)
+			klog.Warningf("Error looking for nvme volume %q: %v", volumeID, err)
 		} else if nvmePath != "" {
 			if partition != "" {
 				nvmePath = nvmePath + nvmeDiskPartitionSuffix + partition
@@ -251,7 +252,7 @@ func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, deviceP
 	return devicePaths
 }
 
-// Return cloud provider
+// Returns cloud provider
 func getCloudProvider(cloudProvider cloudprovider.Interface) (*aws.Cloud, error) {
 	awsCloudProvider, ok := cloudProvider.(*aws.Cloud)
 	if !ok || awsCloudProvider == nil {

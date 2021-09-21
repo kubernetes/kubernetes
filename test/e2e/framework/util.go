@@ -63,6 +63,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -1265,7 +1266,7 @@ func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []stri
 	if err != nil {
 		Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(hostURL.Host) != nil {
+	if netutils.ParseIPSloppy(hostURL.Host) != nil {
 		externalIPs = append(externalIPs, hostURL.Host)
 	} else {
 		hostnames = append(hostnames, hostURL.Host)

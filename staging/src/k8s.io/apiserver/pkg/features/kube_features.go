@@ -38,12 +38,13 @@ const (
 	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
 	// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
 	//
-	// This feature is deprecated, and will be removed in v1.22.
+	// This feature is deprecated, and will be removed in v1.24.
 	StreamingProxyRedirects featuregate.Feature = "StreamingProxyRedirects"
 
 	// owner: @tallclair
 	// alpha: v1.12
 	// beta: v1.14
+	// deprecated: v1.22
 	//
 	// ValidateProxyRedirects controls whether the apiserver should validate that redirects are only
 	// followed to the same host. Only used if StreamingProxyRedirects is enabled.
@@ -146,6 +147,7 @@ const (
 
 	// owner: @liggitt
 	// beta: v1.19
+	// GA: v1.22
 	//
 	// Allows sending warning headers in API responses.
 	WarningHeaders featuregate.Feature = "WarningHeaders"
@@ -162,6 +164,20 @@ const (
 	//
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
+
+	// owner: @dashpole
+	// alpha: v1.22
+	//
+	// Add support for distributed tracing in the API Server
+	APIServerTracing featuregate.Feature = "APIServerTracing"
+
+	// owner: @jiahuif
+	// kep: http://kep.k8s.io/2887
+	// alpha: v1.23
+	//
+	// Enables populating "enum" field of OpenAPI schemas
+	// in the spec returned from kube-apiserver.
+	OpenAPIEnums featuregate.Feature = "OpenAPIEnums"
 )
 
 func init() {
@@ -172,8 +188,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	StreamingProxyRedirects:  {Default: true, PreRelease: featuregate.Deprecated},
-	ValidateProxyRedirects:   {Default: true, PreRelease: featuregate.Beta},
+	StreamingProxyRedirects:  {Default: false, PreRelease: featuregate.Deprecated},
+	ValidateProxyRedirects:   {Default: true, PreRelease: featuregate.Deprecated},
 	AdvancedAuditing:         {Default: true, PreRelease: featuregate.GA},
 	APIResponseCompression:   {Default: true, PreRelease: featuregate.Beta},
 	APIListChunking:          {Default: true, PreRelease: featuregate.Beta},
@@ -186,7 +202,9 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIPriorityAndFairness:   {Default: true, PreRelease: featuregate.Beta},
 	RemoveSelfLink:           {Default: true, PreRelease: featuregate.Beta},
 	SelectorIndex:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	WarningHeaders:           {Default: true, PreRelease: featuregate.Beta},
+	WarningHeaders:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	EfficientWatchResumption: {Default: true, PreRelease: featuregate.Beta},
 	APIServerIdentity:        {Default: false, PreRelease: featuregate.Alpha},
+	APIServerTracing:         {Default: false, PreRelease: featuregate.Alpha},
+	OpenAPIEnums:             {Default: false, PreRelease: featuregate.Alpha},
 }

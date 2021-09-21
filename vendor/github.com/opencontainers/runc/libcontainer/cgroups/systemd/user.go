@@ -13,12 +13,12 @@ import (
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	dbus "github.com/godbus/dbus/v5"
-	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runc/libcontainer/userns"
 	"github.com/pkg/errors"
 )
 
-// NewUserSystemdDbus creates a connection for systemd user-instance.
-func NewUserSystemdDbus() (*systemdDbus.Conn, error) {
+// newUserSystemdDbus creates a connection for systemd user-instance.
+func newUserSystemdDbus() (*systemdDbus.Conn, error) {
 	addr, err := DetectUserDbusSessionBusAddress()
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func NewUserSystemdDbus() (*systemdDbus.Conn, error) {
 //
 // Otherwise returns os.Getuid() .
 func DetectUID() (int, error) {
-	if !system.RunningInUserNS() {
+	if !userns.RunningInUserNS() {
 		return os.Getuid(), nil
 	}
 	b, err := exec.Command("busctl", "--user", "--no-pager", "status").CombinedOutput()

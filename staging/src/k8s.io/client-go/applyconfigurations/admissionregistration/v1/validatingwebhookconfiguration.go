@@ -48,7 +48,7 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 // ExtractValidatingWebhookConfiguration extracts the applied configuration owned by fieldManager from
 // validatingWebhookConfiguration. If no managedFields are found in validatingWebhookConfiguration for fieldManager, a
 // ValidatingWebhookConfigurationApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // validatingWebhookConfiguration must be a unmodified ValidatingWebhookConfiguration API object that was retrieved from the Kubernetes API.

@@ -19,6 +19,7 @@ package console
 import (
 	"fmt"
 	"os"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 )
@@ -31,13 +32,19 @@ const (
 // unlockpt unlocks the slave pseudoterminal device corresponding to the master pseudoterminal referred to by f.
 // unlockpt should be called before opening the slave side of a pty.
 func unlockpt(f *os.File) error {
-	return unix.IoctlSetPointerInt(int(f.Fd()), unix.TIOCSPTLCK, 0)
+	var u int32
+	// XXX do not use unix.IoctlSetPointerInt here, see commit dbd69c59b81.
+	if _, _, err := unix.Syscall(unix.SYS_IOCTL, f.Fd(), unix.TIOCSPTLCK, uintptr(unsafe.Pointer(&u))); err != 0 {
+		return err
+	}
+	return nil
 }
 
 // ptsname retrieves the name of the first available pts for the given master.
 func ptsname(f *os.File) (string, error) {
-	u, err := unix.IoctlGetInt(int(f.Fd()), unix.TIOCGPTN)
-	if err != nil {
+	var u uint32
+	// XXX do not use unix.IoctlGetInt here, see commit dbd69c59b81.
+	if _, _, err := unix.Syscall(unix.SYS_IOCTL, f.Fd(), unix.TIOCGPTN, uintptr(unsafe.Pointer(&u))); err != 0 {
 		return "", err
 	}
 	return fmt.Sprintf("/dev/pts/%d", u), nil

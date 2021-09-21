@@ -23,6 +23,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -105,9 +106,34 @@ const (
 	MaxTotalScore int64 = math.MaxInt64
 )
 
+// PodsToActivateKey is a reserved state key for stashing pods.
+// If the stashed pods are present in unschedulableQ or backoffQ，they will be
+// activated (i.e., moved to activeQ) in two phases:
+// - end of a scheduling cycle if it succeeds (will be cleared from `PodsToActivate` if activated)
+// - end of a binding cycle if it succeeds
+var PodsToActivateKey StateKey = "kubernetes.io/pods-to-activate"
+
+// PodsToActivate stores pods to be activated.
+type PodsToActivate struct {
+	sync.Mutex
+	// Map is keyed with namespaced pod name, and valued with the pod.
+	Map map[string]*v1.Pod
+}
+
+// Clone just returns the same state.
+func (s *PodsToActivate) Clone() StateData {
+	return s
+}
+
+// NewPodsToActivate instantiates a PodsToActivate object.
+func NewPodsToActivate() *PodsToActivate {
+	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
+}
+
 // Status indicates the result of running a plugin. It consists of a code, a
-// message, (optionally) an error and an plugin name it fails by. When the status
-// code is not `Success`, the reasons should explain why.
+// message, (optionally) an error, and a plugin name it fails by.
+// When the status code is not Success, the reasons should explain why.
+// And, when code is Success, all the other fields should be empty.
 // NOTE: A nil Status is also considered as Success.
 type Status struct {
 	code    Code
@@ -282,10 +308,13 @@ type QueueSortPlugin interface {
 }
 
 // EnqueueExtensions is an optional interface that plugins can implement to efficiently
-// move unschedulable Pods in internal scheduling queues.
+// move unschedulable Pods in internal scheduling queues. Plugins
+// that fail pod scheduling (e.g., Filter plugins) are expected to implement this interface.
 type EnqueueExtensions interface {
-	// EventsToRegister returns a series of interested events that
-	// will be registered when instantiating the internal scheduling queue.
+	// EventsToRegister returns a series of possible events that may cause a Pod
+	// failed by this plugin schedulable.
+	// The events will be registered when instantiating the internal scheduling queue,
+	// and leveraged to build event handlers dynamically.
 	// Note: the returned list needs to be static (not depend on configuration parameters);
 	// otherwise it would lead to undefined behavior.
 	EventsToRegister() []ClusterEvent
@@ -471,40 +500,11 @@ type Framework interface {
 	// cycle is aborted.
 	RunPreFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod) *Status
 
-	// RunFilterPlugins runs the set of configured Filter plugins for pod on
-	// the given node. Note that for the node being evaluated, the passed nodeInfo
-	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
-	// considered to be running on the node could be different). For example, during
-	// preemption, we may pass a copy of the original nodeInfo object that has some pods
-	// removed from it to evaluate the possibility of preempting them to
-	// schedule the target pod.
-	RunFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *NodeInfo) PluginToStatus
-
 	// RunPostFilterPlugins runs the set of configured PostFilter plugins.
 	// PostFilter plugins can either be informational, in which case should be configured
 	// to execute first and return Unschedulable status, or ones that try to change the
 	// cluster state to make the pod potentially schedulable in a future scheduling cycle.
 	RunPostFilterPlugins(ctx context.Context, state *CycleState, pod *v1.Pod, filteredNodeStatusMap NodeToStatusMap) (*PostFilterResult, *Status)
-
-	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
-	// PreFilter plugins. It returns directly if any of the plugins return any
-	// status other than Success.
-	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
-
-	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
-	// PreFilter plugins. It returns directly if any of the plugins return any
-	// status other than Success.
-	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
-
-	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
-	// of these plugins returns any status other than "Success", the given pod is rejected.
-	RunPreScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) *Status
-
-	// RunScorePlugins runs the set of configured Score plugins. It returns a map that
-	// stores for each Score plugin name the corresponding NodeScoreList(s).
-	// It also returns *Status, which is set to non-success if any of the plugins returns
-	// a non-success status.
-	RunScorePlugins(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node) (PluginToNodeScores, *Status)
 
 	// RunPreBindPlugins runs the set of configured PreBind plugins. It returns
 	// *Status and its code is set to non-success if any of the plugins returns
@@ -554,7 +554,7 @@ type Framework interface {
 	HasScorePlugins() bool
 
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
-	ListPlugins() map[string][]config.Plugin
+	ListPlugins() *config.Plugins
 
 	// ProfileName returns the profile name associated to this framework.
 	ProfileName() string
@@ -584,7 +584,8 @@ type Handle interface {
 	GetWaitingPod(uid types.UID) WaitingPod
 
 	// RejectWaitingPod rejects a waiting pod given its UID.
-	RejectWaitingPod(uid types.UID)
+	// The return value indicates if the pod is waiting or not.
+	RejectWaitingPod(uid types.UID) bool
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
@@ -614,7 +615,7 @@ type PostFilterResult struct {
 
 // PodNominator abstracts operations to maintain nominated Pods.
 type PodNominator interface {
-	// AddNominatedPod adds the given pod to the nominated pod map or
+	// AddNominatedPod adds the given pod to the nominator or
 	// updates it if it already exists.
 	AddNominatedPod(pod *PodInfo, nodeName string)
 	// DeleteNominatedPodIfExists deletes nominatedPod from internal cache. It's a no-op if it doesn't exist.
@@ -629,14 +630,28 @@ type PodNominator interface {
 // This is used by preemption PostFilter plugins when evaluating the feasibility of
 // scheduling the pod on nodes when certain running pods get evicted.
 type PluginsRunner interface {
-	// RunPreScorePlugins runs the set of configured PreScore plugins for pod on the given nodes
+	// RunPreScorePlugins runs the set of configured PreScore plugins. If any
+	// of these plugins returns any status other than "Success", the given pod is rejected.
 	RunPreScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) *Status
-	// RunScorePlugins runs the set of configured Score plugins for pod on the given nodes
+	// RunScorePlugins runs the set of configured Score plugins. It returns a map that
+	// stores for each Score plugin name the corresponding NodeScoreList(s).
+	// It also returns *Status, which is set to non-success if any of the plugins returns
+	// a non-success status.
 	RunScorePlugins(context.Context, *CycleState, *v1.Pod, []*v1.Node) (PluginToNodeScores, *Status)
-	// RunFilterPlugins runs the set of configured filter plugins for pod on the given node.
+	// RunFilterPlugins runs the set of configured Filter plugins for pod on
+	// the given node. Note that for the node being evaluated, the passed nodeInfo
+	// reference could be different from the one in NodeInfoSnapshot map (e.g., pods
+	// considered to be running on the node could be different). For example, during
+	// preemption, we may pass a copy of the original nodeInfo object that has some pods
+	// removed from it to evaluate the possibility of preempting them to
+	// schedule the target pod.
 	RunFilterPlugins(context.Context, *CycleState, *v1.Pod, *NodeInfo) PluginToStatus
-	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured PreFilter plugins.
+	// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
+	// PreFilter plugins. It returns directly if any of the plugins return any
+	// status other than Success.
 	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
-	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured PreFilter plugins.
+	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
+	// PreFilter plugins. It returns directly if any of the plugins return any
+	// status other than Success.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
 }

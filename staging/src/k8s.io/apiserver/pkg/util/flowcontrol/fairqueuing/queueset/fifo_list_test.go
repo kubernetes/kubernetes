@@ -20,6 +20,8 @@ import (
 	"math/rand"
 	"testing"
 	"time"
+
+	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 func TestFIFOWithEnqueueDequeueSingleRequest(t *testing.T) {
@@ -146,6 +148,62 @@ func TestFIFOWithRemoveIsIdempotent(t *testing.T) {
 	orderExpected := append(arrival[0:randomIndex], arrival[randomIndex+1:]...)
 	remainingRequests := walkAll(list)
 	verifyOrder(t, orderExpected, remainingRequests)
+}
+
+func TestFIFOSeatsSum(t *testing.T) {
+	list := newRequestFIFO()
+
+	newRequest := func(width uint) *request {
+		return &request{workEstimate: fcrequest.WorkEstimate{Seats: width}}
+	}
+	arrival := []*request{newRequest(1), newRequest(2), newRequest(3)}
+	removeFn := make([]removeFromFIFOFunc, 0)
+
+	seatsSum := 0
+	for i := range arrival {
+		removeFn = append(removeFn, list.Enqueue(arrival[i]))
+
+		seatsSum += i + 1
+		if list.SeatsSum() != seatsSum {
+			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
+		}
+	}
+
+	for i := range removeFn {
+		removeFn[i]()
+
+		seatsSum -= i + 1
+		if list.SeatsSum() != seatsSum {
+			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
+		}
+
+		// check idempotency
+		removeFn[i]()
+		if list.SeatsSum() != seatsSum {
+			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
+		}
+	}
+
+	// Check second type of idempotency: Dequeue + removeFn.
+	for i := range arrival {
+		removeFn[i] = list.Enqueue(arrival[i])
+		seatsSum += i + 1
+	}
+
+	for i := range arrival {
+		if _, ok := list.Dequeue(); !ok {
+			t.Errorf("Unexpected failed dequeue: %d", i)
+		}
+		seatsSum -= i + 1
+		if list.SeatsSum() != seatsSum {
+			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
+		}
+
+		removeFn[i]()
+		if list.SeatsSum() != seatsSum {
+			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
+		}
+	}
 }
 
 func TestFIFOWithWalk(t *testing.T) {

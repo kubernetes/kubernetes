@@ -185,7 +185,7 @@ func CriuPath(criupath string) func(*LinuxFactory) error {
 // configures the factory with the provided option funcs.
 func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
 	if root != "" {
-		if err := os.MkdirAll(root, 0700); err != nil {
+		if err := os.MkdirAll(root, 0o700); err != nil {
 			return nil, newGenericError(err, SystemError)
 		}
 	}
@@ -196,7 +196,11 @@ func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
 		Validator: validate.New(),
 		CriuPath:  "criu",
 	}
-	Cgroupfs(l)
+
+	if err := Cgroupfs(l); err != nil {
+		return nil, err
+	}
+
 	for _, opt := range options {
 		if opt == nil {
 			continue
@@ -225,7 +229,7 @@ type LinuxFactory struct {
 	// containers.
 	CriuPath string
 
-	// New{u,g}uidmapPath is the path to the binaries used for mapping with
+	// New{u,g}idmapPath is the path to the binaries used for mapping with
 	// rootless containers.
 	NewuidmapPath string
 	NewgidmapPath string
@@ -259,7 +263,7 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 	} else if !os.IsNotExist(err) {
 		return nil, newGenericError(err, SystemError)
 	}
-	if err := os.MkdirAll(containerRoot, 0711); err != nil {
+	if err := os.MkdirAll(containerRoot, 0o711); err != nil {
 		return nil, newGenericError(err, SystemError)
 	}
 	if err := os.Chown(containerRoot, unix.Geteuid(), unix.Getegid()); err != nil {
@@ -287,7 +291,7 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 	if l.Root == "" {
 		return nil, newGenericError(fmt.Errorf("invalid root"), ConfigInvalid)
 	}
-	//when load, we need to check id is valid or not.
+	// when load, we need to check id is valid or not.
 	if err := l.validateID(id); err != nil {
 		return nil, err
 	}
@@ -365,6 +369,12 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 		defer consoleSocket.Close()
 	}
 
+	logPipeFdStr := os.Getenv("_LIBCONTAINER_LOGPIPE")
+	logPipeFd, err := strconv.Atoi(logPipeFdStr)
+	if err != nil {
+		return fmt.Errorf("unable to convert _LIBCONTAINER_LOGPIPE=%s to int: %s", logPipeFdStr, err)
+	}
+
 	// clear the current process's environment to clean any libcontainer
 	// specific env vars.
 	os.Clearenv()
@@ -387,7 +397,7 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 		}
 	}()
 
-	i, err := newContainerInit(it, pipe, consoleSocket, fifofd)
+	i, err := newContainerInit(it, pipe, consoleSocket, fifofd, logPipeFd)
 	if err != nil {
 		return err
 	}

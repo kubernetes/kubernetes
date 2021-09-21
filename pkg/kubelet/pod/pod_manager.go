@@ -19,10 +19,13 @@ package pod
 import (
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/secret"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -159,6 +162,25 @@ func isPodInTerminatedState(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
+// updateMetrics updates the metrics surfaced by the pod manager.
+// oldPod or newPod may be nil to signify creation or deletion.
+func updateMetrics(oldPod, newPod *v1.Pod) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return
+	}
+
+	var numEC int
+	if oldPod != nil {
+		numEC -= len(oldPod.Spec.EphemeralContainers)
+	}
+	if newPod != nil {
+		numEC += len(newPod.Spec.EphemeralContainers)
+	}
+	if numEC != 0 {
+		metrics.ManagedEphemeralContainers.Add(float64(numEC))
+	}
+}
+
 // updatePodsInternal replaces the given pods in the current state of the
 // manager, updating the various indices. The caller is assumed to hold the
 // lock.
@@ -202,6 +224,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 			}
 		} else {
 			resolvedPodUID := kubetypes.ResolvedPodUID(pod.UID)
+			updateMetrics(pm.podByUID[resolvedPodUID], pod)
 			pm.podByUID[resolvedPodUID] = pod
 			pm.podByFullName[podFullName] = pod
 			if mirror, ok := pm.mirrorPodByFullName[podFullName]; ok {
@@ -212,6 +235,7 @@ func (pm *basicManager) updatePodsInternal(pods ...*v1.Pod) {
 }
 
 func (pm *basicManager) DeletePod(pod *v1.Pod) {
+	updateMetrics(pod, nil)
 	pm.lock.Lock()
 	defer pm.lock.Unlock()
 	if pm.secretManager != nil {

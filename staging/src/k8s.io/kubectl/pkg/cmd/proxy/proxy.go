@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -50,6 +51,8 @@ type ProxyOptions struct {
 	unixSocket    string
 	keepalive     time.Duration
 
+	appendServerPath bool
+
 	clientConfig *rest.Config
 	filter       *proxy.FilterServer
 
@@ -66,31 +69,31 @@ const (
 var (
 	proxyLong = templates.LongDesc(i18n.T(`
 		Creates a proxy server or application-level gateway between localhost and
-		the Kubernetes API Server. It also allows serving static content over specified
+		the Kubernetes API server. It also allows serving static content over specified
 		HTTP path. All incoming data enters through one port and gets forwarded to
-		the remote kubernetes API Server port, except for the path matching the static content path.`))
+		the remote Kubernetes API server port, except for the path matching the static content path.`))
 
 	proxyExample = templates.Examples(i18n.T(`
-		# To proxy all of the kubernetes api and nothing else.
+		# To proxy all of the Kubernetes API and nothing else
 		kubectl proxy --api-prefix=/
 
-		# To proxy only part of the kubernetes api and also some static files.
+		# To proxy only part of the Kubernetes API and also some static files
 		# You can get pods info with 'curl localhost:8001/api/v1/pods'
 		kubectl proxy --www=/my/files --www-prefix=/static/ --api-prefix=/api/
 
-		# To proxy the entire kubernetes api at a different root.
+		# To proxy the entire Kubernetes API at a different root
 		# You can get pods info with 'curl localhost:8001/custom/api/v1/pods'
 		kubectl proxy --api-prefix=/custom/
 
-		# Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+		# Run a proxy to the Kubernetes API server on port 8011, serving static content from ./local/www/
 		kubectl proxy --port=8011 --www=./local/www/
 
-		# Run a proxy to kubernetes apiserver on an arbitrary local port.
-		# The chosen port for the server will be output to stdout.
+		# Run a proxy to the Kubernetes API server on an arbitrary local port
+		# The chosen port for the server will be output to stdout
 		kubectl proxy --port=0
 
-		# Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
-		# This makes e.g. the pods api available at localhost:8001/k8s-api/v1/pods/
+		# Run a proxy to the Kubernetes API server, changing the API prefix to k8s-api
+		# This makes e.g. the pods API available at localhost:8001/k8s-api/v1/pods/
 		kubectl proxy --api-prefix=/k8s-api`))
 )
 
@@ -138,6 +141,7 @@ func NewCmdProxy(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().BoolVar(&o.disableFilter, "disable-filter", o.disableFilter, "If true, disable request filtering in the proxy. This is dangerous, and can leave you vulnerable to XSRF attacks, when used with an accessible port.")
 	cmd.Flags().StringVarP(&o.unixSocket, "unix-socket", "u", o.unixSocket, "Unix socket on which to run the proxy.")
 	cmd.Flags().DurationVar(&o.keepalive, "keepalive", o.keepalive, "keepalive specifies the keep-alive period for an active network connection. Set to 0 to disable keepalive.")
+	cmd.Flags().BoolVar(&o.appendServerPath, "append-server-path", o.appendServerPath, "If true, enables automatic path appending of the kube context server path to each request.")
 	return cmd
 }
 
@@ -157,6 +161,15 @@ func (o *ProxyOptions) Complete(f cmdutil.Factory) error {
 		o.apiPrefix += "/"
 	}
 
+	if o.appendServerPath == false {
+		target, err := url.Parse(clientConfig.Host)
+		if err != nil {
+			return err
+		}
+		if target.Path != "" && target.Path != "/" {
+			klog.Warning("Your kube context contains a server path " + target.Path + ", use --append-server-path to automatically append the path to each request")
+		}
+	}
 	if o.disableFilter {
 		if o.unixSocket == "" {
 			klog.Warning("Request filter disabled, your proxy is vulnerable to XSRF attacks, please be cautious")
@@ -193,7 +206,7 @@ func (o ProxyOptions) Validate() error {
 
 // RunProxy checks given arguments and executes command
 func (o ProxyOptions) RunProxy() error {
-	server, err := proxy.NewServer(o.staticDir, o.apiPrefix, o.staticPrefix, o.filter, o.clientConfig, o.keepalive)
+	server, err := proxy.NewServer(o.staticDir, o.apiPrefix, o.staticPrefix, o.filter, o.clientConfig, o.keepalive, o.appendServerPath)
 
 	if err != nil {
 		return err

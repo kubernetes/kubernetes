@@ -21,13 +21,12 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
-
+	"k8s.io/controller-manager/controller"
 	endpointslicecontroller "k8s.io/kubernetes/pkg/controller/endpointslice"
 	endpointslicemirroringcontroller "k8s.io/kubernetes/pkg/controller/endpointslicemirroring"
 )
 
-func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, error) {
+func startEndpointSliceController(ctx ControllerContext) (controller.Interface, bool, error) {
 	go endpointslicecontroller.NewController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Services(),
@@ -40,7 +39,7 @@ func startEndpointSliceController(ctx ControllerContext) (http.Handler, bool, er
 	return nil, true, nil
 }
 
-func startEndpointSliceMirroringController(ctx ControllerContext) (http.Handler, bool, error) {
+func startEndpointSliceMirroringController(ctx ControllerContext) (controller.Interface, bool, error) {
 	go endpointslicemirroringcontroller.NewController(
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.InformerFactory.Discovery().V1().EndpointSlices(),

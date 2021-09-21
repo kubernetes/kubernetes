@@ -26,7 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	v1helper "k8s.io/component-helpers/scheduling/corev1"
@@ -40,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -59,7 +59,7 @@ const (
 // managerImpl implements Manager
 type managerImpl struct {
 	//  used to track time
-	clock clock.Clock
+	clock clock.WithTicker
 	// config is how the manager is configured
 	config Config
 	// the function to invoke to kill a pod
@@ -113,7 +113,7 @@ func NewManager(
 	containerGC ContainerGC,
 	recorder record.EventRecorder,
 	nodeRef *v1.ObjectReference,
-	clock clock.Clock,
+	clock clock.WithTicker,
 ) (Manager, lifecycle.PodAdmitHandler) {
 	manager := &managerImpl{
 		clock:                        clock,
@@ -561,15 +561,15 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		klog.ErrorS(nil, "Eviction manager: cannot evict a critical pod", "pod", klog.KObj(pod))
 		return false
 	}
-	status := v1.PodStatus{
-		Phase:   v1.PodFailed,
-		Message: evictMsg,
-		Reason:  Reason,
-	}
 	// record that we are evicting the pod
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
-	err := m.killPodFunc(pod, status, &gracePeriodOverride)
+	klog.V(3).InfoS("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
+	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {
+		status.Phase = v1.PodFailed
+		status.Reason = Reason
+		status.Message = evictMsg
+	})
 	if err != nil {
 		klog.ErrorS(err, "Eviction manager: pod failed to evict", "pod", klog.KObj(pod))
 	} else {

@@ -8,9 +8,11 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -22,37 +24,35 @@ func New() Validator {
 	return &ConfigValidator{}
 }
 
-type ConfigValidator struct {
-}
+type ConfigValidator struct{}
+
+type check func(config *configs.Config) error
 
 func (v *ConfigValidator) Validate(config *configs.Config) error {
-	if err := v.rootfs(config); err != nil {
-		return err
+	checks := []check{
+		v.cgroups,
+		v.rootfs,
+		v.network,
+		v.hostname,
+		v.security,
+		v.usernamespace,
+		v.cgroupnamespace,
+		v.sysctl,
+		v.intelrdt,
+		v.rootlessEUID,
 	}
-	if err := v.network(config); err != nil {
-		return err
-	}
-	if err := v.hostname(config); err != nil {
-		return err
-	}
-	if err := v.security(config); err != nil {
-		return err
-	}
-	if err := v.usernamespace(config); err != nil {
-		return err
-	}
-	if err := v.cgroupnamespace(config); err != nil {
-		return err
-	}
-	if err := v.sysctl(config); err != nil {
-		return err
-	}
-	if err := v.intelrdt(config); err != nil {
-		return err
-	}
-	if config.RootlessEUID {
-		if err := v.rootlessEUID(config); err != nil {
+	for _, c := range checks {
+		if err := c(config); err != nil {
 			return err
+		}
+	}
+	// Relaxed validation rules for backward compatibility
+	warns := []check{
+		v.mounts, // TODO (runc v1.x.x): make this an error instead of a warning
+	}
+	for _, c := range warns {
+		if err := c(config); err != nil {
+			logrus.WithError(err).Warnf("invalid configuration")
 		}
 	}
 	return nil
@@ -217,6 +217,45 @@ func (v *ConfigValidator) intelrdt(config *configs.Config) error {
 		}
 		if intelrdt.IsMBAEnabled() && config.IntelRdt.MemBwSchema == "" {
 			return errors.New("Intel RDT/MBA is enabled and intelRdt is specified in config, but intelRdt.memBwSchema is empty")
+		}
+	}
+
+	return nil
+}
+
+func (v *ConfigValidator) cgroups(config *configs.Config) error {
+	c := config.Cgroups
+	if c == nil {
+		return nil
+	}
+
+	if (c.Name != "" || c.Parent != "") && c.Path != "" {
+		return fmt.Errorf("cgroup: either Path or Name and Parent should be used, got %+v", c)
+	}
+
+	r := c.Resources
+	if r == nil {
+		return nil
+	}
+
+	if !cgroups.IsCgroup2UnifiedMode() && r.Unified != nil {
+		return cgroups.ErrV1NoUnified
+	}
+
+	if cgroups.IsCgroup2UnifiedMode() {
+		_, err := cgroups.ConvertMemorySwapToCgroupV2Value(r.MemorySwap, r.Memory)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (v *ConfigValidator) mounts(config *configs.Config) error {
+	for _, m := range config.Mounts {
+		if !filepath.IsAbs(m.Destination) {
+			return fmt.Errorf("invalid mount %+v: mount destination not absolute", m)
 		}
 	}
 

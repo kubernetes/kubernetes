@@ -110,8 +110,10 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 	if *sshOptions != "" {
 		args = append(strings.Split(*sshOptions, " "), args...)
 	}
+	klog.Infof("Running the command %s, with args: %v", cmd, args)
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
+		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil

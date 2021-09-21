@@ -21,11 +21,10 @@ limitations under the License.
 package app
 
 import (
-	"net/http"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/scale"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
@@ -34,20 +33,15 @@ import (
 	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
-func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
+func startHPAController(ctx ControllerContext) (controller.Interface, bool, error) {
 	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
 		return nil, false, nil
 	}
 
-	if ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients {
-		// use the new-style clients if support for custom metrics is enabled
-		return startHPAControllerWithRESTClient(ctx)
-	}
-
-	return startHPAControllerWithLegacyClient(ctx)
+	return startHPAControllerWithRESTClient(ctx)
 }
 
-func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool, error) {
+func startHPAControllerWithRESTClient(ctx ControllerContext) (controller.Interface, bool, error) {
 	clientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 
@@ -67,19 +61,7 @@ func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool
 	return startHPAControllerWithMetricsClient(ctx, metricsClient)
 }
 
-func startHPAControllerWithLegacyClient(ctx ControllerContext) (http.Handler, bool, error) {
-	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
-	metricsClient := metrics.NewHeapsterMetricsClient(
-		hpaClient,
-		metrics.DefaultHeapsterNamespace,
-		metrics.DefaultHeapsterScheme,
-		metrics.DefaultHeapsterService,
-		metrics.DefaultHeapsterPort,
-	)
-	return startHPAControllerWithMetricsClient(ctx, metricsClient)
-}
-
-func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (http.Handler, bool, error) {
+func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient metrics.MetricsClient) (controller.Interface, bool, error) {
 	hpaClient := ctx.ClientBuilder.ClientOrDie("horizontal-pod-autoscaler")
 	hpaClientConfig := ctx.ClientBuilder.ConfigOrDie("horizontal-pod-autoscaler")
 

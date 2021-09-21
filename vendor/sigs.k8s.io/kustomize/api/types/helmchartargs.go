@@ -51,6 +51,10 @@ type HelmChart struct {
 	// If omitted, the flag --generate-name is passed to 'helm template'.
 	ReleaseName string `json:"releaseName,omitempty" yaml:"releaseName,omitempty"`
 
+	// Namespace set the target namespace for a release. It is .Release.Namespace
+	// in the helm template
+	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+
 	// ValuesFile is local file path to a values file to use _instead of_
 	// the default values that accompanied the chart.
 	// The default values are in '{ChartHome}/{Name}/values.yaml'.
@@ -64,6 +68,10 @@ type HelmChart struct {
 	// Legal values: 'merge', 'override', 'replace'.
 	// Defaults to 'override'.
 	ValuesMerge string `json:"valuesMerge,omitempty" yaml:"valuesMerge,omitempty"`
+
+	// IncludeCRDs specifies if Helm should also generate CustomResourceDefinitions.
+	// Defaults to 'false'.
+	IncludeCRDs bool `json:"includeCRDs,omitempty" yaml:"includeCRDs,omitempty"`
 }
 
 // HelmChartArgs contains arguments to helm.

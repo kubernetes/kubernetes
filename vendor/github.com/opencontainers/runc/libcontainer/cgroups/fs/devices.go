@@ -9,10 +9,9 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupdevices "github.com/opencontainers/runc/libcontainer/cgroups/devices"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
-	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runc/libcontainer/userns"
 )
 
 type DevicesGroup struct {
@@ -36,7 +35,7 @@ func (s *DevicesGroup) Apply(path string, d *cgroupData) error {
 }
 
 func loadEmulator(path string) (*cgroupdevices.Emulator, error) {
-	list, err := fscommon.ReadFile(path, "devices.list")
+	list, err := cgroups.ReadFile(path, "devices.list")
 	if err != nil {
 		return nil, err
 	}
@@ -54,8 +53,8 @@ func buildEmulator(rules []*devices.Rule) (*cgroupdevices.Emulator, error) {
 	return emu, nil
 }
 
-func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if system.RunningInUserNS() || cgroup.SkipDevices {
+func (s *DevicesGroup) Set(path string, r *configs.Resources) error {
+	if userns.RunningInUserNS() || r.SkipDevices {
 		return nil
 	}
 
@@ -65,7 +64,7 @@ func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
 	if err != nil {
 		return err
 	}
-	target, err := buildEmulator(cgroup.Resources.Devices)
+	target, err := buildEmulator(r.Devices)
 	if err != nil {
 		return err
 	}
@@ -81,7 +80,7 @@ func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
 		if rule.Allow {
 			file = "devices.allow"
 		}
-		if err := fscommon.WriteFile(path, file, rule.CgroupString()); err != nil {
+		if err := cgroups.WriteFile(path, file, rule.CgroupString()); err != nil {
 			return err
 		}
 	}

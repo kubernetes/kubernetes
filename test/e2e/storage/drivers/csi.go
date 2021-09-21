@@ -46,7 +46,11 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -142,6 +146,7 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapBlock:               true,
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
+		storageframework.CapOnlineExpansion:     true,
 		storageframework.CapSingleNodeVolume:    true,
 
 		// This is needed for the
@@ -161,12 +166,8 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-resizer.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
 }
@@ -234,13 +235,51 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 			// testsuites/volumelimits.go `should support volume limits`
 			// test.
 			"--maxvolumespernode=10",
+			// Enable volume lifecycle checks, to report failure if
+			// the volume is not unpublished / unstaged correctly.
+			"--check-volume-lifecycle=true",
 		},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	}
+
+	// Disable volume lifecycle checks due to issue #103651 for the one
+	// test that it breaks.
+	// TODO: enable this check once issue is resolved for csi-host-path driver
+	// (https://github.com/kubernetes/kubernetes/pull/104858).
+	if strings.Contains(ginkgo.CurrentGinkgoTestDescription().FullTestText,
+		"should unmount if pod is gracefully deleted while kubelet is down") {
+		o.DriverContainerArguments = append(o.DriverContainerArguments, "--check-volume-lifecycle=false")
+	}
+
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
-		return utils.PatchCSIDeployment(config.Framework, o, item)
+		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
+			return err
+		}
+
+		// Remove csi-external-health-monitor-agent and
+		// csi-external-health-monitor-controller
+		// containers. The agent is obsolete.
+		// The controller is not needed for any of the
+		// tests and is causing too much overhead when
+		// running in a large cluster (see
+		// https://github.com/kubernetes/kubernetes/issues/102452#issuecomment-856991009).
+		switch item := item.(type) {
+		case *appsv1.StatefulSet:
+			var containers []v1.Container
+			for _, container := range item.Spec.Template.Spec.Containers {
+				switch container.Name {
+				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
+					// Remove these containers.
+				default:
+					// Keep the others.
+					containers = append(containers, container)
+				}
+			}
+			item.Spec.Template.Spec.Containers = containers
+		}
+		return nil
 	}, h.manifests...)
 
 	if err != nil {
@@ -382,16 +421,16 @@ func (c *MockCSICalls) LogGRPC(method string, request, reply interface{}, err er
 		// "" on no error.
 		Error string
 		// Full error dump, to be able to parse out full gRPC error code and message separately in a test.
-		FullError error
+		FullError *spb.Status
 	}{
-		Method:    method,
-		Request:   request,
-		Response:  reply,
-		FullError: err,
+		Method:   method,
+		Request:  request,
+		Response: reply,
 	}
 
 	if err != nil {
 		logMessage.Error = err.Error()
+		logMessage.FullError = grpcstatus.Convert(err).Proto()
 	}
 
 	msg, _ := json.Marshal(logMessage)
@@ -767,6 +806,7 @@ func InitGcePDCSIDriver() storageframework.TestDriver {
 				storageframework.CapVolumeLimits:        false,
 				storageframework.CapTopology:            true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				storageframework.CapSnapshotDataSource:  true,
 			},

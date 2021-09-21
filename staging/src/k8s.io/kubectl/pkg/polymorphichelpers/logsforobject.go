@@ -76,31 +76,34 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 	case *corev1.Pod:
 		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
 		if !allContainers {
+			currOpts := new(corev1.PodLogOptions)
+			if opts != nil {
+				opts.DeepCopyInto(currOpts)
+			}
 			// in case the "kubectl.kubernetes.io/default-container" annotation is present, we preset the opts.Containers to default to selected
 			// container. This gives users ability to preselect the most interesting container in pod.
-			if annotations := t.GetAnnotations(); annotations != nil && len(opts.Container) == 0 {
-				var containerName string
+			if annotations := t.GetAnnotations(); annotations != nil && currOpts.Container == "" {
+				var defaultContainer string
 				if len(annotations[podcmd.DefaultContainerAnnotationName]) > 0 {
-					containerName = annotations[podcmd.DefaultContainerAnnotationName]
+					defaultContainer = annotations[podcmd.DefaultContainerAnnotationName]
 				} else if len(annotations[defaultLogsContainerAnnotationName]) > 0 {
 					// Only log deprecation if we have only the old annotation. This allows users to
 					// set both to support multiple versions of kubectl; if they are setting both
 					// they must already know it is deprecated, so we don't need to add noisy
 					// warnings.
-					containerName = annotations[defaultLogsContainerAnnotationName]
+					defaultContainer = annotations[defaultLogsContainerAnnotationName]
 					fmt.Fprintf(os.Stderr, "Using deprecated annotation `kubectl.kubernetes.io/default-logs-container` in pod/%v. Please use `kubectl.kubernetes.io/default-container` instead\n", t.Name)
 				}
-				if len(containerName) > 0 {
-					if exists, _ := podcmd.FindContainerByName(t, containerName); exists != nil {
-						opts.Container = containerName
+				if len(defaultContainer) > 0 {
+					if exists, _ := podcmd.FindContainerByName(t, defaultContainer); exists == nil {
+						fmt.Fprintf(os.Stderr, "Default container name %q not found in pod %s\n", defaultContainer, t.Name)
 					} else {
-						fmt.Fprintf(os.Stderr, "Default container name %q not found in a pod\n", containerName)
+						currOpts.Container = defaultContainer
 					}
 				}
 			}
 
-			var containerName string
-			if opts == nil || len(opts.Container) == 0 {
+			if currOpts.Container == "" {
 				// We don't know container name. In this case we expect only one container to be present in the pod (ignoring InitContainers).
 				// If there is more than one container, we should return an error showing all container names.
 				if len(t.Spec.Containers) != 1 {
@@ -117,14 +120,12 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 
 					return nil, errors.New(err)
 				}
-				containerName = t.Spec.Containers[0].Name
-			} else {
-				containerName = opts.Container
+				currOpts.Container = t.Spec.Containers[0].Name
 			}
 
-			container, fieldPath := podcmd.FindContainerByName(t, containerName)
+			container, fieldPath := podcmd.FindContainerByName(t, currOpts.Container)
 			if container == nil {
-				return nil, fmt.Errorf("container %s is not valid for pod %s", opts.Container, t.Name)
+				return nil, fmt.Errorf("container %s is not valid for pod %s", currOpts.Container, t.Name)
 			}
 			ref, err := reference.GetPartialReference(scheme.Scheme, t, fieldPath)
 			if err != nil {
@@ -132,7 +133,7 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 			}
 
 			ret := make(map[corev1.ObjectReference]rest.ResponseWrapper, 1)
-			ret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, opts)
+			ret[*ref] = clientset.Pods(t.Namespace).GetLogs(t.Name, currOpts)
 			return ret, nil
 		}
 

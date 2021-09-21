@@ -30,11 +30,11 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -138,9 +138,6 @@ func parseMaxSize(size string) (int64, error) {
 	if !ok {
 		return 0, fmt.Errorf("invalid max log size")
 	}
-	if maxSize < 0 {
-		return 0, fmt.Errorf("negative max log size %d", maxSize)
-	}
 	return maxSize, nil
 }
 
@@ -160,6 +157,10 @@ func NewContainerLogManager(runtimeService internalapi.RuntimeService, osInterfa
 	parsedMaxSize, err := parseMaxSize(maxSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse container log max size %q: %v", maxSize, err)
+	}
+	// Negative number means to disable container log rotation
+	if parsedMaxSize < 0 {
+		return NewStubContainerLogManager(), nil
 	}
 	// policy LogRotatePolicy
 	return &containerLogManager{

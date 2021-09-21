@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -20,9 +21,12 @@ package dockershim
 
 import (
 	"context"
+	"errors"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
+
+var ErrNotImplemented = errors.New("Not implemented")
 
 // ContainerStats returns stats for a container stats request based on container id.
 func (ds *dockerService) ContainerStats(_ context.Context, r *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
@@ -61,4 +65,16 @@ func (ds *dockerService) ListContainerStats(ctx context.Context, r *runtimeapi.L
 	}
 
 	return &runtimeapi.ListContainerStatsResponse{Stats: stats}, nil
+}
+
+// PodSandboxStats returns stats for a pod sandbox based on pod sandbox id.
+// This function is not implemented for the dockershim.
+func (ds *dockerService) PodSandboxStats(_ context.Context, r *runtimeapi.PodSandboxStatsRequest) (*runtimeapi.PodSandboxStatsResponse, error) {
+	return nil, ErrNotImplemented
+}
+
+// ListPodSandboxStats returns stats for a list of pod sandboxes based on a filter.
+// This function is not implemented for the dockershim.
+func (ds *dockerService) ListPodSandboxStats(ctx context.Context, r *runtimeapi.ListPodSandboxStatsRequest) (*runtimeapi.ListPodSandboxStatsResponse, error) {
+	return nil, ErrNotImplemented
 }

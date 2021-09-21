@@ -28,12 +28,13 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/component-base/metrics/testutil"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 const (
@@ -45,7 +46,7 @@ const (
 type TestGenericPLEG struct {
 	pleg    *GenericPLEG
 	runtime *containertest.FakeRuntime
-	clock   *clock.FakeClock
+	clock   *testingclock.FakeClock
 }
 
 func newTestGenericPLEG() *TestGenericPLEG {
@@ -54,7 +55,7 @@ func newTestGenericPLEG() *TestGenericPLEG {
 
 func newTestGenericPLEGWithChannelSize(eventChannelCap int) *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
-	clock := clock.NewFakeClock(time.Time{})
+	clock := testingclock.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
@@ -702,7 +703,7 @@ kubelet_running_containers{container_state="unknown"} 2
 			name:        "test pod count",
 			metricsName: "kubelet_running_pods",
 			wants: `
-# HELP kubelet_running_pods [ALPHA] Number of pods currently running
+# HELP kubelet_running_pods [ALPHA] Number of pods that have a running pod sandbox
 # TYPE kubelet_running_pods gauge
 kubelet_running_pods 2
 `,

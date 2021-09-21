@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -20,13 +21,16 @@ package cm
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/stats/pidlimit"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -131,9 +135,22 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
 func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList) error {
+	rp := getCgroupConfig(rl)
+
+	// Enforce MemoryQoS for cgroups of kube-reserved/system-reserved. For more information,
+	// see https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2570-memory-qos
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) {
+		if rp.Memory != nil {
+			if rp.Unified == nil {
+				rp.Unified = make(map[string]string)
+			}
+			rp.Unified[MemoryMin] = strconv.FormatInt(*rp.Memory, 10)
+		}
+	}
+
 	cgroupConfig := &CgroupConfig{
 		Name:               cName,
-		ResourceParameters: getCgroupConfig(rl),
+		ResourceParameters: rp,
 	}
 	if cgroupConfig.ResourceParameters == nil {
 		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
@@ -174,10 +191,10 @@ func getCgroupConfig(rl v1.ResourceList) *ResourceConfig {
 	return &rc
 }
 
-// getNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
+// GetNodeAllocatableAbsolute returns the absolute value of Node Allocatable which is primarily useful for enforcement.
 // Note that not all resources that are available on the node are included in the returned list of resources.
 // Returns a ResourceList.
-func (cm *containerManagerImpl) getNodeAllocatableAbsolute() v1.ResourceList {
+func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return cm.getNodeAllocatableAbsoluteImpl(cm.capacity)
 }
 

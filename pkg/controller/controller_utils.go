@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -52,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/integer"
 
 	"k8s.io/klog/v2"
@@ -445,10 +445,10 @@ func (r RealControllerRevisionControl) PatchControllerRevision(namespace, name s
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {
-	// CreatePods creates new pods according to the spec.
-	CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error
-	// CreatePodsWithControllerRef creates new pods according to the spec, and sets object as the pod's controller.
-	CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
+	// CreatePods creates new pods according to the spec, and sets object as the pod's controller.
+	CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error
+	// CreatePodsWithGenerateName creates new pods according to the spec, sets object as the pod's controller and sets pod's generateName.
+	CreatePodsWithGenerateName(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateName string) error
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string, object runtime.Object) error
 	// PatchPod patches the pod.
@@ -513,15 +513,22 @@ func validateControllerRef(controllerRef *metav1.OwnerReference) error {
 	return nil
 }
 
-func (r RealPodControl) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
-	return r.createPods(namespace, template, object, nil)
+func (r RealPodControl) CreatePods(namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference) error {
+	return r.CreatePodsWithGenerateName(namespace, template, controllerObject, controllerRef, "")
 }
 
-func (r RealPodControl) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (r RealPodControl) CreatePodsWithGenerateName(namespace string, template *v1.PodTemplateSpec, controllerObject runtime.Object, controllerRef *metav1.OwnerReference, generateName string) error {
 	if err := validateControllerRef(controllerRef); err != nil {
 		return err
 	}
-	return r.createPods(namespace, template, controllerObject, controllerRef)
+	pod, err := GetPodFromTemplate(template, controllerObject, controllerRef)
+	if err != nil {
+		return err
+	}
+	if len(generateName) > 0 {
+		pod.ObjectMeta.GenerateName = generateName
+	}
+	return r.createPods(namespace, pod, controllerObject)
 }
 
 func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
@@ -554,11 +561,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	pod, err := GetPodFromTemplate(template, object, controllerRef)
-	if err != nil {
-		return err
-	}
+func (r RealPodControl) createPods(namespace string, pod *v1.Pod, object runtime.Object) error {
 	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
@@ -623,7 +626,7 @@ func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
 	return nil
 }
 
-func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, object runtime.Object) error {
+func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
 	f.CreateCallCount++
@@ -631,13 +634,14 @@ func (f *FakePodControl) CreatePods(namespace string, spec *v1.PodTemplateSpec, 
 		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
 	}
 	f.Templates = append(f.Templates, *spec)
+	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
 	if f.Err != nil {
 		return f.Err
 	}
 	return nil
 }
 
-func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (f *FakePodControl) CreatePodsWithGenerateName(namespace string, spec *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference, generateNamePrefix string) error {
 	f.Lock()
 	defer f.Unlock()
 	f.CreateCallCount++
@@ -829,7 +833,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		return !podutil.IsPodReady(s.Pods[i])
 	}
 
-	// 4. higher pod-deletion-cost < lower pod-deletion cost
+	// 4. lower pod-deletion-cost < higher pod-deletion cost
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodDeletionCost) {
 		pi, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[i].Annotations)
 		pj, _ := helper.GetDeletionCostFromPodAnnotations(s.Pods[j].Annotations)

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -31,19 +32,19 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
-	discovery "k8s.io/api/discovery/v1beta1"
-
 	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
@@ -52,7 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/util/async"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 // KernelCompatTester tests whether the required kernel capabilities are
@@ -138,6 +139,101 @@ type remoteSubnetInfo struct {
 
 const NETWORK_TYPE_OVERLAY = "overlay"
 
+func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
+	var hns HostNetworkService
+	hns = hnsV1{}
+	supportedFeatures := hcn.GetSupportedFeatures()
+	if supportedFeatures.Api.V2 {
+		hns = hnsV2{}
+	}
+
+	return hns, supportedFeatures
+}
+
+func getNetworkName(hnsNetworkName string) (string, error) {
+	if len(hnsNetworkName) == 0 {
+		klog.V(3).InfoS("network-name flag not set. Checking environment variable")
+		hnsNetworkName = os.Getenv("KUBE_NETWORK")
+		if len(hnsNetworkName) == 0 {
+			return "", fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
+		}
+	}
+	return hnsNetworkName, nil
+}
+
+func getNetworkInfo(hns HostNetworkService, hnsNetworkName string) (*hnsNetworkInfo, error) {
+	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
+	for err != nil {
+		klog.ErrorS(err, "Unable to find HNS Network specified. Please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
+		time.Sleep(1 * time.Second)
+		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
+	}
+	return hnsNetworkInfo, err
+}
+
+func isOverlay(hnsNetworkInfo *hnsNetworkInfo) bool {
+	return strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY)
+}
+
+// StackCompatTester tests whether the required kernel and network are dualstack capable
+type StackCompatTester interface {
+	DualStackCompatible(networkName string) bool
+}
+
+type DualStackCompatTester struct{}
+
+func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
+	dualStackFeatureEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack)
+	if !dualStackFeatureEnabled {
+		return false
+	}
+
+	globals, err := hcn.GetGlobals()
+	if err != nil {
+		klog.ErrorS(err, "Unable to determine networking stack version. Falling back to single-stack")
+		return false
+	}
+
+	if !kernelSupportsDualstack(globals.Version) {
+		klog.InfoS("This version of Windows does not support dual-stack. Falling back to single-stack")
+		return false
+	}
+
+	// check if network is using overlay
+	hns, _ := newHostNetworkService()
+	networkName, err = getNetworkName(networkName)
+	if err != nil {
+		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
+		return false
+	}
+	networkInfo, err := getNetworkInfo(hns, networkName)
+	if err != nil {
+		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
+		return false
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) && isOverlay(networkInfo) {
+		// Overlay (VXLAN) networks on Windows do not support dual-stack networking today
+		klog.InfoS("Winoverlay does not support dual-stack. Falling back to single-stack")
+		return false
+	}
+
+	return true
+}
+
+// The hcsshim version logic has a bug that did not calculate the versioning of DualStack correctly.
+// DualStack is supported in WS 2004+ (10.0.19041+) where HCN component version is 11.10+
+// https://github.com/microsoft/hcsshim/pull/1003#issuecomment-827930358
+func kernelSupportsDualstack(currentVersion hcn.Version) bool {
+	hnsVersion := fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor)
+	v, err := version.ParseSemantic(hnsVersion)
+	if err != nil {
+		return false
+	}
+
+	return v.AtLeast(version.MustParseSemantic("11.10.0"))
+}
+
 func Log(v interface{}, message string, level klog.Level) {
 	klog.V(level).InfoS("%s", message, "spewConfig", spewSdump(v))
 }
@@ -197,11 +293,6 @@ func (info *endpointsInfo) IsTerminating() bool {
 	return info.terminating
 }
 
-// GetTopology returns the topology information of the endpoint.
-func (info *endpointsInfo) GetTopology() map[string]string {
-	return nil
-}
-
 // GetZoneHint returns the zone hint for the endpoint.
 func (info *endpointsInfo) GetZoneHints() sets.String {
 	return sets.String{}
@@ -220,6 +311,16 @@ func (info *endpointsInfo) Port() (int, error) {
 // Equal is part of proxy.Endpoint interface.
 func (info *endpointsInfo) Equal(other proxy.Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
+}
+
+// GetNodeName returns the NodeName for this endpoint.
+func (info *endpointsInfo) GetNodeName() string {
+	return ""
+}
+
+// GetZone returns the Zone for this endpoint.
+func (info *endpointsInfo) GetZone() string {
+	return ""
 }
 
 //Uses mac prefix and IPv4 address to return a mac address
@@ -324,7 +425,7 @@ func (proxier *Proxier) newEndpointInfo(baseInfo *proxy.BaseEndpointInfo) proxy.
 		ip:         baseInfo.IP(),
 		port:       uint16(portNumber),
 		isLocal:    baseInfo.GetIsLocal(),
-		macAddress: conjureMac("02-11", net.ParseIP(baseInfo.IP())),
+		macAddress: conjureMac("02-11", netutils.ParseIPSloppy(baseInfo.IP())),
 		refCount:   new(uint16),
 		hnsID:      "",
 		hns:        proxier.hns,
@@ -410,7 +511,7 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 	}
 
 	for _, ingress := range service.Status.LoadBalancer.Ingress {
-		if net.ParseIP(ingress.IP) != nil {
+		if netutils.ParseIPSloppy(ingress.IP) != nil {
 			info.loadBalancerIngressIPs = append(info.loadBalancerIngressIPs, &loadBalancerIngressInfo{ip: ingress.IP})
 		}
 	}
@@ -420,11 +521,11 @@ func (proxier *Proxier) newServiceInfo(port *v1.ServicePort, service *v1.Service
 func (network hnsNetworkInfo) findRemoteSubnetProviderAddress(ip string) string {
 	var providerAddress string
 	for _, rs := range network.remoteSubnets {
-		_, ipNet, err := net.ParseCIDR(rs.destinationPrefix)
+		_, ipNet, err := netutils.ParseCIDRSloppy(rs.destinationPrefix)
 		if err != nil {
 			klog.ErrorS(err, "Failed to parse CIDR")
 		}
-		if ipNet.Contains(net.ParseIP(ip)) {
+		if ipNet.Contains(netutils.ParseIPSloppy(ip)) {
 			providerAddress = rs.providerAddress
 		}
 		if ip == rs.providerAddress {
@@ -453,10 +554,9 @@ type Proxier struct {
 	mu                sync.Mutex // protects the following fields
 	serviceMap        proxy.ServiceMap
 	endpointsMap      proxy.EndpointsMap
-	// endpointsSynced and servicesSynced are set to true when corresponding
+	// endpointSlicesSynced and servicesSynced are set to true when corresponding
 	// objects are synced after startup. This is used to avoid updating hns policies
 	// with some partial data after kube-proxy restart.
-	endpointsSynced      bool
 	endpointSlicesSynced bool
 	servicesSynced       bool
 	isIPv6Mode           bool
@@ -468,7 +568,7 @@ type Proxier struct {
 	clusterCIDR    string
 	hostname       string
 	nodeIP         net.IP
-	recorder       record.EventRecorder
+	recorder       events.EventRecorder
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -526,7 +626,7 @@ func NewProxier(
 	clusterCIDR string,
 	hostname string,
 	nodeIP net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
@@ -535,48 +635,36 @@ func NewProxier(
 
 	if nodeIP == nil {
 		klog.InfoS("invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = net.ParseIP("127.0.0.1")
+		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
 
 	if len(clusterCIDR) == 0 {
 		klog.InfoS("clusterCIDR not specified, unable to distinguish between internal and external traffic")
 	}
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
-	var hns HostNetworkService
-	hns = hnsV1{}
-	supportedFeatures := hcn.GetSupportedFeatures()
-	if supportedFeatures.Api.V2 {
-		hns = hnsV2{}
-	}
-
-	hnsNetworkName := config.NetworkName
-	if len(hnsNetworkName) == 0 {
-		klog.V(3).InfoS("network-name flag not set. Checking environment variable")
-		hnsNetworkName = os.Getenv("KUBE_NETWORK")
-		if len(hnsNetworkName) == 0 {
-			return nil, fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
-		}
+	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder, []string{} /* windows listen to all node addresses */)
+	hns, supportedFeatures := newHostNetworkService()
+	hnsNetworkName, err := getNetworkName(config.NetworkName)
+	if err != nil {
+		return nil, err
 	}
 
 	klog.V(3).InfoS("Cleaning up old HNS policy lists")
 	deleteAllHnsLoadBalancerPolicy()
 
 	// Get HNS network information
-	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
-	for err != nil {
-		klog.ErrorS(err, "Unable to find HNS Network specified. Please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
-		time.Sleep(1 * time.Second)
-		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
+	hnsNetworkInfo, err := getNetworkInfo(hns, hnsNetworkName)
+	if err != nil {
+		return nil, err
 	}
 
 	// Network could have been detected before Remote Subnet Routes are applied or ManagementIP is updated
 	// Sleep and update the network to include new information
-	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
+	if isOverlay(hnsNetworkInfo) {
 		time.Sleep(10 * time.Second)
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 		if err != nil {
-			return nil, fmt.Errorf("Could not find HNS network %s", hnsNetworkName)
+			return nil, fmt.Errorf("could not find HNS network %s", hnsNetworkName)
 		}
 	}
 
@@ -592,7 +680,7 @@ func NewProxier(
 
 	var sourceVip string
 	var hostMac string
-	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
+	if isOverlay(hnsNetworkInfo) {
 		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
@@ -605,11 +693,20 @@ func NewProxier(
 			return nil, fmt.Errorf("source-vip flag not set")
 		}
 
+		if nodeIP.IsUnspecified() {
+			// attempt to get the correct ip address
+			klog.V(2).InfoS("node ip was unspecified.  Attempting to find node ip")
+			nodeIP, err = apiutil.ResolveBindAddress(nodeIP)
+			if err != nil {
+				klog.InfoS("failed to find an ip. You may need set the --bind-address flag", "err", err)
+			}
+		}
+
 		interfaces, _ := net.Interfaces() //TODO create interfaces
 		for _, inter := range interfaces {
 			addresses, _ := inter.Addrs()
 			for _, addr := range addresses {
-				addrIP, _, _ := net.ParseCIDR(addr.String())
+				addrIP, _, _ := netutils.ParseCIDRSloppy(addr.String())
 				if addrIP.String() == nodeIP.String() {
 					klog.V(2).InfoS("record Host MAC address", "addr", inter.HardwareAddr.String())
 					hostMac = inter.HardwareAddr.String()
@@ -617,12 +714,11 @@ func NewProxier(
 			}
 		}
 		if len(hostMac) == 0 {
-			return nil, fmt.Errorf("Could not find host mac address for %s", nodeIP)
+			return nil, fmt.Errorf("could not find host mac address for %s", nodeIP)
 		}
 	}
 
-	isIPv6 := utilnet.IsIPv6(nodeIP)
-	endpointSlicesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying)
+	isIPv6 := netutils.IsIPv6(nodeIP)
 	proxier := &Proxier{
 		endPointsRefCount:   make(endPointsReferenceCountMap),
 		serviceMap:          make(proxy.ServiceMap),
@@ -649,7 +745,7 @@ func NewProxier(
 		ipFamily = v1.IPv6Protocol
 	}
 	serviceChanges := proxy.NewServiceChangeTracker(proxier.newServiceInfo, ipFamily, recorder, proxier.serviceMapChange)
-	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, endpointSlicesEnabled, proxier.endpointsMapChange)
+	endPointChangeTracker := proxy.NewEndpointChangeTracker(hostname, proxier.newEndpointInfo, ipFamily, recorder, proxier.endpointsMapChange)
 	proxier.endpointsChanges = endPointChangeTracker
 	proxier.serviceChanges = serviceChanges
 
@@ -667,7 +763,7 @@ func NewDualStackProxier(
 	clusterCIDR string,
 	hostname string,
 	nodeIP [2]net.IP,
-	recorder record.EventRecorder,
+	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
 ) (proxy.Provider, error) {
@@ -825,11 +921,7 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsEndpointSliceProxying) {
-		proxier.setInitialized(proxier.endpointSlicesSynced)
-	} else {
-		proxier.setInitialized(proxier.endpointsSynced)
-	}
+	proxier.setInitialized(proxier.endpointSlicesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -848,39 +940,6 @@ func shouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 		return true
 	}
 	return false
-}
-
-// OnEndpointsAdd is called whenever creation of new endpoints object
-// is observed.
-func (proxier *Proxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(nil, endpoints)
-}
-
-// OnEndpointsUpdate is called whenever modification of an existing
-// endpoints object is observed.
-func (proxier *Proxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
-
-	if proxier.endpointsChanges.Update(oldEndpoints, endpoints) && proxier.isInitialized() {
-		proxier.Sync()
-	}
-}
-
-// OnEndpointsDelete is called whenever deletion of an existing endpoints
-// object is observed.
-func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
-	proxier.OnEndpointsUpdate(endpoints, nil)
-}
-
-// OnEndpointsSynced is called once all the initial event handlers were
-// called and the state is fully propagated to local cache.
-func (proxier *Proxier) OnEndpointsSynced() {
-	proxier.mu.Lock()
-	proxier.endpointsSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
-	proxier.mu.Unlock()
-
-	// Sync unconditionally - this is called once per lifetime.
-	proxier.syncProxyRules()
 }
 
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
@@ -1102,7 +1161,7 @@ func (proxier *Proxier) syncProxyRules() {
 					hnsEndpoint := &endpointsInfo{
 						ip:              ep.ip,
 						isLocal:         false,
-						macAddress:      conjureMac("02-11", net.ParseIP(ep.ip)),
+						macAddress:      conjureMac("02-11", netutils.ParseIPSloppy(ep.ip)),
 						providerAddress: providerAddress,
 					}
 
@@ -1250,7 +1309,7 @@ func (proxier *Proxier) syncProxyRules() {
 				uint16(svcInfo.Port()),
 			)
 			if err != nil {
-				klog.ErrorS(err, "Policy creation failed", err)
+				klog.ErrorS(err, "Policy creation failed")
 				continue
 			}
 			externalIP.hnsID = hnsLoadBalancer.hnsID
@@ -1265,7 +1324,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			hnsLoadBalancer, err := hns.getLoadBalancer(
 				lbIngressEndpoints,
-				loadBalancerFlags{isDSR: svcInfo.preserveDIP || proxier.isDSR || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
+				loadBalancerFlags{isDSR: svcInfo.preserveDIP || svcInfo.localTrafficDSR, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP, sessionAffinity: sessionAffinityClientIP, isIPv6: proxier.isIPv6Mode},
 				sourceVip,
 				lbIngressIP.ip,
 				Enum(svcInfo.Protocol()),

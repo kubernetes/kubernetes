@@ -940,7 +940,7 @@ Kubeadm: Expose the `kubeadm join` workflow as phases
 
 - The `kubeadm join` command can now be used in phases. Similar to the work that was done for `kubeadm init` in 1.13, in 1.14 the `join` phases can be now executed step-by-step/selectively using the `kubeadm join phase` sub-command. This makes it possible to further customize the workflow of joining nodes to the cluster.
 kubernetes/kubeadm: [#1204](https://github.com/kubernetes/kubeadm/issues/1204)
-kubernetes/enhancements: [kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/kubeadm/0029-20180918-kubeadm-phases-beta.md)
+kubernetes/enhancements: [kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/kubeadm/2501-kubeadm-phases-to-beta/README.md)
 
 ## Known Issues
 

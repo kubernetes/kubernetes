@@ -21,9 +21,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -90,13 +88,12 @@ func (ingressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 
 // Validate validates ingresses on create.
 func (ingressStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	var requestGV schema.GroupVersion
-	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
-		requestGV = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-	}
 	ingress := obj.(*networking.Ingress)
-	return validation.ValidateIngressCreate(ingress, requestGV)
+	return validation.ValidateIngressCreate(ingress)
 }
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (ingressStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
 // Canonicalize normalizes the object after validation.
 func (ingressStrategy) Canonicalize(obj runtime.Object) {
@@ -109,11 +106,12 @@ func (ingressStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate validates ingresses on update.
 func (ingressStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	var requestGV schema.GroupVersion
-	if requestInfo, ok := request.RequestInfoFrom(ctx); ok {
-		requestGV = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
-	}
-	return validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress), requestGV)
+	return validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (ingressStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.
@@ -157,4 +155,9 @@ func (ingressStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // ValidateUpdate is the default update validation for an end user updating status
 func (ingressStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateIngressStatusUpdate(obj.(*networking.Ingress), old.(*networking.Ingress))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (ingressStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

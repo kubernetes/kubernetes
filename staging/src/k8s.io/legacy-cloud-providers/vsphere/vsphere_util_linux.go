@@ -1,5 +1,5 @@
-// +build !providerless
-// +build linux
+//go:build !providerless && linux
+// +build !providerless,linux
 
 /*
 Copyright 2018 The Kubernetes Authors.

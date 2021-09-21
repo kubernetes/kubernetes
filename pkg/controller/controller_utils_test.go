@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -52,14 +51,15 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
-func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *clock.FakeClock) {
+func NewFakeControllerExpectationsLookup(ttl time.Duration) (*ControllerExpectations, *testingclock.FakeClock) {
 	fakeTime := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	fakeClock := clock.NewFakeClock(fakeTime)
+	fakeClock := testingclock.NewFakeClock(fakeTime)
 	ttlPolicy := &cache.TTLPolicy{TTL: ttl, Clock: fakeClock}
 	ttlStore := cache.NewFakeExpirationStore(
 		ExpKeyFunc, nil, ttlPolicy, fakeClock)
@@ -300,9 +300,10 @@ func TestCreatePods(t *testing.T) {
 	}
 
 	controllerSpec := newReplicationController(1)
+	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
+	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec, controllerRef)
 	assert.NoError(t, err, "unexpected error: %v", err)
 
 	expectedPod := v1.Pod{
@@ -312,6 +313,47 @@ func TestCreatePods(t *testing.T) {
 		},
 		Spec: controllerSpec.Spec.Template.Spec,
 	}
+	fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
+	var actualPod = &v1.Pod{}
+	err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)
+	assert.NoError(t, err, "unexpected error: %v", err)
+	assert.True(t, apiequality.Semantic.DeepDerivative(&expectedPod, actualPod),
+		"Body: %s", fakeHandler.RequestBody)
+}
+
+func TestCreatePodsWithGenerateName(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	body := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+
+	podControl := RealPodControl{
+		KubeClient: clientset,
+		Recorder:   &record.FakeRecorder{},
+	}
+
+	controllerSpec := newReplicationController(1)
+	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
+
+	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
+	generateName := "hello-"
+	err := podControl.CreatePodsWithGenerateName(ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName)
+	assert.NoError(t, err, "unexpected error: %v", err)
+
+	expectedPod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:          controllerSpec.Spec.Template.Labels,
+			GenerateName:    generateName,
+			OwnerReferences: []metav1.OwnerReference{*controllerRef},
+		},
+		Spec: controllerSpec.Spec.Template.Spec,
+	}
+
 	fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
 	var actualPod = &v1.Pod{}
 	err = json.Unmarshal([]byte(fakeHandler.RequestBody), actualPod)

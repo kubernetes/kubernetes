@@ -19,10 +19,13 @@ package testing
 import (
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 var zero int64
@@ -167,6 +170,19 @@ func (p *PodWrapper) SchedulerName(s string) *PodWrapper {
 // Namespace sets `s` as the namespace of the inner pod.
 func (p *PodWrapper) Namespace(s string) *PodWrapper {
 	p.SetNamespace(s)
+	return p
+}
+
+// OwnerReference updates the owning controller of the pod.
+func (p *PodWrapper) OwnerReference(name string, gvk schema.GroupVersionKind) *PodWrapper {
+	p.OwnerReferences = []metav1.OwnerReference{
+		{
+			APIVersion: gvk.GroupVersion().String(),
+			Kind:       gvk.Kind,
+			Name:       name,
+			Controller: pointer.BoolPtr(true),
+		},
+	}
 	return p
 }
 
@@ -400,6 +416,8 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 		res[k] = resource.MustParse(v)
 	}
 	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
+		Name:  fmt.Sprintf("con%d", len(p.Spec.Containers)),
+		Image: imageutils.GetPauseImageName(),
 		Resources: v1.ResourceRequirements{
 			Requests: res,
 		},

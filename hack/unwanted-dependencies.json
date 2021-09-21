@@ -1,0 +1,30 @@
+{ 
+  "spec": {
+    "unwantedModules": {
+      "github.com/go-kit/kit": "lots of transitive dependencies, see https://github.com/prometheus/common/issues/255",
+      "github.com/go-openapi/analysis": "use k8s.io/kube-openapi/pkg/validation/spec",
+      "github.com/go-openapi/spec": "use k8s.io/kube-openapi/pkg/validation/spec instead",
+      "github.com/go-openapi/strfmt": "use k8s.io/kube-openapi/pkg/validation/strfmt instead",
+      "github.com/go-openapi/validate": "use k8s.io/kube-openapi/pkg/validation/validate instead",
+      "github.com/influxdata/influxdb1-client": "",
+      "go.mongodb.org/mongo-driver": "",
+      "k8s.io/klog": "we have switched to klog v2, so avoid klog v1",
+      "rsc.io/quote": "refer to #102833",
+      "rsc.io/sampler": "refer to #102833",
+      "github.com/hashicorp/golang-lru": "",
+      "github.com/hashicorp/hcl": "",
+      "github.com/json-iterator/go": "refer to #105030",
+      "github.com/spf13/viper": "refer to #102598",
+      "github.com/go-bindata/go-bindata ": "refer to #99829"
+    }
+  },
+  "status": {
+    "references": [
+      "github.com/go-kit/kit",
+      "github.com/hashicorp/golang-lru",
+      "github.com/hashicorp/hcl",
+      "github.com/json-iterator/go",
+      "github.com/spf13/viper"
+    ]
+  }
+}

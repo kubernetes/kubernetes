@@ -246,6 +246,8 @@ func (v *fakeBlockVolume) GetGlobalMapPath(*volume.Spec) (string, error) { retur
 
 func (v *fakeBlockVolume) GetPodDeviceMapPath() (string, string) { return "", "" }
 
+func (v *fakeBlockVolume) SupportsMetrics() bool { return true }
+
 func (v *fakeBlockVolume) GetMetrics() (*volume.Metrics, error) {
 	return expectedBlockMetrics(), nil
 }

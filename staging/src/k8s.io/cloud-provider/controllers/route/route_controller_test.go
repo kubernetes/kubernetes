@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -31,6 +31,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
+	netutils "k8s.io/utils/net"
 )
 
 func alwaysReady() bool { return true }
@@ -60,7 +61,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		{"a00:100::/10", myClusterRoute, "b00:100::/24", false},
 	}
 	for i, testCase := range testCases {
-		_, cidr, err := net.ParseCIDR(testCase.clusterCIDR)
+		_, cidr, err := netutils.ParseCIDRSloppy(testCase.clusterCIDR)
 		if err != nil {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
@@ -359,10 +360,10 @@ func TestReconcile(t *testing.T) {
 			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
 		cidrs := make([]*net.IPNet, 0)
-		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
+		_, cidr, _ := netutils.ParseCIDRSloppy("10.120.0.0/16")
 		cidrs = append(cidrs, cidr)
 		if testCase.dualStack {
-			_, cidrv6, _ := net.ParseCIDR("ace:cab:deca::/8")
+			_, cidrv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/8")
 			cidrs = append(cidrs, cidrv6)
 		}
 

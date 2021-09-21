@@ -57,8 +57,6 @@ func (r *SpecBuilder) BuildSpecs(args []string, additionalArgs []string) {
 		} else {
 			fmt.Printf("    compiled %s.test\n", suite.PackageName)
 		}
-
-		runner.CleanUp()
 	}
 
 	if passed {

@@ -41,7 +41,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubectl/pkg/cmd/attach"
-	"k8s.io/kubectl/pkg/cmd/delete"
+	cmddelete "k8s.io/kubectl/pkg/cmd/delete"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubectl/pkg/cmd/logs"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -60,31 +60,31 @@ var (
 	runLong = templates.LongDesc(i18n.T(`Create and run a particular image in a pod.`))
 
 	runExample = templates.Examples(i18n.T(`
-		# Start a nginx pod.
+		# Start a nginx pod
 		kubectl run nginx --image=nginx
 
-		# Start a hazelcast pod and let the container expose port 5701.
+		# Start a hazelcast pod and let the container expose port 5701
 		kubectl run hazelcast --image=hazelcast/hazelcast --port=5701
 
-		# Start a hazelcast pod and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container.
+		# Start a hazelcast pod and set environment variables "DNS_DOMAIN=cluster" and "POD_NAMESPACE=default" in the container
 		kubectl run hazelcast --image=hazelcast/hazelcast --env="DNS_DOMAIN=cluster" --env="POD_NAMESPACE=default"
 
-		# Start a hazelcast pod and set labels "app=hazelcast" and "env=prod" in the container.
+		# Start a hazelcast pod and set labels "app=hazelcast" and "env=prod" in the container
 		kubectl run hazelcast --image=hazelcast/hazelcast --labels="app=hazelcast,env=prod"
 
-		# Dry run. Print the corresponding API objects without creating them.
+		# Dry run; print the corresponding API objects without creating them
 		kubectl run nginx --image=nginx --dry-run=client
 
-		# Start a nginx pod, but overload the spec with a partial set of values parsed from JSON.
+		# Start a nginx pod, but overload the spec with a partial set of values parsed from JSON
 		kubectl run nginx --image=nginx --overrides='{ "apiVersion": "v1", "spec": { ... } }'
 
-		# Start a busybox pod and keep it in the foreground, don't restart it if it exits.
+		# Start a busybox pod and keep it in the foreground, don't restart it if it exits
 		kubectl run -i -t busybox --image=busybox --restart=Never
 
-		# Start the nginx pod using the default command, but use custom arguments (arg1 .. argN) for that command.
+		# Start the nginx pod using the default command, but use custom arguments (arg1 .. argN) for that command
 		kubectl run nginx --image=nginx -- <arg1> <arg2> ... <argN>
 
-		# Start the nginx pod using a different command and custom arguments.
+		# Start the nginx pod using a different command and custom arguments
 		kubectl run nginx --image=nginx --command -- <cmd> <arg1> ... <argN>`))
 )
 
@@ -103,8 +103,8 @@ type RunOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
 	RecordFlags *genericclioptions.RecordFlags
 
-	DeleteFlags   *delete.DeleteFlags
-	DeleteOptions *delete.DeleteOptions
+	DeleteFlags   *cmddelete.DeleteFlags
+	DeleteOptions *cmddelete.DeleteOptions
 
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resource.DryRunVerifier
@@ -134,7 +134,7 @@ type RunOptions struct {
 func NewRunOptions(streams genericclioptions.IOStreams) *RunOptions {
 	return &RunOptions{
 		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		DeleteFlags: delete.NewDeleteFlags("to use to replace the resource."),
+		DeleteFlags: cmddelete.NewDeleteFlags("to use to replace the resource."),
 		RecordFlags: genericclioptions.NewRecordFlags(),
 
 		Recorder: genericclioptions.NoopRecorder{},
@@ -178,10 +178,10 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().StringVar(&opt.Overrides, "overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
 	cmd.Flags().StringArray("env", []string{}, "Environment variables to set in the container.")
 	cmd.Flags().String("serviceaccount", "", "Service account to set in the pod spec.")
-	cmd.Flags().MarkDeprecated("serviceaccount", "has no effect and will be removed in the future.")
+	cmd.Flags().MarkDeprecated("serviceaccount", "has no effect and will be removed in 1.24.")
 	cmd.Flags().StringVar(&opt.Port, "port", opt.Port, i18n.T("The port that this container exposes."))
 	cmd.Flags().Int("hostport", -1, "The host port mapping for the container port. To demonstrate a single-machine container.")
-	cmd.Flags().MarkDeprecated("hostport", "has no effect and will be removed in the future.")
+	cmd.Flags().MarkDeprecated("hostport", "has no effect and will be removed in 1.24.")
 	cmd.Flags().StringP("labels", "l", "", "Comma separated labels to apply to the pod(s). Will override previous values.")
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
 	cmd.Flags().BoolVarP(&opt.TTY, "tty", "t", opt.TTY, "Allocated a TTY for each container in the pod.")
@@ -190,9 +190,9 @@ func addRunFlags(cmd *cobra.Command, opt *RunOptions) {
 	cmd.Flags().String("restart", "Always", i18n.T("The restart policy for this Pod.  Legal values [Always, OnFailure, Never]."))
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
 	cmd.Flags().String("requests", "", i18n.T("The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges."))
-	cmd.Flags().MarkDeprecated("requests", "has no effect and will be removed in the future.")
+	cmd.Flags().MarkDeprecated("requests", "has no effect and will be removed in 1.24.")
 	cmd.Flags().String("limits", "", i18n.T("The resource requirement limits for this container.  For example, 'cpu=200m,memory=512Mi'.  Note that server side components may assign limits depending on the server configuration, such as limit ranges."))
-	cmd.Flags().MarkDeprecated("limits", "has no effect and will be removed in the future.")
+	cmd.Flags().MarkDeprecated("limits", "has no effect and will be removed in 1.24.")
 	cmd.Flags().BoolVar(&opt.Expose, "expose", opt.Expose, "If true, service is created for the container(s) which are run")
 	cmd.Flags().BoolVarP(&opt.Quiet, "quiet", "q", opt.Quiet, "If true, suppress prompt messages.")
 	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container in privileged mode."))
@@ -312,6 +312,13 @@ func (o *RunOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	params["annotations"] = cmdutil.GetFlagStringArray(cmd, "annotations")
 	params["env"] = cmdutil.GetFlagStringArray(cmd, "env")
+
+	// TODO(eddiezane): These flags will be removed for 1.24
+	// https://github.com/kubernetes/kubectl/issues/1101#issuecomment-916149516
+	delete(params, "serviceaccount")
+	delete(params, "hostport")
+	delete(params, "requests")
+	delete(params, "limits")
 
 	var createdObjects = []*RunObject{}
 	runObject, err := o.createGeneratedObject(f, cmd, generator, names, params, o.Overrides)

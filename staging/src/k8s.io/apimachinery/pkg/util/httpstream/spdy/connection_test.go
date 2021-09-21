@@ -323,6 +323,9 @@ func TestConnectionRemoveStreams(t *testing.T) {
 	// remove all existing
 	c.RemoveStreams(stream0, stream1)
 
+	// remove nil stream should not crash
+	c.RemoveStreams(nil)
+
 	if len(c.streams) != 0 {
 		t.Fatalf("should not have any streams, has %d", len(c.streams))
 	}

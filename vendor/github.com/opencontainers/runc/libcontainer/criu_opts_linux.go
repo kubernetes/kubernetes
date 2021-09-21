@@ -1,6 +1,6 @@
 package libcontainer
 
-import criu "github.com/checkpoint-restore/go-criu/v4/rpc"
+import criu "github.com/checkpoint-restore/go-criu/v5/rpc"
 
 type CriuPageServerInfo struct {
 	Address string // IP address of CRIU page server
@@ -29,4 +29,5 @@ type CriuOpts struct {
 	AutoDedup               bool               // auto deduplication for incremental dumps
 	LazyPages               bool               // restore memory pages lazily using userfaultfd
 	StatusFd                int                // fd for feedback when lazy server is ready
+	LsmProfile              string             // LSM profile used to restore the container
 }

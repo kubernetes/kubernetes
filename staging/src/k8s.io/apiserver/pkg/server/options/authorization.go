@@ -193,7 +193,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 		klog.Warning("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
 	} else {
 		cfg := authorizerfactory.DelegatingAuthorizerConfig{
-			SubjectAccessReviewClient: client.AuthorizationV1().SubjectAccessReviews(),
+			SubjectAccessReviewClient: client.AuthorizationV1(),
 			AllowCacheTTL:             s.AllowCacheTTL,
 			DenyCacheTTL:              s.DenyCacheTTL,
 			WebhookRetryBackoff:       s.WebhookRetryBackoff,

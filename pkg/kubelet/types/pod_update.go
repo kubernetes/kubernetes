@@ -120,8 +120,8 @@ const (
 	SyncPodUpdate
 	// SyncPodCreate is when the pod is created from source
 	SyncPodCreate
-	// SyncPodKill is when the pod is killed based on a trigger internal to the kubelet for eviction.
-	// If a SyncPodKill request is made to pod workers, the request is never dropped, and will always be processed.
+	// SyncPodKill is when the pod should have no running containers. A pod stopped in this way could be
+	// restarted in the future due config changes.
 	SyncPodKill
 )
 
@@ -142,6 +142,9 @@ func (sp SyncPodType) String() string {
 
 // IsMirrorPod returns true if the passed Pod is a Mirror Pod.
 func IsMirrorPod(pod *v1.Pod) bool {
+	if pod.Annotations == nil {
+		return false
+	}
 	_, ok := pod.Annotations[ConfigMirrorAnnotationKey]
 	return ok
 }

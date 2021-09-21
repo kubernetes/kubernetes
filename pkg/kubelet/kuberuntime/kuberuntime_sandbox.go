@@ -18,19 +18,21 @@ package kuberuntime
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"runtime"
 	"sort"
 
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
+	netutils "k8s.io/utils/net"
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
@@ -138,6 +140,14 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	}
 	podSandboxConfig.Linux = lc
 
+	if runtime.GOOS == "windows" {
+		wc, err := m.generatePodSandboxWindowsConfig(pod)
+		if err != nil {
+			return nil, err
+		}
+		podSandboxConfig.Windows = wc
+	}
+
 	return podSandboxConfig, nil
 }
 
@@ -206,6 +216,54 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxLinuxConfig(pod *v1.Pod) (
 	return lc, nil
 }
 
+// generatePodSandboxWindowsConfig generates WindowsPodSandboxConfig from v1.Pod.
+// On Windows this will get called in addition to LinuxPodSandboxConfig because not all relevant fields have been added to
+// WindowsPodSandboxConfig at this time.
+func (m *kubeGenericRuntimeManager) generatePodSandboxWindowsConfig(pod *v1.Pod) (*runtimeapi.WindowsPodSandboxConfig, error) {
+	wc := &runtimeapi.WindowsPodSandboxConfig{
+		SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+	}
+
+	sc := pod.Spec.SecurityContext
+	if sc == nil || sc.WindowsOptions == nil {
+		return wc, nil
+	}
+
+	wo := sc.WindowsOptions
+	if wo.GMSACredentialSpec != nil {
+		wc.SecurityContext.CredentialSpec = *wo.GMSACredentialSpec
+	}
+
+	if wo.RunAsUserName != nil {
+		wc.SecurityContext.RunAsUsername = *wo.RunAsUserName
+	}
+
+	if kubecontainer.HasWindowsHostProcessContainer(pod) {
+		// Pods containing HostProcess containers should fail to schedule if feature is not
+		// enabled instead of trying to schedule containers as regular containers as stated in
+		// PRR review.
+		if !utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			return nil, fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled")
+		}
+
+		if wo.HostProcess != nil && !*wo.HostProcess {
+			return nil, fmt.Errorf("pod must not contain any HostProcess containers if Pod's WindowsOptions.HostProcess is set to false")
+		}
+		// At present Windows all containers in a Windows pod must be HostProcess containers
+		// and HostNetwork is required to be set.
+		if !kubecontainer.AllContainersAreWindowsHostProcess(pod) {
+			return nil, fmt.Errorf("pod must not contain both HostProcess and non-HostProcess containers")
+		}
+		if !kubecontainer.IsHostNetworkPod(pod) {
+			return nil, fmt.Errorf("hostNetwork is required if Pod contains HostProcess containers")
+		}
+
+		wc.SecurityContext.HostProcess = true
+	}
+
+	return wc, nil
+}
+
 // getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
 func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeapi.PodSandbox, error) {
 	var filter *runtimeapi.PodSandboxFilter
@@ -240,7 +298,7 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(podNamespace, podName
 
 	// pick primary IP
 	if len(podSandbox.Network.Ip) != 0 {
-		if net.ParseIP(podSandbox.Network.Ip) == nil {
+		if netutils.ParseIPSloppy(podSandbox.Network.Ip) == nil {
 			klog.InfoS("Pod Sandbox reported an unparseable primary IP", "pod", klog.KRef(podNamespace, podName), "IP", podSandbox.Network.Ip)
 			return nil
 		}
@@ -249,7 +307,7 @@ func (m *kubeGenericRuntimeManager) determinePodSandboxIPs(podNamespace, podName
 
 	// pick additional ips, if cri reported them
 	for _, podIP := range podSandbox.Network.AdditionalIps {
-		if nil == net.ParseIP(podIP.Ip) {
+		if nil == netutils.ParseIPSloppy(podIP.Ip) {
 			klog.InfoS("Pod Sandbox reported an unparseable additional IP", "pod", klog.KRef(podNamespace, podName), "IP", podIP.Ip)
 			return nil
 		}

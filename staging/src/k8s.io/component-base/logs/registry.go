@@ -21,31 +21,25 @@ import (
 	"sort"
 
 	"github.com/go-logr/logr"
-	json "k8s.io/component-base/logs/json"
 )
-
-const (
-	jsonLogFormat = "json"
-)
-
-var logRegistry = NewLogFormatRegistry()
 
 // LogFormatRegistry store klog format registry
 type LogFormatRegistry struct {
-	registry map[string]logr.Logger
+	registry map[string]*logr.Logger
 	frozen   bool
 }
 
 // NewLogFormatRegistry return new init LogFormatRegistry struct
 func NewLogFormatRegistry() *LogFormatRegistry {
 	return &LogFormatRegistry{
-		registry: make(map[string]logr.Logger),
+		registry: make(map[string]*logr.Logger),
 		frozen:   false,
 	}
 }
 
-// Register new log format registry to global logRegistry
-func (lfr *LogFormatRegistry) Register(name string, logger logr.Logger) error {
+// Register new log format registry to global logRegistry.
+// nil is valid and selects the default klog output.
+func (lfr *LogFormatRegistry) Register(name string, logger *logr.Logger) error {
 	if lfr.frozen {
 		return fmt.Errorf("log format is frozen, unable to register log format")
 	}
@@ -57,7 +51,7 @@ func (lfr *LogFormatRegistry) Register(name string, logger logr.Logger) error {
 }
 
 // Get specified log format logger
-func (lfr *LogFormatRegistry) Get(name string) (logr.Logger, error) {
+func (lfr *LogFormatRegistry) Get(name string) (*logr.Logger, error) {
 	re, ok := lfr.registry[name]
 	if !ok {
 		return nil, fmt.Errorf("log format: %s does not exists", name)
@@ -66,7 +60,7 @@ func (lfr *LogFormatRegistry) Get(name string) (logr.Logger, error) {
 }
 
 // Set specified log format logger
-func (lfr *LogFormatRegistry) Set(name string, logger logr.Logger) error {
+func (lfr *LogFormatRegistry) Set(name string, logger *logr.Logger) error {
 	if lfr.frozen {
 		return fmt.Errorf("log format is frozen, unable to set log format")
 	}
@@ -98,9 +92,4 @@ func (lfr *LogFormatRegistry) List() []string {
 // Freeze freezes the log format registry
 func (lfr *LogFormatRegistry) Freeze() {
 	lfr.frozen = true
-}
-func init() {
-	// Text format is default klog format
-	logRegistry.Register(defaultLogFormat, nil)
-	logRegistry.Register(jsonLogFormat, json.JSONLogger)
 }

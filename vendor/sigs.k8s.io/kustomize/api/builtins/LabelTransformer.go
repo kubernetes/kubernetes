@@ -27,16 +27,10 @@ func (p *LabelTransformerPlugin) Transform(m resmap.ResMap) error {
 	if len(p.Labels) == 0 {
 		return nil
 	}
-	for _, r := range m.Resources() {
-		err := r.ApplyFilter(labels.Filter{
-			Labels:  p.Labels,
-			FsSlice: p.FieldSpecs,
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	return m.ApplyFilter(labels.Filter{
+		Labels:  p.Labels,
+		FsSlice: p.FieldSpecs,
+	})
 }
 
 func NewLabelTransformerPlugin() resmap.TransformerPlugin {

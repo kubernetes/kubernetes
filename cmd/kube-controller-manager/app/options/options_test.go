@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"net"
 	"reflect"
 	"sort"
 	"testing"
@@ -59,7 +58,9 @@ import (
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
+	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	netutils "k8s.io/utils/net"
 )
 
 var args = []string{
@@ -83,6 +84,7 @@ var args = []string{
 	"--concurrent-deployment-syncs=10",
 	"--concurrent-statefulset-syncs=15",
 	"--concurrent-endpoint-syncs=10",
+	"--concurrent-ephemeralvolume-syncs=10",
 	"--concurrent-service-endpoint-syncs=10",
 	"--concurrent-gc-syncs=30",
 	"--concurrent-namespace-syncs=20",
@@ -288,6 +290,11 @@ func TestAddFlags(t *testing.T) {
 				MirroringMaxEndpointsPerSubset:          1000,
 			},
 		},
+		EphemeralVolumeController: &EphemeralVolumeControllerOptions{
+			&ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
+				ConcurrentEphemeralVolumeSyncs: 10,
+			},
+		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{
 			&garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
@@ -306,7 +313,6 @@ func TestAddFlags(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
-				HorizontalPodAutoscalerUseRESTClients:               true,
 			},
 		},
 		JobController: &JobControllerOptions{
@@ -397,7 +403,7 @@ func TestAddFlags(t *testing.T) {
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
 			BindPort:    10001,
-			BindAddress: net.ParseIP("192.168.4.21"),
+			BindAddress: netutils.ParseIPSloppy("192.168.4.21"),
 			ServerCert: apiserveroptions.GeneratableKeyCert{
 				CertDirectory: "/a/b/c",
 				PairName:      "kube-controller-manager",
@@ -546,6 +552,9 @@ func TestApplyTo(t *testing.T) {
 				MirroringConcurrentServiceEndpointSyncs: 2,
 				MirroringMaxEndpointsPerSubset:          1000,
 			},
+			EphemeralVolumeController: ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration{
+				ConcurrentEphemeralVolumeSyncs: 10,
+			},
 			GarbageCollectorController: garbagecollectorconfig.GarbageCollectorControllerConfiguration{
 				ConcurrentGCSyncs: 30,
 				GCIgnoredResources: []garbagecollectorconfig.GroupResource{
@@ -561,7 +570,6 @@ func TestApplyTo(t *testing.T) {
 				HorizontalPodAutoscalerCPUInitializationPeriod:      metav1.Duration{Duration: 90 * time.Second},
 				HorizontalPodAutoscalerInitialReadinessDelay:        metav1.Duration{Duration: 50 * time.Second},
 				HorizontalPodAutoscalerTolerance:                    0.1,
-				HorizontalPodAutoscalerUseRESTClients:               true,
 			},
 			JobController: jobconfig.JobControllerConfiguration{
 				ConcurrentJobSyncs: 5,

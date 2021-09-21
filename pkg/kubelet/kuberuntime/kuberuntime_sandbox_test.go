@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -25,7 +26,10 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/features"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
 	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
@@ -171,4 +175,188 @@ func newSeccompPod(podFieldProfile, containerFieldProfile *v1.SeccompProfile, po
 		}
 	}
 	return pod
+}
+
+func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	const containerName = "container"
+	gmsaCreds := "gmsa-creds"
+	userName := "SYSTEM"
+	trueVar := true
+	falseVar := false
+
+	testCases := []struct {
+		name                      string
+		hostProcessFeatureEnabled bool
+		podSpec                   *v1.PodSpec
+		expectedWindowsConfig     *runtimeapi.WindowsPodSandboxConfig
+		expectedError             error
+	}{
+		{
+			name:                      "Empty PodSecurityContext",
+			hostProcessFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{},
+			},
+			expectedError: nil,
+		},
+		{
+			name:                      "GMSACredentialSpec in PodSecurityContext",
+			hostProcessFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						GMSACredentialSpec: &gmsaCreds,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					CredentialSpec: "gmsa-creds",
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:                      "RunAsUserName in PodSecurityContext",
+			hostProcessFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						RunAsUserName: &userName,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					RunAsUsername: "SYSTEM",
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:                      "Pod with HostProcess containers and feature gate disabled",
+			hostProcessFeatureEnabled: false,
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: nil,
+			expectedError:         fmt.Errorf("pod contains HostProcess containers but feature 'WindowsHostProcessContainers' is not enabled"),
+		},
+		{
+			name:                      "Pod with HostProcess containers and non-HostProcess containers",
+			hostProcessFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}, {
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &falseVar,
+						},
+					},
+				}},
+			},
+			expectedWindowsConfig: nil,
+			expectedError:         fmt.Errorf("pod must not contain both HostProcess and non-HostProcess containers"),
+		},
+		{
+			name:                      "Pod with HostProcess containers and HostNetwork not set",
+			hostProcessFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: nil,
+			expectedError:         fmt.Errorf("hostNetwork is required if Pod contains HostProcess containers"),
+		},
+		{
+			name:                      "Pod with HostProcess containers and HostNetwork set",
+			hostProcessFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+				}},
+			},
+			expectedWindowsConfig: &runtimeapi.WindowsPodSandboxConfig{
+				SecurityContext: &runtimeapi.WindowsSandboxSecurityContext{
+					HostProcess: true,
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name:                      "Pod's WindowsOptions.HostProcess set to false and pod has HostProcess containers",
+			hostProcessFeatureEnabled: true,
+			podSpec: &v1.PodSpec{
+				HostNetwork: true,
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess: &falseVar,
+					},
+				},
+				Containers: []v1.Container{{
+					Name: containerName,
+					SecurityContext: &v1.SecurityContext{
+						WindowsOptions: &v1.WindowsSecurityContextOptions{
+							HostProcess: &trueVar,
+						},
+					},
+				}},
+			},
+			expectedWindowsConfig: nil,
+			expectedError:         fmt.Errorf("pod must not contain any HostProcess containers if Pod's WindowsOptions.HostProcess is set to false"),
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.hostProcessFeatureEnabled)()
+			pod := &v1.Pod{}
+			pod.Spec = *testCase.podSpec
+
+			wc, err := m.generatePodSandboxWindowsConfig(pod)
+
+			assert.Equal(t, wc, testCase.expectedWindowsConfig)
+			assert.Equal(t, err, testCase.expectedError)
+		})
+	}
 }

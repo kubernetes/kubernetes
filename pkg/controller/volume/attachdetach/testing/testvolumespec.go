@@ -59,12 +59,12 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 	}
 }
 
-var extraPods *v1.PodList
-var volumeAttachments *storagev1.VolumeAttachmentList
-var pvs *v1.PersistentVolumeList
-var nodes *v1.NodeList
-
 func CreateTestClient() *fake.Clientset {
+	var extraPods *v1.PodList
+	var volumeAttachments *storagev1.VolumeAttachmentList
+	var pvs *v1.PersistentVolumeList
+	var nodes *v1.NodeList
+
 	fakeClient := &fake.Clientset{}
 
 	extraPods = &v1.PodList{}
@@ -156,7 +156,7 @@ func CreateTestClient() *fake.Clientset {
 			// We want also the "mynode" node since all the testing pods live there
 			nodeName = nodeNamePrefix
 		}
-		attachVolumeToNode("lostVolumeName", nodeName)
+		attachVolumeToNode(nodes, "lostVolumeName", nodeName)
 	}
 	fakeClient.AddReactor("update", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		updateAction := action.(core.UpdateAction)
@@ -296,7 +296,7 @@ func NewPV(pvName, volumeName string) *v1.PersistentVolume {
 	}
 }
 
-func attachVolumeToNode(volumeName, nodeName string) {
+func attachVolumeToNode(nodes *v1.NodeList, volumeName, nodeName string) {
 	// if nodeName exists, get the object.. if not create node object
 	var node *v1.Node
 	found := false
@@ -544,7 +544,7 @@ func (attacher *testPluginAttacher) GetDeviceMountPath(spec *volume.Spec) (strin
 	return "", nil
 }
 
-func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	attacher.pluginLock.Lock()
 	defer attacher.pluginLock.Unlock()
 	if spec == nil {

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -302,6 +303,86 @@ func createExternalLoadBalancer(gce *Cloud, svc *v1.Service, nodeNames []string,
 		nil,
 		nodes,
 	)
+}
+
+func TestShouldNotRecreateLBWhenNetworkTiersMismatch(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	nodeNames := []string{"test-node-1"}
+
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService("")
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	staticIP := "1.2.3.4"
+	gce.ReserveRegionAddress(&compute.Address{Address: staticIP, Name: "foo", NetworkTier: cloud.NetworkTierStandard.ToGCEValue()}, vals.Region)
+
+	for _, tc := range []struct {
+		desc          string
+		mutateSvc     func(service *v1.Service)
+		expectNetTier string
+		expectError   bool
+	}{
+		{
+			desc: "initial LB config with standard network tier annotation",
+			mutateSvc: func(service *v1.Service) {
+				svc.Annotations[NetworkTierAnnotationKey] = string(NetworkTierAnnotationStandard)
+			},
+			expectNetTier: NetworkTierAnnotationStandard.ToGCEValue(),
+		},
+		{
+			desc: "svc changed to empty network tier annotation",
+			mutateSvc: func(service *v1.Service) {
+				svc.Annotations = make(map[string]string)
+			},
+			expectNetTier: NetworkTierAnnotationStandard.ToGCEValue(),
+		},
+		{
+			desc: "network tier annotation changed to premium",
+			mutateSvc: func(service *v1.Service) {
+				svc.Annotations[NetworkTierAnnotationKey] = string(NetworkTierAnnotationPremium)
+			},
+			expectNetTier: NetworkTierAnnotationPremium.ToGCEValue(),
+		},
+		{
+			desc: " Network tiers annotation set to Standard and reserved static IP is specified",
+			mutateSvc: func(service *v1.Service) {
+				svc.Annotations[NetworkTierAnnotationKey] = string(NetworkTierAnnotationStandard)
+				svc.Spec.LoadBalancerIP = staticIP
+
+			},
+			expectNetTier: NetworkTierAnnotationStandard.ToGCEValue(),
+		},
+		{
+			desc: "svc changed to empty network tier annotation with static ip",
+			mutateSvc: func(service *v1.Service) {
+				svc.Annotations = make(map[string]string)
+			},
+			expectNetTier: NetworkTierAnnotationStandard.ToGCEValue(),
+			expectError:   true,
+		},
+	} {
+		tc.mutateSvc(svc)
+		status, err := gce.ensureExternalLoadBalancer(vals.ClusterName, vals.ClusterID, svc, nil, nodes)
+		if tc.expectError {
+			if err == nil {
+				t.Errorf("for test case %q, expect errror != nil, but got %v", tc.desc, err)
+			}
+		} else {
+			assert.NoError(t, err)
+			assert.NotEmpty(t, status.Ingress)
+		}
+
+		lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+		fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+		assert.NoError(t, err)
+		if fwdRule.NetworkTier != tc.expectNetTier {
+			t.Fatalf("for test case %q, expect fwdRule.NetworkTier == %q, got %v ", tc.desc, tc.expectNetTier, fwdRule.NetworkTier)
+		}
+		assertExternalLbResources(t, gce, svc, vals, nodeNames)
+	}
 }
 
 func TestEnsureExternalLoadBalancer(t *testing.T) {

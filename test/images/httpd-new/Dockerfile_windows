@@ -18,7 +18,7 @@ ARG REGISTRY
 # We're using a Linux image to unpack the archive, then we're copying it over to Windows.
 FROM --platform=linux/amd64 alpine:3.6 as prep
 
-ADD https://home.apache.org/~steffenal/VC15/binaries/httpd-2.4.46-win64-VC15.zip /httpd.zip
+ADD https://home.apache.org/~steffenal/VC15/binaries/httpd-2.4.48-win64-VC15.zip /httpd.zip
 ADD https://windows.php.net/downloads/releases/archives/php-7.4.14-Win32-vc15-x64.zip /php.zip
 ADD https://windows.php.net/downloads/nano/crt/crt-vc15-x64.zip /crt-vc15-x64.zip
 
@@ -43,5 +43,4 @@ ENV PATH="C:\dig;C:\bin;C:\curl;C:\Windows\System32;C:\Windows;C:\Program Files\
 
 USER ContainerAdministrator
 EXPOSE 80
-LABEL image_version="2.4.39-1"
 ENTRYPOINT ["C:/usr/local/apache2/bin/httpd.exe"]

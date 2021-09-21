@@ -229,7 +229,8 @@ func TestCPUManagerAdd(t *testing.T) {
 		},
 		0,
 		cpuset.NewCPUSet(),
-		topologymanager.NewFakeManager())
+		topologymanager.NewFakeManager(),
+		nil)
 	testCases := []struct {
 		description        string
 		updateErr          error
@@ -276,7 +277,7 @@ func TestCPUManagerAdd(t *testing.T) {
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
-		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
+		mgr.activePods = func() []*v1.Pod { return nil }
 
 		err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
@@ -479,7 +480,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
 
 		mockState := &mockState{
 			assignments:   testCase.stAssignments,
@@ -634,7 +635,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, cpuset.NewCPUSet(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, nil, 5*time.Second, machineInfo, cpuset.NewCPUSet(), testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -1004,7 +1005,8 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 		},
 		1,
 		cpuset.NewCPUSet(0),
-		topologymanager.NewFakeManager())
+		topologymanager.NewFakeManager(),
+		nil)
 	testCases := []struct {
 		description        string
 		updateErr          error
@@ -1041,7 +1043,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 
 		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
-		mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
+		mgr.activePods = func() []*v1.Pod { return nil }
 
 		err := mgr.Allocate(pod, container)
 		if !reflect.DeepEqual(err, testCase.expAllocateErr) {
@@ -1059,5 +1061,71 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
 				testCase.description, testCase.expCPUSet, mgr.state.GetDefaultCPUSet())
 		}
+	}
+}
+
+func TestCPUManagerHandlePolicyOptions(t *testing.T) {
+	testCases := []struct {
+		description      string
+		cpuPolicyName    string
+		cpuPolicyOptions map[string]string
+		expectedError    error
+	}{
+		{
+			description:   "options to none policy",
+			cpuPolicyName: "none",
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			expectedError: fmt.Errorf("received unsupported options"),
+		},
+	}
+
+	// any correct realistic topology is fine. We pick a simple one.
+	mockedMachineInfo := cadvisorapi.MachineInfo{
+		NumCores: 4,
+		Topology: []cadvisorapi.Node{
+			{
+				Cores: []cadvisorapi.Core{
+					{
+						Id:      0,
+						Threads: []int{0},
+					},
+					{
+						Id:      1,
+						Threads: []int{1},
+					},
+					{
+						Id:      2,
+						Threads: []int{2},
+					},
+					{
+						Id:      3,
+						Threads: []int{3},
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			machineInfo := &mockedMachineInfo
+			nodeAllocatableReservation := v1.ResourceList{}
+			sDir, err := ioutil.TempDir("/tmp/", "cpu_manager_test")
+			if err != nil {
+				t.Errorf("cannot create state file: %s", err.Error())
+			}
+			defer os.RemoveAll(sDir)
+
+			_, err = NewManager(testCase.cpuPolicyName, testCase.cpuPolicyOptions, 5*time.Second, machineInfo, cpuset.NewCPUSet(), nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			if err == nil {
+				t.Errorf("Expected error, but NewManager succeeded")
+			}
+			if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
+				t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
+			}
+		})
+
 	}
 }

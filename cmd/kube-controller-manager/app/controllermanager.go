@@ -59,7 +59,9 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	genericcontrollermanager "k8s.io/controller-manager/app"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+	controllerhealthz "k8s.io/controller-manager/pkg/healthz"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/controller-manager/pkg/leadermigration"
 	"k8s.io/klog/v2"
@@ -198,12 +200,13 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
 		checks = append(checks, electionChecker)
 	}
+	healthzHandler := controllerhealthz.NewMutableHealthzHandler(checks...)
 
 	// Start the controller manager HTTP server
 	// unsecuredMux is the handler for these controller *after* authn/authz filters have been applied
 	var unsecuredMux *mux.PathRecorderMux
 	if c.SecureServing != nil {
-		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
+		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, healthzHandler)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh returned by c.SecureServing.Serve
 		if _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
@@ -222,7 +225,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			klog.Fatalf("error building controller context: %v", err)
 		}
 		controllerInitializers := initializersFunc(controllerContext.LoopMode)
-		if err := StartControllers(controllerContext, startSATokenController, controllerInitializers, unsecuredMux); err != nil {
+		if err := StartControllers(controllerContext, startSATokenController, controllerInitializers, unsecuredMux, healthzHandler); err != nil {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
 
@@ -262,7 +265,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 		// Wrap saTokenControllerInitFunc to signal readiness for migration after starting
 		//  the controller.
-		startSATokenController = func(ctx ControllerContext) (http.Handler, bool, error) {
+		startSATokenController = func(ctx ControllerContext) (controller.Interface, bool, error) {
 			defer close(leaderMigrator.MigrationReady)
 			return saTokenControllerInitFunc(ctx)
 		}
@@ -367,10 +370,14 @@ func (c ControllerContext) IsControllerEnabled(name string) bool {
 	return genericcontrollermanager.IsControllerEnabled(name, ControllersDisabledByDefault, c.ComponentConfig.Generic.Controllers)
 }
 
-// InitFunc is used to launch a particular controller.  It may run additional "should I activate checks".
+// InitFunc is used to launch a particular controller. It returns a controller
+// that can optionally implement other interfaces so that the controller manager
+// can support the requested features.
+// The returned controller may be nil, which will be considered an anonymous controller
+// that requests no additional features from the controller manager.
 // Any error returned will cause the controller process to `Fatal`
 // The bool indicates whether the controller was enabled.
-type InitFunc func(ctx ControllerContext) (debuggingHandler http.Handler, enabled bool, err error)
+type InitFunc func(ctx ControllerContext) (controller controller.Interface, enabled bool, err error)
 
 // ControllerInitializersFunc is used to create a collection of initializers
 //  given the loopMode.
@@ -536,7 +543,8 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 }
 
 // StartControllers starts a set of controllers with a specified ControllerContext
-func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc, unsecuredMux *mux.PathRecorderMux) error {
+func StartControllers(ctx ControllerContext, startSATokenController InitFunc, controllers map[string]InitFunc,
+	unsecuredMux *mux.PathRecorderMux, healthzHandler *controllerhealthz.MutableHealthzHandler) error {
 	// Always start the SA token controller first using a full-power client, since it needs to mint tokens for the rest
 	// If this fails, just return here and fail since other controllers won't be able to get credentials.
 	if startSATokenController != nil {
@@ -551,6 +559,8 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 		ctx.Cloud.Initialize(ctx.ClientBuilder, ctx.Stop)
 	}
 
+	var controllerChecks []healthz.HealthChecker
+
 	for controllerName, initFn := range controllers {
 		if !ctx.IsControllerEnabled(controllerName) {
 			klog.Warningf("%q is disabled", controllerName)
@@ -560,7 +570,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 		time.Sleep(wait.Jitter(ctx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
 		klog.V(1).Infof("Starting %q", controllerName)
-		debugHandler, started, err := initFn(ctx)
+		ctrl, started, err := initFn(ctx)
 		if err != nil {
 			klog.Errorf("Error starting %q", controllerName)
 			return err
@@ -569,13 +579,29 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			klog.Warningf("Skipping %q", controllerName)
 			continue
 		}
-		if debugHandler != nil && unsecuredMux != nil {
-			basePath := "/debug/controllers/" + controllerName
-			unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
-			unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+		check := controllerhealthz.NamedPingChecker(controllerName)
+		if ctrl != nil {
+			// check if the controller supports and requests a debugHandler
+			// and it needs the unsecuredMux to mount the handler onto.
+			if debuggable, ok := ctrl.(controller.Debuggable); ok && unsecuredMux != nil {
+				if debugHandler := debuggable.DebuggingHandler(); debugHandler != nil {
+					basePath := "/debug/controllers/" + controllerName
+					unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
+					unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
+				}
+			}
+			if healthCheckable, ok := ctrl.(controller.HealthCheckable); ok {
+				if realCheck := healthCheckable.HealthChecker(); realCheck != nil {
+					check = controllerhealthz.NamedHealthChecker(controllerName, realCheck)
+				}
+			}
 		}
+		controllerChecks = append(controllerChecks, check)
+
 		klog.Infof("Started %q", controllerName)
 	}
+
+	healthzHandler.AddHealthChecker(controllerChecks...)
 
 	return nil
 }
@@ -587,7 +613,7 @@ type serviceAccountTokenControllerStarter struct {
 	rootClientBuilder clientbuilder.ControllerClientBuilder
 }
 
-func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {
+func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (controller.Interface, bool, error) {
 	if !ctx.IsControllerEnabled(saTokenControllerName) {
 		klog.Warningf("%q is disabled", saTokenControllerName)
 		return nil, false, nil

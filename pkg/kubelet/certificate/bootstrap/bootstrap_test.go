@@ -19,6 +19,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -34,8 +35,253 @@ import (
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	restclient "k8s.io/client-go/rest"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/keyutil"
 )
+
+func copyFile(src, dst string) (err error) {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cerr := out.Close()
+		if err == nil {
+			err = cerr
+		}
+	}()
+	_, err = io.Copy(out, in)
+	return err
+}
+
+func TestLoadClientConfig(t *testing.T) {
+	//Create a temporary folder under tmp to store the required certificate files and configuration files.
+	fileDir := t.TempDir()
+	//Copy the required certificate file to the temporary directory.
+	copyFile("./testdata/mycertinvalid.crt", fileDir+"/mycertinvalid.crt")
+	copyFile("./testdata/mycertvalid.crt", fileDir+"/mycertvalid.crt")
+	copyFile("./testdata/mycertinvalid.key", fileDir+"/mycertinvalid.key")
+	copyFile("./testdata/mycertvalid.key", fileDir+"/mycertvalid.key")
+	testDataValid := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: ca-a.crt
+    server: https://cluster-a.com
+  name: cluster-a
+- cluster:
+    server: https://cluster-b.com
+  name: cluster-b
+contexts:
+- context:
+    cluster: cluster-a
+    namespace: ns-a
+    user: user-a
+  name: context-a
+- context:
+    cluster: cluster-b
+    namespace: ns-b
+    user: user-b
+  name: context-b
+current-context: context-b
+users:
+- name: user-a
+  user:
+    client-certificate: mycertvalid.crt
+    client-key: mycertvalid.key
+- name: user-b
+  user:
+    client-certificate: mycertvalid.crt
+    client-key: mycertvalid.key
+
+`)
+	filevalid, err := ioutil.TempFile(fileDir, "kubeconfigvalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ioutil.WriteFile(filevalid.Name(), testDataValid, os.FileMode(0755))
+
+	testDataInvalid := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: ca-a.crt
+    server: https://cluster-a.com
+  name: cluster-a
+- cluster:
+    server: https://cluster-b.com
+  name: cluster-b
+contexts:
+- context:
+    cluster: cluster-a
+    namespace: ns-a
+    user: user-a
+  name: context-a
+- context:
+    cluster: cluster-b
+    namespace: ns-b
+    user: user-b
+  name: context-b
+current-context: context-b
+users:
+- name: user-a
+  user:
+    client-certificate: mycertinvalid.crt
+    client-key: mycertinvalid.key
+- name: user-b
+  user:
+    client-certificate: mycertinvalid.crt
+    client-key: mycertinvalid.key
+
+`)
+	fileinvalid, err := ioutil.TempFile(fileDir, "kubeconfiginvalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ioutil.WriteFile(fileinvalid.Name(), testDataInvalid, os.FileMode(0755))
+
+	testDatabootstrap := []byte(`
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority: ca-a.crt
+    server: https://cluster-a.com
+  name: cluster-a
+- cluster:
+    server: https://cluster-b.com
+  name: cluster-b
+contexts:
+- context:
+    cluster: cluster-a
+    namespace: ns-a
+    user: user-a
+  name: context-a
+- context:
+    cluster: cluster-b
+    namespace: ns-b
+    user: user-b
+  name: context-b
+current-context: context-b
+users:
+- name: user-a
+  user:
+   token: mytoken-b
+- name: user-b
+  user:
+   token: mytoken-b
+`)
+	fileboot, err := ioutil.TempFile(fileDir, "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ioutil.WriteFile(fileboot.Name(), testDatabootstrap, os.FileMode(0755))
+
+	dir, err := ioutil.TempDir(fileDir, "k8s-test-certstore-current")
+	if err != nil {
+		t.Fatalf("Unable to create the test directory %q: %v", dir, err)
+	}
+
+	store, err := certificate.NewFileStore("kubelet-client", dir, dir, "", "")
+	if err != nil {
+		t.Errorf("unable to build bootstrap cert store")
+	}
+
+	tests := []struct {
+		name                 string
+		kubeconfigPath       string
+		bootstrapPath        string
+		certDir              string
+		expectedCertConfig   *restclient.Config
+		expectedClientConfig *restclient.Config
+	}{
+		{
+			name:           "bootstrapPath is empty",
+			kubeconfigPath: filevalid.Name(),
+			bootstrapPath:  "",
+			certDir:        dir,
+			expectedCertConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+			expectedClientConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+		},
+		{
+			name:           "bootstrap path is set and the contents of kubeconfigPath are valid",
+			kubeconfigPath: filevalid.Name(),
+			bootstrapPath:  fileboot.Name(),
+			certDir:        dir,
+			expectedCertConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+			expectedClientConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: fileDir + "/mycertvalid.crt",
+					KeyFile:  fileDir + "/mycertvalid.key",
+				},
+				BearerToken: "",
+			},
+		},
+		{
+			name:           "bootstrap path is set and the contents of kubeconfigPath are not valid",
+			kubeconfigPath: fileinvalid.Name(),
+			bootstrapPath:  fileboot.Name(),
+			certDir:        dir,
+			expectedCertConfig: &restclient.Config{
+				Host:            "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{},
+				BearerToken:     "mytoken-b",
+			},
+			expectedClientConfig: &restclient.Config{
+				Host: "https://cluster-b.com",
+				TLSClientConfig: restclient.TLSClientConfig{
+					CertFile: store.CurrentPath(),
+					KeyFile:  store.CurrentPath(),
+				},
+				BearerToken: "",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			certConfig, clientConfig, err := LoadClientConfig(test.kubeconfigPath, test.bootstrapPath, test.certDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(certConfig, test.expectedCertConfig) {
+				t.Errorf("Unexpected certConfig: %s", diff.ObjectDiff(certConfig, test.expectedCertConfig))
+			}
+			if !reflect.DeepEqual(clientConfig, test.expectedClientConfig) {
+				t.Errorf("Unexpected clientConfig: %s", diff.ObjectDiff(clientConfig, test.expectedClientConfig))
+			}
+		})
+	}
+}
 
 func TestLoadRESTClientConfig(t *testing.T) {
 	testData := []byte(`
@@ -141,7 +387,7 @@ func TestRequestNodeCertificate(t *testing.T) {
 type failureType int
 
 const (
-	noError failureType = iota
+	noError failureType = iota //nolint:deadcode,varcheck
 	createError
 	certificateSigningRequestDenied
 )

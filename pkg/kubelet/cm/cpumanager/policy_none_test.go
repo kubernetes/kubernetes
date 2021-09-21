@@ -86,3 +86,20 @@ func TestNonePolicyGetAllocatableCPUs(t *testing.T) {
 		t.Errorf("NonePolicy GetAllocatableCPUs() error. expected empty set, returned: %v", cpus)
 	}
 }
+
+func TestNonePolicyOptions(t *testing.T) {
+	var err error
+
+	_, err = NewNonePolicy(nil)
+	if err != nil {
+		t.Errorf("NewNonePolicy with nil options failure. expected no error but got: %v", err)
+	}
+
+	opts := map[string]string{
+		FullPCPUsOnlyOption: "true",
+	}
+	_, err = NewNonePolicy(opts)
+	if err == nil {
+		t.Errorf("NewNonePolicy with (any) options failure. expected error but got none")
+	}
+}

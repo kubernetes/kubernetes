@@ -185,7 +185,7 @@ func (c *ConditionController) sync(key string) error {
 }
 
 // Run starts the controller.
-func (c *ConditionController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *ConditionController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -196,7 +196,7 @@ func (c *ConditionController) Run(threadiness int, stopCh <-chan struct{}) {
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 

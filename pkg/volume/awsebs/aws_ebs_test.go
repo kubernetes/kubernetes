@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -50,7 +51,7 @@ func TestCanSupport(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/aws-ebs" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -460,7 +461,7 @@ func TestUnsupportedVolumeHost(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	_, err = plug.ConstructVolumeSpec("", "")

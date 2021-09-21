@@ -50,7 +50,7 @@ type JUnitFailureMessage struct {
 }
 
 type JUnitSkipped struct {
-	XMLName xml.Name `xml:"skipped"`
+	Message string `xml:",chardata"`
 }
 
 type JUnitReporter struct {
@@ -132,6 +132,9 @@ func (reporter *JUnitReporter) SpecDidComplete(specSummary *types.SpecSummary) {
 	}
 	if specSummary.State == types.SpecStateSkipped || specSummary.State == types.SpecStatePending {
 		testCase.Skipped = &JUnitSkipped{}
+		if specSummary.Failure.Message != "" {
+			testCase.Skipped.Message = failureMessage(specSummary.Failure)
+		}
 	}
 	testCase.Time = specSummary.RunTime.Seconds()
 	reporter.suite.TestCases = append(reporter.suite.TestCases, testCase)

@@ -29,8 +29,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/pkg/transport"
+	"go.etcd.io/etcd/client/pkg/v3/transport"
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // DeletePodOrErrorf deletes a pod or fails with a call to t.Errorf.
@@ -41,7 +41,7 @@ func DeletePodOrErrorf(t *testing.T, c clientset.Interface, ns, name string) {
 }
 
 // Requests to try.  Each one should be forbidden or not forbidden
-// depending on the authentication and authorization setup of the master.
+// depending on the authentication and authorization setup of the API server.
 var (
 	Code200 = map[int]bool{200: true}
 	Code201 = map[int]bool{201: true}

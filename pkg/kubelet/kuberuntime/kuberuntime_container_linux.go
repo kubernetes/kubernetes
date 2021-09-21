@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -19,8 +20,10 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"strconv"
 	"time"
 
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -28,18 +31,26 @@ import (
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
+	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // applyPlatformSpecificContainerConfig applies platform specific configurations to runtimeapi.ContainerConfig.
 func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(config *runtimeapi.ContainerConfig, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) error {
-	config.Linux = m.generateLinuxContainerConfig(container, pod, uid, username, nsTarget)
+	enforceMemoryQoS := false
+	// Set memory.min and memory.high if MemoryQoS enabled with cgroups v2
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) &&
+		libcontainercgroups.IsCgroup2UnifiedMode() {
+		enforceMemoryQoS = true
+	}
+	config.Linux = m.generateLinuxContainerConfig(container, pod, uid, username, nsTarget, enforceMemoryQoS)
 	return nil
 }
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
-func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID) *runtimeapi.LinuxContainerConfig {
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) *runtimeapi.LinuxContainerConfig {
 	lc := &runtimeapi.LinuxContainerConfig{
 		Resources:       &runtimeapi.LinuxContainerResources{},
 		SecurityContext: m.determineEffectiveSecurityContext(pod, container, uid, username),
@@ -55,6 +66,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	cpuRequest := container.Resources.Requests.Cpu()
 	cpuLimit := container.Resources.Limits.Cpu()
 	memoryLimit := container.Resources.Limits.Memory().Value()
+	memoryRequest := container.Resources.Requests.Memory().Value()
 	oomScoreAdj := int64(qos.GetContainerOOMScoreAdjust(pod, container,
 		int64(m.machineInfo.MemoryCapacity)))
 	// If request is not specified, but limit is, we want request to default to limit.
@@ -88,6 +100,60 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 	}
 
 	lc.Resources.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeSwap) {
+		// NOTE(ehashman): Behaviour is defined in the opencontainers runtime spec:
+		// https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
+		switch m.memorySwapBehavior {
+		case kubelettypes.UnlimitedSwap:
+			// -1 = unlimited swap
+			lc.Resources.MemorySwapLimitInBytes = -1
+		case kubelettypes.LimitedSwap:
+			fallthrough
+		default:
+			// memorySwapLimit = total permitted memory+swap; if equal to memory limit, => 0 swap above memory limit
+			// Some swapping is still possible.
+			// Note that if memory limit is 0, memory swap limit is ignored.
+			lc.Resources.MemorySwapLimitInBytes = lc.Resources.MemoryLimitInBytes
+		}
+	}
+
+	// Set memory.min and memory.high to enforce MemoryQoS
+	if enforceMemoryQoS {
+		unified := map[string]string{}
+
+		if memoryRequest != 0 {
+			unified[cm.MemoryMin] = strconv.FormatInt(memoryRequest, 10)
+		}
+
+		// If container sets limits.memory, we set memory.high=pod.spec.containers[i].resources.limits[memory] * memory_throttling_factor
+		// for container level cgroup if memory.high>memory.min.
+		// If container doesn't set limits.memory, we set memory.high=node_allocatable_memory * memory_throttling_factor
+		// for container level cgroup.
+		memoryHigh := int64(0)
+		if memoryLimit != 0 {
+			memoryHigh = int64(float64(memoryLimit) * m.memoryThrottlingFactor)
+		} else {
+			allocatable := m.getNodeAllocatable()
+			allocatableMemory, ok := allocatable[v1.ResourceMemory]
+			if ok && allocatableMemory.Value() > 0 {
+				memoryHigh = int64(float64(allocatableMemory.Value()) * m.memoryThrottlingFactor)
+			}
+		}
+		if memoryHigh > memoryRequest {
+			unified[cm.MemoryHigh] = strconv.FormatInt(memoryHigh, 10)
+		}
+		if len(unified) > 0 {
+			if lc.Resources.Unified == nil {
+				lc.Resources.Unified = unified
+			} else {
+				for k, v := range unified {
+					lc.Resources.Unified[k] = v
+				}
+			}
+			klog.V(4).InfoS("MemoryQoS config for container", "pod", klog.KObj(pod), "containerName", container.Name, "unified", unified)
+		}
+	}
 
 	return lc
 }

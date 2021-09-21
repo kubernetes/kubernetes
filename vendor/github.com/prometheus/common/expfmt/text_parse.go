@@ -299,6 +299,17 @@ func (p *TextParser) startLabelName() stateFn {
 		p.parseError(fmt.Sprintf("expected '=' after label name, found %q", p.currentByte))
 		return nil
 	}
+	// Check for duplicate label names.
+	labels := make(map[string]struct{})
+	for _, l := range p.currentMetric.Label {
+		lName := l.GetName()
+		if _, exists := labels[lName]; !exists {
+			labels[lName] = struct{}{}
+		} else {
+			p.parseError(fmt.Sprintf("duplicate label names for metric %q", p.currentMF.GetName()))
+			return nil
+		}
+	}
 	return p.startLabelValue
 }
 

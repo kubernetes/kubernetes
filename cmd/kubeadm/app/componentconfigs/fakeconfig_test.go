@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
@@ -210,8 +211,6 @@ var (
 			certificatesDir: /etc/kubernetes/pki
 			clusterName: LeCluster
 			controllerManager: {}
-			dns:
-			  type: CoreDNS
 			etcd:
 			  local:
 			    dataDir: /var/lib/etcd
@@ -235,9 +234,6 @@ var (
 			Networking: kubeadmapiv1.Networking{
 				DNSDomain:     "cluster.local",
 				ServiceSubnet: "10.96.0.0/12",
-			},
-			DNS: kubeadmapiv1.DNS{
-				Type: kubeadmapiv1.CoreDNS,
 			},
 			Etcd: kubeadmapiv1.Etcd{
 				Local: &kubeadmapiv1.LocalEtcd{
@@ -280,8 +276,7 @@ func TestConfigBaseMarshal(t *testing.T) {
 			apiVersion: %s
 			clusterName: LeCluster
 			controllerManager: {}
-			dns:
-			  type: ""
+			dns: {}
 			etcd: {}
 			kind: ClusterConfiguration
 			kubernetesVersion: 1.2.3

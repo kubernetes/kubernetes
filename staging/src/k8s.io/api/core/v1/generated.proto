@@ -522,6 +522,7 @@ message ConfigMapList {
 }
 
 // ConfigMapNodeConfigSource contains the information to reference a ConfigMap as a config source for the Node.
+// This API is deprecated since 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
 message ConfigMapNodeConfigSource {
   // Namespace is the metadata.namespace of the referenced ConfigMap.
   // This field is required in all cases.
@@ -622,10 +623,10 @@ message Container {
   // Entrypoint array. Not executed within a shell.
   // The docker image's ENTRYPOINT is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string command = 3;
@@ -633,10 +634,10 @@ message Container {
   // Arguments to the entrypoint.
   // The docker image's CMD is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string args = 4;
@@ -787,6 +788,7 @@ message Container {
 message ContainerImage {
   // Names by which this image is known.
   // e.g. ["k8s.gcr.io/hyperkube:v1.0.7", "dockerhub.io/google_containers/hyperkube:v1.0.7"]
+  // +optional
   repeated string names = 1;
 
   // The size of the image in bytes.
@@ -906,15 +908,11 @@ message ContainerStatus {
   // Specifies whether the container has passed its readiness probe.
   optional bool ready = 4;
 
-  // The number of times the container has been restarted, currently based on
-  // the number of dead containers that have not yet been removed.
-  // Note that this is calculated from dead containers. But those containers are subject to
-  // garbage collection. This value will get capped at 5 by GC.
+  // The number of times the container has been restarted.
   optional int32 restartCount = 5;
 
   // The image the container is running.
-  // More info: https://kubernetes.io/docs/concepts/containers/images
-  // TODO(dchen1107): Which image the container is running with?
+  // More info: https://kubernetes.io/docs/concepts/containers/images.
   optional string image = 6;
 
   // ImageID of the container's image.
@@ -1059,8 +1057,6 @@ message EndpointPort {
   // RFC-6335 and http://www.iana.org/assignments/service-names).
   // Non-standard protocols should use prefixed names such as
   // mycompany.com/my-custom-protocol.
-  // This is a beta field that is guarded by the ServiceAppProtocol feature
-  // gate and enabled by default.
   // +optional
   optional string appProtocol = 4;
 }
@@ -1153,11 +1149,12 @@ message EnvVar {
   optional string name = 1;
 
   // Variable references $(VAR_NAME) are expanded
-  // using the previous defined environment variables in the container and
+  // using the previously defined environment variables in the container and
   // any service environment variables. If a variable cannot be resolved,
-  // the reference in the input string will be unchanged. The $(VAR_NAME)
-  // syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped
-  // references will never be expanded, regardless of whether the variable
+  // the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+  // "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+  // Escaped references will never be expanded, regardless of whether the variable
   // exists or not.
   // Defaults to "".
   // +optional
@@ -1229,10 +1226,10 @@ message EphemeralContainerCommon {
   // Entrypoint array. Not executed within a shell.
   // The docker image's ENTRYPOINT is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string command = 3;
@@ -1240,10 +1237,10 @@ message EphemeralContainerCommon {
   // Arguments to the entrypoint.
   // The docker image's CMD is used if this is not provided.
   // Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
-  // cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax
-  // can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded,
-  // regardless of whether the variable exists or not.
-  // Cannot be updated.
+  // cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
+  // to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+  // produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+  // of whether the variable exists or not. Cannot be updated.
   // More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
   // +optional
   repeated string args = 4;
@@ -1336,7 +1333,8 @@ message EphemeralContainerCommon {
   // +optional
   optional string imagePullPolicy = 14;
 
-  // SecurityContext is not allowed for ephemeral containers.
+  // Optional: SecurityContext defines the security options the ephemeral container should be run with.
+  // If set, the fields of SecurityContext override the equivalent fields of PodSecurityContext.
   // +optional
   optional SecurityContext securityContext = 15;
 
@@ -2057,7 +2055,7 @@ message LocalVolumeSource {
   // Filesystem type to mount.
   // It applies only when the Path is a block device.
   // Must be a filesystem type supported by the host operating system.
-  // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a fileystem if unspecified.
+  // Ex. "ext4", "xfs", "ntfs". The default value is to auto-select a filesystem if unspecified.
   // +optional
   optional string fsType = 2;
 }
@@ -2231,6 +2229,7 @@ message NodeCondition {
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.
+// This API is deprecated since 1.22
 message NodeConfigSource {
   // ConfigMap is a reference to a Node's ConfigMap
   optional ConfigMapNodeConfigSource configMap = 2;
@@ -2386,8 +2385,9 @@ message NodeSpec {
   // +optional
   repeated Taint taints = 5;
 
-  // If specified, the source to get node configuration from
-  // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
+  // Deprecated. If specified, the source of the node's configuration.
+  // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field.
+  // This field is deprecated as of 1.22: https://git.k8s.io/enhancements/keps/sig-node/281-dynamic-kubelet-configuration
   // +optional
   optional NodeConfigSource configSource = 6;
 
@@ -2679,13 +2679,32 @@ message PersistentVolumeClaimSpec {
   // This field can be used to specify either:
   // * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot)
   // * An existing PVC (PersistentVolumeClaim)
-  // * An existing custom resource that implements data population (Alpha)
-  // In order to use custom resource types that implement data population,
-  // the AnyVolumeDataSource feature gate must be enabled.
   // If the provisioner or an external controller can support the specified data source,
   // it will create a new volume based on the contents of the specified data source.
+  // If the AnyVolumeDataSource feature gate is enabled, this field will always have
+  // the same contents as the DataSourceRef field.
   // +optional
   optional TypedLocalObjectReference dataSource = 7;
+
+  // Specifies the object from which to populate the volume with data, if a non-empty
+  // volume is desired. This may be any local object from a non-empty API group (non
+  // core object) or a PersistentVolumeClaim object.
+  // When this field is specified, volume binding will only succeed if the type of
+  // the specified object matches some installed volume populator or dynamic
+  // provisioner.
+  // This field will replace the functionality of the DataSource field and as such
+  // if both fields are non-empty, they must have the same value. For backwards
+  // compatibility, both fields (DataSource and DataSourceRef) will be set to the same
+  // value automatically if one of them is empty and the other is non-empty.
+  // There are two important differences between DataSource and DataSourceRef:
+  // * While DataSource only allows two specific types of objects, DataSourceRef
+  //   allows any non-core object, as well as PersistentVolumeClaim objects.
+  // * While DataSource ignores disallowed values (dropping them), DataSourceRef
+  //   preserves all values, and generates an error if a disallowed value is
+  //   specified.
+  // (Alpha) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
+  // +optional
+  optional TypedLocalObjectReference dataSourceRef = 8;
 }
 
 // PersistentVolumeClaimStatus is the current status of a persistent volume claim.
@@ -3019,7 +3038,7 @@ message PodAffinityTerm {
   // and the ones listed in the namespaces field.
   // null selector and null or empty namespaces list means "this pod's namespace".
   // An empty selector ({}) matches all namespaces.
-  // This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
+  // This field is beta-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
 }
@@ -3889,7 +3908,8 @@ message Probe {
   // value overrides the value provided by the pod spec.
   // Value must be non-negative integer. The value zero indicates stop immediately via
   // the kill signal (no opportunity to shut down).
-  // This is an alpha field and requires enabling ProbeTerminationGracePeriod feature gate.
+  // This is a beta field and requires enabling ProbeTerminationGracePeriod feature gate.
+  // Minimum value is 1. spec.terminationGracePeriodSeconds is used if unset.
   // +optional
   optional int64 terminationGracePeriodSeconds = 7;
 }
@@ -4781,8 +4801,6 @@ message ServicePort {
   // RFC-6335 and http://www.iana.org/assignments/service-names).
   // Non-standard protocols should use prefixed names such as
   // mycompany.com/my-custom-protocol.
-  // This is a beta field that is guarded by the ServiceAppProtocol feature
-  // gate and enabled by default.
   // +optional
   optional string appProtocol = 6;
 
@@ -4939,7 +4957,7 @@ message ServiceSpec {
   // If specified and supported by the platform, this will restrict traffic through the cloud-provider
   // load-balancer will be restricted to the specified client IPs. This field will be ignored if the
   // cloud-provider does not support the feature."
-  // More info: https://kubernetes.io/docs/tasks/access-application-cluster/configure-cloud-provider-firewall/
+  // More info: https://kubernetes.io/docs/tasks/access-application-cluster/create-external-load-balancer/
   // +optional
   repeated string loadBalancerSourceRanges = 9;
 
@@ -4986,23 +5004,6 @@ message ServiceSpec {
   // +optional
   optional SessionAffinityConfig sessionAffinityConfig = 14;
 
-  // topologyKeys is a preference-order list of topology keys which
-  // implementations of services should use to preferentially sort endpoints
-  // when accessing this Service, it can not be used at the same time as
-  // externalTrafficPolicy=Local.
-  // Topology keys must be valid label keys and at most 16 keys may be specified.
-  // Endpoints are chosen based on the first topology key with available backends.
-  // If this field is specified and all entries have no backends that match
-  // the topology of the client, the service has no backends for that client
-  // and connections should fail.
-  // The special value "*" may be used to mean "any topology". This catch-all
-  // value, if used, only makes sense as the last value in the list.
-  // If this is not specified or empty, no topology constraints will be applied.
-  // This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
-  // This field is deprecated and will be removed in a future version.
-  // +optional
-  repeated string topologyKeys = 16;
-
   // IPFamilies is a list of IP families (e.g. IPv4, IPv6) assigned to this
   // service, and is gated by the "IPv6DualStack" feature gate.  This field
   // is usually assigned automatically based on cluster configuration and the
@@ -5037,11 +5038,14 @@ message ServiceSpec {
   optional string ipFamilyPolicy = 17;
 
   // allocateLoadBalancerNodePorts defines if NodePorts will be automatically
-  // allocated for services with type LoadBalancer.  Default is "true". It may be
-  // set to "false" if the cluster load-balancer does not rely on NodePorts.
-  // allocateLoadBalancerNodePorts may only be set for services with type LoadBalancer
-  // and will be cleared if the type is changed to any other type.
-  // This field is alpha-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+  // allocated for services with type LoadBalancer.  Default is "true". It
+  // may be set to "false" if the cluster load-balancer does not rely on
+  // NodePorts.  If the caller requests specific NodePorts (by specifying a
+  // value), those requests will be respected, regardless of this field.
+  // This field may only be set for services with type LoadBalancer and will
+  // be cleared if the type is changed to any other type.
+  // This field is beta-level and is only honored by servers that enable the ServiceLBNodePortControl feature.
+  // +featureGate=ServiceLBNodePortControl
   // +optional
   optional bool allocateLoadBalancerNodePorts = 20;
 
@@ -5290,7 +5294,7 @@ message TopologySpreadConstraint {
   //   but giving higher precedence to topologies that would help reduce the
   //   skew.
   // A constraint is considered "Unsatisfiable" for an incoming pod
-  // if and only if every possible node assigment for that pod would violate
+  // if and only if every possible node assignment for that pod would violate
   // "MaxSkew" on some topology.
   // For example, in a 3-zone cluster, MaxSkew is set to 1, and pods with the same
   // labelSelector spread as 3/1/1:
@@ -5629,5 +5633,15 @@ message WindowsSecurityContextOptions {
   // PodSecurityContext, the value specified in SecurityContext takes precedence.
   // +optional
   optional string runAsUserName = 3;
+
+  // HostProcess determines if a container should be run as a 'Host Process' container.
+  // This field is alpha-level and will only be honored by components that enable the
+  // WindowsHostProcessContainers feature flag. Setting this field without the feature
+  // flag will result in errors when validating the Pod. All of a Pod's containers must
+  // have the same effective HostProcess value (it is not allowed to have a mix of HostProcess
+  // containers and non-HostProcess containers).  In addition, if HostProcess is true
+  // then HostNetwork must also be set to true.
+  // +optional
+  optional bool hostProcess = 4;
 }
 

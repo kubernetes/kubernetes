@@ -28,10 +28,10 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // InTreeToCSITranslator contains methods required to check migratable status
@@ -57,13 +57,23 @@ type CSILimits struct {
 }
 
 var _ framework.FilterPlugin = &CSILimits{}
+var _ framework.EnqueueExtensions = &CSILimits{}
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
-const CSIName = "NodeVolumeLimits"
+const CSIName = names.NodeVolumeLimits
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *CSILimits) Name() string {
 	return CSIName
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *CSILimits) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.CSINode, ActionType: framework.Add},
+		{Resource: framework.Pod, ActionType: framework.Delete},
+	}
 }
 
 // Filter invoked at the filter extension point.
@@ -75,7 +85,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("node not found: %s", node.Name))
+		return framework.NewStatus(framework.Error, "node not found")
 	}
 
 	// If CSINode doesn't exist, the predicate may read the limits from Node object

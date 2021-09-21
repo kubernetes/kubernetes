@@ -35,10 +35,6 @@ type HPAControllerConfiguration struct {
 	// horizontalPodAutoscalerTolerance is the tolerance for when
 	// resource usage suggests upscaling/downscaling
 	HorizontalPodAutoscalerTolerance float64
-	// HorizontalPodAutoscalerUseRESTClients causes the HPA controller to use REST clients
-	// through the kube-aggregator when enabled, instead of using the legacy metrics client
-	// through the API server proxy.
-	HorizontalPodAutoscalerUseRESTClients bool
 	// HorizontalPodAutoscalerCPUInitializationPeriod is the period after pod start when CPU samples
 	// might be skipped.
 	HorizontalPodAutoscalerCPUInitializationPeriod metav1.Duration

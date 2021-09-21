@@ -107,7 +107,7 @@ func (ds *DefaultSender) Send(c *Client, req *http.Request) (resp *http.Response
 			return resp, err
 		}
 		resp, err = c.HTTPClient.Do(rr.Request())
-		if err != nil || !autorest.ResponseHasStatusCode(resp, ds.ValidStatusCodes...) {
+		if err == nil && !autorest.ResponseHasStatusCode(resp, ds.ValidStatusCodes...) {
 			return resp, err
 		}
 		drainRespBody(resp)
@@ -953,8 +953,10 @@ func readAndCloseBody(body io.ReadCloser) ([]byte, error) {
 
 // reads the response body then closes it
 func drainRespBody(resp *http.Response) {
-	io.Copy(ioutil.Discard, resp.Body)
-	resp.Body.Close()
+	if resp != nil {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}
 }
 
 func serviceErrFromXML(body []byte, storageErr *AzureStorageServiceError) error {

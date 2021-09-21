@@ -96,7 +96,7 @@ type ServerResourcesInterface interface {
 	//
 	// Deprecated: use ServerGroupsAndResources instead.
 	ServerResources() ([]*metav1.APIResourceList, error)
-	// ServerResources returns the supported groups and resources for all groups and versions.
+	// ServerGroupsAndResources returns the supported groups and resources for all groups and versions.
 	//
 	// The returned group and resource lists might be non-nil with partial results even in the
 	// case of non-nil error.

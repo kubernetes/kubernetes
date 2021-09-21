@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -16,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mockcontainerserviceclient/interface.go -package=mockcontainerserviceclient Interface
 package containerserviceclient
 
 import (
@@ -32,8 +34,6 @@ const (
 )
 
 // Interface is the client interface for ContainerService.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient/interface.go -package=mockcontainerserviceclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/containerserviceclient/mockcontainerserviceclient/interface.go
 type Interface interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, managedClusterName string, parameters containerservice.ManagedCluster, etag string) *retry.Error
 	Delete(ctx context.Context, resourceGroupName string, managedClusterName string) *retry.Error

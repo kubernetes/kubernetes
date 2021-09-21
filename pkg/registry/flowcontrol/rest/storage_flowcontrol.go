@@ -21,20 +21,19 @@ import (
 	"fmt"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	flowcontrolbootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta1"
+	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	flowcontrolapisv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
 	flowcontrolapisv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
+	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/ensurer"
 	flowschemastore "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema/storage"
 	prioritylevelconfigurationstore "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration/storage"
@@ -66,6 +65,14 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 			return genericapiserver.APIGroupInfo{}, false, err
 		}
 		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1beta1.SchemeGroupVersion.Version] = flowControlStorage
+	}
+
+	if apiResourceConfigSource.VersionEnabled(flowcontrolapisv1beta2.SchemeGroupVersion) {
+		flowControlStorage, err := p.storage(apiResourceConfigSource, restOptionsGetter)
+		if err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		}
+		apiGroupInfo.VersionedResourcesStorageMap[flowcontrolapisv1beta2.SchemeGroupVersion.Version] = flowControlStorage
 	}
 
 	return apiGroupInfo, true, nil
@@ -131,7 +138,7 @@ func ensureAPFBootstrapConfiguration(hookContext genericapiserver.PostStartHookC
 	// we have successfully initialized the bootstrap configuration, now we
 	// spin up a goroutine which reconciles the bootstrap configuration periodically.
 	go func() {
-		err := wait.PollImmediateUntil(
+		wait.PollImmediateUntil(
 			time.Minute,
 			func() (bool, error) {
 				if err := ensure(clientset); err != nil {
@@ -140,21 +147,17 @@ func ensureAPFBootstrapConfiguration(hookContext genericapiserver.PostStartHookC
 				// always auto update both suggested and mandatory configuration
 				return false, nil
 			}, hookContext.StopCh)
-		if err != nil {
-			klog.ErrorS(err, "APF bootstrap ensurer is exiting")
-		}
+		klog.Info("APF bootstrap ensurer is exiting")
 	}()
 
 	return nil
 }
 
-func ensure(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
+func ensure(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
 	if err := ensureSuggestedConfiguration(clientset); err != nil {
 		// We should not attempt creation of mandatory objects if ensuring the suggested
 		// configuration resulted in an error.
 		// This only happens when the stop channel is closed.
-		// We rely on the presence of the "exempt" priority level configuration object in the cluster
-		// to indicate whether we should ensure suggested configuration.
 		return fmt.Errorf("failed ensuring suggested settings - %w", err)
 	}
 
@@ -169,34 +172,17 @@ func ensure(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
 	return nil
 }
 
-// shouldCreateSuggested checks if the exempt priority level exists and returns
-// whether the suggested flow schemas and priority levels should be ensured.
-func shouldCreateSuggested(flowcontrolClientSet flowcontrolclient.FlowcontrolV1beta1Interface) (bool, error) {
-	if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(context.TODO(), flowcontrol.PriorityLevelConfigurationNameExempt, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}
-	return false, nil
-}
-
-func ensureSuggestedConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
-	shouldCreateSuggested, err := shouldCreateSuggested(clientset)
-	if err != nil {
-		return fmt.Errorf("failed to determine whether suggested configuration should be created - error: %w", err)
-	}
-
-	fsEnsurer := ensurer.NewSuggestedFlowSchemaEnsurer(clientset.FlowSchemas(), shouldCreateSuggested)
+func ensureSuggestedConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
+	fsEnsurer := ensurer.NewSuggestedFlowSchemaEnsurer(clientset.FlowSchemas())
 	if err := fsEnsurer.Ensure(flowcontrolbootstrap.SuggestedFlowSchemas); err != nil {
 		return err
 	}
 
-	plEnsurer := ensurer.NewSuggestedPriorityLevelEnsurerEnsurer(clientset.PriorityLevelConfigurations(), shouldCreateSuggested)
+	plEnsurer := ensurer.NewSuggestedPriorityLevelEnsurerEnsurer(clientset.PriorityLevelConfigurations())
 	return plEnsurer.Ensure(flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
 }
 
-func ensureMandatoryConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
+func ensureMandatoryConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
 	fsEnsurer := ensurer.NewMandatoryFlowSchemaEnsurer(clientset.FlowSchemas())
 	if err := fsEnsurer.Ensure(flowcontrolbootstrap.MandatoryFlowSchemas); err != nil {
 		return err
@@ -206,7 +192,7 @@ func ensureMandatoryConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1
 	return plEnsurer.Ensure(flowcontrolbootstrap.MandatoryPriorityLevelConfigurations)
 }
 
-func removeConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
+func removeConfiguration(clientset flowcontrolclient.FlowcontrolV1beta2Interface) error {
 	if err := removeFlowSchema(clientset.FlowSchemas()); err != nil {
 		return err
 	}

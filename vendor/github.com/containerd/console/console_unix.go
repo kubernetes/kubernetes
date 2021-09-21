@@ -19,8 +19,6 @@
 package console
 
 import (
-	"os"
-
 	"golang.org/x/sys/unix"
 )
 
@@ -28,7 +26,7 @@ import (
 // The master is returned as the first console and a string
 // with the path to the pty slave is returned as the second
 func NewPty() (Console, string, error) {
-	f, err := os.OpenFile("/dev/ptmx", unix.O_RDWR|unix.O_NOCTTY|unix.O_CLOEXEC, 0)
+	f, err := openpt()
 	if err != nil {
 		return nil, "", err
 	}

@@ -35,8 +35,8 @@ const (
 )
 
 type pid struct {
-	Pid           int `json:"pid"`
-	PidFirstChild int `json:"pid_first"`
+	Pid           int `json:"stage2_pid"`
+	PidFirstChild int `json:"stage1_pid"`
 }
 
 // network is an internal struct used to setup container networks.
@@ -70,13 +70,14 @@ type initConfig struct {
 	RootlessEUID     bool                  `json:"rootless_euid,omitempty"`
 	RootlessCgroups  bool                  `json:"rootless_cgroups,omitempty"`
 	SpecState        *specs.State          `json:"spec_state,omitempty"`
+	Cgroup2Path      string                `json:"cgroup2_path,omitempty"`
 }
 
 type initer interface {
 	Init() error
 }
 
-func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd int) (initer, error) {
+func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd, logFd int) (initer, error) {
 	var config *initConfig
 	if err := json.NewDecoder(pipe).Decode(&config); err != nil {
 		return nil, err
@@ -90,6 +91,7 @@ func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd 
 			pipe:          pipe,
 			consoleSocket: consoleSocket,
 			config:        config,
+			logFd:         logFd,
 		}, nil
 	case initStandard:
 		return &linuxStandardInit{
@@ -98,6 +100,7 @@ func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd 
 			parentPid:     unix.Getppid(),
 			config:        config,
 			fifoFd:        fifoFd,
+			logFd:         logFd,
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown init type %q", t)
@@ -109,9 +112,19 @@ func populateProcessEnvironment(env []string) error {
 	for _, pair := range env {
 		p := strings.SplitN(pair, "=", 2)
 		if len(p) < 2 {
-			return fmt.Errorf("invalid environment '%v'", pair)
+			return fmt.Errorf("invalid environment variable: %q", pair)
 		}
-		if err := os.Setenv(p[0], p[1]); err != nil {
+		name, val := p[0], p[1]
+		if name == "" {
+			return fmt.Errorf("environment variable name can't be empty: %q", pair)
+		}
+		if strings.IndexByte(name, 0) >= 0 {
+			return fmt.Errorf("environment variable name can't contain null(\\x00): %q", pair)
+		}
+		if strings.IndexByte(val, 0) >= 0 {
+			return fmt.Errorf("environment variable value can't contain null(\\x00): %q", pair)
+		}
+		if err := os.Setenv(name, val); err != nil {
 			return err
 		}
 	}
@@ -127,6 +140,26 @@ func finalizeNamespace(config *initConfig) error {
 	// container
 	if err := utils.CloseExecFrom(config.PassedFilesCount + 3); err != nil {
 		return errors.Wrap(err, "close exec fds")
+	}
+
+	// we only do chdir if it's specified
+	doChdir := config.Cwd != ""
+	if doChdir {
+		// First, attempt the chdir before setting up the user.
+		// This could allow us to access a directory that the user running runc can access
+		// but the container user cannot.
+		err := unix.Chdir(config.Cwd)
+		switch {
+		case err == nil:
+			doChdir = false
+		case os.IsPermission(err):
+			// If we hit an EPERM, we should attempt again after setting up user.
+			// This will allow us to successfully chdir if the container user has access
+			// to the directory, but the user running runc does not.
+			// This is useful in cases where the cwd is also a volume that's been chowned to the container user.
+		default:
+			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
+		}
 	}
 
 	caps := &configs.Capabilities{}
@@ -150,10 +183,8 @@ func finalizeNamespace(config *initConfig) error {
 	if err := setupUser(config); err != nil {
 		return errors.Wrap(err, "setup user")
 	}
-	// Change working directory AFTER the user has been set up.
-	// Otherwise, if the cwd is also a volume that's been chowned to the container user (and not the user running runc),
-	// this command will EPERM.
-	if config.Cwd != "" {
+	// Change working directory AFTER the user has been set up, if we haven't done it yet.
+	if doChdir {
 		if err := unix.Chdir(config.Cwd); err != nil {
 			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
 		}

@@ -92,7 +92,6 @@ var _ = SIGDescribe("Watchers", func() {
 		framework.ExpectNoError(err, "failed to create a configmap with label %s in namespace: %s", multipleWatchersLabelValueA, ns)
 		expectEvent(watchA, watch.Added, testConfigMapA)
 		expectEvent(watchAB, watch.Added, testConfigMapA)
-		expectNoEvent(watchB, watch.Added, testConfigMapA)
 
 		ginkgo.By("modifying configmap A and ensuring the correct watchers observe the notification")
 		testConfigMapA, err = updateConfigMap(c, ns, testConfigMapA.GetName(), func(cm *v1.ConfigMap) {
@@ -101,7 +100,6 @@ var _ = SIGDescribe("Watchers", func() {
 		framework.ExpectNoError(err, "failed to update configmap %s in namespace: %s", testConfigMapA.GetName(), ns)
 		expectEvent(watchA, watch.Modified, testConfigMapA)
 		expectEvent(watchAB, watch.Modified, testConfigMapA)
-		expectNoEvent(watchB, watch.Modified, testConfigMapA)
 
 		ginkgo.By("modifying configmap A again and ensuring the correct watchers observe the notification")
 		testConfigMapA, err = updateConfigMap(c, ns, testConfigMapA.GetName(), func(cm *v1.ConfigMap) {
@@ -110,14 +108,12 @@ var _ = SIGDescribe("Watchers", func() {
 		framework.ExpectNoError(err, "failed to update configmap %s in namespace: %s", testConfigMapA.GetName(), ns)
 		expectEvent(watchA, watch.Modified, testConfigMapA)
 		expectEvent(watchAB, watch.Modified, testConfigMapA)
-		expectNoEvent(watchB, watch.Modified, testConfigMapA)
 
 		ginkgo.By("deleting configmap A and ensuring the correct watchers observe the notification")
 		err = c.CoreV1().ConfigMaps(ns).Delete(context.TODO(), testConfigMapA.GetName(), metav1.DeleteOptions{})
 		framework.ExpectNoError(err, "failed to delete configmap %s in namespace: %s", testConfigMapA.GetName(), ns)
 		expectEvent(watchA, watch.Deleted, nil)
 		expectEvent(watchAB, watch.Deleted, nil)
-		expectNoEvent(watchB, watch.Deleted, nil)
 
 		ginkgo.By("creating a configmap with label B and ensuring the correct watchers observe the notification")
 		testConfigMapB, err = c.CoreV1().ConfigMaps(ns).Create(context.TODO(), testConfigMapB, metav1.CreateOptions{})

@@ -51,7 +51,7 @@ func (m *manager) getControllers() error {
 		return nil
 	}
 
-	data, err := fscommon.ReadFile(m.dirPath, "cgroup.controllers")
+	data, err := cgroups.ReadFile(m.dirPath, "cgroup.controllers")
 	if err != nil {
 		if m.rootless && m.config.Path == "" {
 			return nil
@@ -75,7 +75,7 @@ func (m *manager) Apply(pid int) error {
 		// - "runc create (rootless + limits + no cgrouppath + no permission) fails with informative error"
 		if m.rootless {
 			if m.config.Path == "" {
-				if blNeed, nErr := needAnyControllers(m.config); nErr == nil && !blNeed {
+				if blNeed, nErr := needAnyControllers(m.config.Resources); nErr == nil && !blNeed {
 					return nil
 				}
 				return errors.Wrap(err, "rootless needs no limits + no cgrouppath when no permission is granted for cgroups")
@@ -98,48 +98,30 @@ func (m *manager) GetAllPids() ([]int, error) {
 }
 
 func (m *manager) GetStats() (*cgroups.Stats, error) {
-	var (
-		errs []error
-	)
+	var errs []error
 
 	st := cgroups.NewStats()
-	if err := m.getControllers(); err != nil {
-		return st, err
-	}
 
 	// pids (since kernel 4.5)
-	if _, ok := m.controllers["pids"]; ok {
-		if err := statPids(m.dirPath, st); err != nil {
-			errs = append(errs, err)
-		}
-	} else {
-		if err := statPidsWithoutController(m.dirPath, st); err != nil {
-			errs = append(errs, err)
-		}
+	if err := statPids(m.dirPath, st); err != nil {
+		errs = append(errs, err)
 	}
 	// memory (since kernel 4.5)
-	if _, ok := m.controllers["memory"]; ok {
-		if err := statMemory(m.dirPath, st); err != nil {
-			errs = append(errs, err)
-		}
+	if err := statMemory(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, err)
 	}
 	// io (since kernel 4.5)
-	if _, ok := m.controllers["io"]; ok {
-		if err := statIo(m.dirPath, st); err != nil {
-			errs = append(errs, err)
-		}
+	if err := statIo(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, err)
 	}
 	// cpu (since kernel 4.15)
-	if _, ok := m.controllers["cpu"]; ok {
-		if err := statCpu(m.dirPath, st); err != nil {
-			errs = append(errs, err)
-		}
+	// Note cpu.stat is available even if the controller is not enabled.
+	if err := statCpu(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, err)
 	}
 	// hugetlb (since kernel 5.6)
-	if _, ok := m.controllers["hugetlb"]; ok {
-		if err := statHugeTlb(m.dirPath, st); err != nil {
-			errs = append(errs, err)
-		}
+	if err := statHugeTlb(m.dirPath, st); err != nil && !os.IsNotExist(err) {
+		errs = append(errs, err)
 	}
 	if len(errs) > 0 && !m.rootless {
 		return st, errors.Errorf("error while statting cgroup v2: %+v", errs)
@@ -163,53 +145,50 @@ func (m *manager) Path(_ string) string {
 	return m.dirPath
 }
 
-func (m *manager) Set(container *configs.Config) error {
-	if container == nil || container.Cgroups == nil {
-		return nil
-	}
+func (m *manager) Set(r *configs.Resources) error {
 	if err := m.getControllers(); err != nil {
 		return err
 	}
 	// pids (since kernel 4.5)
-	if err := setPids(m.dirPath, container.Cgroups); err != nil {
+	if err := setPids(m.dirPath, r); err != nil {
 		return err
 	}
 	// memory (since kernel 4.5)
-	if err := setMemory(m.dirPath, container.Cgroups); err != nil {
+	if err := setMemory(m.dirPath, r); err != nil {
 		return err
 	}
 	// io (since kernel 4.5)
-	if err := setIo(m.dirPath, container.Cgroups); err != nil {
+	if err := setIo(m.dirPath, r); err != nil {
 		return err
 	}
 	// cpu (since kernel 4.15)
-	if err := setCpu(m.dirPath, container.Cgroups); err != nil {
+	if err := setCpu(m.dirPath, r); err != nil {
 		return err
 	}
 	// devices (since kernel 4.15, pseudo-controller)
 	//
-	// When m.Rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
+	// When m.rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
 	// However, errors from other subsystems are not ignored.
 	// see @test "runc create (rootless + limits + no cgrouppath + no permission) fails with informative error"
-	if err := setDevices(m.dirPath, container.Cgroups); err != nil && !m.rootless {
+	if err := setDevices(m.dirPath, r); err != nil && !m.rootless {
 		return err
 	}
 	// cpuset (since kernel 5.0)
-	if err := setCpuset(m.dirPath, container.Cgroups); err != nil {
+	if err := setCpuset(m.dirPath, r); err != nil {
 		return err
 	}
 	// hugetlb (since kernel 5.6)
-	if err := setHugeTlb(m.dirPath, container.Cgroups); err != nil {
+	if err := setHugeTlb(m.dirPath, r); err != nil {
 		return err
 	}
 	// freezer (since kernel 5.2, pseudo-controller)
-	if err := setFreezer(m.dirPath, container.Cgroups.Freezer); err != nil {
+	if err := setFreezer(m.dirPath, r.Freezer); err != nil {
 		return err
 	}
-	if err := m.setUnified(container.Cgroups.Unified); err != nil {
+	if err := m.setUnified(r.Unified); err != nil {
 		return err
 	}
-	m.config = container.Cgroups
+	m.config.Resources = r
 	return nil
 }
 
@@ -218,7 +197,7 @@ func (m *manager) setUnified(res map[string]string) error {
 		if strings.Contains(k, "/") {
 			return fmt.Errorf("unified resource %q must be a file name (no slashes)", k)
 		}
-		if err := fscommon.WriteFile(m.dirPath, k, v); err != nil {
+		if err := cgroups.WriteFile(m.dirPath, k, v); err != nil {
 			errC := errors.Cause(err)
 			// Check for both EPERM and ENOENT since O_CREAT is used by WriteFile.
 			if errors.Is(errC, os.ErrPermission) || errors.Is(errC, os.ErrNotExist) {
@@ -256,4 +235,17 @@ func (m *manager) GetFreezerState() (configs.FreezerState, error) {
 
 func (m *manager) Exists() bool {
 	return cgroups.PathExists(m.dirPath)
+}
+
+func OOMKillCount(path string) (uint64, error) {
+	return fscommon.GetValueByKey(path, "memory.events", "oom_kill")
+}
+
+func (m *manager) OOMKillCount() (uint64, error) {
+	c, err := OOMKillCount(m.dirPath)
+	if err != nil && m.rootless && os.IsNotExist(err) {
+		err = nil
+	}
+
+	return c, err
 }

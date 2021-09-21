@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,6 +34,7 @@ import (
 	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
+	netutils "k8s.io/utils/net"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -720,7 +720,7 @@ func filterClient(client *gcli.Client, opts *proxyutil.FilteredDialOptions) *gcl
 }
 
 func (p *glusterfsVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (*v1.PersistentVolume, error) {
-	if !volutil.AccessModesContainedInAll(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
+	if !volutil.ContainsAllAccessModes(p.plugin.GetAccessModes(), p.options.PVC.Spec.AccessModes) {
 		return nil, fmt.Errorf("invalid AccessModes %v: only AccessModes %v are supported", p.options.PVC.Spec.AccessModes, p.plugin.GetAccessModes())
 	}
 	if p.options.PVC.Spec.Selector != nil {
@@ -992,7 +992,7 @@ func getClusterNodes(cli *gcli.Client, cluster string) (dynamicHostIps []string,
 		}
 		ipaddr := dstrings.Join(nodeInfo.NodeAddRequest.Hostnames.Storage, "")
 		// IP validates if a string is a valid IP address.
-		ip := net.ParseIP(ipaddr)
+		ip := netutils.ParseIPSloppy(ipaddr)
 		if ip == nil {
 			return nil, fmt.Errorf("glusterfs server node ip address %s must be a valid IP address, (e.g. 10.9.8.7)", ipaddr)
 		}

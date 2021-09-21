@@ -7,9 +7,9 @@ import (
 	"errors"
 
 	"sigs.k8s.io/kustomize/api/filters/prefixsuffix"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/resmap"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/yaml"
 )
 
@@ -73,12 +73,11 @@ func (p *PrefixSuffixTransformerPlugin) Transform(m resmap.ResMap) error {
 					r.StorePreviousId()
 				}
 			}
-			err := r.ApplyFilter(prefixsuffix.Filter{
+			if err := r.ApplyFilter(prefixsuffix.Filter{
 				Prefix:    p.Prefix,
 				Suffix:    p.Suffix,
 				FieldSpec: fs,
-			})
-			if err != nil {
+			}); err != nil {
 				return err
 			}
 		}

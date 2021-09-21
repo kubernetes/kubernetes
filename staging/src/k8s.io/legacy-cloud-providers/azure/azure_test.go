@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -3335,4 +3336,157 @@ func TestInitializeCloudFromConfig(t *testing.T) {
 	err = az.InitializeCloudFromConfig(&config, false)
 	expectedErr = fmt.Errorf("useInstanceMetadata must be enabled without Azure credentials")
 	assert.Equal(t, expectedErr, err)
+}
+
+func TestFindSecurityRule(t *testing.T) {
+	testRuleName := "test-rule"
+	testIP1 := "192.168.192.168"
+	sg := network.SecurityRule{
+		Name: to.StringPtr(testRuleName),
+		SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+			Protocol:                 network.SecurityRuleProtocolTCP,
+			SourcePortRange:          to.StringPtr("*"),
+			SourceAddressPrefix:      to.StringPtr("Internet"),
+			DestinationPortRange:     to.StringPtr("80"),
+			DestinationAddressPrefix: to.StringPtr(testIP1),
+			Access:                   network.SecurityRuleAccessAllow,
+			Direction:                network.SecurityRuleDirectionInbound,
+		},
+	}
+	testCases := []struct {
+		desc     string
+		testRule network.SecurityRule
+		expected bool
+	}{
+		{
+			desc:     "false should be returned for an empty rule",
+			testRule: network.SecurityRule{},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when rule name doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr("not-the-right-name"),
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when protocol doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol: network.SecurityRuleProtocolUDP,
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when SourcePortRange doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:        network.SecurityRuleProtocolUDP,
+					SourcePortRange: to.StringPtr("1.2.3.4/32"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when SourceAddressPrefix doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:            network.SecurityRuleProtocolUDP,
+					SourcePortRange:     to.StringPtr("*"),
+					SourceAddressPrefix: to.StringPtr("2.3.4.0/24"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when DestinationPortRange doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:             network.SecurityRuleProtocolUDP,
+					SourcePortRange:      to.StringPtr("*"),
+					SourceAddressPrefix:  to.StringPtr("Internet"),
+					DestinationPortRange: to.StringPtr("443"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when DestinationAddressPrefix doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocolUDP,
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr("192.168.0.3"),
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when Access doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocolUDP,
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr(testIP1),
+					Access:                   network.SecurityRuleAccessDeny,
+					// Direction:                network.SecurityRuleDirectionInbound,
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "false should be returned when Direction doesn't match",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocolUDP,
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr(testIP1),
+					Access:                   network.SecurityRuleAccessAllow,
+					Direction:                network.SecurityRuleDirectionOutbound,
+				},
+			},
+			expected: false,
+		},
+		{
+			desc: "true should be returned when everything matches but protocol is in different case",
+			testRule: network.SecurityRule{
+				Name: to.StringPtr(testRuleName),
+				SecurityRulePropertiesFormat: &network.SecurityRulePropertiesFormat{
+					Protocol:                 network.SecurityRuleProtocol("TCP"),
+					SourcePortRange:          to.StringPtr("*"),
+					SourceAddressPrefix:      to.StringPtr("Internet"),
+					DestinationPortRange:     to.StringPtr("80"),
+					DestinationAddressPrefix: to.StringPtr(testIP1),
+					Access:                   network.SecurityRuleAccessAllow,
+					Direction:                network.SecurityRuleDirectionInbound,
+				},
+			},
+			expected: true,
+		},
+		{
+			desc:     "true should be returned when everything matches",
+			testRule: sg,
+			expected: true,
+		},
+	}
+
+	for i := range testCases {
+		found := findSecurityRule([]network.SecurityRule{sg}, testCases[i].testRule)
+		assert.Equal(t, testCases[i].expected, found, testCases[i].desc)
+	}
 }

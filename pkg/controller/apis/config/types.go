@@ -42,6 +42,7 @@ import (
 	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
+	ephemeralvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/ephemeral/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
 )
 
@@ -84,6 +85,9 @@ type KubeControllerManagerConfiguration struct {
 	// EndpointSliceMirroringControllerConfiguration holds configuration for
 	// EndpointSliceMirroringController related features.
 	EndpointSliceMirroringController endpointslicemirroringconfig.EndpointSliceMirroringControllerConfiguration
+	// EphemeralVolumeControllerConfiguration holds configuration for EphemeralVolumeController
+	// related features.
+	EphemeralVolumeController ephemeralvolumeconfig.EphemeralVolumeControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration

@@ -25,7 +25,12 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -850,6 +855,77 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 	}
 }
 
+func TestValidateNodeResourcesBalancedAllocationArgs(t *testing.T) {
+	cases := map[string]struct {
+		args     *config.NodeResourcesBalancedAllocationArgs
+		wantErrs field.ErrorList
+	}{
+		"valid config": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 1,
+					},
+					{
+						Name:   "memory",
+						Weight: 1,
+					},
+				},
+			},
+		},
+		"invalid config": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 2,
+					},
+					{
+						Name:   "memory",
+						Weight: 1,
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		"repeated resources": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 1,
+					},
+					{
+						Name:   "cpu",
+						Weight: 1,
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "resources[1].name",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateNodeResourcesBalancedAllocationArgs(nil, tc.args)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateNodeResourcesBalancedAllocationArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidateNodeAffinityArgs(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -950,9 +1026,10 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 
 func TestValidateVolumeBindingArgs(t *testing.T) {
 	cases := []struct {
-		name    string
-		args    config.VolumeBindingArgs
-		wantErr error
+		name     string
+		args     config.VolumeBindingArgs
+		features map[featuregate.Feature]bool
+		wantErr  error
 	}{
 		{
 			name: "zero is a valid config",
@@ -971,14 +1048,112 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			args: config.VolumeBindingArgs{
 				BindTimeoutSeconds: -10,
 			},
-			wantErr: &field.Error{
-				Type:  field.ErrorTypeInvalid,
-				Field: "bindTimeoutSeconds",
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "bindTimeoutSeconds",
+				BadValue: int64(-10),
+				Detail:   "invalid BindTimeoutSeconds, should not be a negative value",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=off] shape should be nil when the feature is off",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape:              nil,
 			},
 		},
+		{
+			name: "[VolumeCapacityPriority=off] error if the shape is not nil when the feature is off",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: false,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 1, Score: 1},
+					{Utilization: 3, Score: 3},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "shape",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape should not be empty",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape:              []config.UtilizationShapePoint{},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:  field.ErrorTypeRequired,
+				Field: "shape",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape points must be sorted in increasing order",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: 3, Score: 3},
+					{Utilization: 1, Score: 1},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{&field.Error{
+				Type:   field.ErrorTypeInvalid,
+				Field:  "shape[1].utilization",
+				Detail: "Invalid value: 1: utilization values must be sorted in increasing order",
+			}}),
+		},
+		{
+			name: "[VolumeCapacityPriority=on] shape point: invalid utilization and score",
+			features: map[featuregate.Feature]bool{
+				features.VolumeCapacityPriority: true,
+			},
+			args: config.VolumeBindingArgs{
+				BindTimeoutSeconds: 10,
+				Shape: []config.UtilizationShapePoint{
+					{Utilization: -1, Score: 1},
+					{Utilization: 10, Score: -1},
+					{Utilization: 20, Score: 11},
+					{Utilization: 101, Score: 1},
+				},
+			},
+			wantErr: errors.NewAggregate([]error{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[0].utilization",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[1].score",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[2].score",
+				},
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "shape[3].utilization",
+				},
+			}),
+		},
 	}
+
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+			}
 			err := ValidateVolumeBindingArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)
@@ -988,6 +1163,13 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 }
 
 func TestValidateFitArgs(t *testing.T) {
+	defaultScoringStrategy := &config.ScoringStrategy{
+		Type: config.LeastAllocated,
+		Resources: []config.ResourceSpec{
+			{Name: "cpu", Weight: 1},
+			{Name: "memory", Weight: 1},
+		},
+	}
 	argsTest := []struct {
 		name   string
 		args   config.NodeResourcesFitArgs
@@ -997,6 +1179,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: too long value",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 			expect: "name part must be no more than 63 characters",
 		},
@@ -1004,6 +1187,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: name is empty",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{"example.com/"},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 			expect: "name part must be non-empty",
 		},
@@ -1011,6 +1195,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: name has too many slash",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{"example.com/aaa/bbb"},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 			expect: "a qualified name must consist of alphanumeric characters",
 		},
@@ -1018,18 +1203,21 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: valid args",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{"example.com"},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 		},
 		{
 			name: "IgnoredResourceGroups: valid args ",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com"},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 		},
 		{
 			name: "IgnoredResourceGroups: illegal args",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com/"},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 			expect: "name part must be non-empty",
 		},
@@ -1037,6 +1225,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResourceGroups: name is too long",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 			expect: "name part must be no more than 63 characters",
 		},
@@ -1044,14 +1233,20 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResourceGroups: name cannot be contain slash",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com/aa"},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 			expect: "resource group name can't contain '/'",
+		},
+		{
+			name:   "ScoringStrategy: field is required",
+			args:   config.NodeResourcesFitArgs{},
+			expect: "ScoringStrategy field is required",
 		},
 	}
 
 	for _, test := range argsTest {
 		t.Run(test.name, func(t *testing.T) {
-			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
+			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && (!strings.Contains(err.Error(), test.expect)) {
 				t.Errorf("case[%v]: error details do not include %v", test.name, err)
 			}
 		})

@@ -87,7 +87,7 @@ func updateImageAllowList() {
 }
 
 func getNodeProblemDetectorImage() string {
-	const defaultImage string = "k8s.gcr.io/node-problem-detector:v0.6.2"
+	const defaultImage string = "k8s.gcr.io/node-problem-detector/node-problem-detector:v0.8.7"
 	image := os.Getenv("NODE_PROBLEM_DETECTOR_IMAGE")
 	if image == "" {
 		image = defaultImage

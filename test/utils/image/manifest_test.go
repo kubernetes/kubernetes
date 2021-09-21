@@ -41,20 +41,11 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 			in:  "test",
 			out: "test.io/library/test",
 		}, {
-			in:  "gcr.io/kubernetes-e2e-test-images/test:123",
-			out: "test.io/kubernetes-e2e-test-images/test:123",
-		}, {
 			in:  "k8s.gcr.io/test:123",
 			out: "test.io/test:123",
 		}, {
 			in:  "gcr.io/k8s-authenticated-test/test:123",
 			out: "test.io/k8s-authenticated-test/test:123",
-		}, {
-			in:  "gcr.io/google-samples/test:latest",
-			out: "test.io/google-samples/test:latest",
-		}, {
-			in:  "gcr.io/gke-release/test:latest",
-			out: "test.io/gke-release/test:latest",
 		}, {
 			in:  "k8s.gcr.io/sig-storage/test:latest",
 			out: "test.io/sig-storage/test:latest",
@@ -82,11 +73,8 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 	// Set custom registries
 	reg := RegistryList{
 		DockerLibraryRegistry:   "test.io/library",
-		E2eRegistry:             "test.io/kubernetes-e2e-test-images",
 		GcRegistry:              "test.io",
-		GcrReleaseRegistry:      "test.io/gke-release",
 		PrivateRegistry:         "test.io/k8s-authenticated-test",
-		SampleRegistry:          "test.io/google-samples",
 		SigStorageRegistry:      "test.io/sig-storage",
 		InvalidRegistry:         "test.io/invalid",
 		MicrosoftRegistry:       "test.io/microsoft",

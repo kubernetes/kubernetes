@@ -1034,7 +1034,7 @@ func TestCSINodeValidation(t *testing.T) {
 	driverName2 := "1io.kubernetes-storage-2-csi-driver3"
 	longName := "my-a-b-c-d-c-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-ABCDEFGHIJKLMNOPQRSTUVWXYZ-driver" // 88 chars
 	nodeID := "nodeA"
-	longID := longName + longName // 176 chars
+	longID := longName + longName + "abcdefghijklmnopqrstuvwxyz" // 202 chars
 	successCases := []storage.CSINode{
 		{
 			// driver name: dot only
@@ -1696,8 +1696,7 @@ func TestCSIDriverValidation(t *testing.T) {
 	storageCapacity := true
 	notStorageCapacity := false
 	supportedFSGroupPolicy := storage.FileFSGroupPolicy
-	invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-	invalidFSGroupPolicy = "invalid-mode"
+	invalidFSGroupPolicy := storage.FSGroupPolicy("invalid-mode")
 	successCases := []storage.CSIDriver{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: driverName},
@@ -1966,6 +1965,12 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 				new.Spec.RequiresRepublish = &requiresRepublish
 			},
 		},
+		{
+			name: "StorageCapacity changed",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.StorageCapacity = &notStorageCapacity
+			},
+		},
 	}
 	for _, test := range successCases {
 		t.Run(test.name, func(t *testing.T) {
@@ -2051,8 +2056,7 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 		{
 			name: "FSGroupPolicy invalidated",
 			modify: func(new *storage.CSIDriver) {
-				invalidFSGroupPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
-				invalidFSGroupPolicy = "invalid"
+				invalidFSGroupPolicy := storage.FSGroupPolicy("invalid")
 				new.Spec.FSGroupPolicy = &invalidFSGroupPolicy
 			},
 		},
@@ -2064,15 +2068,15 @@ func TestCSIDriverValidationUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "StorageCapacity changed",
-			modify: func(new *storage.CSIDriver) {
-				new.Spec.StorageCapacity = &notStorageCapacity
-			},
-		},
-		{
 			name: "TokenRequests invalidated",
 			modify: func(new *storage.CSIDriver) {
 				new.Spec.TokenRequests = []storage.TokenRequest{{Audience: gcp}, {Audience: gcp}}
+			},
+		},
+		{
+			name: "invalid nil StorageCapacity",
+			modify: func(new *storage.CSIDriver) {
+				new.Spec.StorageCapacity = nil
 			},
 		},
 	}

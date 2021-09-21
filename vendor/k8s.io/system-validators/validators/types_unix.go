@@ -57,6 +57,8 @@ var DefaultSysSpec = SysSpec{
 			{Name: "BLK_DEV_DM", Description: "Required for devicemapper."},
 			{Name: "CFS_BANDWIDTH", Description: "Required for CPU quota."},
 			{Name: "CGROUP_HUGETLB", Description: "Required for hugetlb cgroup."},
+			{Name: "SECCOMP", Description: "Required for seccomp."},
+			{Name: "SECCOMP_FILTER", Description: "Required for seccomp mode 2."},
 		},
 		Forbidden: []KernelConfig{},
 	},

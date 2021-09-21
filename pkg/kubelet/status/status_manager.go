@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -356,6 +357,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 		}
 	}
 
+	klog.V(5).InfoS("TerminatePod calling updateStatusInternal", "pod", klog.KObj(pod), "podUID", pod.UID)
 	m.updateStatusInternal(pod, status, true)
 }
 
@@ -431,10 +433,43 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 	}
 
 	normalizeStatus(pod, &status)
+
+	// Perform some more extensive logging of container termination state to assist in
+	// debugging production races (generally not needed).
+	if klog.V(5).Enabled() {
+		var containers []string
+		for _, s := range append(append([]v1.ContainerStatus(nil), status.InitContainerStatuses...), status.ContainerStatuses...) {
+			var current, previous string
+			switch {
+			case s.State.Running != nil:
+				current = "running"
+			case s.State.Waiting != nil:
+				current = "waiting"
+			case s.State.Terminated != nil:
+				current = fmt.Sprintf("terminated=%d", s.State.Terminated.ExitCode)
+			default:
+				current = "unknown"
+			}
+			switch {
+			case s.LastTerminationState.Running != nil:
+				previous = "running"
+			case s.LastTerminationState.Waiting != nil:
+				previous = "waiting"
+			case s.LastTerminationState.Terminated != nil:
+				previous = fmt.Sprintf("terminated=%d", s.LastTerminationState.Terminated.ExitCode)
+			default:
+				previous = "<none>"
+			}
+			containers = append(containers, fmt.Sprintf("(%s state=%s previous=%s)", s.Name, current, previous))
+		}
+		sort.Strings(containers)
+		klog.InfoS("updateStatusInternal", "version", cachedStatus.version+1, "pod", klog.KObj(pod), "podUID", pod.UID, "containers", strings.Join(containers, " "))
+	}
+
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
 	if isCached && isPodStatusByKubeletEqual(&cachedStatus.status, &status) && !forceUpdate {
-		klog.V(5).InfoS("Ignoring same status for pod", "pod", klog.KObj(pod), "status", status)
+		klog.V(3).InfoS("Ignoring same status for pod", "pod", klog.KObj(pod), "status", status)
 		return false // No new status.
 	}
 
@@ -566,7 +601,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 		klog.InfoS("Failed to get status for pod",
 			"podUID", uid,
 			"pod", klog.KRef(status.podNamespace, status.podName),
-			"error", err)
+			"err", err)
 		return
 	}
 
@@ -583,7 +618,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 
 	oldStatus := pod.Status.DeepCopy()
 	newPod, patchBytes, unchanged, err := statusutil.PatchPodStatus(m.kubeClient, pod.Namespace, pod.Name, pod.UID, *oldStatus, mergePodStatus(*oldStatus, status.status))
-	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "patchBytes", patchBytes)
+	klog.V(3).InfoS("Patch status for pod", "pod", klog.KObj(pod), "patch", string(patchBytes))
 
 	if err != nil {
 		klog.InfoS("Failed to update status for pod", "pod", klog.KObj(pod), "err", err)

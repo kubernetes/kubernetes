@@ -2767,6 +2767,9 @@ func (t *trackingWorkqueue) Len() int {
 func (t *trackingWorkqueue) ShutDown() {
 	t.limiter.ShutDown()
 }
+func (t *trackingWorkqueue) ShutDownWithDrain() {
+	t.limiter.ShutDownWithDrain()
+}
 func (t *trackingWorkqueue) ShuttingDown() bool {
 	return t.limiter.ShuttingDown()
 }

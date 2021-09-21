@@ -377,6 +377,7 @@ func TestValidateAuthInfoExec(t *testing.T) {
 			Env: []clientcmdapi.ExecEnvVar{
 				{Name: "foo", Value: "bar"},
 			},
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		},
 	}
 	test := configValidationTest{
@@ -391,7 +392,8 @@ func TestValidateAuthInfoExecNoVersion(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
 		Exec: &clientcmdapi.ExecConfig{
-			Command: "/bin/example",
+			Command:         "/bin/example",
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		},
 	}
 	test := configValidationTest{
@@ -409,7 +411,8 @@ func TestValidateAuthInfoExecNoCommand(t *testing.T) {
 	config := clientcmdapi.NewConfig()
 	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
 		Exec: &clientcmdapi.ExecConfig{
-			APIVersion: "clientauthentication.k8s.io/v1alpha1",
+			APIVersion:      "clientauthentication.k8s.io/v1alpha1",
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		},
 	}
 	test := configValidationTest{
@@ -430,8 +433,9 @@ func TestValidateAuthInfoExecWithAuthProvider(t *testing.T) {
 			Name: "oidc",
 		},
 		Exec: &clientcmdapi.ExecConfig{
-			Command:    "/bin/example",
-			APIVersion: "clientauthentication.k8s.io/v1alpha1",
+			Command:         "/bin/example",
+			APIVersion:      "clientauthentication.k8s.io/v1alpha1",
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		},
 	}
 	test := configValidationTest{
@@ -454,10 +458,50 @@ func TestValidateAuthInfoExecNoEnv(t *testing.T) {
 			Env: []clientcmdapi.ExecEnvVar{
 				{Name: "foo", Value: ""},
 			},
+			InteractiveMode: clientcmdapi.IfAvailableExecInteractiveMode,
 		},
 	}
 	test := configValidationTest{
 		config: config,
+	}
+
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoExecInteractiveModeMissing(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			Command:    "/bin/example",
+			APIVersion: "clientauthentication.k8s.io/v1alpha1",
+		},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			"interactiveMode must be specified for user to use exec authentication plugin",
+		},
+	}
+
+	test.testAuthInfo("user", t)
+	test.testConfig(t)
+}
+
+func TestValidateAuthInfoExecInteractiveModeInvalid(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["user"] = &clientcmdapi.AuthInfo{
+		Exec: &clientcmdapi.ExecConfig{
+			Command:         "/bin/example",
+			APIVersion:      "clientauthentication.k8s.io/v1alpha1",
+			InteractiveMode: "invalid",
+		},
+	}
+	test := configValidationTest{
+		config: config,
+		expectedErrorSubstring: []string{
+			`invalid interactiveMode for user: "invalid"`,
+		},
 	}
 
 	test.testAuthInfo("user", t)

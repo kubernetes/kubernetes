@@ -19,6 +19,8 @@ package app
 import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/inotify"
+
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 func watchForLockfileContention(path string, done chan struct{}) error {
@@ -43,4 +45,8 @@ func watchForLockfileContention(path string, done chan struct{}) error {
 		watcher.Close()
 	}()
 	return nil
+}
+
+func isCgroup2UnifiedMode() bool {
+	return libcontainercgroups.IsCgroup2UnifiedMode()
 }

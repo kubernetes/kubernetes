@@ -108,7 +108,7 @@ type ApplyOptions struct {
 
 var (
 	applyLong = templates.LongDesc(i18n.T(`
-		Apply a configuration to a resource by filename or stdin.
+		Apply a configuration to a resource by file name or stdin.
 		The resource name must be specified. This resource will be created if it doesn't exist yet.
 		To use 'apply', always create the resource initially with either 'apply' or 'create --save-config'.
 
@@ -117,20 +117,20 @@ var (
 		Alpha Disclaimer: the --prune functionality is not yet complete. Do not use unless you are aware of what the current state is. See https://issues.k8s.io/34274.`))
 
 	applyExample = templates.Examples(i18n.T(`
-		# Apply the configuration in pod.json to a pod.
+		# Apply the configuration in pod.json to a pod
 		kubectl apply -f ./pod.json
 
-		# Apply resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml.
+		# Apply resources from a directory containing kustomization.yaml - e.g. dir/kustomization.yaml
 		kubectl apply -k dir/
 
-		# Apply the JSON passed into stdin to a pod.
+		# Apply the JSON passed into stdin to a pod
 		cat pod.json | kubectl apply -f -
 
 		# Note: --prune is still in Alpha
-		# Apply the configuration in manifest.yaml that matches label app=nginx and delete all the other resources that are not in the file and match label app=nginx.
+		# Apply the configuration in manifest.yaml that matches label app=nginx and delete all other resources that are not in the file and match label app=nginx
 		kubectl apply --prune -f manifest.yaml -l app=nginx
 
-		# Apply the configuration in manifest.yaml and delete all the other configmaps that are not in the file.
+		# Apply the configuration in manifest.yaml and delete all the other config maps that are not in the file
 		kubectl apply --prune -f manifest.yaml --all --prune-whitelist=core/v1/ConfigMap`))
 
 	warningNoLastAppliedConfigAnnotation = "Warning: resource %[1]s is missing the %[2]s annotation which is required by %[3]s apply. %[3]s apply should only be used on resources created declaratively by either %[3]s create --save-config or %[3]s apply. The missing annotation will be patched automatically.\n"
@@ -170,7 +170,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd := &cobra.Command{
 		Use:                   "apply (-f FILENAME | -k DIRECTORY)",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Apply a configuration to a resource by filename or stdin"),
+		Short:                 i18n.T("Apply a configuration to a resource by file name or stdin"),
 		Long:                  applyLong,
 		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -187,7 +187,7 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().BoolVar(&o.Overwrite, "overwrite", o.Overwrite, "Automatically resolve conflicts between the modified and live configuration by using values from the modified configuration")
-	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, including the uninitialized ones, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
+	cmd.Flags().BoolVar(&o.Prune, "prune", o.Prune, "Automatically delete resource objects, that do not appear in the configs and are created by either apply or create --save-config. Should be used with either -l or --all.")
 	cmdutil.AddValidateFlags(cmd)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVar(&o.All, "all", o.All, "Select all resources in the namespace of the specified resource types.")
@@ -324,8 +324,6 @@ func isIncompatibleServerError(err error) bool {
 func (o *ApplyOptions) GetObjects() ([]*resource.Info, error) {
 	var err error = nil
 	if !o.objectsCached {
-		// include the uninitialized objects by default if --prune is true
-		// unless explicitly set --include-uninitialized=false
 		r := o.Builder.
 			Unstructured().
 			Schema(o.Validator).
@@ -460,7 +458,7 @@ are the ways you can resolve this warning:
 * You may co-own fields by updating your manifest to match the existing
   value; in this case, you'll become the manager if the other manager(s)
   stop managing the field (remove it from their configuration).
-See http://k8s.io/docs/reference/using-api/server-side-apply/#conflicts`, err)
+See https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts`, err)
 			}
 			return err
 		}

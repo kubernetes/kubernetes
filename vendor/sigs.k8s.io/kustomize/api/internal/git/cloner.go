@@ -4,7 +4,7 @@
 package git
 
 import (
-	"sigs.k8s.io/kustomize/api/filesys"
+	"sigs.k8s.io/kustomize/kyaml/filesys"
 )
 
 // Cloner is a function that can clone a git repo.
@@ -14,7 +14,7 @@ type Cloner func(repoSpec *RepoSpec) error
 // to say, some remote API, to obtain a local clone of
 // a remote repo.
 func ClonerUsingGitExec(repoSpec *RepoSpec) error {
-	r, err := newCmdRunner()
+	r, err := newCmdRunner(repoSpec.Timeout)
 	if err != nil {
 		return err
 	}
@@ -36,7 +36,10 @@ func ClonerUsingGitExec(repoSpec *RepoSpec) error {
 	if err = r.run("checkout", "FETCH_HEAD"); err != nil {
 		return err
 	}
-	return r.run("submodule", "update", "--init", "--recursive")
+	if repoSpec.Submodules {
+		return r.run("submodule", "update", "--init", "--recursive")
+	}
+	return nil
 }
 
 // DoNothingCloner returns a cloner that only sets

@@ -115,6 +115,12 @@ func (m *csiBlockMapper) GetStagingPath() string {
 	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", m.specName)
 }
 
+// SupportsMetrics returns true for csiBlockMapper as it initializes the
+// MetricsProvider.
+func (m *csiBlockMapper) SupportsMetrics() bool {
+	return true
+}
+
 // getPublishDir returns path to a directory, where the volume is published to each pod.
 // Example: plugins/kubernetes.io/csi/volumeDevices/publish/{specName}
 func (m *csiBlockMapper) getPublishDir() string {
@@ -187,7 +193,8 @@ func (m *csiBlockMapper) stageVolumeForBlock(
 		accessMode,
 		nodeStageSecrets,
 		csiSource.VolumeAttributes,
-		nil /* MountOptions */)
+		nil, /* MountOptions */
+		nil /* fsGroup */)
 
 	if err != nil {
 		return "", err
@@ -259,7 +266,8 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		volAttribs,
 		nodePublishSecrets,
 		fsTypeBlockName,
-		[]string{},
+		[]string{}, /* mountOptions */
+		nil,        /* fsGroup */
 	)
 
 	if err != nil {

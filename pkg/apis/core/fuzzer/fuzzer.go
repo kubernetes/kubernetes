@@ -31,6 +31,7 @@ import (
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/apis/core"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 // Funcs returns the fuzzer functions for the core group.
@@ -296,6 +297,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			types := []core.ServiceExternalTrafficPolicyType{core.ServiceExternalTrafficPolicyTypeCluster, core.ServiceExternalTrafficPolicyTypeLocal}
 			*p = types[c.Rand.Intn(len(types))]
 		},
+		func(p *core.ServiceInternalTrafficPolicyType, c fuzz.Continue) {
+			types := []core.ServiceInternalTrafficPolicyType{core.ServiceInternalTrafficPolicyCluster, core.ServiceInternalTrafficPolicyLocal}
+			*p = types[c.Rand.Intn(len(types))]
+		},
 		func(ct *core.Container, c fuzz.Continue) {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
@@ -517,6 +522,9 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				}
 			case core.ServiceAffinityNone:
 				ss.SessionAffinityConfig = nil
+			}
+			if ss.AllocateLoadBalancerNodePorts == nil {
+				ss.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			}
 		},
 		func(s *core.NodeStatus, c fuzz.Continue) {

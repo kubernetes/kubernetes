@@ -34,6 +34,7 @@ type staticPolicyTest struct {
 	topo            *topology.CPUTopology
 	numReservedCPUs int
 	podUID          string
+	options         map[string]string
 	containerName   string
 	stAssignments   state.ContainerCPUAssignments
 	stDefaultCPUSet cpuset.CPUSet
@@ -43,8 +44,27 @@ type staticPolicyTest struct {
 	expCSet         cpuset.CPUSet
 }
 
+// this is not a real Clone() - hence Pseudo- - because we don't clone some
+// objects which are accessed read-only
+func (spt staticPolicyTest) PseudoClone() staticPolicyTest {
+	return staticPolicyTest{
+		description:     spt.description,
+		topo:            spt.topo, // accessed in read-only
+		numReservedCPUs: spt.numReservedCPUs,
+		podUID:          spt.podUID,
+		options:         spt.options, // accessed in read-only
+		containerName:   spt.containerName,
+		stAssignments:   spt.stAssignments.Clone(),
+		stDefaultCPUSet: spt.stDefaultCPUSet.Clone(),
+		pod:             spt.pod, // accessed in read-only
+		expErr:          spt.expErr,
+		expCPUAlloc:     spt.expCPUAlloc,
+		expCSet:         spt.expCSet.Clone(),
+	}
+}
+
 func TestStaticPolicyName(t *testing.T) {
-	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+	policy, _ := NewStaticPolicy(topoSingleSocketHT, 1, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
 
 	policyName := policy.Name()
 	if policyName != "static" {
@@ -120,7 +140,7 @@ func TestStaticPolicyStart(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+			p, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
 			policy := p.(*staticPolicy)
 			st := &mockState{
 				assignments:   testCase.stAssignments,
@@ -168,7 +188,9 @@ func TestStaticPolicyAdd(t *testing.T) {
 	largeTopoSock0CPUSet := largeTopoSock0Builder.Result()
 	largeTopoSock1CPUSet := largeTopoSock1Builder.Result()
 
-	testCases := []staticPolicyTest{
+	// these are the cases which must behave the same regardless the policy options.
+	// So we will permutate the options to ensure this holds true.
+	optionsInsensitiveTestCases := []staticPolicyTest{
 		{
 			description:     "GuPodSingleCore, SingleSocketHT, ExpectError",
 			topo:            topoSingleSocketHT,
@@ -179,17 +201,6 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expErr:          fmt.Errorf("not enough cpus available to satisfy request"),
 			expCPUAlloc:     false,
 			expCSet:         cpuset.NewCPUSet(),
-		},
-		{
-			description:     "GuPodSingleCore, SingleSocketHT, ExpectAllocOneCPU",
-			topo:            topoSingleSocketHT,
-			numReservedCPUs: 1,
-			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
-			pod:             makePod("fakePod", "fakeContainer2", "1000m", "1000m"),
-			expErr:          nil,
-			expCPUAlloc:     true,
-			expCSet:         cpuset.NewCPUSet(4), // expect sibling of partial core
 		},
 		{
 			description:     "GuPodMultipleCores, SingleSocketHT, ExpectAllocOneCore",
@@ -401,22 +412,6 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCSet:     largeTopoSock1CPUSet.Union(cpuset.NewCPUSet(10, 34, 22, 47)),
 		},
 		{
-			// Only partial cores are available in the entire system.
-			// Expect allocation of all the CPUs from the partial cores.
-			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocCPUs",
-			topo:        topoQuadSocketFourWayHT,
-			stAssignments: state.ContainerCPUAssignments{
-				"fakePod": map[string]cpuset.CPUSet{
-					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52)),
-				},
-			},
-			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 67, 52),
-			pod:             makePod("fakePod", "fakeContainer5", "5000m", "5000m"),
-			expErr:          nil,
-			expCPUAlloc:     true,
-			expCSet:         cpuset.NewCPUSet(10, 11, 53, 67, 52),
-		},
-		{
 			// Only 7 CPUs are available.
 			// Pod requests 76 cores.
 			// Error is expected since available CPUs are less than the request.
@@ -435,45 +430,130 @@ func TestStaticPolicyAdd(t *testing.T) {
 		},
 	}
 
-	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+	// testcases for the default behaviour of the policy.
+	defaultOptionsTestCases := []staticPolicyTest{
+		{
+			description:     "GuPodSingleCore, SingleSocketHT, ExpectAllocOneCPU",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("fakePod", "fakeContainer2", "1000m", "1000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(4), // expect sibling of partial core
+		},
+		{
+			// Only partial cores are available in the entire system.
+			// Expect allocation of all the CPUs from the partial cores.
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocCPUs",
+			topo:        topoQuadSocketFourWayHT,
+			stAssignments: state.ContainerCPUAssignments{
+				"fakePod": map[string]cpuset.CPUSet{
+					"fakeContainer100": largeTopoCPUSet.Difference(cpuset.NewCPUSet(10, 11, 53, 37, 55, 67, 52)),
+				},
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(10, 11, 53, 67, 52),
+			pod:             makePod("fakePod", "fakeContainer5", "5000m", "5000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(10, 11, 53, 67, 52),
+		},
+	}
 
-		st := &mockState{
-			assignments:   testCase.stAssignments,
-			defaultCPUSet: testCase.stDefaultCPUSet,
+	// testcases for the FullPCPUsOnlyOption
+	smtalignOptionTestCases := []staticPolicyTest{
+		{
+			description: "GuPodSingleCore, SingleSocketHT, ExpectAllocOneCPU",
+			topo:        topoSingleSocketHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 1,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			pod:             makePod("fakePod", "fakeContainer2", "1000m", "1000m"),
+			expErr:          SMTAlignmentError{RequestedCPUs: 1, CpusPerCore: 2},
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(), // reject allocation of sibling of partial core
+		},
+		{
+			// test SMT-level != 2 - which is the default on x86_64
+			description: "GuPodMultipleCores, topoQuadSocketFourWayHT, ExpectAllocOneCPUs",
+			topo:        topoQuadSocketFourWayHT,
+			options: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			numReservedCPUs: 8,
+			stAssignments:   state.ContainerCPUAssignments{},
+			stDefaultCPUSet: largeTopoCPUSet,
+			pod:             makePod("fakePod", "fakeContainer15", "15000m", "15000m"),
+			expErr:          SMTAlignmentError{RequestedCPUs: 15, CpusPerCore: 4},
+			expCPUAlloc:     false,
+			expCSet:         cpuset.NewCPUSet(),
+		},
+	}
+
+	for _, testCase := range optionsInsensitiveTestCases {
+		for _, options := range []map[string]string{
+			nil,
+			{
+				FullPCPUsOnlyOption: "true",
+			},
+		} {
+			tCase := testCase.PseudoClone()
+			tCase.description = fmt.Sprintf("options=%v %s", options, testCase.description)
+			tCase.options = options
+			runStaticPolicyTestCase(t, tCase)
+		}
+	}
+
+	for _, testCase := range defaultOptionsTestCases {
+		runStaticPolicyTestCase(t, testCase)
+	}
+	for _, testCase := range smtalignOptionTestCases {
+		runStaticPolicyTestCase(t, testCase)
+	}
+}
+
+func runStaticPolicyTestCase(t *testing.T, testCase staticPolicyTest) {
+	policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), testCase.options)
+
+	st := &mockState{
+		assignments:   testCase.stAssignments,
+		defaultCPUSet: testCase.stDefaultCPUSet,
+	}
+
+	container := &testCase.pod.Spec.Containers[0]
+	err := policy.Allocate(st, testCase.pod, container)
+	if !reflect.DeepEqual(err, testCase.expErr) {
+		t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %q but got: %q",
+			testCase.description, testCase.expErr, err)
+	}
+
+	if testCase.expCPUAlloc {
+		cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
+		if !found {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
+				testCase.description, container.Name, st.assignments)
 		}
 
-		container := &testCase.pod.Spec.Containers[0]
-		err := policy.Allocate(st, testCase.pod, container)
-		if !reflect.DeepEqual(err, testCase.expErr) {
-			t.Errorf("StaticPolicy Allocate() error (%v). expected add error: %v but got: %v",
-				testCase.description, testCase.expErr, err)
+		if !reflect.DeepEqual(cset, testCase.expCSet) {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
+				testCase.description, testCase.expCSet, cset)
 		}
 
-		if testCase.expCPUAlloc {
-			cset, found := st.assignments[string(testCase.pod.UID)][container.Name]
-			if !found {
-				t.Errorf("StaticPolicy Allocate() error (%v). expected container %v to be present in assignments %v",
-					testCase.description, container.Name, st.assignments)
-			}
-
-			if !reflect.DeepEqual(cset, testCase.expCSet) {
-				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v but got %v",
-					testCase.description, testCase.expCSet, cset)
-			}
-
-			if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
-				t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
-					testCase.description, cset, st.defaultCPUSet)
-			}
+		if !cset.Intersection(st.defaultCPUSet).IsEmpty() {
+			t.Errorf("StaticPolicy Allocate() error (%v). expected cpuset %v to be disoint from the shared cpuset %v",
+				testCase.description, cset, st.defaultCPUSet)
 		}
+	}
 
-		if !testCase.expCPUAlloc {
-			_, found := st.assignments[string(testCase.pod.UID)][container.Name]
-			if found {
-				t.Errorf("StaticPolicy Allocate() error (%v). Did not expect container %v to be present in assignments %v",
-					testCase.description, container.Name, st.assignments)
-			}
+	if !testCase.expCPUAlloc {
+		_, found := st.assignments[string(testCase.pod.UID)][container.Name]
+		if found {
+			t.Errorf("StaticPolicy Allocate() error (%v). Did not expect container %v to be present in assignments %v",
+				testCase.description, container.Name, st.assignments)
 		}
 	}
 }
@@ -537,7 +617,7 @@ func TestStaticPolicyRemove(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -627,7 +707,7 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
-		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+		p, _ := NewStaticPolicy(tc.topo, 0, cpuset.NewCPUSet(), topologymanager.NewFakeManager(), nil)
 		policy := p.(*staticPolicy)
 		st := &mockState{
 			assignments:   tc.stAssignments,
@@ -701,7 +781,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
-			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager())
+			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expNewErr, err)
@@ -778,7 +858,7 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager())
+		policy, _ := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
 
 		st := &mockState{
 			assignments:   testCase.stAssignments,
@@ -817,5 +897,90 @@ func TestStaticPolicyAddWithResvList(t *testing.T) {
 					testCase.description, container.Name, st.assignments)
 			}
 		}
+	}
+}
+
+type staticPolicyOptionTestCase struct {
+	description   string
+	policyOptions map[string]string
+	expectedError bool
+	expectedValue StaticPolicyOptions
+}
+
+func TestStaticPolicyOptions(t *testing.T) {
+	testCases := []staticPolicyOptionTestCase{
+		{
+			description:   "nil args",
+			policyOptions: nil,
+			expectedError: false,
+			expectedValue: StaticPolicyOptions{},
+		},
+		{
+			description:   "empty args",
+			policyOptions: map[string]string{},
+			expectedError: false,
+			expectedValue: StaticPolicyOptions{},
+		},
+		{
+			description: "bad single arg",
+			policyOptions: map[string]string{
+				"badValue1": "",
+			},
+			expectedError: true,
+		},
+		{
+			description: "bad multiple arg",
+			policyOptions: map[string]string{
+				"badValue1": "",
+				"badvalue2": "aaaa",
+			},
+			expectedError: true,
+		},
+		{
+			description: "good arg",
+			policyOptions: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			expectedError: false,
+			expectedValue: StaticPolicyOptions{
+				FullPhysicalCPUsOnly: true,
+			},
+		},
+		{
+			description: "good arg, bad value",
+			policyOptions: map[string]string{
+				FullPCPUsOnlyOption: "enabled!",
+			},
+			expectedError: true,
+		},
+
+		{
+			description: "bad arg intermixed",
+			policyOptions: map[string]string{
+				FullPCPUsOnlyOption: "1",
+				"badvalue2":         "lorem ipsum",
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			opts, err := NewStaticPolicyOptions(testCase.policyOptions)
+			gotError := (err != nil)
+			if gotError != testCase.expectedError {
+				t.Fatalf("error with args %v expected error %v got %v: %v",
+					testCase.policyOptions, testCase.expectedError, gotError, err)
+			}
+
+			if testCase.expectedError {
+				return
+			}
+
+			if !reflect.DeepEqual(opts, testCase.expectedValue) {
+				t.Fatalf("value mismatch with args %v expected value %v got %v",
+					testCase.policyOptions, testCase.expectedValue, opts)
+			}
+		})
 	}
 }

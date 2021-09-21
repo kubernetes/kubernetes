@@ -42,7 +42,7 @@ import (
 )
 
 // Tests for ipv4-ipv6 dual-stack feature
-var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
+var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	f := framework.NewDefaultFramework("dualstack")
 
 	var cs clientset.Interface
@@ -65,20 +65,6 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 			framework.ExpectEqual(len(internalIPs), 2)
 			// assert 2 ips belong to different families
 			framework.ExpectEqual(netutils.IsIPv4String(internalIPs[0]) != netutils.IsIPv4String(internalIPs[1]), true)
-		}
-	})
-
-	ginkgo.It("should have ipv4 and ipv6 node podCIDRs", func() {
-		// TODO (aramase) can switch to new function to get all nodes
-		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
-		framework.ExpectNoError(err)
-
-		for _, node := range nodeList.Items {
-			framework.ExpectEqual(len(node.Spec.PodCIDRs), 2)
-			// assert podCIDR is same as podCIDRs[0]
-			framework.ExpectEqual(node.Spec.PodCIDR, node.Spec.PodCIDRs[0])
-			// assert one is ipv4 and other is ipv6
-			framework.ExpectEqual(netutils.IsIPv4CIDRString(node.Spec.PodCIDRs[0]) != netutils.IsIPv4CIDRString(node.Spec.PodCIDRs[1]), true)
 		}
 	})
 
@@ -119,7 +105,6 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 	})
 
 	// takes close to 140s to complete, so doesn't need to be marked [SLOW]
-	// TODO (aramase) remove phase 2 tag once phase 2 of dual stack is merged
 	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip", func() {
 		serverDeploymentName := "dualstack-server"
 		clientDeploymentName := "dualstack-client"
@@ -365,7 +350,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		expectedPolicy := v1.IPFamilyPolicyRequireDualStack
 		expectedFamilies := []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol}
 
-		service := createService(t.ServiceName, t.Namespace, t.Labels, nil, expectedFamilies)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, &expectedPolicy, expectedFamilies)
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
@@ -410,7 +395,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		expectedPolicy := v1.IPFamilyPolicyRequireDualStack
 		expectedFamilies := []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
 
-		service := createService(t.ServiceName, t.Namespace, t.Labels, nil, expectedFamilies)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, &expectedPolicy, expectedFamilies)
 
 		jig.Labels = t.Labels
 		err := jig.CreateServicePods(2)
@@ -440,7 +425,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 
 	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
 	// but using the secondary IP, so we run the same tests for each ClusterIP family
-	ginkgo.Describe("Granular Checks: Services Secondary IP Family", func() {
+	ginkgo.Describe("Granular Checks: Services Secondary IP Family [LinuxOnly]", func() {
 
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)

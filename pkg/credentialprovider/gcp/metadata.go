@@ -23,6 +23,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -41,8 +42,6 @@ const (
 	DockerConfigURLKey = metadataAttributes + "google-dockercfg-url"
 	serviceAccounts    = metadataURL + "instance/service-accounts/"
 	metadataScopes     = metadataURL + "instance/service-accounts/default/scopes"
-	metadataToken      = metadataURL + "instance/service-accounts/default/token"
-	metadataEmail      = metadataURL + "instance/service-accounts/default/email"
 	// StorageScopePrefix is the prefix checked by ContainerRegistryProvider.Enabled.
 	StorageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
 	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
@@ -56,6 +55,8 @@ var gceProductNameFile = "/sys/class/dmi/id/product_name"
 var metadataHeader = &http.Header{
 	"Metadata-Flavor": []string{"Google"},
 }
+
+var warnOnce sync.Once
 
 // init registers the various means by which credentials may
 // be resolved on GCP.
@@ -144,7 +145,17 @@ func onGCEVM() bool {
 
 // Enabled implements DockerConfigProvider for all of the Google implementations.
 func (g *MetadataProvider) Enabled() bool {
-	return onGCEVM()
+	onGCE := onGCEVM()
+	if !onGCE {
+		return false
+	}
+	if credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
+		warnOnce.Do(func() {
+			klog.V(4).Infof("GCP credential provider is now disabled. Please refer to sig-cloud-provider for guidance on external credential provider integration for GCP")
+		})
+		return false
+	}
+	return true
 }
 
 // Provide implements DockerConfigProvider
@@ -189,6 +200,14 @@ func (g *ContainerRegistryProvider) Enabled() bool {
 	if !onGCEVM() {
 		return false
 	}
+
+	if credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
+		warnOnce.Do(func() {
+			klog.V(4).Infof("GCP credential provider is now disabled. Please refer to sig-cloud-provider for guidance on external credential provider integration for GCP")
+		})
+		return false
+	}
+
 	// Given that we are on GCE, we should keep retrying until the metadata server responds.
 	value := runWithBackoff(func() ([]byte, error) {
 		value, err := gcpcredential.ReadURL(serviceAccounts, g.Client, metadataHeader)

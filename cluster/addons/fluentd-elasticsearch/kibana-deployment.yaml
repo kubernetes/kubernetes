@@ -21,7 +21,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: kibana-logging
-          image: docker.elastic.co/kibana/kibana-oss:7.4.2
+          image: docker.elastic.co/kibana/kibana-oss:7.10.2
           resources:
             # need more cpu upon initialization, therefore burstable class
             limits:

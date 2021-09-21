@@ -42,9 +42,10 @@ func NewCRIStatsProvider(
 	runtimeService internalapi.RuntimeService,
 	imageService internalapi.ImageManagerService,
 	hostStatsProvider HostStatsProvider,
+	disableAcceleratorUsageMetrics bool,
 ) *Provider {
 	return newStatsProvider(cadvisor, podManager, runtimeCache, newCRIStatsProvider(cadvisor, resourceAnalyzer,
-		runtimeService, imageService, hostStatsProvider))
+		runtimeService, imageService, hostStatsProvider, disableAcceleratorUsageMetrics))
 }
 
 // NewCadvisorStatsProvider returns a containerStatsProvider that provides both

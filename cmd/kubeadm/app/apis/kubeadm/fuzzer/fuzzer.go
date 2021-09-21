@@ -18,8 +18,12 @@ package fuzzer
 
 import (
 	fuzz "github.com/google/gofuzz"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
+
+	bootstraptokenv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/bootstraptoken/v1"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -49,13 +53,16 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{}
 
 	// Adds the default bootstrap token to get the round trip working
-	obj.BootstrapTokens = []kubeadm.BootstrapToken{
+	obj.BootstrapTokens = []bootstraptokenv1.BootstrapToken{
 		{
 			Groups: []string{"foo"},
 			Usages: []string{"foo"},
 			TTL:    &metav1.Duration{Duration: 1234},
 		},
 	}
+	obj.SkipPhases = nil
+	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Patches = nil
 }
 
 func fuzzNodeRegistration(obj *kubeadm.NodeRegistrationOptions, c fuzz.Continue) {
@@ -116,6 +123,9 @@ func fuzzJoinConfiguration(obj *kubeadm.JoinConfiguration, c fuzz.Continue) {
 		TLSBootstrapToken: "qux",
 		Timeout:           &metav1.Duration{Duration: 1234},
 	}
+	obj.SkipPhases = nil
+	obj.NodeRegistration.ImagePullPolicy = corev1.PullIfNotPresent
+	obj.Patches = nil
 }
 
 func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {

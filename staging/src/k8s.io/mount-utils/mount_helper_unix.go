@@ -1,3 +1,4 @@
+//go:build !windows
 // +build !windows
 
 /*
@@ -32,7 +33,7 @@ const (
 	// At least number of fields per line in /proc/<pid>/mountinfo.
 	expectedAtLeastNumFieldsPerMountInfo = 10
 	// How many times to retry for a consistent read of /proc/mounts.
-	maxListTries = 3
+	maxListTries = 10
 )
 
 // IsCorruptedMnt return true if err is about corrupted mount point

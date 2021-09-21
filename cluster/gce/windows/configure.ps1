@@ -129,6 +129,9 @@ try {
   $kube_env = Fetch-KubeEnv
   Set-EnvironmentVars
 
+  # Set the TCP/IP Parameters to keep idle connections alive.
+  Set-WindowsTCPParameters
+
   # Install Docker if the select CRI is not containerd and docker is not already
   # installed.
   if (${env:CONTAINER_RUNTIME} -ne "containerd") {
@@ -161,17 +164,20 @@ try {
   Setup-ContainerRuntime
   DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
+  DownloadAndInstall-NodeProblemDetector
   DownloadAndInstall-CSIProxyBinaries
   Start-CSIProxy
   Create-NodePki
   Create-KubeletKubeconfig
   Create-KubeproxyKubeconfig
+  Create-NodeProblemDetectorKubeConfig
   Set-PodCidr
   Configure-HostNetworkingService
   Prepare-CniNetworking
   Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet
+  Configure-NodeProblemDetector
 
   # Even if Logging agent is already installed, the function will still [re]start the service.
   if (IsLoggingEnabled $kube_env) {
@@ -199,5 +205,8 @@ catch {
   Write-Host 'Exception caught in script:'
   Write-Host $_.InvocationInfo.PositionMessage
   Write-Host "Kubernetes Windows node setup failed: $($_.Exception.Message)"
+  # Make sure kubelet won't remain running in case any failure happened during the startup.
+  Write-Host "Cleaning up, Unregistering WorkerServices..."
+  Unregister-WorkerServices
   exit 1
 }

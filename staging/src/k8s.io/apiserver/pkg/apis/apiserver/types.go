@@ -62,8 +62,7 @@ type EgressSelectorConfiguration struct {
 // EgressSelection provides the configuration for a single egress selection client.
 type EgressSelection struct {
 	// Name is the name of the egress selection.
-	// Currently supported values are "controlplane", "master", "etcd" and "cluster"
-	// The "master" egress selector is deprecated in favor of "controlplane"
+	// Currently supported values are "controlplane", "etcd" and "cluster"
 	Name string
 
 	// Connection is the exact information used to configure the egress selection
@@ -146,4 +145,24 @@ type TLSConfig struct {
 	// Must be configured if TCPTransport.URL is prefixed with https://
 	// +optional
 	ClientCert string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// TracingConfiguration provides versioned configuration for tracing clients.
+type TracingConfiguration struct {
+	metav1.TypeMeta
+
+	// +optional
+	// Endpoint of the collector that's running on the control-plane node.
+	// The APIServer uses the egressType ControlPlane when sending data to the collector.
+	// The syntax is defined in https://github.com/grpc/grpc/blob/master/doc/naming.md.
+	// Defaults to the otlp grpc default, localhost:4317
+	// The connection is insecure, and does not currently support TLS.
+	Endpoint *string
+
+	// +optional
+	// SamplingRatePerMillion is the number of samples to collect per million spans.
+	// Defaults to 0.
+	SamplingRatePerMillion *int32
 }

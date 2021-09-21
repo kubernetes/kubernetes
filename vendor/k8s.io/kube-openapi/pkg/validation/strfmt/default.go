@@ -23,6 +23,8 @@ import (
 	"strings"
 
 	"github.com/asaskevich/govalidator"
+
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -154,13 +156,13 @@ func init() {
 	Default.Add("hostname", &hn, IsHostname)
 
 	ip4 := IPv4("")
-	Default.Add("ipv4", &ip4, govalidator.IsIPv4)
+	Default.Add("ipv4", &ip4, isIPv4)
 
 	ip6 := IPv6("")
 	Default.Add("ipv6", &ip6, govalidator.IsIPv6)
 
 	cidr := CIDR("")
-	Default.Add("cidr", &cidr, govalidator.IsCIDR)
+	Default.Add("cidr", &cidr, isCIDR)
 
 	mac := MAC("")
 	Default.Add("mac", &mac, govalidator.IsMAC)
@@ -203,6 +205,18 @@ func init() {
 
 	pw := Password("")
 	Default.Add("password", &pw, func(_ string) bool { return true })
+}
+
+// isIPv4 checks if the string is an IPv4 address, tolerating leading 0's for compatibility with go < 1.17.
+func isIPv4(s string) bool {
+	ip := netutils.ParseIPSloppy(s)
+	return ip != nil && strings.Contains(s, ".")
+}
+
+// isCIDR checks if the string is valid CIDR notation, tolerating leading 0's for compatibility with go < 1.17.
+func isCIDR(s string) bool {
+	_, _, err := netutils.ParseCIDRSloppy(s)
+	return err == nil
 }
 
 // Base64 represents a base64 encoded string, using URLEncoding alphabet

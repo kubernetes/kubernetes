@@ -74,13 +74,13 @@ var (
 		JSON and YAML formats are accepted.`))
 
 	createExample = templates.Examples(i18n.T(`
-		# Create a pod using the data in pod.json.
+		# Create a pod using the data in pod.json
 		kubectl create -f ./pod.json
 
-		# Create a pod based on the JSON passed into stdin.
+		# Create a pod based on the JSON passed into stdin
 		cat pod.json | kubectl create -f -
 
-		# Edit the data in docker-registry.yaml in JSON then create the resource using the edited data.
+		# Edit the data in docker-registry.yaml in JSON then create the resource using the edited data
 		kubectl create -f docker-registry.yaml --edit -o json`))
 )
 
@@ -103,7 +103,7 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 	cmd := &cobra.Command{
 		Use:                   "create -f FILENAME",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Create a resource from a file or from stdin."),
+		Short:                 i18n.T("Create a resource from a file or from stdin"),
 		Long:                  createLong,
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {

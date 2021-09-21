@@ -35,13 +35,14 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	fakesysctl "k8s.io/component-helpers/node/utils/sysctl/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -51,7 +52,6 @@ import (
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
-	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -274,8 +274,8 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 		execer := &fakeexec.FakeExec{
 			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
 		}
-		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
+		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "kube-proxy")
 
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,

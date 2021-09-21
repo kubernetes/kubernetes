@@ -21,6 +21,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -78,8 +79,8 @@ func hasLastApplied(obj runtime.Object) bool {
 	if annotations == nil {
 		return false
 	}
-	_, ok := annotations[corev1.LastAppliedConfigAnnotation]
-	return ok
+	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
+	return ok && len(lastApplied) > 0
 }
 
 func setLastApplied(obj runtime.Object, value string) error {
@@ -92,6 +93,9 @@ func setLastApplied(obj runtime.Object, value string) error {
 		annotations = map[string]string{}
 	}
 	annotations[corev1.LastAppliedConfigAnnotation] = value
+	if err := apimachineryvalidation.ValidateAnnotationsSize(annotations); err != nil {
+		delete(annotations, corev1.LastAppliedConfigAnnotation)
+	}
 	accessor.SetAnnotations(annotations)
 	return nil
 }

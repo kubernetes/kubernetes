@@ -322,7 +322,7 @@ func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.Sni
 // Extract$.ApplyConfig.Type|public$ extracts the applied configuration owned by fieldManager from
 // $.Struct|private$. If no managedFields are found in $.Struct|private$ for fieldManager, a
 // $.ApplyConfig.ApplyConfiguration|public$ is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // $.Struct|private$ must be a unmodified $.Struct|public$ API object that was retrieved from the Kubernetes API.

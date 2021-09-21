@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
@@ -143,6 +144,15 @@ func TestAppendPriorityConfigs(t *testing.T) {
 					Name: podtopologyspread.Name,
 					Args: &config.PodTopologySpreadArgs{
 						DefaultingType: config.SystemDefaulting,
+					},
+				},
+				{
+					Name: noderesources.LeastAllocatedName,
+					Args: &config.NodeResourcesLeastAllocatedArgs{
+						Resources: []config.ResourceSpec{
+							{Name: string(v1.ResourceCPU), Weight: 1},
+							{Name: string(v1.ResourceMemory), Weight: 1},
+						},
 					},
 				},
 			},

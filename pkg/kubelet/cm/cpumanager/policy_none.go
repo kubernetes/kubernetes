@@ -17,6 +17,8 @@ limitations under the License.
 package cpumanager
 
 import (
+	"fmt"
+
 	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -32,8 +34,11 @@ var _ Policy = &nonePolicy{}
 const PolicyNone policyName = "none"
 
 // NewNonePolicy returns a cpuset manager policy that does nothing
-func NewNonePolicy() Policy {
-	return &nonePolicy{}
+func NewNonePolicy(cpuPolicyOptions map[string]string) (Policy, error) {
+	if len(cpuPolicyOptions) > 0 {
+		return nil, fmt.Errorf("None policy: received unsupported options=%v", cpuPolicyOptions)
+	}
+	return &nonePolicy{}, nil
 }
 
 func (p *nonePolicy) Name() string {

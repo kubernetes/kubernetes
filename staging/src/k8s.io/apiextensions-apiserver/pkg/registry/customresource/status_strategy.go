@@ -83,3 +83,8 @@ func (a statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 func (a statusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return a.customResourceStrategy.validator.ValidateStatusUpdate(ctx, obj, old, a.scale)
 }
+
+// WarningsOnUpdate returns warnings for the given update.
+func (statusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}

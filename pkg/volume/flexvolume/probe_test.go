@@ -19,6 +19,7 @@ package flexvolume
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fsnotify/fsnotify"
@@ -33,6 +34,10 @@ const (
 	driverName = "fake-driver"
 )
 
+func assertPathSuffix(t *testing.T, dir1 string, dir2 string) {
+	assert.True(t, strings.HasSuffix(dir2, dir1))
+}
+
 // Probes a driver installed before prober initialization.
 func TestProberExistingDriverBeforeInit(t *testing.T) {
 	// Arrange
@@ -46,8 +51,8 @@ func TestProberExistingDriverBeforeInit(t *testing.T) {
 	// current subdirectories) registered.
 	assert.Equal(t, 1, len(events))
 	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)
-	assert.Equal(t, pluginDir, watcher.watches[0])
-	assert.Equal(t, driverPath, watcher.watches[1])
+	assertPathSuffix(t, pluginDir, watcher.watches[0])
+	assertPathSuffix(t, driverPath, watcher.watches[1])
 	assert.NoError(t, err)
 
 	// Should no longer probe.
@@ -83,8 +88,8 @@ func TestProberAddRemoveDriver(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, 1, len(events))
-	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)               // 1 newly added
-	assert.Equal(t, driverPath, watcher.watches[len(watcher.watches)-1]) // Checks most recent watch
+	assert.Equal(t, volume.ProbeAddOrUpdate, events[0].Op)                   // 1 newly added
+	assertPathSuffix(t, driverPath, watcher.watches[len(watcher.watches)-1]) // Checks most recent watch
 	assert.NoError(t, err)
 
 	// Call probe again, should return 0 event.
@@ -174,7 +179,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 // Tests the behavior when no drivers exist in the plugin directory.
 func TestEmptyPluginDir(t *testing.T) {
 	// Arrange
-	fs := utilfs.NewFakeFs()
+	fs := utilfs.NewTempFs()
 	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
@@ -205,7 +210,7 @@ func TestRemovePluginDir(t *testing.T) {
 
 	// Assert
 	assert.Equal(t, 3, len(watcher.watches)) // 2 from initial setup, 1 from new watch.
-	assert.Equal(t, pluginDir, watcher.watches[len(watcher.watches)-1])
+	assertPathSuffix(t, pluginDir, watcher.watches[len(watcher.watches)-1])
 }
 
 // Issue an event to remove plugindir. New directory should still be watched.
@@ -218,22 +223,22 @@ func TestNestedDriverDir(t *testing.T) {
 	// test add testDriverName
 	testDriverName := "testDriverName"
 	testDriverPath := filepath.Join(pluginDir, testDriverName)
-	fs.MkdirAll(testDriverPath, 0666)
+	fs.MkdirAll(testDriverPath, 0777)
 	watcher.TriggerEvent(fsnotify.Create, testDriverPath)
 	// Assert
 	assert.Equal(t, 3, len(watcher.watches)) // 2 from initial setup, 1 from new watch.
-	assert.Equal(t, testDriverPath, watcher.watches[len(watcher.watches)-1])
+	assertPathSuffix(t, testDriverPath, watcher.watches[len(watcher.watches)-1])
 
 	// test add nested subdir inside testDriverName
 	basePath := testDriverPath
 	for i := 0; i < 10; i++ {
 		subdirName := "subdirName"
 		subdirPath := filepath.Join(basePath, subdirName)
-		fs.MkdirAll(subdirPath, 0666)
+		fs.MkdirAll(subdirPath, 0777)
 		watcher.TriggerEvent(fsnotify.Create, subdirPath)
 		// Assert
 		assert.Equal(t, 4+i, len(watcher.watches)) // 3 + newly added
-		assert.Equal(t, subdirPath, watcher.watches[len(watcher.watches)-1])
+		assertPathSuffix(t, subdirPath, watcher.watches[len(watcher.watches)-1])
 		basePath = subdirPath
 	}
 }
@@ -268,7 +273,7 @@ func TestProberMultipleEvents(t *testing.T) {
 }
 
 func TestProberError(t *testing.T) {
-	fs := utilfs.NewFakeFs()
+	fs := utilfs.NewTempFs()
 	watcher := newFakeWatcher()
 	prober := &flexVolumeProber{
 		pluginDir: pluginDir,
@@ -286,7 +291,7 @@ func TestProberError(t *testing.T) {
 // Installs a mock driver (an empty file) in the mock fs.
 func installDriver(driverName string, fs utilfs.Filesystem) {
 	driverPath := filepath.Join(pluginDir, driverName)
-	fs.MkdirAll(driverPath, 0666)
+	fs.MkdirAll(driverPath, 0777)
 	fs.Create(filepath.Join(driverPath, driverName))
 }
 
@@ -296,7 +301,7 @@ func initTestEnvironment(t *testing.T) (
 	fs utilfs.Filesystem,
 	watcher *fakeWatcher,
 	prober volume.DynamicPluginProber) {
-	fs = utilfs.NewFakeFs()
+	fs = utilfs.NewTempFs()
 	watcher = newFakeWatcher()
 	prober = &flexVolumeProber{
 		pluginDir: pluginDir,

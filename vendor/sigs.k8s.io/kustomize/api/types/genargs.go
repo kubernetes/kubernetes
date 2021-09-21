@@ -39,7 +39,7 @@ func (g *GenArgs) ShouldAddHashSuffixToName() bool {
 
 // Behavior returns Behavior field of GeneratorArgs
 func (g *GenArgs) Behavior() GenerationBehavior {
-	if g.args == nil {
+	if g == nil || g.args == nil {
 		return BehaviorUnspecified
 	}
 	return NewGenerationBehavior(g.args.Behavior)

@@ -23,6 +23,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -30,9 +32,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/coreos/pkg/capnslog"
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/integration"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc/grpclog"
+
 	apitesting "k8s.io/apimachinery/pkg/api/apitesting"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -47,6 +50,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -64,7 +68,7 @@ func init() {
 	utilruntime.Must(example.AddToScheme(scheme))
 	utilruntime.Must(examplev1.AddToScheme(scheme))
 
-	capnslog.SetGlobalLogLevel(capnslog.CRITICAL)
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, os.Stderr))
 }
 
 // prefixTransformer adds and verifies that all data has the correct prefix on its way in and out.
@@ -104,9 +108,7 @@ func newPod() runtime.Object {
 }
 
 func TestCreate(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	etcdClient := cluster.RandClient()
+	ctx, store, etcdClient := testSetup(t)
 
 	key := "/testkey"
 	out := &example.Pod{}
@@ -161,8 +163,7 @@ func checkStorageInvariants(ctx context.Context, t *testing.T, etcdClient *clien
 }
 
 func TestCreateWithTTL(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
@@ -180,8 +181,7 @@ func TestCreateWithTTL(t *testing.T) {
 }
 
 func TestCreateWithKeyExist(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key, _ := testPropogateStore(ctx, t, store, obj)
 	out := &example.Pod{}
@@ -192,8 +192,7 @@ func TestCreateWithKeyExist(t *testing.T) {
 }
 
 func TestGet(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 	// create an object to test
 	key, createdObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 	// update the object once to allow get by exact resource version to be tested
@@ -297,8 +296,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestUnconditionalDelete(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	tests := []struct {
@@ -334,8 +332,7 @@ func TestUnconditionalDelete(t *testing.T) {
 }
 
 func TestConditionalDelete(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", UID: "A"}})
 
 	tests := []struct {
@@ -394,8 +391,7 @@ func TestConditionalDelete(t *testing.T) {
 //   [DONE] Added TestPreconditionalDeleteWithSuggestion
 
 func TestDeleteWithSuggestion(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -410,8 +406,7 @@ func TestDeleteWithSuggestion(t *testing.T) {
 }
 
 func TestDeleteWithSuggestionAndConflict(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -437,8 +432,7 @@ func TestDeleteWithSuggestionAndConflict(t *testing.T) {
 }
 
 func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -456,19 +450,23 @@ func TestDeleteWithSuggestionOfDeletedObject(t *testing.T) {
 }
 
 func TestValidateDeletionWithSuggestion(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
-	// Check that validaing fresh object fails.
+	// Check that validaing fresh object fails is called once and fails.
+	validationCalls := 0
 	validationError := fmt.Errorf("validation error")
 	validateNothing := func(_ context.Context, _ runtime.Object) error {
+		validationCalls++
 		return validationError
 	}
 	out := &example.Pod{}
 	if err := store.Delete(ctx, key, out, nil, validateNothing, originalPod); err != validationError {
 		t.Errorf("Unexpected failure during deletion: %v", err)
+	}
+	if validationCalls != 1 {
+		t.Errorf("validate function should have been called once, called %d", validationCalls)
 	}
 
 	// First update, so originalPod is outdated.
@@ -506,8 +504,7 @@ func TestValidateDeletionWithSuggestion(t *testing.T) {
 }
 
 func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "name"}})
 
@@ -535,8 +532,7 @@ func TestPreconditionalDeleteWithSuggestion(t *testing.T) {
 }
 
 func TestGetToList(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 	prevKey, prevStoredObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "prev"}})
 
 	prevRV, _ := strconv.Atoi(prevStoredObj.ResourceVersion)
@@ -650,9 +646,7 @@ func TestGetToList(t *testing.T) {
 }
 
 func TestGuaranteedUpdate(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
-	etcdClient := cluster.RandClient()
+	ctx, store, etcdClient := testSetup(t)
 	key := "/testkey"
 
 	tests := []struct {
@@ -794,8 +788,7 @@ func TestGuaranteedUpdate(t *testing.T) {
 }
 
 func TestGuaranteedUpdateWithTTL(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
@@ -818,8 +811,7 @@ func TestGuaranteedUpdateWithTTL(t *testing.T) {
 }
 
 func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 	key := "/somekey"
@@ -885,8 +877,7 @@ func TestGuaranteedUpdateChecksStoredData(t *testing.T) {
 }
 
 func TestGuaranteedUpdateWithConflict(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 	key, _ := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	errChan := make(chan error, 1)
@@ -932,8 +923,7 @@ func TestGuaranteedUpdateWithConflict(t *testing.T) {
 }
 
 func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 	key, originalPod := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
 
 	// First, update without a suggestion so originalPod is outdated
@@ -977,13 +967,41 @@ func TestGuaranteedUpdateWithSuggestionAndConflict(t *testing.T) {
 	if updatedPod2.Name != "foo-3" {
 		t.Errorf("unexpected pod name: %q", updatedPod2.Name)
 	}
+
+	// Third, update using a current version as the suggestion.
+	// Return an error and make sure that SimpleUpdate is NOT called a second time,
+	// since the live lookup shows the suggestion was already up to date.
+	attempts := 0
+	updatedPod3 := &example.Pod{}
+	err = store.GuaranteedUpdate(ctx, key, updatedPod3, false, nil,
+		storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+			pod := obj.(*example.Pod)
+			if pod.Name != updatedPod2.Name || pod.ResourceVersion != updatedPod2.ResourceVersion {
+				t.Errorf(
+					"unexpected live object (name=%s, rv=%s), expected name=%s, rv=%s",
+					pod.Name,
+					pod.ResourceVersion,
+					updatedPod2.Name,
+					updatedPod2.ResourceVersion,
+				)
+			}
+			attempts++
+			return nil, fmt.Errorf("validation or admission error")
+		}),
+		updatedPod2,
+	)
+	if err == nil {
+		t.Fatalf("expected error, got none")
+	}
+	if attempts != 1 {
+		t.Errorf("expected 1 attempt, got %d", attempts)
+	}
 }
 
 func TestTransformationFailure(t *testing.T) {
+	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, NewDefaultLeaseManagerConfig())
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 
 	preset := []struct {
@@ -1056,12 +1074,11 @@ func TestTransformationFailure(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	client := testserver.RunEtcd(t, nil)
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RemainingItemCount, true)()
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, NewDefaultLeaseManagerConfig())
-	disablePagingStore := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, NewDefaultLeaseManagerConfig())
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, NewDefaultLeaseManagerConfig())
+	disablePagingStore := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, false, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1552,14 +1569,12 @@ func TestList(t *testing.T) {
 }
 
 func TestListContinuation(t *testing.T) {
+	etcdClient := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
-	etcdClient := cluster.RandClient()
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", transformer, true, NewDefaultLeaseManagerConfig())
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1714,14 +1729,12 @@ func (r *clientRecorder) resetReads() {
 }
 
 func TestListContinuationWithFilter(t *testing.T) {
+	etcdClient := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
-	etcdClient := cluster.RandClient()
 	recorder := &clientRecorder{KV: etcdClient.KV}
 	etcdClient.KV = recorder
-	store := newStore(etcdClient, codec, newPod, "", transformer, true, NewDefaultLeaseManagerConfig())
+	store := newStore(etcdClient, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 
 	preset := []struct {
@@ -1821,10 +1834,9 @@ func TestListContinuationWithFilter(t *testing.T) {
 }
 
 func TestListInconsistentContinuation(t *testing.T) {
+	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
-	store := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, NewDefaultLeaseManagerConfig())
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, NewDefaultLeaseManagerConfig())
 	ctx := context.Background()
 
 	// Setup storage with the following structure:
@@ -1916,7 +1928,7 @@ func TestListInconsistentContinuation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cluster.Client(0).KV.Compact(ctx, int64(lastRV), clientv3.WithCompactPhysical()); err != nil {
+	if _, err := client.KV.Compact(ctx, int64(lastRV), clientv3.WithCompactPhysical()); err != nil {
 		t.Fatalf("Unable to compact, %v", err)
 	}
 
@@ -1966,18 +1978,18 @@ func TestListInconsistentContinuation(t *testing.T) {
 	}
 }
 
-func testSetup(t *testing.T) (context.Context, *store, *integration.ClusterV3) {
+func testSetup(t *testing.T) (context.Context, *store, *clientv3.Client) {
+	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
 	// As 30s is the default timeout for testing in glboal configuration,
 	// we cannot wait longer than that in a single time: change it to 10
 	// for testing purposes. See apimachinery/pkg/util/wait/wait.go
-	store := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, LeaseManagerConfig{
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, LeaseManagerConfig{
 		ReuseDurationSeconds: 1,
 		MaxObjectCount:       defaultLeaseMaxObjectCount,
 	})
 	ctx := context.Background()
-	return ctx, store, cluster
+	return ctx, store, client
 }
 
 // testPropogateStore helps propagates store with objects, automates key generation, and returns
@@ -2007,9 +2019,8 @@ func testPropogateStoreWithKey(ctx context.Context, t *testing.T, store *store, 
 }
 
 func TestPrefix(t *testing.T) {
+	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
 	transformer := &prefixTransformer{prefix: []byte(defaultTestPrefix)}
 	testcases := map[string]string{
 		"custom/prefix":     "/custom/prefix",
@@ -2017,7 +2028,7 @@ func TestPrefix(t *testing.T) {
 		"/registry":         "/registry",
 	}
 	for configuredPrefix, effectivePrefix := range testcases {
-		store := newStore(cluster.RandClient(), codec, nil, configuredPrefix, transformer, true, NewDefaultLeaseManagerConfig())
+		store := newStore(client, codec, nil, configuredPrefix, schema.GroupResource{Resource: "widgets"}, transformer, true, NewDefaultLeaseManagerConfig())
 		if store.pathPrefix != effectivePrefix {
 			t.Errorf("configured prefix of %s, expected effective prefix of %s, got %s", configuredPrefix, effectivePrefix, store.pathPrefix)
 		}
@@ -2176,14 +2187,13 @@ func (t *fancyTransformer) createObject() error {
 }
 
 func TestConsistentList(t *testing.T) {
+	client := testserver.RunEtcd(t, nil)
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	defer cluster.Terminate(t)
 
 	transformer := &fancyTransformer{
 		transformer: &prefixTransformer{prefix: []byte(defaultTestPrefix)},
 	}
-	store := newStore(cluster.RandClient(), codec, newPod, "", transformer, true, NewDefaultLeaseManagerConfig())
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, transformer, true, NewDefaultLeaseManagerConfig())
 	transformer.store = store
 
 	for i := 0; i < 5; i++ {
@@ -2248,8 +2258,7 @@ func TestConsistentList(t *testing.T) {
 }
 
 func TestCount(t *testing.T) {
-	ctx, store, cluster := testSetup(t)
-	defer cluster.Terminate(t)
+	ctx, store, _ := testSetup(t)
 
 	resourceA := "/foo.bar.io/abc"
 
@@ -2287,13 +2296,12 @@ func TestCount(t *testing.T) {
 
 func TestLeaseMaxObjectCount(t *testing.T) {
 	codec := apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion)
-	cluster := integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1})
-	store := newStore(cluster.RandClient(), codec, newPod, "", &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, LeaseManagerConfig{
+	client := testserver.RunEtcd(t, nil)
+	store := newStore(client, codec, newPod, "", schema.GroupResource{Resource: "pods"}, &prefixTransformer{prefix: []byte(defaultTestPrefix)}, true, LeaseManagerConfig{
 		ReuseDurationSeconds: defaultLeaseReuseDurationSeconds,
 		MaxObjectCount:       2,
 	})
 	ctx := context.Background()
-	defer cluster.Terminate(t)
 
 	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", SelfLink: "testlink"}}
 	out := &example.Pod{}

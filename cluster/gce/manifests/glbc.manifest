@@ -3,8 +3,6 @@ kind: Pod
 metadata:
   name: l7-lb-controller
   namespace: kube-system
-  annotations:
-    scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     k8s-app: gcp-lb-controller
     kubernetes.io/name: "GLBC"

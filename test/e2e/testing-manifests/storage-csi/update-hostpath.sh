@@ -60,6 +60,9 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: psp-csi-hostpath-role
 subjects:
+  # This list of ServiceAccount intentionally covers everything that might
+  # be needed. In practice, only some of these accounts are actually
+  # used.
   - kind: ServiceAccount
     name: csi-attacher
     namespace: default
@@ -74,6 +77,9 @@ subjects:
     namespace: default
   - kind: ServiceAccount
     name: csi-external-health-monitor-controller
+    namespace: default
+  - kind: ServiceAccount
+    name: csi-hostpathplugin-sa
     namespace: default
 roleRef:
   kind: ClusterRole

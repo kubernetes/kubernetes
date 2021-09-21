@@ -49,7 +49,7 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // ExtractLimitRange extracts the applied configuration owned by fieldManager from
 // limitRange. If no managedFields are found in limitRange for fieldManager, a
 // LimitRangeApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // limitRange must be a unmodified LimitRange API object that was retrieved from the Kubernetes API.

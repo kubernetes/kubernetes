@@ -49,7 +49,7 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 // ExtractNetworkPolicy extracts the applied configuration owned by fieldManager from
 // networkPolicy. If no managedFields are found in networkPolicy for fieldManager, a
 // NetworkPolicyApplyConfiguration is returned with only the Name, Namespace (if applicable),
-// APIVersion and Kind populated. Is is possible that no managed fields were found for because other
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
 // field managers have taken ownership of all the fields previously owned by fieldManager, or because
 // the fieldManager never owned fields any fields.
 // networkPolicy must be a unmodified NetworkPolicy API object that was retrieved from the Kubernetes API.

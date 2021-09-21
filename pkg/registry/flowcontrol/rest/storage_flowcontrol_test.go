@@ -20,44 +20,7 @@ import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
-	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
-	"k8s.io/client-go/kubernetes/fake"
 )
-
-func TestShouldEnsurePredefinedSettings(t *testing.T) {
-	testCases := []struct {
-		name                  string
-		existingPriorityLevel *flowcontrolv1beta1.PriorityLevelConfiguration
-		expected              bool
-	}{
-		{
-			name:                  "should ensure if exempt priority-level is absent",
-			existingPriorityLevel: nil,
-			expected:              true,
-		},
-		{
-			name:                  "should not ensure if exempt priority-level is present",
-			existingPriorityLevel: bootstrap.MandatoryPriorityLevelConfigurationExempt,
-			expected:              false,
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			c := fake.NewSimpleClientset()
-			if testCase.existingPriorityLevel != nil {
-				c.FlowcontrolV1beta1().PriorityLevelConfigurations().Create(context.TODO(), testCase.existingPriorityLevel, metav1.CreateOptions{})
-			}
-			should, err := shouldCreateSuggested(c.FlowcontrolV1beta1())
-			assert.NoError(t, err)
-			assert.Equal(t, testCase.expected, should)
-		})
-	}
-}
 
 func TestContextFromChannelAndMaxWaitDurationWithChannelClosed(t *testing.T) {
 	stopCh := make(chan struct{})
