@@ -222,17 +222,6 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	return true
 }
 
-func Log(v interface{}, message string, level klog.Level) {
-	klog.V(level).InfoS("%s", message, "spewConfig", spewSdump(v))
-}
-
-func LogJson(interfaceName string, v interface{}, message string, level klog.Level) {
-	jsonString, err := json.Marshal(v)
-	if err == nil {
-		klog.V(level).InfoS("%s", message, interfaceName, string(jsonString))
-	}
-}
-
 func spewSdump(v interface{}) string {
 	scs := spew.NewDefaultConfig()
 	scs.DisableMethods = true
@@ -442,7 +431,7 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 }
 
 func (ep *endpointsInfo) Cleanup() {
-	Log(ep, "Endpoint Cleanup", 3)
+	klog.V(3).InfoS("Endpoint cleanup", "spewConfig", spewSdump(ep))
 	if !ep.GetIsLocal() && ep.refCount != nil {
 		*ep.refCount--
 
@@ -787,7 +776,7 @@ func CleanupLeftovers() (encounteredError bool) {
 }
 
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
-	Log(svcInfo, "Service Cleanup", 3)
+	klog.V(3).InfoS("Service cleanup", "spewConfig", spewSdump(svcInfo))
 	// Skip the svcInfo.policyApplied check to remove all the policies
 	svcInfo.deleteAllHnsLoadBalancerPolicy()
 	// Cleanup Endpoints references
@@ -829,7 +818,9 @@ func deleteAllHnsLoadBalancerPolicy() {
 		return
 	}
 	for _, plist := range plists {
-		LogJson("policyList", plist, "Remove Policy", 3)
+		if jsonString, err := json.Marshal(plist); err == nil {
+			klog.V(3).InfoS("Remove policy", "policyList", jsonString)
+		}
 		_, err = plist.Delete()
 		if err != nil {
 			klog.ErrorS(err, "Failed to delete policy list")
@@ -1197,7 +1188,9 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Save the hnsId for reference
-			LogJson("endpointInfo", newHnsEndpoint, "Hns Endpoint resource", 1)
+			if jsonString, err := json.Marshal(plist); err == nil {
+				klog.V(1).InfoS("Hns endpoint resource", "endpointInfo", jsonString)
+			}
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
 			if newHnsEndpoint.GetIsLocal() {
 				hnsLocalEndpoints = append(hnsLocalEndpoints, *newHnsEndpoint)
@@ -1209,7 +1202,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			ep.hnsID = newHnsEndpoint.hnsID
 
-			Log(ep, "Endpoint resource found", 3)
+			klog.V(3).InfoS("Endpoint resource found", "spewConfig", spewSdump(ep))
 		}
 
 		klog.V(3).InfoS("Associated endpoints for service", "spewConfig", spewSdump(hnsEndpoints), "svcName", svcName.String())
@@ -1327,7 +1320,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 		}
 		svcInfo.policyApplied = true
-		Log(svcInfo, "+++Policy Successfully applied for service +++", 2)
+		klog.V(2).InfoS("Policy Successfully applied for service", "spewConfig", spewSdump(svcInfo))
 	}
 
 	if proxier.healthzServer != nil {
