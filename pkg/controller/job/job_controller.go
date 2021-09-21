@@ -880,8 +880,8 @@ func (jm *Controller) removeTrackingFinalizersFromAllPods(pods []*v1.Pod) error 
 //    or the job was removed.
 // 3. Increment job counters for pods that no longer have a finalizer.
 // 4. Add Complete condition if satisfied with current counters.
-// It does this up to a limited number of Pods so that the size of .status
-// doesn't grow too much and this sync doesn't starve other Jobs.
+// It does this in a controlled way such that the size of .status doesn't grow
+// too much.
 func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*v1.Pod, succeededIndexes orderedIntervals, uncounted uncountedTerminatedPods, finishedCond *batch.JobCondition, needsFlush bool) error {
 	isIndexed := isIndexedJob(job)
 	var podsToRemoveFinalizer []*v1.Pod
@@ -936,15 +936,17 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 			}
 		}
 		if len(newSucceededIndexes)+len(uncountedStatus.Succeeded)+len(uncountedStatus.Failed) >= maxUncountedPods {
-			// The controller added enough Pods already to .status.uncountedTerminatedPods
-			// We stop counting pods and removing finalizers here to:
-			// 1. Ensure that the UIDs representation are under 20 KB.
-			// 2. Cap the number of finalizer removals so that syncing of big Jobs
-			//    doesn't starve smaller ones.
-			//
-			// The job will be synced again because the Job status and Pod updates
-			// will put the Job back to the work queue.
-			break
+			if len(newSucceededIndexes) > 0 {
+				succeededIndexes = succeededIndexes.withOrderedIndexes(newSucceededIndexes)
+				job.Status.Succeeded = int32(succeededIndexes.total())
+				job.Status.CompletedIndexes = succeededIndexes.String()
+			}
+			var err error
+			if needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, uidsWithFinalizer, needsFlush); err != nil {
+				return err
+			}
+			podsToRemoveFinalizer = nil
+			newSucceededIndexes = nil
 		}
 	}
 	if len(newSucceededIndexes) > 0 {
