@@ -62,7 +62,7 @@ func (q *graceTerminateRSList) add(rs *listItem) bool {
 		return false
 	}
 
-	klog.V(5).InfoS("Adding rs item to graceful delete rsList", "realServer", rs)
+	klog.V(5).InfoS("Adding real server to graceful delete real server list", "realServer", rs)
 	q.list[uniqueRS] = rs
 	return true
 }
@@ -85,11 +85,11 @@ func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (boo
 	for name, rs := range q.list {
 		deleted, err := handler(rs)
 		if err != nil {
-			klog.ErrorS(err, "Try delete rs err", "name", name)
+			klog.ErrorS(err, "Error in deleting real server", "realServer", name)
 			success = false
 		}
 		if deleted {
-			klog.InfoS("lw: remote out of the list", "name", name)
+			klog.InfoS("Removed real server from graceful delete real server list", "realServer", name)
 			q.remove(rs)
 		}
 	}
@@ -140,7 +140,7 @@ func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer
 	}
 	deleted, err := m.deleteRsFunc(ele)
 	if err != nil {
-		klog.ErrorS(err, "Error in deleting rs ", "realServer", ele.String())
+		klog.ErrorS(err, "Error in deleting real server", "realServer", ele)
 	}
 	if deleted {
 		return nil
@@ -150,13 +150,13 @@ func (m *GracefulTerminationManager) GracefulDeleteRS(vs *utilipvs.VirtualServer
 	if err != nil {
 		return err
 	}
-	klog.V(5).InfoS("Adding an element to graceful delete rsList", "element", ele)
+	klog.V(5).InfoS("Adding real server to graceful delete real server list", "realServer", ele)
 	m.rsList.add(ele)
 	return nil
 }
 
 func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, error) {
-	klog.V(5).InfoS("Trying to delete rs", "realServer", rsToDelete.String())
+	klog.V(5).InfoS("Trying to delete real server", "realServer", rsToDelete)
 	rss, err := m.ipvs.GetRealServers(rsToDelete.VirtualServer)
 	if err != nil {
 		return false, err
@@ -167,10 +167,10 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 			//     (existing connections will be deleted on the next packet because sysctlExpireNoDestConn=1)
 			// For other protocols, don't delete until all connections have expired)
 			if utilipvs.IsRsGracefulTerminationNeeded(rsToDelete.VirtualServer.Protocol) && rs.ActiveConn+rs.InactiveConn != 0 {
-				klog.V(5).InfoS("Not deleting, RS ActiveConn, InactiveConn", "realServer", rsToDelete.String(), "realServerActiveConnection", rs.ActiveConn, "realServerInactiveConnection", rs.InactiveConn)
+				klog.V(5).InfoS("Not deleting real server, active connection, and inactive connection", "realServer", rsToDelete, "realServerActiveConnection", rs.ActiveConn, "realServerInactiveConnection", rs.InactiveConn)
 				return false, nil
 			}
-			klog.V(5).InfoS("Deleting rs", "realServer", rsToDelete.String())
+			klog.V(5).InfoS("Deleting real server", "realServer", rsToDelete)
 			err := m.ipvs.DeleteRealServer(rsToDelete.VirtualServer, rs)
 			if err != nil {
 				return false, fmt.Errorf("delete destination %q err: %w", rs.String(), err)
@@ -183,7 +183,7 @@ func (m *GracefulTerminationManager) deleteRsFunc(rsToDelete *listItem) (bool, e
 
 func (m *GracefulTerminationManager) tryDeleteRs() {
 	if !m.rsList.flushList(m.deleteRsFunc) {
-		klog.ErrorS(nil, "Try flush graceful termination list err")
+		klog.ErrorS(nil, "Try flush graceful termination list error")
 	}
 }
 
