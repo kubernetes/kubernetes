@@ -36,9 +36,9 @@ KUBE_BASE_IMAGE_REGISTRY?=k8s.gcr.io
 BASE_IMAGE_VERSION?=bullseye-v1.0.0
 BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:${BASE_IMAGE_VERSION}
 
-# Keep debian releases (e.g. debian 10 == buster) consistent 
+# Keep debian releases (e.g. debian 11 == bullseye) consistent 
 # between BASE_IMAGE_VERSION and DISTROLESS_IMAGE images
-DISTROLESS_IMAGE?=base-debian10
+DISTROLESS_IMAGE?=base-debian11
 RUNNERIMAGE?=gcr.io/distroless/${DISTROLESS_IMAGE}:latest
 
 TEMP_DIR:=$(shell mktemp -d -t conformance-XXXXXX)
