@@ -470,17 +470,19 @@ const (
 // media type, because the list of media types that support field validation are a subset of
 // all supported media types (only json and yaml supports field validation).
 func fieldValidation(req *http.Request) (fieldValidationDirective, error) {
-	supportedMediaTypes := []string{"application/json", "application/yaml"}
+	supportedContentTypes := []string{runtime.ContentTypeJSON, runtime.ContentTypeJSONMergePatch, runtime.ContentTypeYAML}
 	supported := false
-	contentType := req.Header.Get("ContentType")
+	contentType := req.Header.Get("Content-Type")
+	//contentType := req.Header.Get("ContentType")
 	// TODO: not sure if it is okay to assume empty content type is a valid one
 	if contentType != "" {
 		for _, v := range strings.Split(contentType, ",") {
 			t, _, err := mime.ParseMediaType(v)
+			fmt.Printf("t = %+v\n", t)
 			if err != nil {
 				return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("could not parse media type: %v", v))
 			}
-			for _, mt := range supportedMediaTypes {
+			for _, mt := range supportedContentTypes {
 				if t == mt {
 					supported = true
 					break
@@ -488,7 +490,7 @@ func fieldValidation(req *http.Request) (fieldValidationDirective, error) {
 			}
 		}
 		if !supported {
-			return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter only supports media types types %v\n content type provided: %s", supportedMediaTypes, contentType))
+			return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter only supports content types %v\n content type provided: %s", supportedContentTypes, contentType))
 		}
 	}
 

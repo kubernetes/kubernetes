@@ -4353,7 +4353,7 @@ func TestUpdateChecksAPIVersion(t *testing.T) {
 
 // runRequest is used by TestDryRun and TestFieldValidation since it runs the test
 // twice in a row with a slightly different URL (one has ?dryRun, one doesn't).
-func runRequest(t *testing.T, path, verb string, data []byte, contentType string) *http.Response {
+func runRequest(t testing.TB, path, verb string, data []byte, contentType string) *http.Response {
 	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -4364,22 +4364,6 @@ func runRequest(t *testing.T, path, verb string, data []byte, contentType string
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-	return response
-}
-
-// runRequestOrDie is like runRequest, but used for benchmarking.
-func runRequestOrDie(path, verb string, data []byte, contentType string) *http.Response {
-	request, err := http.NewRequest(verb, path, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	if contentType != "" {
-		request.Header.Set("Content-Type", contentType)
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		panic(err)
 	}
 	return response
 }
@@ -4495,12 +4479,12 @@ func BenchmarkFieldValidation(b *testing.B) {
 				postPath := "/namespaces/default/simples"
 				postData := []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar"}`)
 				basePostURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-				_ = runRequestOrDie(basePostURL+postPath+bm.queryParam, "POST", postData, "")
+				_ = runRequest(b, basePostURL+postPath+bm.queryParam, "POST", postData, "")
 
 				putPath := "/namespaces/default/simples/id"
 				putData := []byte(`{"kind": "Simple", "apiVersion": "test.group/version", "metadata": {"name": "id", "creationTimestamp": null}, "other": "bar", "unknown": "baz"}`)
 				basePutURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-				_ = runRequestOrDie(basePutURL+putPath+bm.queryParam, "PUT", putData, "")
+				_ = runRequest(b, basePutURL+putPath+bm.queryParam, "PUT", putData, "")
 			}
 		})
 
