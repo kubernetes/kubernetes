@@ -44,10 +44,10 @@ var (
 	// patterns of URLs that we don't care about can be added here to improve
 	// efficiency.
 	regWhiteList = []*regexp.Regexp{
-		regexp.MustCompile(`https://kubernetes-site\.appspot\.com`),
+		regexp.MustCompile(`^https://kubernetes-site\.appspot\.com`),
 		// skip url that doesn't start with an English alphabet, e.g., URLs with IP addresses.
-		regexp.MustCompile(`https?://[^A-Za-z].*`),
-		regexp.MustCompile(`https?://localhost.*`),
+		regexp.MustCompile(`^https?://[^A-Za-z].*`),
+		regexp.MustCompile(`^https?://localhost.*`),
 	}
 	// URLs listed in the fullURLWhiteList won't be checked. This separated from
 	// the RegWhiteList to improve efficiency. This list includes dummy URLs that
@@ -67,8 +67,8 @@ var (
 	}
 
 	visitedURLs    = map[string]struct{}{}
-	htmlpreviewReg = regexp.MustCompile(`https://htmlpreview\.github\.io/\?`)
-	httpOrhttpsReg = regexp.MustCompile(`https?.*`)
+	htmlpreviewReg = regexp.MustCompile(`^https://htmlpreview\.github\.io/\?`)
+	httpOrhttpsReg = regexp.MustCompile(`^https?.*`)
 )
 
 func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {

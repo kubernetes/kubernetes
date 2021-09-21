@@ -43,7 +43,7 @@ const (
 
 var (
 	managedDiskPathRE   = regexp.MustCompile(`.*/subscriptions/(?:.*)/resourceGroups/(?:.*)/providers/Microsoft.Compute/disks/(.+)`)
-	unmanagedDiskPathRE = regexp.MustCompile(`http(?:.*)://(?:.*)/vhds/(.+)`)
+	unmanagedDiskPathRE = regexp.MustCompile(`^http(?:.*)://(?:.*)/vhds/(.+)`)
 	managed             = string(v1.AzureManagedDisk)
 )
 
