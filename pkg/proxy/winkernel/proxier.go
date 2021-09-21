@@ -31,7 +31,6 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
-	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -219,12 +218,6 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	}
 
 	return true
-}
-
-func spewSdump(v interface{}) string {
-	scs := spew.NewDefaultConfig()
-	scs.DisableMethods = true
-	return scs.Sdump(v)
 }
 
 // internal struct for endpoints information
@@ -817,7 +810,7 @@ func deleteAllHnsLoadBalancerPolicy() {
 		return
 	}
 	for _, plist := range plists {
-		klog.V(3).InfoS("Remove policy", "policyList", plist)
+		klog.V(3).InfoS("Remove policy", "policies", plist)
 		_, err = plist.Delete()
 		if err != nil {
 			klog.ErrorS(err, "Failed to delete policy list")
@@ -1046,7 +1039,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.policyApplied {
-			klog.V(4).InfoS("Policy already applied", "spewConfig", spewSdump(svcInfo))
+			klog.V(4).InfoS("Policy already applied", "serviceInfo", svcInfo)
 			continue
 		}
 
@@ -1143,7 +1136,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 					newHnsEndpoint, err = hns.createEndpoint(hnsEndpoint, hnsNetworkName)
 					if err != nil {
-						klog.ErrorS(err, "Remote endpoint creation failed", "spewConfig", spewSdump(hnsEndpoint))
+						klog.ErrorS(err, "Remote endpoint creation failed", "endpointsInfo", hnsEndpoint)
 						continue
 					}
 				} else {
@@ -1185,7 +1178,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Save the hnsId for reference
-			klog.V(1).InfoS("Hns endpoint resource", "endpointInfo", newHnsEndpoint)
+			klog.V(1).InfoS("Hns endpoint resource", "endpointsInfo", newHnsEndpoint)
 
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
 			if newHnsEndpoint.GetIsLocal() {
@@ -1201,7 +1194,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(3).InfoS("Endpoint resource found", "endpointsInfo", ep)
 		}
 
-		klog.V(3).InfoS("Associated endpoints for service", "spewConfig", spewSdump(hnsEndpoints), "svcName", svcName.String())
+		klog.V(3).InfoS("Associated endpoints for service", "endpointsInfo", hnsEndpoints, "svcName", svcName.String())
 
 		if len(svcInfo.hnsID) > 0 {
 			// This should not happen
@@ -1213,7 +1206,7 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		klog.V(4).Infof("Trying to Apply Policies for service", "spewConfig", spewSdump(svcInfo))
+		klog.V(4).Infof("Trying to apply Policies for service", "serviceInfo", svcInfo)
 		var hnsLoadBalancer *loadBalancerInfo
 		var sourceVip = proxier.sourceVip
 		if containsPublicIP || containsNodeIP {
@@ -1316,7 +1309,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 		}
 		svcInfo.policyApplied = true
-		klog.V(2).InfoS("Policy Successfully applied for service", "spewConfig", spewSdump(svcInfo))
+		klog.V(2).InfoS("Policy successfully applied for service", "serviceInfo", svcInfo)
 	}
 
 	if proxier.healthzServer != nil {
