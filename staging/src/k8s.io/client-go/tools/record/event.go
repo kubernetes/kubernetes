@@ -25,13 +25,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record/util"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const maxTriesPerEvent = 12
