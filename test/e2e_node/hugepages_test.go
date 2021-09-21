@@ -17,6 +17,7 @@ limitations under the License.
 package e2enode
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -117,17 +118,8 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity,
 	return pod
 }
 
-// configureHugePages attempts to allocate hugepages of the specified size
-func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int) error {
-	// Compact memory to make bigger contiguous blocks of memory available
-	// before allocating huge pages.
-	// https://www.kernel.org/doc/Documentation/sysctl/vm.txt
-	if _, err := os.Stat("/proc/sys/vm/compact_memory"); err == nil {
-		if err := exec.Command("/bin/sh", "-c", "echo 1 > /proc/sys/vm/compact_memory").Run(); err != nil {
-			return err
-		}
-	}
-
+// reserveHugePages just writes appropriate value into sysfs
+func reserveHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int) error {
 	// e.g. hugepages/hugepages-2048kB/nr_hugepages
 	hugepagesSuffix := fmt.Sprintf("hugepages/hugepages-%dkB/%s", hugepagesSize, hugepagesCapacityFile)
 
@@ -145,25 +137,80 @@ func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int) 
 		return err
 	}
 
-	// verify that the number of hugepages was updated
-	// e.g. /bin/sh -c "cat /sys/kernel/mm/hugepages/hugepages-2048kB/vm.nr_hugepages"
-	command = fmt.Sprintf("cat %s", hugepagesFile)
-	outData, err := exec.Command("/bin/sh", "-c", command).Output()
+	if hugepagesCount > 0 {
+		// verify that the number of hugepages was updated
+		// e.g. /bin/sh -c "cat /sys/kernel/mm/hugepages/hugepages-2048kB/vm.nr_hugepages"
+		command = fmt.Sprintf("cat %s", hugepagesFile)
+		outData, err := exec.Command("/bin/sh", "-c", command).Output()
+		if err != nil {
+			return err
+		}
+
+		numHugePages, err := strconv.Atoi(strings.TrimSpace(string(outData)))
+		if err != nil {
+			return err
+		}
+
+		framework.Logf("Hugepages total is set to %v", numHugePages)
+		if numHugePages == hugepagesCount {
+			return nil
+		}
+
+		return fmt.Errorf("expected hugepages %v, but found %v", hugepagesCount, numHugePages)
+	}
+	return nil
+}
+
+func traceMemInfo() {
+	file, err := os.Open("/proc/meminfo")
 	if err != nil {
+		framework.Logf("Can't read meminfo %v", err)
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	// optionally, resize scanner's capacity for lines over 64K, see next example
+	for scanner.Scan() {
+		framework.Logf(scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		framework.Logf("Can't read meminfo %v", err)
+	}
+}
+
+// configureHugePages attempts to allocate hugepages of the specified size
+func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int, raiseError bool) error {
+	// Compact memory to make bigger contiguous blocks of memory available
+	// before allocating huge pages.
+	// https://www.kernel.org/doc/Documentation/sysctl/vm.txt
+	if _, err := os.Stat("/proc/sys/vm/compact_memory"); err == nil {
+		if err := exec.Command("/bin/sh", "-c", "echo 1 > /proc/sys/vm/compact_memory").Run(); err != nil {
+			return err
+		}
+	}
+
+	attempts := 30 * time.Second / framework.Poll
+	// compaction may take a time, let's make 15 attempts
+	gomega.Eventually(func() error {
+		attempts -= 1
+		err := reserveHugePages(hugepagesSize, hugepagesCount, numaNodeID)
+
+		// clear it eventually and trace
+		if err != nil {
+			if attempts == 0 {
+				traceMemInfo()
+			}
+			reserveHugePages(hugepagesSize, 0, numaNodeID)
+		}
+
+		if attempts == 0 && !raiseError {
+			return nil
+		}
 		return err
-	}
-
-	numHugePages, err := strconv.Atoi(strings.TrimSpace(string(outData)))
-	if err != nil {
-		return err
-	}
-
-	framework.Logf("Hugepages total is set to %v", numHugePages)
-	if numHugePages == hugepagesCount {
-		return nil
-	}
-
-	return fmt.Errorf("expected hugepages %v, but found %v", hugepagesCount, numHugePages)
+	}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+	return nil
 }
 
 // isHugePageAvailable returns true if hugepages of the specified size is available on the host
@@ -267,12 +314,8 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 				}
 
 				ginkgo.By(fmt.Sprintf("Configuring the host to reserve %d of pre-allocated hugepages of size %d", count, size))
-				gomega.Eventually(func() error {
-					if err := configureHugePages(size, count, nil); err != nil {
-						return err
-					}
-					return nil
-				}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+				err := configureHugePages(size, count, nil, true)
+				framework.ExpectNoError(err)
 			}
 		}
 
@@ -308,8 +351,8 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			ginkgo.By("Releasing hugepages")
 			gomega.Eventually(func() error {
 				for hugepagesResource := range hugepages {
-					command := fmt.Sprintf("echo 0 > %s-%dkB/%s", hugepagesDirPrefix, resourceToSize[hugepagesResource], hugepagesCapacityFile)
-					if err := exec.Command("/bin/sh", "-c", command).Run(); err != nil {
+					err := reserveHugePages(resourceToSize[hugepagesResource], 0, nil)
+					if err != nil {
 						return err
 					}
 				}
