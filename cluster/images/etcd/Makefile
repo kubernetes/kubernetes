@@ -67,19 +67,19 @@ GOARM?=7
 TEMP_DIR:=$(shell mktemp -d)
 
 ifeq ($(ARCH),amd64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:buster-v1.9.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:buster-v1.9.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),arm64)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:buster-v1.9.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-arm64:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:buster-v1.9.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-ppc64le:bullseye-v1.0.0
 endif
 ifeq ($(ARCH),s390x)
-    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:buster-v1.9.0
+    BASEIMAGE?=k8s.gcr.io/build-image/debian-base-s390x:bullseye-v1.0.0
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
