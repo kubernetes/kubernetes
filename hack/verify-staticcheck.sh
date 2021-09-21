@@ -45,6 +45,7 @@ export IFS=','; checks="${CHECKS[*]}"; unset IFS
 # NOTE: To ignore issues detected a package, add it to the .staticcheck_failures blacklist
 IGNORE=(
   "vendor/k8s.io/kubectl/pkg/cmd/edit/testdata"  # golang/go#24854, dominikh/go-tools#565
+  "cluster/addons/fluentd-elasticsearch/es-image" # cannot traverse go modules
 )
 export IFS='|'; ignore_pattern="^(${IGNORE[*]})\$"; unset IFS
 
@@ -63,10 +64,21 @@ cd "${KUBE_ROOT}"
 failure_file="${KUBE_ROOT}/hack/.staticcheck_failures"
 kube::util::check-file-in-alphabetical-order "${failure_file}"
 
+function normalize_package() {
+  pkg="${1}"
+  if [[ "${pkg}" == "vendor/"* || "${pkg}" == "k8s.io/"* ]]; then
+    # Treat this as a full package path (stripping vendor prefix if needed)
+    echo "${pkg#"vendor/"}"
+  else
+    # Treat this as a relative package path to k8s.io/kubernetes
+    echo "./${pkg}"
+  fi
+}
+
 all_packages=()
 while IFS='' read -r line; do
-  # Prepend './' to get staticcheck to treat these as paths, not packages.
-  all_packages+=("./$line")
+  line=$(normalize_package "${line}")
+  all_packages+=("${line}")
 done < <( hack/make-rules/helpers/cache_go_dirs.sh "${KUBE_ROOT}/_tmp/all_go_dirs" |
             grep "^${FOCUS:-.}" |
             grep -vE "(third_party|generated|clientset_generated|hack|testdata|/_)" |
@@ -95,7 +107,7 @@ while read -r error; do
   elif [[ "${in_failing}" -eq "0" ]]; then
     really_failing+=( "$pkg" )
   fi
-done < <(GOOS=linux staticcheck -checks "${checks}" "${all_packages[@]}" 2>/dev/null || true)
+done < <(GO111MODULE=on GOOS=linux staticcheck -checks "${checks}" "${all_packages[@]}" 2>/dev/null || true)
 
 export IFS=$'\n'  # Expand ${really_failing[*]} to separate lines
 kube::util::read-array really_failing < <(sort -u <<<"${really_failing[*]}")
@@ -109,8 +121,9 @@ done
 # Check that all failing_packages actually still exist
 gone=()
 for p in "${failing_packages[@]}"; do
-  if ! kube::util::array_contains "./$p" "${all_packages[@]}"; then
-    gone+=( "$p" )
+  p=$(normalize_package "${p}")
+  if ! kube::util::array_contains "${p}" "${all_packages[@]}"; then
+    gone+=( "${p}" )
   fi
 done
 
