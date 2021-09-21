@@ -20,8 +20,12 @@ rules:
   - "apps"
   resources:
   - deployments
+  # We must maintain a list of metrics-server deployment names
+  # to avoid potential backward/forward compatibility issues
   resourceNames:
-  - metrics-server
+  - metrics-server-v0.3.6
+  - metrics-server-v0.4.4
+  - metrics-server-v0.5.0
   verbs:
   - get
   - list

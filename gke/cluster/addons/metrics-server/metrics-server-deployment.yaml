@@ -23,6 +23,8 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  # Change of deployment name must be incorporated in resourceNames field of
+  # ClusterRole system:metrics-server to avoid backward/forward compatibility issues
   name: metrics-server-v0.4.4
   namespace: kube-system
   labels:
