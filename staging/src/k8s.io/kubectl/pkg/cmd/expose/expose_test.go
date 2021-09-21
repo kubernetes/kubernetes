@@ -72,7 +72,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"app": "go"},
 				},
 			},
-			expected: "service/foo exposed",
+			expected: "error: selector must be specified",
 			status:   200,
 		},
 		{

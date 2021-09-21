@@ -22,10 +22,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/cobra"
+	cobra "github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -247,6 +247,12 @@ func (o *ExposeServiceOptions) Validate() error {
 	if len(o.Selector) == 0 {
 		return fmt.Errorf("selector must be specified")
 	}
+	isHeadlessService := o.ClusterIP == "None"
+	if len(o.Ports) == 0 { 
+		if len(o.Port) == 0 && !isHeadlessService { 
+			return fmt.Errorf("'ports' or 'port' is a required parameter") 
+		} 
+	} 
 	return nil
 }
 
@@ -331,58 +337,16 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
 			codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
-			service, err = cmdutil.Merge(codec, service, inline)
+			service, err := cmdutil.Merge(codec, service, inline)
+			if err != nil {
+				return err
+			}
+			err = o.checkService(service, cmd)
 			if err != nil {
 				return err
 			}
 		}
-
-		if err := o.Recorder.Record(service); err != nil {
-			klog.V(4).Infof("error recording current command: %v", err)
-		}
-
-		if o.DryRunStrategy == cmdutil.DryRunClient {
-			if meta, err := meta.Accessor(service); err == nil && o.EnforceNamespace {
-				meta.SetNamespace(o.Namespace)
-			}
-			return o.PrintObj(service, o.Out)
-		}
-		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), service, scheme.DefaultJSONEncoder()); err != nil {
-			return err
-		}
-
-		asUnstructured := &unstructured.Unstructured{}
-		if err := scheme.Scheme.Convert(service, asUnstructured, nil); err != nil {
-			return err
-		}
-		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
-		if err != nil {
-			return err
-		}
-		objMapping, err := o.Mapper.RESTMapping(gvks[0].GroupKind(), gvks[0].Version)
-		if err != nil {
-			return err
-		}
-		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(objMapping.GroupVersionKind); err != nil {
-				return err
-			}
-		}
-		// Serialize the service with the annotation applied.
-		client, err := o.ClientForMapping(objMapping)
-		if err != nil {
-			return err
-		}
-		actualObject, err := resource.
-			NewHelper(client, objMapping).
-			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
-			WithFieldManager(o.fieldManager).
-			Create(o.Namespace, false, asUnstructured)
-		if err != nil {
-			return err
-		}
-
-		return o.PrintObj(actualObject, o.Out)
+		return nil
 	})
 	if err != nil {
 		return err
@@ -390,7 +354,56 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 	return nil
 }
 
-func (o *ExposeServiceOptions) createService() (*v1.Service, error) {
+func (o *ExposeServiceOptions) checkService(service runtime.Object, cmd *cobra.Command) error {
+	if err := o.Recorder.Record(service); err != nil {
+		klog.V(4).Infof("error recording current command: %v", err)
+	}
+
+	if o.DryRunStrategy == cmdutil.DryRunClient {
+		if meta, err := meta.Accessor(service); err == nil && o.EnforceNamespace {
+			meta.SetNamespace(o.Namespace)
+		}
+		return o.PrintObj(service, o.Out)
+	}
+	if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), service, scheme.DefaultJSONEncoder()); err != nil {
+		return err
+	}
+
+	asUnstructured := &unstructured.Unstructured{}
+	if err := scheme.Scheme.Convert(service, asUnstructured, nil); err != nil {
+		return err
+	}
+	gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
+	if err != nil {
+		return err
+	}
+	objMapping, err := o.Mapper.RESTMapping(gvks[0].GroupKind(), gvks[0].Version)
+	if err != nil {
+		return err
+	}
+	if o.DryRunStrategy == cmdutil.DryRunServer {
+		if err := o.DryRunVerifier.HasSupport(objMapping.GroupVersionKind); err != nil {
+			return err
+		}
+	}
+	// Serialize the service with the annotation applied.
+	client, err := o.ClientForMapping(objMapping)
+	if err != nil {
+		return err
+	}
+	actualObject, err := resource.
+		NewHelper(client, objMapping).
+		DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
+		WithFieldManager(o.fieldManager).
+		Create(o.Namespace, false, asUnstructured)
+	if err != nil {
+		return err
+	}
+
+	return o.PrintObj(actualObject, o.Out)
+}
+
+func (o *ExposeServiceOptions) createService() (*corev1.Service, error) {
 	selector, err := parseLabels(o.Selector)
 	if err != nil {
 		return nil, err
@@ -405,7 +418,7 @@ func (o *ExposeServiceOptions) createService() (*v1.Service, error) {
 	}
 
 	name := o.Name
-	ports := []v1.ServicePort{}
+	ports := []corev1.ServicePort{}
 	var portProtocolMap map[string]string
 	if len(o.Protocols) > 0 {
 		portProtocolMap, err = parseProtocols(o.Protocols)
@@ -442,20 +455,20 @@ func (o *ExposeServiceOptions) createService() (*v1.Service, error) {
 					o.Protocol = stillPortString
 				}
 			}
-			ports = append(ports, v1.ServicePort{
+			ports = append(ports, corev1.ServicePort{
 				Name:     name,
 				Port:     int32(port),
-				Protocol: v1.Protocol(o.Protocol),
+				Protocol: corev1.Protocol(o.Protocol),
 			})
 		}
 	}
 
-	service := v1.Service{
+	service := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
 			Labels: labels,
 		},
-		Spec: v1.ServiceSpec{
+		Spec: corev1.ServiceSpec{
 			Selector: selector,
 			Ports:    ports,
 		},
@@ -483,24 +496,24 @@ func (o *ExposeServiceOptions) createService() (*v1.Service, error) {
 		service.Spec.ExternalIPs = []string{o.ExternalIP}
 	}
 	if len(o.Type) != 0 {
-		service.Spec.Type = v1.ServiceType(o.Type)
+		service.Spec.Type = corev1.ServiceType(o.Type)
 	}
-	if service.Spec.Type == v1.ServiceTypeLoadBalancer {
+	if service.Spec.Type == corev1.ServiceTypeLoadBalancer {
 		service.Spec.LoadBalancerIP = o.LoadBalancerIP
 	}
 	if len(o.SessionAffinity) != 0 {
-		switch v1.ServiceAffinity(o.SessionAffinity) {
-		case v1.ServiceAffinityNone:
-			service.Spec.SessionAffinity = v1.ServiceAffinityNone
-		case v1.ServiceAffinityClientIP:
-			service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
+		switch corev1.ServiceAffinity(o.SessionAffinity) {
+		case corev1.ServiceAffinityNone:
+			service.Spec.SessionAffinity = corev1.ServiceAffinityNone
+		case corev1.ServiceAffinityClientIP:
+			service.Spec.SessionAffinity = corev1.ServiceAffinityClientIP
 		default:
 			return nil, fmt.Errorf("unknown session affinity: %s", o.SessionAffinity)
 		}
 	}
 	if len(o.ClusterIP) != 0 {
 		if o.ClusterIP == "None" {
-			service.Spec.ClusterIP = v1.ClusterIPNone
+			service.Spec.ClusterIP = corev1.ClusterIPNone
 		} else {
 			service.Spec.ClusterIP = o.ClusterIP
 		}
