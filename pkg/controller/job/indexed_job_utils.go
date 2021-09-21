@@ -338,10 +338,3 @@ func (bci byCompletionIndex) Swap(i, j int) {
 func (bci byCompletionIndex) Len() int {
 	return len(bci)
 }
-
-func completionModeStr(job *batch.Job) string {
-	if job.Spec.CompletionMode != nil {
-		return string(*job.Spec.CompletionMode)
-	}
-	return string(batch.NonIndexedCompletion)
-}
