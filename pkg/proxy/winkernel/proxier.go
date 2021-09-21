@@ -20,7 +20,6 @@ limitations under the License.
 package winkernel
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -431,7 +430,7 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 }
 
 func (ep *endpointsInfo) Cleanup() {
-	klog.V(3).InfoS("Endpoint cleanup", "spewConfig", spewSdump(ep))
+	klog.V(3).InfoS("Endpoint cleanup", "endpointsInfo", ep)
 	if !ep.GetIsLocal() && ep.refCount != nil {
 		*ep.refCount--
 
@@ -776,7 +775,7 @@ func CleanupLeftovers() (encounteredError bool) {
 }
 
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
-	klog.V(3).InfoS("Service cleanup", "spewConfig", spewSdump(svcInfo))
+	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
 	// Skip the svcInfo.policyApplied check to remove all the policies
 	svcInfo.deleteAllHnsLoadBalancerPolicy()
 	// Cleanup Endpoints references
@@ -818,9 +817,7 @@ func deleteAllHnsLoadBalancerPolicy() {
 		return
 	}
 	for _, plist := range plists {
-		if jsonString, err := json.Marshal(plist); err == nil {
-			klog.V(3).InfoS("Remove policy", "policyList", jsonString)
-		}
+		klog.V(3).InfoS("Remove policy", "policyList", plist)
 		_, err = plist.Delete()
 		if err != nil {
 			klog.ErrorS(err, "Failed to delete policy list")
@@ -1188,9 +1185,8 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Save the hnsId for reference
-			if jsonString, err := json.Marshal(plist); err == nil {
-				klog.V(1).InfoS("Hns endpoint resource", "endpointInfo", jsonString)
-			}
+			klog.V(1).InfoS("Hns endpoint resource", "endpointInfo", newHnsEndpoint)
+
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
 			if newHnsEndpoint.GetIsLocal() {
 				hnsLocalEndpoints = append(hnsLocalEndpoints, *newHnsEndpoint)
@@ -1202,7 +1198,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 			ep.hnsID = newHnsEndpoint.hnsID
 
-			klog.V(3).InfoS("Endpoint resource found", "spewConfig", spewSdump(ep))
+			klog.V(3).InfoS("Endpoint resource found", "endpointsInfo", ep)
 		}
 
 		klog.V(3).InfoS("Associated endpoints for service", "spewConfig", spewSdump(hnsEndpoints), "svcName", svcName.String())
