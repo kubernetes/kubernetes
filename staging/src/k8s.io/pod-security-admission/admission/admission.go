@@ -319,8 +319,8 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissio
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
 	}
-	nsPolicy, _ := a.PolicyToEvaluate(namespace.Labels)
-	if nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
+	if nsPolicyErr == nil && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
 		return sharedAllowedResponse()
 	}
 
@@ -350,7 +350,7 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissio
 			return sharedAllowedResponse()
 		}
 	}
-	return a.EvaluatePod(ctx, attrs.GetNamespace(), &pod.ObjectMeta, &pod.Spec, true)
+	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, &pod.ObjectMeta, &pod.Spec, true)
 }
 
 // ValidatePodController evaluates a pod controller create or update request against the effective policy for the namespace.
@@ -371,8 +371,8 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
 		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
 	}
-	nsPolicy, _ := a.PolicyToEvaluate(namespace.Labels)
-	if nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
+	if nsPolicyErr == nil && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
 		return sharedAllowedResponse()
 	}
 
@@ -390,29 +390,22 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
 		return sharedAllowedResponse()
 	}
-	return a.EvaluatePod(ctx, attrs.GetNamespace(), podMetadata, podSpec, false)
+	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, podMetadata, podSpec, false)
 }
 
-// EvaluatePod looks up the policy for the pods namespace, and checks it against the given pod(-like) object.
+// EvaluatePod evaluates the given policy against the given pod(-like) object.
 // The enforce policy is only checked if enforce=true.
 // The returned response may be shared between evaluations and must not be mutated.
-func (a *Admission) EvaluatePod(ctx context.Context, namespaceName string, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, enforce bool) *admissionv1.AdmissionResponse {
+func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
 		return sharedAllowedResponse()
 	}
 
-	namespace, err := a.NamespaceGetter.GetNamespace(ctx, namespaceName)
-	if err != nil {
-		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", namespaceName)
-		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", namespaceName))
-	}
-
 	auditAnnotations := map[string]string{}
-	nsPolicy, err := a.PolicyToEvaluate(namespace.Labels)
-	if err != nil {
-		klog.V(2).InfoS("failed to parse PodSecurity namespace labels", "err", err)
-		auditAnnotations["error"] = fmt.Sprintf("Failed to parse policy: %v", err)
+	if nsPolicyErr != nil {
+		klog.V(2).InfoS("failed to parse PodSecurity namespace labels", "err", nsPolicyErr)
+		auditAnnotations["error"] = fmt.Sprintf("Failed to parse policy: %v", nsPolicyErr)
 	}
 	// TODO: log nsPolicy evaluation with context (op, resource, namespace, name) for the request.
 
