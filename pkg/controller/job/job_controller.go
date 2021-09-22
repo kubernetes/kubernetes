@@ -900,6 +900,8 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 			uidsWithFinalizer.Insert(string(p.UID))
 		}
 	}
+	// Shallow copy, as it will only be used to detect changes in the counters.
+	oldCounters := job.Status
 	if cleanUncountedPodsWithoutFinalizers(&job.Status, uidsWithFinalizer) {
 		needsFlush = true
 	}
@@ -954,7 +956,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 		job.Status.CompletedIndexes = succeededIndexes.String()
 	}
 	var err error
-	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, uidsWithFinalizer, needsFlush); err != nil {
+	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, needsFlush); err != nil {
 		return err
 	}
 	if jm.enactJobFinished(job, finishedCond) {
@@ -964,6 +966,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 		if _, err := jm.updateStatusHandler(job); err != nil {
 			return fmt.Errorf("removing uncounted pods from status: %w", err)
 		}
+		recordJobPodFinished(job, oldCounters)
 	}
 	return nil
 }
@@ -977,12 +980,15 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 // 4. (if not all removals succeeded) flush Job status again.
 // Returns whether there are pending changes in the Job status that need to be
 // flushed in subsequent calls.
-func (jm *Controller) flushUncountedAndRemoveFinalizers(job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, needsFlush bool) (*batch.Job, bool, error) {
+func (jm *Controller) flushUncountedAndRemoveFinalizers(job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, oldCounters *batch.JobStatus, needsFlush bool) (*batch.Job, bool, error) {
 	var err error
 	if needsFlush {
 		if job, err = jm.updateStatusHandler(job); err != nil {
 			return job, needsFlush, fmt.Errorf("adding uncounted pods to status: %w", err)
 		}
+		recordJobPodFinished(job, *oldCounters)
+		// Shallow copy.
+		*oldCounters = job.Status
 		needsFlush = false
 	}
 	var rmErr error
@@ -1535,4 +1541,12 @@ func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditio
 		return append(list, *newCondition(cType, status, reason, message)), true
 	}
 	return list, false
+}
+
+func recordJobPodFinished(job *batch.Job, oldCounters batch.JobStatus) {
+	completionMode := completionModeStr(job)
+	diff := job.Status.Succeeded - oldCounters.Succeeded
+	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Succeeded).Add(float64(diff))
+	diff = job.Status.Failed - oldCounters.Failed
+	metrics.JobPodsFinished.WithLabelValues(completionMode, metrics.Failed).Add(float64(diff))
 }
