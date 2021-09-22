@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -357,7 +357,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	list, resourceVersion, err := store.WaitUntilFreshAndList(5, nil, nil)
+	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(5, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -367,13 +367,16 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	if len(list) != 3 {
 		t.Errorf("unexpected list returned: %#v", list)
 	}
+	if indexUsed != "" {
+		t.Errorf("Used index %q but expected none to be used", indexUsed)
+	}
 
 	// list by label index.
 	matchValues := []storage.MatchValue{
 		{IndexName: "l:label", Value: "value1"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -383,13 +386,16 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	if len(list) != 2 {
 		t.Errorf("unexpected list returned: %#v", list)
 	}
+	if indexUsed != "l:label" {
+		t.Errorf("Used index %q but expected %q", indexUsed, "l:label")
+	}
 
 	// list with spec.nodeName index.
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -399,12 +405,15 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	if len(list) != 1 {
 		t.Errorf("unexpected list returned: %#v", list)
 	}
+	if indexUsed != "f:spec.nodeName" {
+		t.Errorf("Used index %q but expected %q", indexUsed, "f:spec.nodeName")
+	}
 
 	// list with index not exists.
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
-	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -413,6 +422,9 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 	if len(list) != 3 {
 		t.Errorf("unexpected list returned: %#v", list)
+	}
+	if indexUsed != "" {
+		t.Errorf("Used index %q but expected none to be used", indexUsed)
 	}
 }
 
@@ -459,7 +471,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	_, _, err := store.WaitUntilFreshAndList(5, nil, nil)
+	_, _, _, err := store.WaitUntilFreshAndList(5, nil, nil)
 	if !errors.IsTimeout(err) {
 		t.Errorf("expected timeout error but got: %v", err)
 	}
@@ -484,7 +496,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	store := newTestWatchCache(5, &cache.Indexers{})
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(0, nil, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(0, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -507,7 +519,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(10, nil, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(10, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
