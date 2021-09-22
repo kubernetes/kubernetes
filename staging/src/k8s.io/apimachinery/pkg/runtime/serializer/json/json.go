@@ -162,7 +162,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		types, _, err := s.typer.ObjectKinds(into)
 		switch {
 		case runtime.IsNotRegisteredError(err), isUnstructured:
-			if err := kjson.UnmarshalCaseSensitivePreserveInts(data, into); err != nil {
+			if err := s.unmarshal(into, data, originalData); err != nil {
 				return nil, actual, err
 			}
 			return into, actual, nil
@@ -186,35 +186,10 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 		return nil, actual, err
 	}
 
-	// If the deserializer is non-strict, return here.
-	if !s.options.Strict {
-		if err := kjson.UnmarshalCaseSensitivePreserveInts(data, obj); err != nil {
-			return nil, actual, err
-		}
-		return obj, actual, nil
-	}
-
-	var allStrictErrs []error
-	if s.options.Yaml {
-		// In strict mode pass the original data through the YAMLToJSONStrict converter.
-		// This is done to catch duplicate fields in YAML that would have been dropped in the original YAMLToJSON conversion.
-		// TODO: rework YAMLToJSONStrict to return warnings about duplicate fields without terminating so we don't have to do this twice.
-		_, err := yaml.YAMLToJSONStrict(originalData)
-		if err != nil {
-			allStrictErrs = append(allStrictErrs, err)
-		}
-	}
-
-	strictJSONErrs, err := kjson.UnmarshalStrict(data, obj)
-	if err != nil {
-		// fatal decoding error, not due to strictness
+	if err := s.unmarshal(obj, data, originalData); err != nil {
 		return nil, actual, err
 	}
-	allStrictErrs = append(allStrictErrs, strictJSONErrs...)
-	if len(allStrictErrs) > 0 {
-		// return the successfully decoded object along with the strict errors
-		return obj, actual, runtime.NewStrictDecodingError(allStrictErrs)
-	}
+
 	return obj, actual, nil
 }
 
@@ -264,6 +239,40 @@ func (s *Serializer) RecognizesData(data []byte) (ok, unknown bool, err error) {
 		return false, true, nil
 	}
 	return utilyaml.IsJSONBuffer(data), false, nil
+}
+
+func (s *Serializer) unmarshal(into runtime.Object, data, originalData []byte) error {
+	// If the deserializer is non-strict, return here.
+	if !s.options.Strict {
+		if err := kjson.UnmarshalCaseSensitivePreserveInts(data, into); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	var allStrictErrs []error
+	if s.options.Yaml {
+		// In strict mode pass the original data through the YAMLToJSONStrict converter.
+		// This is done to catch duplicate fields in YAML that would have been dropped in the original YAMLToJSON conversion.
+		// TODO: rework YAMLToJSONStrict to return warnings about duplicate fields without terminating so we don't have to do this twice.
+		_, err := yaml.YAMLToJSONStrict(originalData)
+		if err != nil {
+			allStrictErrs = append(allStrictErrs, err)
+		}
+	}
+
+	strictJSONErrs, err := kjson.UnmarshalStrict(data, into)
+	if err != nil {
+		// fatal decoding error, not due to strictness
+		return err
+	}
+	allStrictErrs = append(allStrictErrs, strictJSONErrs...)
+	if len(allStrictErrs) > 0 {
+		// return the successfully decoded object along with the strict errors
+		return runtime.NewStrictDecodingError(allStrictErrs)
+	}
+
+	return nil
 }
 
 // Framer is the default JSON framing behavior, with newlines delimiting individual objects.
