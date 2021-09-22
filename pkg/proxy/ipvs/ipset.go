@@ -191,13 +191,13 @@ func ensureIPSet(set *IPSet) error {
 func checkMinVersion(vstring string) bool {
 	version, err := utilversion.ParseGeneric(vstring)
 	if err != nil {
-		klog.ErrorS(err, "Vstring is not a valid version string", "versionString", vstring)
+		klog.ErrorS(err, "Got invalid version string", "versionString", vstring)
 		return false
 	}
 
 	minVersion, err := utilversion.ParseGeneric(MinIPSetCheckVersion)
 	if err != nil {
-		klog.ErrorS(err, "MinCheckVersion is not a valid version string", "minCheckVersion", MinIPSetCheckVersion)
+		klog.ErrorS(err, "Got invalid version string", "versionString", MinIPSetCheckVersion)
 		return false
 	}
 	return !version.LessThan(minVersion)
