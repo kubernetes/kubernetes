@@ -229,8 +229,8 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			klog.Fatalf("error starting controllers: %v", err)
 		}
 
-		controllerContext.InformerFactory.Start(controllerContext.Stop)
-		controllerContext.ObjectOrMetadataInformerFactory.Start(controllerContext.Stop)
+		controllerContext.InformerFactory.Start(stopCh)
+		controllerContext.ObjectOrMetadataInformerFactory.Start(stopCh)
 		close(controllerContext.InformersStarted)
 
 		select {}
@@ -351,9 +351,6 @@ type ControllerContext struct {
 	// IncludeCloudLoops is for a kube-controller-manager running all loops
 	// ExternalLoops is for a kube-controller-manager running with a cloud-controller-manager
 	LoopMode ControllerLoopMode
-
-	// Stop is the stop channel
-	Stop <-chan struct{}
 
 	// InformersStarted is closed after all of the controllers have been initialized and are running.  After this point it is safe,
 	// for an individual controller to start the shared informers. Before it is closed, they should not.
@@ -535,7 +532,6 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 		AvailableResources:              availableResources,
 		Cloud:                           cloud,
 		LoopMode:                        loopMode,
-		Stop:                            stop,
 		InformersStarted:                make(chan struct{}),
 		ResyncPeriod:                    ResyncPeriod(s),
 	}
@@ -556,7 +552,7 @@ func StartControllers(ctx context.Context, controllerCtx ControllerContext, star
 	// Initialize the cloud provider with a reference to the clientBuilder only after token controller
 	// has started in case the cloud provider uses the client builder.
 	if controllerCtx.Cloud != nil {
-		controllerCtx.Cloud.Initialize(controllerCtx.ClientBuilder, controllerCtx.Stop)
+		controllerCtx.Cloud.Initialize(controllerCtx.ClientBuilder, ctx.Done())
 	}
 
 	var controllerChecks []healthz.HealthChecker
@@ -653,10 +649,10 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Tokens controller: %v", err)
 	}
-	go controller.Run(int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs), controllerContext.Stop)
+	go controller.Run(int(controllerContext.ComponentConfig.SAController.ConcurrentSATokenSyncs), ctx.Done())
 
 	// start the first set of informers now so that other controllers can start
-	controllerContext.InformerFactory.Start(controllerContext.Stop)
+	controllerContext.InformerFactory.Start(ctx.Done())
 
 	return nil, true, nil
 }

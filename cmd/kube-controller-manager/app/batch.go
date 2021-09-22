@@ -36,7 +36,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs), controllerContext.Stop)
+	).Run(int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs), ctx.Done())
 	return nil, true, nil
 }
 
@@ -49,7 +49,7 @@ func startCronJobController(ctx context.Context, controllerContext ControllerCon
 		if err != nil {
 			return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
 		}
-		go cj2c.Run(int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs), controllerContext.Stop)
+		go cj2c.Run(int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs), ctx.Done())
 		return nil, true, nil
 	}
 	cjc, err := cronjob.NewController(
@@ -58,6 +58,6 @@ func startCronJobController(ctx context.Context, controllerContext ControllerCon
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating CronJob controller: %v", err)
 	}
-	go cjc.Run(controllerContext.Stop)
+	go cjc.Run(ctx.Done())
 	return nil, true, nil
 }

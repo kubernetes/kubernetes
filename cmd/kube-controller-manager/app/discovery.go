@@ -37,7 +37,7 @@ func startEndpointSliceController(ctx context.Context, controllerContext Control
 		controllerContext.ComponentConfig.EndpointSliceController.MaxEndpointsPerSlice,
 		controllerContext.ClientBuilder.ClientOrDie("endpointslice-controller"),
 		controllerContext.ComponentConfig.EndpointSliceController.EndpointUpdatesBatchPeriod.Duration,
-	).Run(int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs), controllerContext.Stop)
+	).Run(int(controllerContext.ComponentConfig.EndpointSliceController.ConcurrentServiceEndpointSyncs), ctx.Done())
 	return nil, true, nil
 }
 
@@ -49,6 +49,6 @@ func startEndpointSliceMirroringController(ctx context.Context, controllerContex
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringMaxEndpointsPerSubset,
 		controllerContext.ClientBuilder.ClientOrDie("endpointslicemirroring-controller"),
 		controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringEndpointUpdatesBatchPeriod.Duration,
-	).Run(int(controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringConcurrentServiceEndpointSyncs), controllerContext.Stop)
+	).Run(int(controllerContext.ComponentConfig.EndpointSliceMirroringController.MirroringConcurrentServiceEndpointSyncs), ctx.Done())
 	return nil, true, nil
 }

@@ -92,7 +92,7 @@ func startServiceController(ctx context.Context, controllerContext ControllerCon
 		klog.Errorf("Failed to start service controller: %v", err)
 		return nil, false, nil
 	}
-	go serviceController.Run(controllerContext.Stop, int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
+	go serviceController.Run(ctx.Done(), int(controllerContext.ComponentConfig.ServiceController.ConcurrentServiceSyncs))
 	return nil, true, nil
 }
 
@@ -168,7 +168,7 @@ func startNodeIpamController(ctx context.Context, controllerContext ControllerCo
 	if err != nil {
 		return nil, true, err
 	}
-	go nodeIpamController.Run(controllerContext.Stop)
+	go nodeIpamController.Run(ctx.Done())
 	return nil, true, nil
 }
 
@@ -193,7 +193,7 @@ func startNodeLifecycleController(ctx context.Context, controllerContext Control
 	if err != nil {
 		return nil, true, err
 	}
-	go lifecycleController.Run(controllerContext.Stop)
+	go lifecycleController.Run(ctx.Done())
 	return nil, true, nil
 }
 
@@ -212,7 +212,7 @@ func startCloudNodeLifecycleController(ctx context.Context, controllerContext Co
 		return nil, false, nil
 	}
 
-	go cloudNodeLifecycleController.Run(controllerContext.Stop)
+	go cloudNodeLifecycleController.Run(ctx.Done())
 	return nil, true, nil
 }
 
@@ -252,7 +252,7 @@ func startRouteController(ctx context.Context, controllerContext ControllerConte
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ComponentConfig.KubeCloudShared.ClusterName,
 		clusterCIDRs)
-	go routeController.Run(controllerContext.Stop, controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
+	go routeController.Run(ctx.Done(), controllerContext.ComponentConfig.KubeCloudShared.RouteReconciliationPeriod.Duration)
 	return nil, true, nil
 }
 
@@ -285,17 +285,17 @@ func startPersistentVolumeBinderController(ctx context.Context, controllerContex
 	if volumeControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to construct persistentvolume controller: %v", volumeControllerErr)
 	}
-	go volumeController.Run(controllerContext.Stop)
+	go volumeController.Run(ctx.Done())
 	return nil, true, nil
 }
 
-func startAttachDetachController(_ context.Context, ctx ControllerContext) (controller.Interface, bool, error) {
-	if ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
+func startAttachDetachController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
+	if controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration < time.Second {
 		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 
-	csiNodeInformer := ctx.InformerFactory.Storage().V1().CSINodes()
-	csiDriverInformer := ctx.InformerFactory.Storage().V1().CSIDrivers()
+	csiNodeInformer := controllerContext.InformerFactory.Storage().V1().CSINodes()
+	csiDriverInformer := controllerContext.InformerFactory.Storage().V1().CSIDrivers()
 
 	plugins, err := ProbeAttachableVolumePlugins()
 	if err != nil {
@@ -303,34 +303,34 @@ func startAttachDetachController(_ context.Context, ctx ControllerContext) (cont
 	}
 
 	filteredDialOptions, err := options.ParseVolumeHostFilters(
-		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
-		ctx.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
+		controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostCIDRDenylist,
+		controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeHostAllowLocalLoopback)
 	if err != nil {
 		return nil, true, err
 	}
 
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
-			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
-			ctx.InformerFactory.Core().V1().Pods(),
-			ctx.InformerFactory.Core().V1().Nodes(),
-			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
-			ctx.InformerFactory.Core().V1().PersistentVolumes(),
+			controllerContext.ClientBuilder.ClientOrDie("attachdetach-controller"),
+			controllerContext.InformerFactory.Core().V1().Pods(),
+			controllerContext.InformerFactory.Core().V1().Nodes(),
+			controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
+			controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 			csiNodeInformer,
 			csiDriverInformer,
-			ctx.InformerFactory.Storage().V1().VolumeAttachments(),
-			ctx.Cloud,
+			controllerContext.InformerFactory.Storage().V1().VolumeAttachments(),
+			controllerContext.Cloud,
 			plugins,
-			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
-			ctx.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
-			ctx.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
+			GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+			controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
+			controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 			attachdetach.DefaultTimerConfig,
 			filteredDialOptions,
 		)
 	if attachDetachControllerErr != nil {
 		return nil, true, fmt.Errorf("failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
-	go attachDetachController.Run(ctx.Stop)
+	go attachDetachController.Run(ctx.Done())
 	return nil, true, nil
 }
 
@@ -361,7 +361,7 @@ func startVolumeExpandController(ctx context.Context, controllerContext Controll
 		if expandControllerErr != nil {
 			return nil, true, fmt.Errorf("failed to start volume expand controller: %v", expandControllerErr)
 		}
-		go expandController.Run(controllerContext.Stop)
+		go expandController.Run(ctx.Done())
 		return nil, true, nil
 	}
 	return nil, false, nil
@@ -376,7 +376,7 @@ func startEphemeralVolumeController(ctx context.Context, controllerContext Contr
 		if err != nil {
 			return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
 		}
-		go ephemeralController.Run(int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs), controllerContext.Stop)
+		go ephemeralController.Run(int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs), ctx.Done())
 		return nil, true, nil
 	}
 	return nil, false, nil
@@ -389,7 +389,7 @@ func startEndpointController(ctx context.Context, controllerCtx ControllerContex
 		controllerCtx.InformerFactory.Core().V1().Endpoints(),
 		controllerCtx.ClientBuilder.ClientOrDie("endpoint-controller"),
 		controllerCtx.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
-	).Run(int(controllerCtx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), controllerCtx.Stop)
+	).Run(int(controllerCtx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), ctx.Done())
 	return nil, true, nil
 }
 
@@ -399,7 +399,7 @@ func startReplicationController(ctx context.Context, controllerContext Controlle
 		controllerContext.InformerFactory.Core().V1().ReplicationControllers(),
 		controllerContext.ClientBuilder.ClientOrDie("replication-controller"),
 		replicationcontroller.BurstReplicas,
-	).Run(int(controllerContext.ComponentConfig.ReplicationController.ConcurrentRCSyncs), controllerContext.Stop)
+	).Run(int(controllerContext.ComponentConfig.ReplicationController.ConcurrentRCSyncs), ctx.Done())
 	return nil, true, nil
 }
 
@@ -409,7 +409,7 @@ func startPodGCController(ctx context.Context, controllerContext ControllerConte
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		int(controllerContext.ComponentConfig.PodGCController.TerminatedPodGCThreshold),
-	).Run(controllerContext.Stop)
+	).Run(ctx.Done())
 	return nil, true, nil
 }
 
@@ -441,10 +441,10 @@ func startResourceQuotaController(ctx context.Context, controllerContext Control
 	if err != nil {
 		return nil, false, err
 	}
-	go resourceQuotaController.Run(int(controllerContext.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), controllerContext.Stop)
+	go resourceQuotaController.Run(int(controllerContext.ComponentConfig.ResourceQuotaController.ConcurrentResourceQuotaSyncs), ctx.Done())
 
 	// Periodically the quota controller to detect new resource types
-	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, controllerContext.Stop)
+	go resourceQuotaController.Sync(discoveryFunc, 30*time.Second, ctx.Done())
 
 	return nil, true, nil
 }
@@ -457,10 +457,10 @@ func startNamespaceController(ctx context.Context, controllerContext ControllerC
 	nsKubeconfig.QPS *= 20
 	nsKubeconfig.Burst *= 100
 	namespaceKubeClient := clientset.NewForConfigOrDie(nsKubeconfig)
-	return startModifiedNamespaceController(controllerContext, namespaceKubeClient, nsKubeconfig)
+	return startModifiedNamespaceController(ctx, controllerContext, namespaceKubeClient, nsKubeconfig)
 }
 
-func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (controller.Interface, bool, error) {
+func startModifiedNamespaceController(ctx context.Context, controllerContext ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (controller.Interface, bool, error) {
 
 	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
@@ -473,11 +473,11 @@ func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient
 		namespaceKubeClient,
 		metadataClient,
 		discoverResourcesFn,
-		ctx.InformerFactory.Core().V1().Namespaces(),
-		ctx.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
+		controllerContext.InformerFactory.Core().V1().Namespaces(),
+		controllerContext.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
 		v1.FinalizerKubernetes,
 	)
-	go namespaceController.Run(int(ctx.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs), ctx.Stop)
+	go namespaceController.Run(int(controllerContext.ComponentConfig.NamespaceController.ConcurrentNamespaceSyncs), ctx.Done())
 
 	return nil, true, nil
 }
@@ -492,7 +492,7 @@ func startServiceAccountController(ctx context.Context, controllerContext Contro
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating ServiceAccount controller: %v", err)
 	}
-	go sac.Run(1, controllerContext.Stop)
+	go sac.Run(1, ctx.Done())
 	return nil, true, nil
 }
 
@@ -500,7 +500,7 @@ func startTTLController(ctx context.Context, controllerContext ControllerContext
 	go ttlcontroller.NewTTLController(
 		controllerContext.InformerFactory.Core().V1().Nodes(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-controller"),
-	).Run(5, controllerContext.Stop)
+	).Run(5, ctx.Done())
 	return nil, true, nil
 }
 
@@ -539,11 +539,11 @@ func startGarbageCollectorController(ctx context.Context, controllerContext Cont
 
 	// Start the garbage collector.
 	workers := int(controllerContext.ComponentConfig.GarbageCollectorController.ConcurrentGCSyncs)
-	go garbageCollector.Run(workers, controllerContext.Stop)
+	go garbageCollector.Run(workers, ctx.Done())
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
-	go garbageCollector.Sync(discoveryClient, 30*time.Second, controllerContext.Stop)
+	go garbageCollector.Sync(discoveryClient, 30*time.Second, ctx.Done())
 
 	return garbageCollector, true, nil
 }
@@ -559,7 +559,7 @@ func startPVCProtectionController(ctx context.Context, controllerContext Control
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
 	}
-	go pvcProtectionController.Run(1, controllerContext.Stop)
+	go pvcProtectionController.Run(1, ctx.Done())
 	return nil, true, nil
 }
 
@@ -568,7 +568,7 @@ func startPVProtectionController(ctx context.Context, controllerContext Controll
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		controllerContext.ClientBuilder.ClientOrDie("pv-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
-	).Run(1, controllerContext.Stop)
+	).Run(1, ctx.Done())
 	return nil, true, nil
 }
 
@@ -579,7 +579,7 @@ func startTTLAfterFinishedController(ctx context.Context, controllerContext Cont
 	go ttlafterfinished.New(
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
-	).Run(int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), controllerContext.Stop)
+	).Run(int(controllerContext.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Done())
 	return nil, true, nil
 }
 
@@ -681,6 +681,6 @@ func startStorageVersionGCController(ctx context.Context, controllerContext Cont
 		controllerContext.ClientBuilder.ClientOrDie("storage-version-garbage-collector"),
 		controllerContext.InformerFactory.Coordination().V1().Leases(),
 		controllerContext.InformerFactory.Internal().V1alpha1().StorageVersions(),
-	).Run(controllerContext.Stop)
+	).Run(ctx.Done())
 	return nil, true, nil
 }
