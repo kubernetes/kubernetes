@@ -17,6 +17,7 @@ limitations under the License.
 package benchmark
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -173,8 +174,11 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 		}
 		destFile = path.Join(*dataItemsDir, destFile)
 	}
-
-	return ioutil.WriteFile(destFile, b, 0644)
+	formatted := &bytes.Buffer{}
+	if err := json.Indent(formatted, b, "", "  "); err != nil {
+		return fmt.Errorf("indenting error: %v", err)
+	}
+	return ioutil.WriteFile(destFile, formatted.Bytes(), 0644)
 }
 
 type labelValues struct {
