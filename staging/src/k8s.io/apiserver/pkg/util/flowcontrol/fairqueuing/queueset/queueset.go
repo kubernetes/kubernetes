@@ -125,6 +125,9 @@ type queueSet struct {
 	// totSeatsInUse is the number of total "seats" in use by all the
 	// request(s) that are currently executing in this queueset.
 	totSeatsInUse int
+
+	// enqueues is the number of requests that have ever been enqueued
+	enqueues int
 }
 
 // NewQueueSetFactory creates a new QueueSetFactory object
@@ -213,8 +216,8 @@ func (qs *queueSet) setConfiguration(qCfg fq.QueuingConfig, dealer *shuffleshard
 
 	if qCfg.DesiredNumQueues > 0 {
 		// Adding queues is the only thing that requires immediate action
-		// Removing queues is handled by omitting indexes >DesiredNum from
-		// chooseQueueIndexLocked
+		// Removing queues is handled by attrition, removing a queue when
+		// it goes empty and there are too many.
 		numQueues := len(qs.queues)
 		if qCfg.DesiredNumQueues > numQueues {
 			qs.queues = append(qs.queues,
@@ -439,13 +442,15 @@ func (qs *queueSet) getVirtualTimeRatioLocked() float64 {
 // the queuelengthlimit has been reached
 func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Context, workEstimate *fqrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) *request {
 	// Start with the shuffle sharding, to pick a queue.
-	queueIdx := qs.chooseQueueIndexLocked(hashValue, descr1, descr2)
+	queueIdx := qs.shuffleShardLocked(hashValue, descr1, descr2)
 	queue := qs.queues[queueIdx]
 	// The next step is the logic to reject requests that have been waiting too long
 	qs.removeTimedOutRequestsFromQueueLocked(queue, fsName)
 	// NOTE: currently timeout is only checked for each new request.  This means that there can be
 	// requests that are in the queue longer than the timeout if there are no new requests
 	// We prefer the simplicity over the promptness, at least for now.
+
+	defer qs.boundNextDispatch(queue)
 
 	// Create a request and enqueue
 	req := &request{
@@ -455,6 +460,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 		ctx:               ctx,
 		decision:          qs.promiseFactory(nil, ctx.Done(), decisionCancel),
 		arrivalTime:       qs.clock.Now(),
+		arrivalR:          qs.virtualTime,
 		queue:             queue,
 		descr1:            descr1,
 		descr2:            descr2,
@@ -468,26 +474,37 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 	return req
 }
 
-// chooseQueueIndexLocked uses shuffle sharding to select a queue index
+// shuffleShardLocked uses shuffle sharding to select a queue index
 // using the given hashValue and the shuffle sharding parameters of the queueSet.
-func (qs *queueSet) chooseQueueIndexLocked(hashValue uint64, descr1, descr2 interface{}) int {
+func (qs *queueSet) shuffleShardLocked(hashValue uint64, descr1, descr2 interface{}) int {
+	var backHand [8]int
+	// Deal into a data structure, so that the order of visit below is not necessarily the order of the deal.
+	// This removes bias in the case of flows with overlapping hands.
+	hand := qs.dealer.DealIntoHand(hashValue, backHand[:])
+	handSize := len(hand)
+	offset := qs.enqueues % handSize
+	qs.enqueues++
 	bestQueueIdx := -1
 	bestQueueSeatsSum := int(math.MaxInt32)
-	// the dealer uses the current desired number of queues, which is no larger than the number in `qs.queues`.
-	qs.dealer.Deal(hashValue, func(queueIdx int) {
+	for i := 0; i < handSize; i++ {
+		queueIdx := hand[(offset+i)%handSize]
+		queue := qs.queues[queueIdx]
+		waitingSeats := queue.requests.SeatsSum()
 		// TODO: Consider taking into account `additional latency` of requests
 		// in addition to their seats.
 		// Ideally, this should be based on projected completion time in the
 		// virtual world of the youngest request in the queue.
-		queue := qs.queues[queueIdx]
-		waitingSeats := queue.requests.SeatsSum()
-		thisSeatsSum := waitingSeats // + queue.seatsInUse
-		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of %d seats waiting and %d executing", qs.qCfg.Name, descr1, descr2, queueIdx, waitingSeats, queue.seatsInUse)
+		thisSeatsSum := waitingSeats + queue.seatsInUse
+		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d of %d seats waiting and %d executing, virtualStart=%vss", qs.qCfg.Name, descr1, descr2, queueIdx, waitingSeats, queue.seatsInUse, queue.virtualStart)
 		if thisSeatsSum < bestQueueSeatsSum {
 			bestQueueIdx, bestQueueSeatsSum = queueIdx, thisSeatsSum
 		}
-	})
-	klog.V(6).Infof("QS(%s) at r=%s v=%.9fss: For request %#+v %#+v chose queue %d, had seatSum %d & %d requests executing", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, bestQueueSeatsSum, qs.queues[bestQueueIdx].requestsExecuting)
+
+	}
+	if klog.V(6).Enabled() {
+		chosenQueue := qs.queues[bestQueueIdx]
+		klog.V(6).Infof("QS(%s) at r=%s v=%.9fss: For request %#+v %#+v chose queue %d, had seatSum %d & %d requests executing & virtualStart=%vss", qs.qCfg.Name, qs.clock.Now().Format(nsTimeFmt), qs.virtualTime, descr1, descr2, bestQueueIdx, chosenQueue.requests.SeatsSum(), chosenQueue.requestsExecuting, chosenQueue.virtualStart)
+	}
 	return bestQueueIdx
 }
 
@@ -592,6 +609,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 		startTime:         now,
 		decision:          qs.promiseFactory(decisionExecute, ctx.Done(), decisionCancel),
 		arrivalTime:       now,
+		arrivalR:          qs.virtualTime,
 		descr1:            descr1,
 		descr2:            descr2,
 		workEstimate:      *workEstimate,
@@ -612,7 +630,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 // return value indicates whether a request was dispatched; this will
 // be false when there are no requests waiting in any queue.
 func (qs *queueSet) dispatchLocked() bool {
-	queue := qs.selectQueueLocked()
+	queue := qs.findDispatchQueueLocked()
 	if queue == nil {
 		return false
 	}
@@ -644,6 +662,7 @@ func (qs *queueSet) dispatchLocked() bool {
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G * width
 	queue.virtualStart += qs.estimatedServiceSeconds * float64(request.Seats())
+	qs.boundNextDispatch(queue)
 	request.decision.Set(decisionExecute)
 	return ok
 }
@@ -671,10 +690,10 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 	return true
 }
 
-// selectQueueLocked examines the queues in round robin order and
+// findDispatchQueueLocked examines the queues in round robin order and
 // returns the first one of those for which the virtual finish time of
 // the oldest waiting request is minimal.
-func (qs *queueSet) selectQueueLocked() *queue {
+func (qs *queueSet) findDispatchQueueLocked() *queue {
 	minVirtualFinish := math.Inf(1)
 	sMin := math.Inf(1)
 	dsMin := math.Inf(1)
@@ -723,22 +742,9 @@ func (qs *queueSet) selectQueueLocked() *queue {
 	// for the next round.  This way the non-selected queues
 	// win in the case that the virtual finish times are the same
 	qs.robinIndex = minIndex
-	// according to the original FQ formula:
-	//
-	//   Si = MAX(R(t), Fi-1)
-	//
-	// the virtual start (excluding the estimated cost) of the chose
-	// queue should always be greater or equal to the global virtual
-	// time.
-	//
-	// hence we're refreshing the per-queue virtual time for the chosen
-	// queue here. if the last start R (excluded estimated cost)
-	// falls behind the global virtual time, we update the latest virtual
-	// start by: <latest global virtual time> + <previously estimated cost>
-	previouslyEstimatedServiceTime := float64(minQueue.seatsInUse) * qs.estimatedServiceSeconds
-	if qs.virtualTime > minQueue.virtualStart-previouslyEstimatedServiceTime {
-		// per-queue virtual time should not fall behind the global
-		minQueue.virtualStart = qs.virtualTime + previouslyEstimatedServiceTime
+
+	if minQueue.virtualStart < oldestReqFromMinQueue.arrivalR {
+		klog.ErrorS(errors.New("dispatch before arrival"), "Inconceivable!", "QS", qs.qCfg.Name, "queue", minQueue.index, "dispatchR", minQueue.virtualStart, "request", oldestReqFromMinQueue)
 	}
 	metrics.SetDispatchMetrics(qs.qCfg.Name, qs.virtualTime, minQueue.virtualStart, sMin, sMax, dsMin, dsMax)
 	return minQueue
@@ -834,6 +840,28 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		// When a request finishes being served, and the actual service time was S,
 		// the queue’s start R is decremented by (G - S)*width.
 		r.queue.virtualStart -= (qs.estimatedServiceSeconds - S) * float64(r.Seats())
+		qs.boundNextDispatch(r.queue)
+	}
+}
+
+// boundNextDispatch applies the anti-windup hack.
+// We need a hack because all non-empty queues are allocated the same
+// number of seats.  A queue that can not use all those seats and does
+// not go empty accumulates a progresively earlier `virtualStart` compared
+// to queues that are using more than they are allocated.
+// The following hack addresses the first side of that inequity,
+// by insisting that dispatch in the virtual world not precede arrival.
+func (qs *queueSet) boundNextDispatch(queue *queue) {
+	oldestReqFromMinQueue, _ := queue.requests.Peek()
+	if oldestReqFromMinQueue == nil {
+		return
+	}
+	var virtualStartBound = oldestReqFromMinQueue.arrivalR
+	if queue.virtualStart < virtualStartBound {
+		if klog.V(4).Enabled() {
+			klog.InfoS("AntiWindup tweaked queue", "QS", qs.qCfg.Name, "queue", queue.index, "time", qs.clock.Now().Format(nsTimeFmt), "requestDescr1", oldestReqFromMinQueue.descr1, "requestDescr2", oldestReqFromMinQueue.descr2, "newVirtualStart", virtualStartBound, "deltaVirtualStart", (virtualStartBound - queue.virtualStart))
+		}
+		queue.virtualStart = virtualStartBound
 	}
 }
 
