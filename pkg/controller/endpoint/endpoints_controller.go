@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
@@ -493,77 +494,85 @@ func (e *Controller) syncService(key string) error {
 	}
 	subsets = endpoints.RepackSubsets(subsets)
 
-	// See if there's actually an update here.
-	currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			currentEndpoints = &v1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   service.Name,
-					Labels: service.Labels,
-				},
+	var createEndpoints bool
+	var newEndpoints *v1.Endpoints
+
+	// Retry on conflict
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		// See if there's actually an update here.
+		currentEndpoints, err := e.endpointsLister.Endpoints(service.Namespace).Get(service.Name)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				currentEndpoints = &v1.Endpoints{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   service.Name,
+						Labels: service.Labels,
+					},
+				}
+			} else {
+				return err
 			}
-		} else {
-			return err
 		}
-	}
 
-	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
+		createEndpoints = len(currentEndpoints.ResourceVersion) == 0
 
-	// Compare the sorted subsets and labels
-	// Remove the HeadlessService label from the endpoints if it exists,
-	// as this won't be set on the service itself
-	// and will cause a false negative in this diff check.
-	// But first check if it has that label to avoid expensive copies.
-	compareLabels := currentEndpoints.Labels
-	if _, ok := currentEndpoints.Labels[v1.IsHeadlessService]; ok {
-		compareLabels = utillabels.CloneAndRemoveLabel(currentEndpoints.Labels, v1.IsHeadlessService)
-	}
-	if !createEndpoints &&
-		apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
-		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
-		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
-		klog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
-		return nil
-	}
-	newEndpoints := currentEndpoints.DeepCopy()
-	newEndpoints.Subsets = subsets
-	newEndpoints.Labels = service.Labels
-	if newEndpoints.Annotations == nil {
-		newEndpoints.Annotations = make(map[string]string)
-	}
+		// Compare the sorted subsets and labels
+		// Remove the HeadlessService label from the endpoints if it exists,
+		// as this won't be set on the service itself
+		// and will cause a false negative in this diff check.
+		// But first check if it has that label to avoid expensive copies.
+		compareLabels := currentEndpoints.Labels
+		if _, ok := currentEndpoints.Labels[v1.IsHeadlessService]; ok {
+			compareLabels = utillabels.CloneAndRemoveLabel(currentEndpoints.Labels, v1.IsHeadlessService)
+		}
+		if !createEndpoints &&
+			apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
+			apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
+			capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
+			klog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+			return nil
+		}
+		newEndpoints = currentEndpoints.DeepCopy()
+		newEndpoints.Subsets = subsets
+		newEndpoints.Labels = service.Labels
+		if newEndpoints.Annotations == nil {
+			newEndpoints.Annotations = make(map[string]string)
+		}
 
-	if !endpointsLastChangeTriggerTime.IsZero() {
-		newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
-			endpointsLastChangeTriggerTime.UTC().Format(time.RFC3339Nano)
-	} else { // No new trigger time, clear the annotation.
-		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
-	}
+		if !endpointsLastChangeTriggerTime.IsZero() {
+			newEndpoints.Annotations[v1.EndpointsLastChangeTriggerTime] =
+				endpointsLastChangeTriggerTime.UTC().Format(time.RFC3339Nano)
+		} else { // No new trigger time, clear the annotation.
+			delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
+		}
 
-	if truncateEndpoints(newEndpoints) {
-		newEndpoints.Annotations[v1.EndpointsOverCapacity] = truncated
-	} else {
-		delete(newEndpoints.Annotations, v1.EndpointsOverCapacity)
-	}
+		if truncateEndpoints(newEndpoints) {
+			newEndpoints.Annotations[v1.EndpointsOverCapacity] = truncated
+		} else {
+			delete(newEndpoints.Annotations, v1.EndpointsOverCapacity)
+		}
 
-	if newEndpoints.Labels == nil {
-		newEndpoints.Labels = make(map[string]string)
-	}
+		if newEndpoints.Labels == nil {
+			newEndpoints.Labels = make(map[string]string)
+		}
 
-	if !helper.IsServiceIPSet(service) {
-		newEndpoints.Labels = utillabels.CloneAndAddLabel(newEndpoints.Labels, v1.IsHeadlessService, "")
-	} else {
-		newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
-	}
+		if !helper.IsServiceIPSet(service) {
+			newEndpoints.Labels = utillabels.CloneAndAddLabel(newEndpoints.Labels, v1.IsHeadlessService, "")
+		} else {
+			newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
+		}
 
-	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
-	if createEndpoints {
-		// No previous endpoints, create them
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{})
-	} else {
-		// Pre-existing
-		_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(context.TODO(), newEndpoints, metav1.UpdateOptions{})
-	}
+		klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
+		if createEndpoints {
+			// No previous endpoints, create them
+			_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{})
+		} else {
+			// Pre-existing
+			_, err = e.client.CoreV1().Endpoints(service.Namespace).Update(context.TODO(), newEndpoints, metav1.UpdateOptions{})
+		}
+		return err
+	})
+
 	if err != nil {
 		if createEndpoints && errors.IsForbidden(err) {
 			// A request is forbidden primarily for two reasons:
