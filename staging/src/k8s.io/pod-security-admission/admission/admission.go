@@ -188,14 +188,20 @@ func (a *Admission) ValidateConfiguration() error {
 	return nil
 }
 
+var (
+	namespacesResource = corev1.Resource("namespaces")
+	podsResource       = corev1.Resource("pods")
+)
+
 // Validate admits an API request.
 // The objects in admission attributes are expected to be external v1 objects that we care about.
+// The returned response may be shared and must not be mutated.
 func (a *Admission) Validate(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
 	var response *admissionv1.AdmissionResponse
 	switch attrs.GetResource().GroupResource() {
-	case corev1.Resource("namespaces"):
+	case namespacesResource:
 		response = a.ValidateNamespace(ctx, attrs)
-	case corev1.Resource("pods"):
+	case podsResource:
 		response = a.ValidatePod(ctx, attrs)
 	default:
 		response = a.ValidatePodController(ctx, attrs)
@@ -206,10 +212,13 @@ func (a *Admission) Validate(ctx context.Context, attrs Attributes) *admissionv1
 	return response
 }
 
+// ValidateNamespace evaluates a namespace create or update request to ensure the pod security labels are valid,
+// and checks existing pods in the namespace for violations of the new policy when updating the enforce level on a namespace.
+// The returned response may be shared between evaluations and must not be mutated.
 func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
-		return allowedResponse()
+		return sharedAllowedResponse()
 	}
 	obj, err := attrs.GetObject()
 	if err != nil {
@@ -230,7 +239,7 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) *ad
 		if newErr != nil {
 			return invalidResponse(newErr.Error())
 		}
-		return allowedResponse()
+		return sharedAllowedResponse()
 
 	case admissionv1.Update:
 		// if update, check if policy labels changed
@@ -257,24 +266,24 @@ func (a *Admission) ValidateNamespace(ctx context.Context, attrs Attributes) *ad
 		// * if the new enforce is the same version and level was relaxed
 		// * for exempt namespaces
 		if newPolicy.Enforce == oldPolicy.Enforce {
-			return allowedResponse()
+			return sharedAllowedResponse()
 		}
 		if newPolicy.Enforce.Level == api.LevelPrivileged {
-			return allowedResponse()
+			return sharedAllowedResponse()
 		}
 		if newPolicy.Enforce.Version == oldPolicy.Enforce.Version &&
 			api.CompareLevels(newPolicy.Enforce.Level, oldPolicy.Enforce.Level) < 1 {
-			return allowedResponse()
+			return sharedAllowedResponse()
 		}
 		if a.exemptNamespace(attrs.GetNamespace()) {
-			return allowedResponse()
+			return sharedAllowedResponse()
 		}
 		response := allowedResponse()
 		response.Warnings = a.EvaluatePodsInNamespace(ctx, namespace.Name, newPolicy.Enforce)
 		return response
 
 	default:
-		return allowedResponse()
+		return sharedAllowedResponse()
 	}
 }
 
@@ -292,14 +301,27 @@ var ignoredPodSubresources = map[string]bool{
 	"status":      true,
 }
 
+// ValidatePod evaluates a pod create or update request against the effective policy for the namespace.
+// The returned response may be shared between evaluations and must not be mutated.
 func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on ignored subresources
 	if ignoredPodSubresources[attrs.GetSubresource()] {
-		return allowedResponse()
+		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
-		return allowedResponse()
+		return sharedAllowedResponse()
+	}
+
+	// short-circuit on privileged enforce+audit+warn namespaces
+	namespace, err := a.NamespaceGetter.GetNamespace(ctx, attrs.GetNamespace())
+	if err != nil {
+		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
+		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+	}
+	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
+	if nsPolicyErr == nil && nsPolicy.Enforce.Level == api.LevelPrivileged && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+		return sharedAllowedResponse()
 	}
 
 	obj, err := attrs.GetObject()
@@ -325,20 +347,33 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs Attributes) *admissio
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
-			return allowedResponse()
+			return sharedAllowedResponse()
 		}
 	}
-	return a.EvaluatePod(ctx, attrs.GetNamespace(), &pod.ObjectMeta, &pod.Spec, true)
+	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, &pod.ObjectMeta, &pod.Spec, true)
 }
 
+// ValidatePodController evaluates a pod controller create or update request against the effective policy for the namespace.
+// The returned response may be shared between evaluations and must not be mutated.
 func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
-		return allowedResponse()
+		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
-		return allowedResponse()
+		return sharedAllowedResponse()
+	}
+
+	// short-circuit on privileged audit+warn namespaces
+	namespace, err := a.NamespaceGetter.GetNamespace(ctx, attrs.GetNamespace())
+	if err != nil {
+		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", attrs.GetNamespace())
+		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", attrs.GetNamespace()))
+	}
+	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
+	if nsPolicyErr == nil && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+		return sharedAllowedResponse()
 	}
 
 	obj, err := attrs.GetObject()
@@ -353,30 +388,24 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs Attributes)
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
-		return allowedResponse()
+		return sharedAllowedResponse()
 	}
-	return a.EvaluatePod(ctx, attrs.GetNamespace(), podMetadata, podSpec, false)
+	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, podMetadata, podSpec, false)
 }
 
-// EvaluatePod looks up the policy for the pods namespace, and checks it against the given pod(-like) object.
+// EvaluatePod evaluates the given policy against the given pod(-like) object.
 // The enforce policy is only checked if enforce=true.
-func (a *Admission) EvaluatePod(ctx context.Context, namespaceName string, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, enforce bool) *admissionv1.AdmissionResponse {
+// The returned response may be shared between evaluations and must not be mutated.
+func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
-		return allowedResponse()
-	}
-
-	namespace, err := a.NamespaceGetter.GetNamespace(ctx, namespaceName)
-	if err != nil {
-		klog.ErrorS(err, "failed to fetch pod namespace", "namespace", namespaceName)
-		return internalErrorResponse(fmt.Sprintf("failed to lookup namespace %s", namespaceName))
+		return sharedAllowedResponse()
 	}
 
 	auditAnnotations := map[string]string{}
-	nsPolicy, err := a.PolicyToEvaluate(namespace.Labels)
-	if err != nil {
-		klog.V(2).InfoS("failed to parse PodSecurity namespace labels", "err", err)
-		auditAnnotations["error"] = fmt.Sprintf("Failed to parse policy: %v", err)
+	if nsPolicyErr != nil {
+		klog.V(2).InfoS("failed to parse PodSecurity namespace labels", "err", nsPolicyErr)
+		auditAnnotations["error"] = fmt.Sprintf("Failed to parse policy: %v", nsPolicyErr)
 	}
 	// TODO: log nsPolicy evaluation with context (op, resource, namespace, name) for the request.
 
@@ -454,6 +483,12 @@ func (a *Admission) EvaluatePodsInNamespace(ctx context.Context, namespace strin
 
 func (a *Admission) PolicyToEvaluate(labels map[string]string) (api.Policy, error) {
 	return api.PolicyToEvaluate(labels, a.defaultPolicy)
+}
+
+var _sharedAllowedResponse = allowedResponse()
+
+func sharedAllowedResponse() *admissionv1.AdmissionResponse {
+	return _sharedAllowedResponse
 }
 
 // allowedResponse is the response used when the admission decision is allow.
