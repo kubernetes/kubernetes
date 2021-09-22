@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
+	"k8s.io/kubernetes/pkg/kubelet/prober"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/utils/clock"
 )
@@ -61,8 +62,9 @@ type dbusInhibiter interface {
 
 // Manager has functions that can be used to interact with the Node Shutdown Manager.
 type Manager struct {
-	recorder record.EventRecorder
-	nodeRef  *v1.ObjectReference
+	recorder     record.EventRecorder
+	nodeRef      *v1.ObjectReference
+	probeManager prober.Manager
 
 	shutdownGracePeriodRequested    time.Duration
 	shutdownGracePeriodCriticalPods time.Duration
@@ -81,7 +83,7 @@ type Manager struct {
 }
 
 // NewManager returns a new node shutdown manager.
-func NewManager(recorder record.EventRecorder, nodeRef *v1.ObjectReference, getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, syncNodeStatus func(), shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) (*Manager, lifecycle.PodAdmitHandler) {
+func NewManager(probeManager prober.Manager, recorder record.EventRecorder, nodeRef *v1.ObjectReference, getPodsFunc eviction.ActivePodsFunc, killPodFunc eviction.KillPodFunc, syncNodeStatus func(), shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods time.Duration) (*Manager, lifecycle.PodAdmitHandler) {
 	manager := &Manager{
 		recorder:                        recorder,
 		nodeRef:                         nodeRef,
@@ -91,6 +93,7 @@ func NewManager(recorder record.EventRecorder, nodeRef *v1.ObjectReference, getP
 		shutdownGracePeriodRequested:    shutdownGracePeriodRequested,
 		shutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
 		clock:                           clock.RealClock{},
+		probeManager:                    probeManager,
 	}
 	return manager, manager
 }
@@ -282,6 +285,9 @@ func (m *Manager) processShutdownEvent() error {
 			} else {
 				gracePeriodOverride = int64(nonCriticalPodGracePeriod.Seconds())
 			}
+
+			// Stop probes for the pod
+			m.probeManager.RemovePod(pod)
 
 			// If the pod's spec specifies a termination gracePeriod which is less than the gracePeriodOverride calculated, use the pod spec termination gracePeriod.
 			if pod.Spec.TerminationGracePeriodSeconds != nil && *pod.Spec.TerminationGracePeriodSeconds <= gracePeriodOverride {

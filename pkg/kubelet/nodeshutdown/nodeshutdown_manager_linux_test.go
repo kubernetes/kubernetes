@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
+	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	testingclock "k8s.io/utils/clock/testing"
 )
 
@@ -236,10 +237,11 @@ func TestManager(t *testing.T) {
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)()
 
+			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
-			manager, _ := NewManager(fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, tc.shutdownGracePeriodCriticalPods)
+			manager, _ := NewManager(proberManager, fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, tc.shutdownGracePeriodCriticalPods)
 			manager.clock = testingclock.NewFakeClock(time.Now())
 
 			err := manager.Start()
@@ -315,10 +317,11 @@ func TestFeatureEnabled(t *testing.T) {
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)()
 
+			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
-			manager, _ := NewManager(fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, 0 /*shutdownGracePeriodCriticalPods*/)
+			manager, _ := NewManager(proberManager, fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, 0 /*shutdownGracePeriodCriticalPods*/)
 			manager.clock = testingclock.NewFakeClock(time.Now())
 
 			assert.Equal(t, tc.expectEnabled, manager.isFeatureEnabled())
@@ -361,9 +364,10 @@ func TestRestart(t *testing.T) {
 		return dbus, nil
 	}
 
+	proberManager := probetest.FakeManager{}
 	fakeRecorder := &record.FakeRecorder{}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-	manager, _ := NewManager(fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, syncNodeStatus, shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods)
+	manager, _ := NewManager(proberManager, fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, syncNodeStatus, shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods)
 	err := manager.Start()
 	lock.Unlock()
 
