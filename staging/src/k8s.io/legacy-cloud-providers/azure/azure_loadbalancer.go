@@ -20,6 +20,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -304,7 +305,7 @@ func (az *Cloud) cleanBackendpoolForPrimarySLB(primarySLB *network.LoadBalancer,
 					ipConf := (*bp.BackendIPConfigurations)[i]
 					ipConfigID := to.String(ipConf.ID)
 					_, vmSetName, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfigID)
-					if err != nil {
+					if err != nil && !errors.Is(err, cloudprovider.InstanceNotFound) {
 						return nil, err
 					}
 					primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
@@ -1129,13 +1130,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 					for _, ipConf := range *bp.BackendIPConfigurations {
 						ipConfID := to.String(ipConf.ID)
 						nodeName, _, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfID)
-						if err != nil {
+						if err != nil && !errors.Is(err, cloudprovider.InstanceNotFound) {
 							return nil, err
 						}
-						if nodeName == "" {
-							// VM may under deletion
-							continue
-						}
+
 						// If a node is not supposed to be included in the LB, it
 						// would not be in the `nodes` slice. We need to check the nodes that
 						// have been added to the LB's backendpool, find the unwanted ones and

@@ -195,6 +195,7 @@ func (ss *scaleSet) getVmssVMByNodeIdentity(node *nodeIdentity, crt azcache.Azur
 	}
 
 	if !found || vm == nil {
+		klog.Warningf("Unable to find node %s: %v", node.nodeName, cloudprovider.InstanceNotFound)
 		return "", "", nil, cloudprovider.InstanceNotFound
 	}
 	return vmssName, instanceID, vm, nil
@@ -342,6 +343,7 @@ func (ss *scaleSet) GetInstanceIDByNodeName(name string) (string, error) {
 
 	_, _, vm, err := ss.getVmssVM(name, azcache.CacheReadTypeUnsafe)
 	if err != nil {
+		klog.Errorf("Unable to find node %s: %v", name, err)
 		return "", err
 	}
 
@@ -389,6 +391,7 @@ func (ss *scaleSet) GetNodeNameByProviderID(providerID string) (types.NodeName, 
 
 	vm, err := ss.getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID, azcache.CacheReadTypeUnsafe)
 	if err != nil {
+		klog.Errorf("Unable to find node by providerID %s: %v", providerID, err)
 		return "", err
 	}
 
@@ -709,6 +712,7 @@ func (ss *scaleSet) getNodeIdentityByNodeName(nodeName string, crt azcache.Azure
 		return nil, err
 	}
 	if node.vmssName == "" {
+		klog.Warningf("Unable to find node %s: %v", nodeName, cloudprovider.InstanceNotFound)
 		return nil, cloudprovider.InstanceNotFound
 	}
 	return node, nil
@@ -721,7 +725,7 @@ func (ss *scaleSet) listScaleSetVMs(scaleSetName, resourceGroup string) ([]compu
 
 	allVMs, rerr := ss.VirtualMachineScaleSetVMsClient.List(ctx, resourceGroup, scaleSetName, string(compute.InstanceView))
 	if rerr != nil {
-		klog.Errorf("VirtualMachineScaleSetVMsClient.List failed: %v", rerr)
+		klog.Errorf("VirtualMachineScaleSetVMsClient.List(%s, %s) failed: %v", resourceGroup, scaleSetName, rerr)
 		if rerr.IsNotFound() {
 			return nil, cloudprovider.InstanceNotFound
 		}
@@ -1407,7 +1411,7 @@ func (ss *scaleSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (st
 
 		klog.V(4).Infof("Can not extract scale set name from ipConfigurationID (%s), assuming it is managed by availability set", ipConfigurationID)
 		name, rg, err := ss.availabilitySet.GetNodeNameByIPConfigurationID(ipConfigurationID)
-		if err != nil {
+		if err != nil && !errors.Is(err, cloudprovider.InstanceNotFound) {
 			klog.Errorf("GetNodeNameByIPConfigurationID: failed to invoke availabilitySet.GetNodeNameByIPConfigurationID: %s", err.Error())
 			return "", "", err
 		}
@@ -1419,6 +1423,7 @@ func (ss *scaleSet) GetNodeNameByIPConfigurationID(ipConfigurationID string) (st
 	instanceID := matches[3]
 	vm, err := ss.getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID, azcache.CacheReadTypeUnsafe)
 	if err != nil {
+		klog.Errorf("Unable to find node by ipConfigurationID %s: %v", ipConfigurationID, err)
 		return "", "", err
 	}
 
