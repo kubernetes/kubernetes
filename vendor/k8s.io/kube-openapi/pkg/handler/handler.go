@@ -55,29 +55,17 @@ type OpenAPIService struct {
 
 	lastModified time.Time
 
-	jcache    jsonCache
-	pbCache   protobufCache
-	pbgzCache protobufGzipCache
+	jsonCache    cache
+	protoCache   cache
+	protoGzCache cache
 }
 
-type baseCache struct {
-	cacheClean bool
-	cacheBytes []byte
-	inputBytes []byte
+type cache struct {
+	BuildCache func() ([]byte, string, error)
+	once       sync.Once
+	bytes      []byte
 	etag       string
-}
-
-type jsonCache struct {
-	baseCache
-	spec *spec.Swagger
-}
-
-type protobufCache struct {
-	baseCache
-}
-
-type protobufGzipCache struct {
-	baseCache
+	err        error
 }
 
 func init() {
@@ -101,76 +89,67 @@ func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
 }
 
 func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time) {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
-	specBytes, err := o.jcache.Get()
+	specBytes, etag, err := o.jsonCache.Get()
 	if err != nil {
 		// TODO(DangerOnTheRanger): add panic here after further testing
 	}
-	etag := o.jcache.ETag()
 	return specBytes, etag, o.lastModified
 }
 
 func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time) {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
-	if !o.pbCache.IsClean() {
-		err := o.computeSwaggerPbCache()
-		if err != nil {
-			// TODO(DangerOnTheRanger): add panic here after further testing
-		}
-	}
-	specPb, err := o.pbCache.Get()
+	specPb, etag, err := o.protoCache.Get()
 	if err != nil {
 		// TODO(DangerOnTheRanger): add panic here after further testing
 	}
-	etag := o.pbCache.ETag()
 	return specPb, etag, o.lastModified
 }
 
-func (o *OpenAPIService) computeSwaggerPbCache() error {
-	specBytes, err := o.jcache.Get()
-	if err != nil {
-		return err
-	}
-	o.pbCache.Set(specBytes)
-	return nil
-}
-
 func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
-	o.rwMutex.RLock()
-	defer o.rwMutex.RUnlock()
-	if !o.pbgzCache.IsClean() {
-		err := o.computeSwaggerPbGzCache()
-		if err != nil {
-			// TODO(DangerOnTheRanger): add panic here after further testing
-		}
-	}
-	specPbGz, err := o.pbgzCache.Get()
+	specPbGz, etag, err := o.protoGzCache.Get()
 	if err != nil {
 		// TODO(DangerOnTheRanger): add panic here after further testing
 	}
-	etag := o.pbgzCache.ETag()
 	return specPbGz, etag, o.lastModified
-}
-
-func (o *OpenAPIService) computeSwaggerPbGzCache() error {
-	err := o.computeSwaggerPbCache()
-	if err != nil {
-		return err
-	}
-	specPb, err := o.pbCache.Get()
-	if err != nil {
-		return err
-	}
-	o.pbgzCache.Set(specPb)
-	return nil
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 	o.rwMutex.Lock()
 	defer o.rwMutex.Unlock()
-	o.jcache.Set(openapiSpec)
+	o.jsonCache = cache{
+		BuildCache: func() ([]byte, string, error) {
+			bytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(openapiSpec)
+			if err != nil {
+				return nil, "", err
+			}
+			etag := computeETag(bytes)
+			return bytes, etag, nil
+		},
+	}
+	o.protoCache = cache{
+		BuildCache: func() ([]byte, string, error) {
+			json, _, err := o.jsonCache.Get()
+			if err != nil {
+				return nil, "", err
+			}
+			pb, err := ToProtoBinary(json)
+			if err != nil {
+				return nil, "", err
+			}
+			etag := computeETag(pb)
+			return pb, etag, nil
+		},
+	}
+	o.protoGzCache = cache{
+		BuildCache: func() ([]byte, string, error) {
+			proto, _, err := o.protoCache.Get()
+			if err != nil {
+				return nil, "", err
+			}
+			gz := toGzip(proto)
+			etag := computeETag(gz)
+			return gz, etag, nil
+		},
+	}
 	lastModified := time.Now()
 	o.lastModified = lastModified
 	return nil
@@ -304,67 +283,15 @@ func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*re
 	return o, o.RegisterOpenAPIVersionedService(servePath, handler)
 }
 
-func (c *baseCache) Clear() {
-	c.cacheBytes = nil
-	c.inputBytes = nil
-	c.etag = ""
-}
-
-func (c *baseCache) IsClean() bool {
-	return c.cacheBytes != nil
-}
-
-func (c *baseCache) Set(inputBytes []byte) {
-	c.Clear()
-	c.inputBytes = inputBytes
-}
-
-func (c *baseCache) ETag() string {
-	return c.etag
-}
-
-func (c *baseCache) computeETag() {
-	c.etag = computeETag(c.cacheBytes)
-}
-
-func (c *jsonCache) Set(spec *spec.Swagger) {
-	c.Clear()
-	c.spec = spec
-}
-
-func (c *jsonCache) Get() ([]byte, error) {
-	if c.cacheBytes != nil {
-		return c.cacheBytes, nil
+func (c *cache) Get() ([]byte, string, error) {
+	c.once.Do(func() {
+		bytes, etag, err := c.BuildCache()
+		c.bytes = bytes
+		c.etag = etag
+		c.err = err
+	})
+	if c.err != nil {
+		return nil, "", c.err
 	}
-	specBytes, err := jsoniter.ConfigCompatibleWithStandardLibrary.Marshal(c.spec)
-	if err != nil {
-		return nil, err
-	}
-	c.cacheBytes = specBytes
-	c.computeETag()
-	return c.cacheBytes, nil
-
-}
-
-func (c *protobufCache) Get() ([]byte, error) {
-	if c.cacheBytes != nil {
-		return c.cacheBytes, nil
-	}
-	specPb, err := ToProtoBinary(c.inputBytes)
-	if err != nil {
-		return nil, err
-	}
-	c.cacheBytes = specPb
-	c.computeETag()
-	return c.cacheBytes, nil
-}
-
-func (c *protobufGzipCache) Get() ([]byte, error) {
-	if c.cacheBytes != nil {
-		return c.cacheBytes, nil
-	}
-	specPbGz := toGzip(c.inputBytes)
-	c.cacheBytes = specPbGz
-	c.computeETag()
-	return c.cacheBytes, nil
+	return c.bytes, c.etag, nil
 }
