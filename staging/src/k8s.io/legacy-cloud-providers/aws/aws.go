@@ -4460,6 +4460,13 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 	c.sortELBSecurityGroupList(lbSecurityGroupIDs, annotations)
 	loadBalancerSecurityGroupID := lbSecurityGroupIDs[0]
 
+	var deleteSecurityGroupID bool
+	// we shouldn't delete Ingress SG rule, if it allows access
+	// from configured "ElbSecurityGroup", so that we won't disrupt access to Nodes from other ELBs
+	if loadBalancerSecurityGroupID != c.cfg.Global.ElbSecurityGroup {
+		deleteSecurityGroupID = true
+	}
+
 	// Get the actual list of groups that allow ingress from the load-balancer
 	var actualGroups []*ec2.SecurityGroup
 	{
@@ -4555,7 +4562,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 			if !changed {
 				klog.Warning("Allowing ingress was not needed; concurrent change? groupId=", instanceSecurityGroupID)
 			}
-		} else {
+		} else if deleteSecurityGroupID {
 			changed, err := c.removeSecurityGroupIngress(instanceSecurityGroupID, permissions)
 			if err != nil {
 				return err
