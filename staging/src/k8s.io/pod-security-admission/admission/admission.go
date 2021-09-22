@@ -475,7 +475,7 @@ func failureResponse(msg string, reason metav1.StatusReason, code int32) *admiss
 
 // forbiddenResponse is the response used when the admission decision is deny for policy violations.
 func forbiddenResponse(msg string) *admissionv1.AdmissionResponse {
-	return failureResponse(msg, metav1.StatusFailure, http.StatusForbidden)
+	return failureResponse(msg, metav1.StatusReasonForbidden, http.StatusForbidden)
 }
 
 // invalidResponse is the response used for namespace requests when namespace labels are invalid.
