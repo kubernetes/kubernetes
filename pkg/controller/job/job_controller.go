@@ -55,22 +55,21 @@ import (
 	"k8s.io/utils/integer"
 )
 
-const (
-	// maxUncountedPods is the maximum size the slices in
-	// .status.uncountedTerminatedPods should have to keep their representation
-	// roughly below 20 KB.
-	maxUncountedPods          = 500
-	maxPodCreateDeletePerSync = 500
-)
-
 // controllerKind contains the schema.GroupVersionKind for this controller type.
 var controllerKind = batch.SchemeGroupVersion.WithKind("Job")
 
 var (
-	// DefaultJobBackOff is the default backoff period, exported for the e2e test
+	// DefaultJobBackOff is the default backoff period. Exported for tests.
 	DefaultJobBackOff = 10 * time.Second
-	// MaxJobBackOff is the max backoff period, exported for the e2e test
+	// MaxJobBackOff is the max backoff period. Exported for tests.
 	MaxJobBackOff = 360 * time.Second
+	// MaxUncountedPods is the maximum size the slices in
+	// .status.uncountedTerminatedPods should have to keep their representation
+	// roughly below 20 KB. Exported for tests
+	MaxUncountedPods = 500
+	// MaxPodCreateDeletePerSync is the maximum number of pods that can be
+	// created or deleted in a single sync call. Exported for tests.
+	MaxPodCreateDeletePerSync = 500
 )
 
 // Controller ensures that all Job objects have corresponding pods to
@@ -938,7 +937,7 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 				uncountedStatus.Failed = append(uncountedStatus.Failed, pod.UID)
 			}
 		}
-		if len(newSucceededIndexes)+len(uncountedStatus.Succeeded)+len(uncountedStatus.Failed) >= maxUncountedPods {
+		if len(newSucceededIndexes)+len(uncountedStatus.Succeeded)+len(uncountedStatus.Failed) >= MaxUncountedPods {
 			// The controller added enough Pods already to .status.uncountedTerminatedPods
 			// We stop counting pods and removing finalizers here to:
 			// 1. Ensure that the UIDs representation are under 20 KB.
@@ -1230,8 +1229,8 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		rmAtLeast = 0
 	}
 	podsToDelete := activePodsForRemoval(job, activePods, int(rmAtLeast))
-	if len(podsToDelete) > maxPodCreateDeletePerSync {
-		podsToDelete = podsToDelete[:maxPodCreateDeletePerSync]
+	if len(podsToDelete) > MaxPodCreateDeletePerSync {
+		podsToDelete = podsToDelete[:MaxPodCreateDeletePerSync]
 	}
 	if len(podsToDelete) > 0 {
 		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
@@ -1247,8 +1246,8 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 
 	if active < wantActive {
 		diff := wantActive - active
-		if diff > int32(maxPodCreateDeletePerSync) {
-			diff = int32(maxPodCreateDeletePerSync)
+		if diff > int32(MaxPodCreateDeletePerSync) {
+			diff = int32(MaxPodCreateDeletePerSync)
 		}
 
 		jm.expectations.ExpectCreations(jobKey, int(diff))
