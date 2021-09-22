@@ -230,8 +230,8 @@ func TestParallelJobWithCompletions(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(4),
-					Completions: pointer.Int32Ptr(6),
+					Parallelism: pointer.Int32Ptr(504),
+					Completions: pointer.Int32Ptr(506),
 				},
 			})
 			if err != nil {
@@ -241,23 +241,23 @@ func TestParallelJobWithCompletions(t *testing.T) {
 				t.Errorf("apiserver created job with tracking annotation: %t, want %t", got, wFinalizers)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-				Active: 4,
+				Active: 504,
 			}, wFinalizers)
 			// Failed Pods are replaced.
 			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
 				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-				Active: 4,
+				Active: 504,
 				Failed: 2,
 			}, wFinalizers)
 			// Pods are created until the number of succeeded Pods equals completions.
-			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
+			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 503); err != nil {
 				t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Failed:    2,
-				Succeeded: 3,
+				Succeeded: 503,
 				Active:    3,
 			}, wFinalizers)
 			// No more Pods are created after the Job completes.
@@ -267,7 +267,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 			validateJobSucceeded(ctx, t, clientSet, jobObj)
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Failed:    2,
-				Succeeded: 6,
+				Succeeded: 506,
 			}, false)
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 		})
@@ -860,7 +860,11 @@ func setup(t *testing.T, nsBaseName string) (framework.CloseFunc, *restclient.Co
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, apiServerCloseFn := framework.RunAnAPIServer(controlPlaneConfig)
 
-	config := restclient.Config{Host: server.URL}
+	config := restclient.Config{
+		Host:  server.URL,
+		QPS:   200.0,
+		Burst: 200,
+	}
 	clientSet, err := clientset.NewForConfig(&config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
