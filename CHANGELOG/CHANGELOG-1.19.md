@@ -487,18 +487,20 @@ This release contains changes that address the following vulnerabilities:
 A security issue was discovered in Kubernetes where a user may be able to
 create a container with subpath volume mounts to access files &
 directories outside of the volume, including on the host filesystem.
+
 **Affected Versions**:
   - kubelet v1.22.0 - v1.22.1
   - kubelet v1.21.0 - v1.21.4
   - kubelet v1.20.0 - v1.20.10
   - kubelet <= v1.19.14
+
 **Fixed Versions**:
   - kubelet v1.22.2
   - kubelet v1.21.5
   - kubelet v1.20.11
   - kubelet v1.19.15
-This vulnerability was reported by Fabricio Voznika and Mark Wolters of Google.
 
+This vulnerability was reported by Fabricio Voznika and Mark Wolters of Google.
 
 **CVSS Rating:** High (8.8) [CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H](https://www.first.org/cvss/calculator/3.0#CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H)
 
