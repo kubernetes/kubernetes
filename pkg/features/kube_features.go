@@ -779,7 +779,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NetworkPolicyEndPort:                           {Default: true, PreRelease: featuregate.Beta},
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
-	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.Beta},
+	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	IndexedJob:                                     {Default: true, PreRelease: featuregate.Beta},
 	JobTrackingWithFinalizers:                      {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},

@@ -154,8 +154,6 @@ type JobSpec struct {
 	// guarantees (e.g. finalizers) will be honored. If this field is unset,
 	// the Job won't be automatically deleted. If this field is set to zero,
 	// the Job becomes eligible to be deleted immediately after it finishes.
-	// This field is alpha-level and is only honored by servers that enable the
-	// TTLAfterFinished feature.
 	// +optional
 	TTLSecondsAfterFinished *int32 `json:"ttlSecondsAfterFinished,omitempty" protobuf:"varint,8,opt,name=ttlSecondsAfterFinished"`
 
