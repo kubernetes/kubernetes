@@ -385,6 +385,27 @@ func NewTransformingInformer(
 	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, transformer)
 }
 
+// NewTransformingIndexerInformer returns an Indexer and a controller for
+// populating the index while also providing event notifications. You should
+// only used the returned Index for Get/List operations; Add/Modify/Deletes
+// will cause the event notifications to be faulty.
+// The given transform function will be called on all objects before they will
+// be put into the Index and corresponding Add/Modify/Delete handlers will
+// be invoked for them.
+func NewTransformingIndexerInformer(
+	lw ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+	indexers Indexers,
+	transformer TransformFunc,
+) (Indexer, Controller) {
+	// This will hold the client state, as we know it.
+	clientState := NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, indexers)
+
+	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState, transformer)
+}
+
 // newInformer returns a controller for populating the store while also
 // providing event notifications.
 //
