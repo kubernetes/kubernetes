@@ -563,6 +563,21 @@ func TestSync(t *testing.T) {
 			noevents, noerrors, testSyncVolume,
 		},
 
+		{
+			// syncVolume with volume bound to claim which exists in etcd but not updated to local cache.
+			"4-12 - volume bound to newest claim but not updated to local cache",
+			newVolumeArray("volume4-12", "10Gi", "uid4-12-new", "claim4-12", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty),
+			newVolumeArray("volume4-12", "10Gi", "uid4-12-new", "claim4-12", v1.VolumeBound, v1.PersistentVolumeReclaimDelete, classEmpty),
+			func() []*v1.PersistentVolumeClaim {
+				newClaim := newClaimArray("claim4-12", "uid4-12", "10Gi", "volume4-12", v1.ClaimBound, nil, "")
+				// update uid to new-uid and not sync to cache.
+				newClaim = append(newClaim, newClaimArray("claim4-12", "uid4-12-new", "10Gi", "volume4-12", v1.ClaimBound, nil, annSkipLocalStore)...)
+				return newClaim
+			}(),
+			newClaimArray("claim4-12", "uid4-12-new", "10Gi", "volume4-12", v1.ClaimBound, nil, annSkipLocalStore),
+			noevents, noerrors, testSyncVolume,
+		},
+
 		// PVC with class
 		{
 			// syncVolume binds a claim to requested class even if there is a
