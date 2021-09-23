@@ -36,6 +36,9 @@ type Clock interface {
 	After(d time.Duration) <-chan time.Time
 	// NewTimer returns a new Timer.
 	NewTimer(d time.Duration) Timer
+	// AfterFunc executes f in its own goroutine after waiting for d duration and returns
+	// a Timer whose channel can be closed by calling Stop() on the Timer.
+	AfterFunc(d time.Duration, f func()) Timer
 	// Sleep sleeps for the provided duration d.
 	// Consider making the sleep interruptible by using 'select' on a context channel and a timer channel.
 	Sleep(d time.Duration)
@@ -85,6 +88,13 @@ func (RealClock) After(d time.Duration) <-chan time.Time {
 func (RealClock) NewTimer(d time.Duration) Timer {
 	return &realTimer{
 		timer: time.NewTimer(d),
+	}
+}
+
+// AfterFunc is the same as time.AfterFunc(d, f).
+func (RealClock) AfterFunc(d time.Duration, f func()) Timer {
+	return &realTimer{
+		timer: time.AfterFunc(d, f),
 	}
 }
 
