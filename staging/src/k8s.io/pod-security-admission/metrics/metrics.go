@@ -56,11 +56,13 @@ type EvaluationRecorder interface {
 }
 
 type PrometheusRecorder struct {
+	apiVersion api.Version
 }
 
 func NewPrometheusRecorder() *PrometheusRecorder {
 	legacyregistry.MustRegister(SecurityEvaluation)
-	return &PrometheusRecorder{}
+	version := api.MajorMinorVersion(getAPIVersion())
+	return &PrometheusRecorder{apiVersion: version}
 }
 
 func (r PrometheusRecorder) RecordEvaluation(decision Decision, policy api.LevelVersion, evalMode Mode, attrs api.Attributes) {
@@ -73,8 +75,7 @@ func (r PrometheusRecorder) RecordEvaluation(decision Decision, policy api.Level
 		if policy.Version.Latest() {
 			version = "latest"
 		} else {
-			apiVersion := api.MajorMinorVersion(getAPIVersion())
-			if !apiVersion.Older(policy.Version) {
+			if !r.apiVersion.Older(policy.Version) {
 				version = policy.Version.String()
 			} else {
 				version = "future"
