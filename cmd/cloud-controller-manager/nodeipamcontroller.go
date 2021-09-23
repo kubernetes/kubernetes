@@ -98,14 +98,14 @@ func startNodeIpamController(initContext app.ControllerInitContext, ccmConfig *c
 	if len(strings.TrimSpace(nodeIPAMConfig.ServiceCIDR)) != 0 {
 		_, serviceCIDR, err = netutils.ParseCIDRSloppy(nodeIPAMConfig.ServiceCIDR)
 		if err != nil {
-			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.ServiceCIDR, err)
+			klog.ErrorS(err, "Unsuccessful parsing of service CIDR", "CIDR", nodeIPAMConfig.ServiceCIDR)
 		}
 	}
 
 	if len(strings.TrimSpace(nodeIPAMConfig.SecondaryServiceCIDR)) != 0 {
 		_, secondaryServiceCIDR, err = netutils.ParseCIDRSloppy(nodeIPAMConfig.SecondaryServiceCIDR)
 		if err != nil {
-			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.SecondaryServiceCIDR, err)
+			klog.ErrorS(err, "Unsuccessful parsing of service CIDR", "CIDR", nodeIPAMConfig.SecondaryServiceCIDR)
 		}
 	}
 

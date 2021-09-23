@@ -330,6 +330,8 @@ type Controller struct {
 	//    be less than the node health signal update frequency, since there will
 	//    only be fresh values from Kubelet at an interval of node health signal
 	//    update frequency. The constant must be less than podEvictionTimeout.
+	//    podEvictionTimeout works only if you set useTaintBasedEvictions or
+	//    runTaintManager to false.
 	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger
 	//    value takes longer for user to see up-to-date node health.
 	nodeMonitorGracePeriod time.Duration
