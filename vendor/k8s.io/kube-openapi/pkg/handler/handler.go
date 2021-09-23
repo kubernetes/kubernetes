@@ -96,6 +96,8 @@ func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
 }
 
 func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time) {
+	o.rwMutex.RLock()
+	defer o.rwMutex.RUnlock()
 	specBytes, etag, err := o.jsonCache.Get()
 	if err != nil {
 		// TODO(DangerOnTheRanger): add panic here after further testing
@@ -104,6 +106,8 @@ func (o *OpenAPIService) getSwaggerBytes() ([]byte, string, time.Time) {
 }
 
 func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time) {
+	o.rwMutex.RLock()
+	defer o.rwMutex.RUnlock()
 	specPb, etag, err := o.protoCache.Get()
 	if err != nil {
 		// TODO(DangerOnTheRanger): add panic here after further testing
@@ -112,6 +116,8 @@ func (o *OpenAPIService) getSwaggerPbBytes() ([]byte, string, time.Time) {
 }
 
 func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
+	o.rwMutex.RLock()
+	defer o.rwMutex.RUnlock()
 	specPbGz, etag, err := o.protoGzCache.Get()
 	if err != nil {
 		// TODO(DangerOnTheRanger): add panic here after further testing
