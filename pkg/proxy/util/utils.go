@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -274,7 +275,15 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
+			// this function is called in multiple places. All of which
+			// have sanitized data. Except the case of ExternalIPs which is
+			// not validated by api-server. Specifically empty strings
+			// validation. Which yields into a lot of bad error logs.
+			// check for empty string
+			if len(strings.TrimSpace(ip)) != 0 {
+				klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
+
+			}
 		}
 	}
 	return ipFamilyMap
