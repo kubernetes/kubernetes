@@ -622,9 +622,28 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 		if claim != nil && claim.UID != volume.Spec.ClaimRef.UID {
 			// The claim that the PV was pointing to was deleted, and another
 			// with the same name created.
-			klog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s has different UID, the old one must have been deleted", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
-			// Treat the volume as bound to a missing claim.
-			claim = nil
+			// in some cases, the cached claim is not the newest, and the volume.Spec.ClaimRef.UID is newer than cached.
+			// in this case ,we should double check by calling apiserver  to get the newest claim.
+			klog.V(3).Infof("Maybe cached claim: %s is not the newest one, we should fetch it from apiserver", claimrefToClaimKey(volume.Spec.ClaimRef))
+
+			obj, err = ctrl.kubeClient.CoreV1().PersistentVolumeClaims(volume.Spec.ClaimRef.Namespace).Get(context.TODO(),volume.Spec.ClaimRef.Name, metav1.GetOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			} else if apierrors.IsNotFound(err) { // claim has been deleted.
+				claim = nil
+			} else {
+				var ok bool
+				claim, ok = obj.(*v1.PersistentVolumeClaim)
+				if !ok {
+					return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
+				}
+
+				// if in this case, we should let claim be nil.
+				if claim.UID != volume.Spec.ClaimRef.UID {
+					klog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s has different UID, the old one must have been deleted", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef))
+					claim = nil
+				}
+			}
 		}
 
 		if claim == nil {
