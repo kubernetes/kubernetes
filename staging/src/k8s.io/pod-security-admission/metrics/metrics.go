@@ -18,27 +18,8 @@ package metrics
 
 import (
 	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
-	Version "k8s.io/component-base/version"
 	"k8s.io/pod-security-admission/api"
-	"strconv"
 )
-
-const (
-	namespace = "pod_security"
-)
-
-var SecurityEvaluation = metrics.NewCounterVec(
-	&metrics.CounterOpts{
-		Name:           "pod_security_evaluations_total",
-		Help:           "Counter of pod security evaluations.",
-		StabilityLevel: metrics.ALPHA,
-	},
-	[]string{"decision", "policy_level", "policy_version", "mode", "operation", "resource", "subresource"},
-)
-
-type Decision string
-type Mode string
 
 const (
 	ModeAudit      = "audit"
@@ -50,6 +31,22 @@ const (
 	DecisionError  = "error"  // Error preventing evaluation, policy not evaluated
 )
 
+var (
+	SecurityEvaluation = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "pod_security_evaluations_total",
+			Help:           "Counter of pod security evaluations.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"decision", "policy_level", "policy_version", "mode", "operation", "resource", "subresource"},
+	)
+
+	Registry = metrics.NewKubeRegistry()
+)
+
+type Decision string
+type Mode string
+
 type EvaluationRecorder interface {
 	// TODO: fill in args required to record https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/2579-psp-replacemenonitoring
 	RecordEvaluation(decision Decision, policy api.LevelVersion, evalMode Mode, attrs api.Attributes)
@@ -59,9 +56,8 @@ type PrometheusRecorder struct {
 	apiVersion api.Version
 }
 
-func NewPrometheusRecorder() *PrometheusRecorder {
-	legacyregistry.MustRegister(SecurityEvaluation)
-	version := api.MajorMinorVersion(getAPIVersion())
+func NewPrometheusRecorder(version api.Version) *PrometheusRecorder {
+	Registry.MustRegister(SecurityEvaluation)
 	return &PrometheusRecorder{apiVersion: version}
 }
 
@@ -86,16 +82,3 @@ func (r PrometheusRecorder) RecordEvaluation(decision Decision, policy api.Level
 	}
 }
 
-func getAPIVersion() (major int, minor int) {
-	var err error
-	apiVersion := Version.Get()
-	major, err = strconv.Atoi(apiVersion.Major)
-	if err != nil {
-		return
-	}
-	minor, err = strconv.Atoi(apiVersion.Minor)
-	if err != nil {
-		return
-	}
-	return major, minor
-}

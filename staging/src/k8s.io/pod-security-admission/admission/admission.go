@@ -509,15 +509,17 @@ func sharedAllowedResponse() *admissionv1.AdmissionResponse {
 	return _sharedAllowedResponse
 }
 
-func (a *Admission) RecordEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes)  {
-	if a.Metrics != nil{
-		if policy.Audit.Valid(){
-			a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Audit, metrics.ModeAudit, attrs)
+func (a *Admission) RecordEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
+	if a.Metrics != nil {
+		if decision == metrics.DecisionDeny {
+			if policy.Audit.Valid() {
+				a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Audit, metrics.ModeAudit, attrs)
+			}
+			if policy.Warn.Valid() {
+				a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Warn, metrics.ModeWarn, attrs)
+			}
 		}
-		if policy.Warn.Valid() {
-			a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Warn, metrics.ModeWarn, attrs)
-		}
-		if policy.Enforce.Valid(){
+		if policy.Enforce.Valid() {
 			a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Enforce, metrics.ModeEnforce, attrs)
 		}
 	}
