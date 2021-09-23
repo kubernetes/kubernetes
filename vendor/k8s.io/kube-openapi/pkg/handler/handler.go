@@ -78,6 +78,13 @@ func computeETag(data []byte) string {
 	return fmt.Sprintf("\"%X\"", sha512.Sum512(data))
 }
 
+func (c *cache) Get() ([]byte, string, error) {
+	c.once.Do(func() {
+		c.bytes, c.etag, c.err = c.BuildCache()
+	})
+	return c.bytes, c.etag, c.err
+}
+
 // NewOpenAPIService builds an OpenAPIService starting with the given spec.
 func NewOpenAPIService(spec *spec.Swagger) (*OpenAPIService, error) {
 	o := &OpenAPIService{}
@@ -281,17 +288,4 @@ func BuildAndRegisterOpenAPIVersionedService(servePath string, webServices []*re
 		return nil, err
 	}
 	return o, o.RegisterOpenAPIVersionedService(servePath, handler)
-}
-
-func (c *cache) Get() ([]byte, string, error) {
-	c.once.Do(func() {
-		bytes, etag, err := c.BuildCache()
-		c.bytes = bytes
-		c.etag = etag
-		c.err = err
-	})
-	if c.err != nil {
-		return nil, "", c.err
-	}
-	return c.bytes, c.etag, nil
 }
