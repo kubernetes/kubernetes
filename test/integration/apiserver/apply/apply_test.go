@@ -199,7 +199,7 @@ func TestNoOpUpdateSameResourceVersion(t *testing.T) {
 	}
 
 	// Sleep for one second to make sure that the times of each update operation is different.
-	time.Sleep(1 * time.Second)
+	time.Sleep(1200 * time.Millisecond)
 
 	createdObject, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource(podResource).Name(podName).Do(context.TODO()).Get()
 	if err != nil {
@@ -325,7 +325,7 @@ func TestNoSemanticUpdateApplySameResourceVersion(t *testing.T) {
 	}
 
 	// Sleep for one second to make sure that the times of each update operation is different.
-	time.Sleep(1 * time.Second)
+	time.Sleep(1200 * time.Millisecond)
 
 	obj, err = client.AppsV1().RESTClient().Patch(types.ApplyPatchType).
 		Namespace("default").
@@ -410,7 +410,7 @@ func TestNoSemanticUpdatePutSameResourceVersion(t *testing.T) {
 	}
 
 	// Sleep for one second to make sure that the times of each update operation is different.
-	time.Sleep(1 * time.Second)
+	time.Sleep(1200 * time.Millisecond)
 
 	obj, err = client.AppsV1().RESTClient().Put().
 		Namespace("default").
@@ -835,7 +835,7 @@ func TestApplyManagedFields(t *testing.T) {
 	// Sleep for one second to make sure that the times of each update operation is different.
 	// This will let us check that update entries with the same manager name are grouped together,
 	// and that the most recent update time is recorded in the grouped entry.
-	time.Sleep(1 * time.Second)
+	time.Sleep(1200 * time.Millisecond)
 
 	_, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
 		Namespace("default").
