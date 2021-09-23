@@ -156,6 +156,8 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 		if rc.populatorHasAddedPods() && !rc.StatesHasBeenSynced() {
 			klog.InfoS("Reconciler: start to sync state")
 			rc.sync()
+		} else if time.Since(rc.timeOfLastSync) > 5*time.Minute {
+			rc.sync()
 		}
 	}
 }
