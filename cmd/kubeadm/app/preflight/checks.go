@@ -508,7 +508,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 
 // SystemVerificationCheck defines struct used for running the system verification node check in test/e2e_node/system
 type SystemVerificationCheck struct {
-	IsDocker bool
+	Docker bool
 }
 
 // Name will return SystemVerification as name for SystemVerificationCheck
@@ -531,7 +531,7 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 		&system.KernelValidator{Reporter: reporter}}
 
 	// run the docker validator only with docker runtime
-	if sysver.IsDocker {
+	if sysver.Docker {
 		validators = append(validators, &system.DockerValidator{Reporter: reporter})
 	}
 
@@ -1058,7 +1058,7 @@ func addCommonChecks(execer utilsexec.Interface, k8sVersion string, nodeReg *kub
 			InPathCheck{executable: "touch", mandatory: false, exec: execer})
 	}
 	checks = append(checks,
-		SystemVerificationCheck{IsDocker: isDocker},
+		SystemVerificationCheck{Docker: isDocker},
 		HostnameCheck{nodeName: nodeReg.Name},
 		KubeletVersionCheck{KubernetesVersion: k8sVersion, exec: execer},
 		ServiceCheck{Service: "kubelet", CheckIfActive: false},

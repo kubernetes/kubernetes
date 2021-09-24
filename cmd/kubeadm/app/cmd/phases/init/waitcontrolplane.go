@@ -107,11 +107,11 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		context := struct {
 			Error    string
 			Socket   string
-			IsDocker bool
+			Docker   bool
 		}{
 			Error:    fmt.Sprintf("%v", err),
 			Socket:   data.Cfg().NodeRegistration.CRISocket,
-			IsDocker: data.Cfg().NodeRegistration.CRISocket == kubeadmconstants.DefaultDockerCRISocket,
+			Docker:   data.Cfg().NodeRegistration.CRISocket == kubeadmconstants.DefaultDockerCRISocket,
 		}
 
 		kubeletFailTempl.Execute(data.OutputWriter(), context)
