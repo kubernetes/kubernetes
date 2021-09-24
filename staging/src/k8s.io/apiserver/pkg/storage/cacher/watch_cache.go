@@ -420,17 +420,27 @@ func (w *watchCache) List() []interface{} {
 // You HAVE TO explicitly call w.RUnlock() after this function.
 func (w *watchCache) waitUntilFreshAndBlock(resourceVersion uint64, trace *utiltrace.Trace) error {
 	startTime := w.clock.Now()
-	go func() {
-		// Wake us up when the time limit has expired.  The docs
-		// promise that time.After (well, NewTimer, which it calls)
-		// will wait *at least* the duration given. Since this go
-		// routine starts sometime after we record the start time, and
-		// it will wake up the loop below sometime after the broadcast,
-		// we don't need to worry about waking it up before the time
-		// has expired accidentally.
-		<-w.clock.After(blockTimeout)
-		w.cond.Broadcast()
-	}()
+
+	// In case resourceVersion is 0, we accept arbitrarily stale result.
+	// As a result, the condition in the below for loop will never be
+	// satisfied (w.resourceVersion is never negative), this call will
+	// never hit the w.cond.Wait().
+	// As a result - we can optimize the code by not firing the wakeup
+	// function (and avoid starting a gorotuine), especially given that
+	// resourceVersion=0 is the most common case.
+	if resourceVersion > 0 {
+		go func() {
+			// Wake us up when the time limit has expired.  The docs
+			// promise that time.After (well, NewTimer, which it calls)
+			// will wait *at least* the duration given. Since this go
+			// routine starts sometime after we record the start time, and
+			// it will wake up the loop below sometime after the broadcast,
+			// we don't need to worry about waking it up before the time
+			// has expired accidentally.
+			<-w.clock.After(blockTimeout)
+			w.cond.Broadcast()
+		}()
+	}
 
 	w.RLock()
 	if trace != nil {
