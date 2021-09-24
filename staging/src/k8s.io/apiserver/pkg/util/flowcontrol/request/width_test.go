@@ -26,18 +26,18 @@ import (
 
 func TestWorkEstimator(t *testing.T) {
 	tests := []struct {
-		name          string
-		requestURI    string
-		requestInfo   *apirequest.RequestInfo
-		counts        map[string]int64
-		countErr      error
-		seatsExpected uint
+		name                 string
+		requestURI           string
+		requestInfo          *apirequest.RequestInfo
+		counts               map[string]int64
+		countErr             error
+		initialSeatsExpected uint
 	}{
 		{
-			name:          "request has no RequestInfo",
-			requestURI:    "http://server/apis/",
-			requestInfo:   nil,
-			seatsExpected: maximumSeats,
+			name:                 "request has no RequestInfo",
+			requestURI:           "http://server/apis/",
+			requestInfo:          nil,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is not list",
@@ -45,7 +45,7 @@ func TestWorkEstimator(t *testing.T) {
 			requestInfo: &apirequest.RequestInfo{
 				Verb: "get",
 			},
-			seatsExpected: minimumSeats,
+			initialSeatsExpected: minimumSeats,
 		},
 		{
 			name:       "request verb is list, conversion to ListOptions returns error",
@@ -58,7 +58,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			seatsExpected: maximumSeats,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, has limit and resource version is 1",
@@ -71,7 +71,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			seatsExpected: 8,
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, limit not set",
@@ -84,7 +84,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			seatsExpected: 7,
+			initialSeatsExpected: 7,
 		},
 		{
 			name:       "request verb is list, resource version not set",
@@ -97,7 +97,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			seatsExpected: 8,
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, no query parameters, count known",
@@ -110,7 +110,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 399,
 			},
-			seatsExpected: 8,
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, no query parameters, count not known",
@@ -120,8 +120,8 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:      ObjectCountNotFoundErr,
-			seatsExpected: maximumSeats,
+			countErr:             ObjectCountNotFoundErr,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, continuation is set",
@@ -134,7 +134,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			seatsExpected: 8,
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, resource version is zero",
@@ -147,7 +147,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 399,
 			},
-			seatsExpected: 4,
+			initialSeatsExpected: 4,
 		},
 		{
 			name:       "request verb is list, resource version is zero, no limit",
@@ -160,7 +160,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			seatsExpected: 8,
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, resource version match is Exact",
@@ -173,7 +173,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 699,
 			},
-			seatsExpected: 8,
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, resource version match is NotOlderThan, limit not specified",
@@ -186,7 +186,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			seatsExpected: 8,
+			initialSeatsExpected: 8,
 		},
 		{
 			name:       "request verb is list, maximum is capped",
@@ -199,7 +199,7 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 1999,
 			},
-			seatsExpected: maximumSeats,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, list from cache, count not known",
@@ -209,8 +209,8 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:      ObjectCountNotFoundErr,
-			seatsExpected: maximumSeats,
+			countErr:             ObjectCountNotFoundErr,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, object count is stale",
@@ -223,8 +223,8 @@ func TestWorkEstimator(t *testing.T) {
 			counts: map[string]int64{
 				"events.foo.bar": 799,
 			},
-			countErr:      ObjectCountStaleErr,
-			seatsExpected: maximumSeats,
+			countErr:             ObjectCountStaleErr,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, object count is not found",
@@ -234,8 +234,8 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:      ObjectCountNotFoundErr,
-			seatsExpected: maximumSeats,
+			countErr:             ObjectCountNotFoundErr,
+			initialSeatsExpected: maximumSeats,
 		},
 		{
 			name:       "request verb is list, count getter throws unknown error",
@@ -245,8 +245,8 @@ func TestWorkEstimator(t *testing.T) {
 				APIGroup: "foo.bar",
 				Resource: "events",
 			},
-			countErr:      errors.New("unknown error"),
-			seatsExpected: maximumSeats,
+			countErr:             errors.New("unknown error"),
+			initialSeatsExpected: maximumSeats,
 		},
 	}
 
@@ -271,8 +271,8 @@ func TestWorkEstimator(t *testing.T) {
 			}
 
 			workestimateGot := estimator.EstimateWork(req)
-			if test.seatsExpected != workestimateGot.Seats {
-				t.Errorf("Expected work estimate to match: %d seats, but got: %d seats", test.seatsExpected, workestimateGot.Seats)
+			if test.initialSeatsExpected != workestimateGot.InitialSeats {
+				t.Errorf("Expected work estimate to match: %d seats, but got: %d seats", test.initialSeatsExpected, workestimateGot.InitialSeats)
 			}
 		})
 	}
