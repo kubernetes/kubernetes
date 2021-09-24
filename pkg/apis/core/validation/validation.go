@@ -6179,8 +6179,15 @@ func ValidateSecurityContext(sc *core.SecurityContext, fldPath *field.Path) fiel
 
 		if sc.Capabilities != nil {
 			for _, cap := range sc.Capabilities.Add {
+				var capVerify *field.Error
 				if string(cap) == "CAP_SYS_ADMIN" {
-					allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN"))
+					capVerify = field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN")
+				}
+				if capVerify == nil && strings.HasSuffix(string(cap), "SYS_ADMIN") {
+					capVerify = field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN")
+				}
+				if capVerify != nil {
+					allErrs = append(allErrs, capVerify)
 				}
 			}
 		}
