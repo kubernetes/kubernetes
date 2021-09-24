@@ -92,9 +92,6 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 	}
 }
 
-// BenchmarkIndexer-12    	  447849	      2738 ns/op	     242 B/op	       4 allocs/op
-// PASS
-// ok  	k8s.io/kubernetes/vendor/k8s.io/client-go/tools/cache	2.451s
 func BenchmarkIndexer(b *testing.B) {
 	testIndexer := "testIndexer"
 
