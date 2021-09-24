@@ -454,7 +454,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 		if test.Mode == v1.PersistentVolumeBlock {
 			// Block: check content
 			deviceName := fmt.Sprintf("/opt/%d", i)
-			commands := generateReadBlockCmd(deviceName, len(test.ExpectedContent))
+			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
 			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
@@ -573,7 +573,7 @@ func generateWriteCmd(content, path string) []string {
 }
 
 // generateReadBlockCmd generates the corresponding command lines to read from a block device with the given file path.
-func generateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
+func GenerateReadBlockCmd(fullPath string, numberOfCharacters int) []string {
 	var commands []string
 	commands = []string{"head", "-c", strconv.Itoa(numberOfCharacters), fullPath}
 	return commands
