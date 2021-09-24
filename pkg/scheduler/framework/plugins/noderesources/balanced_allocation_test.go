@@ -213,13 +213,6 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 			},
 		},
 	}
-	nonZeroContainer := v1.PodSpec{
-		Containers: []v1.Container{{}},
-	}
-	nonZeroContainer1 := v1.PodSpec{
-		NodeName:   "machine1",
-		Containers: []v1.Container{{}},
-	}
 	tests := []struct {
 		pod          *v1.Pod
 		pods         []*v1.Pod
@@ -273,24 +266,6 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 				{Spec: machine1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 				{Spec: machine2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 				{Spec: machine2Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
-			},
-		},
-		{
-			// Node1 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 300 / 250 = 100%
-			// Memory Fraction: 600 / 10000 = 60%
-			// Node1 Score: MaxNodeScore - (100-60)*MaxNodeScore = 60
-			// Node2 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 100 / 250 = 40%
-			// Memory Fraction: 200 / 10000 = 20%
-			// Node2 Score: MaxNodeScore - (40-20)*MaxNodeScore= 80
-			pod:          &v1.Pod{Spec: nonZeroContainer},
-			nodes:        []*v1.Node{makeNode("machine1", 250, 1000*1024*1024), makeNode("machine2", 250, 1000*1024*1024)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 60}, {Name: "machine2", Score: 80}},
-			name:         "no resources requested, pods scheduled",
-			pods: []*v1.Pod{
-				{Spec: nonZeroContainer1},
-				{Spec: nonZeroContainer1},
 			},
 		},
 		{
@@ -351,17 +326,27 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 		},
 		{
 			// Node1 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 6000 / 6000 = 1
+			// CPU Fraction: 6000 / 4000 > 100% ==> Score := 0
 			// Memory Fraction: 0 / 10000 = 0
-			// Node1 Score: MaxNodeScore - (1 - 0) * MaxNodeScore = 0
+			// Node1 Score: 0
 			// Node2 scores on 0-MaxNodeScore scale
-			// CPU Fraction: 6000 / 6000 = 1
+			// CPU Fraction: 6000 / 4000 > 100% ==> Score := 0
 			// Memory Fraction 5000 / 10000 = 50%
-			// Node2 Score: MaxNodeScore - (1 - 0.5) * MaxNodeScore = 50
+			// Node2 Score: 0
 			pod:          &v1.Pod{Spec: cpuOnly},
-			nodes:        []*v1.Node{makeNode("machine1", 6000, 10000), makeNode("machine2", 6000, 10000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
-			name:         "requested resources at node capacity",
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
+			name:         "requested resources exceed node capacity",
+			pods: []*v1.Pod{
+				{Spec: cpuOnly},
+				{Spec: cpuAndMemory},
+			},
+		},
+		{
+			pod:          &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
+			name:         "zero node resources, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
