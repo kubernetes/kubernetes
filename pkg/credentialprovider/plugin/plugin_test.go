@@ -28,13 +28,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	"k8s.io/client-go/tools/cache"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
 	credentialproviderv1alpha1 "k8s.io/kubelet/pkg/apis/credentialprovider/v1alpha1"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 type fakeExecPlugin struct {
@@ -305,7 +306,7 @@ func Test_ProvideParallel(t *testing.T) {
 }
 
 func Test_getCachedCredentials(t *testing.T) {
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	p := &pluginProvider{
 		clock:          fakeClock,
 		lastCachePurge: fakeClock.Now(),

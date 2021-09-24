@@ -81,12 +81,12 @@ func (d *detectLocalByCIDR) IsImplemented() bool {
 
 func (d *detectLocalByCIDR) JumpIfLocal(args []string, toChain string) []string {
 	line := append(args, "-s", d.cidr, "-j", toChain)
-	klog.V(4).Info("[DetectLocalByCIDR (", d.cidr, ")", " Jump Local: ", line)
+	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpLocal", line)
 	return line
 }
 
 func (d *detectLocalByCIDR) JumpIfNotLocal(args []string, toChain string) []string {
 	line := append(args, "!", "-s", d.cidr, "-j", toChain)
-	klog.V(4).Info("[DetectLocalByCIDR (", d.cidr, ")]", " Jump Not Local: ", line)
+	klog.V(4).InfoS("Detect Local By CIDR", "cidr", d.cidr, "jumpNotLocal", line)
 	return line
 }

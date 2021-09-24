@@ -138,24 +138,6 @@ const (
 	// Postpone deletion of a PV or a PVC when they are being used
 	StorageObjectInUseProtection featuregate.Feature = "StorageObjectInUseProtection"
 
-	// owner: @dims, @derekwaynecarr
-	// alpha: v1.10
-	// beta: v1.14
-	// GA: v1.20
-	//
-	// Implement support for limiting pids in pods
-	SupportPodPidsLimit featuregate.Feature = "SupportPodPidsLimit"
-
-	// owner: @mikedanese
-	// alpha: v1.13
-	// beta: v1.21
-	// ga: v1.22
-	//
-	// Migrate ServiceAccount volumes to use a projected volume consisting of a
-	// ServiceAccountTokenVolumeProjection. This feature adds new required flags
-	// to the API server.
-	BoundServiceAccountTokenVolume featuregate.Feature = "BoundServiceAccountTokenVolume"
-
 	// owner: @pohly
 	// alpha: v1.14
 	// beta: v1.16
@@ -360,13 +342,6 @@ const (
 	// the driver by passing FSGroup through the NodeStageVolume and
 	// NodePublishVolume calls.
 	DelegateFSGroupToCSIDriver featuregate.Feature = "DelegateFSGroupToCSIDriver"
-
-	// owner: @RobertKrawitz, @derekwaynecarr
-	// beta: v1.15
-	// GA: v1.20
-	//
-	// Implement support for limiting pids in nodes
-	SupportNodePidsLimit featuregate.Feature = "SupportNodePidsLimit"
 
 	// owner: @RobertKrawitz
 	// alpha: v1.15
@@ -791,9 +766,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
 	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA},
-	SupportPodPidsLimit:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	SupportNodePidsLimit:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	BoundServiceAccountTokenVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	CSIMigration:                                   {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationGCE:                                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)
 	InTreePluginGCEUnregister:                      {Default: false, PreRelease: featuregate.Alpha},

@@ -20,7 +20,6 @@ limitations under the License.
 package winkernel
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -32,14 +31,12 @@ import (
 
 	"github.com/Microsoft/hcsshim"
 	"github.com/Microsoft/hcsshim/hcn"
-	"github.com/davecgh/go-spew/spew"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/events"
@@ -188,20 +185,22 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 		return false
 	}
 
-	globals, err := hcn.GetGlobals()
-	if err != nil {
-		klog.ErrorS(err, "Unable to determine networking stack version. Falling back to single-stack")
-		return false
-	}
-
-	if !kernelSupportsDualstack(globals.Version) {
-		klog.InfoS("This version of Windows does not support dual-stack. Falling back to single-stack")
+	// First tag of hcsshim that has a proper check for dual stack support is v0.8.22 due to a bug.
+	if err := hcn.IPv6DualStackSupported(); err != nil {
+		// Hcn *can* fail the query to grab the version of hcn itself (which this call will do internally before parsing
+		// to see if dual stack is supported), but the only time this can happen, at least that can be discerned, is if the host
+		// is pre-1803 and hcn didn't exist. hcsshim should truthfully return a known error if this happened that we can
+		// check against, and the case where 'err != this known error' would be the 'this feature isn't supported' case, as is being
+		// used here. For now, seeming as how nothing before ws2019 (1809) is listed as supported for k8s we can pretty much assume
+		// any error here isn't because the query failed, it's just that dualstack simply isn't supported on the host. With all
+		// that in mind, just log as info and not error to let the user know we're falling back.
+		klog.InfoS("This version of Windows does not support dual-stack. Falling back to single-stack", "err", err.Error())
 		return false
 	}
 
 	// check if network is using overlay
 	hns, _ := newHostNetworkService()
-	networkName, err = getNetworkName(networkName)
+	networkName, err := getNetworkName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
 		return false
@@ -219,36 +218,6 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	}
 
 	return true
-}
-
-// The hcsshim version logic has a bug that did not calculate the versioning of DualStack correctly.
-// DualStack is supported in WS 2004+ (10.0.19041+) where HCN component version is 11.10+
-// https://github.com/microsoft/hcsshim/pull/1003#issuecomment-827930358
-func kernelSupportsDualstack(currentVersion hcn.Version) bool {
-	hnsVersion := fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor)
-	v, err := version.ParseSemantic(hnsVersion)
-	if err != nil {
-		return false
-	}
-
-	return v.AtLeast(version.MustParseSemantic("11.10.0"))
-}
-
-func Log(v interface{}, message string, level klog.Level) {
-	klog.V(level).InfoS("%s", message, "spewConfig", spewSdump(v))
-}
-
-func LogJson(interfaceName string, v interface{}, message string, level klog.Level) {
-	jsonString, err := json.Marshal(v)
-	if err == nil {
-		klog.V(level).InfoS("%s", message, interfaceName, string(jsonString))
-	}
-}
-
-func spewSdump(v interface{}) string {
-	scs := spew.NewDefaultConfig()
-	scs.DisableMethods = true
-	return scs.Sdump(v)
 }
 
 // internal struct for endpoints information
@@ -454,7 +423,7 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 }
 
 func (ep *endpointsInfo) Cleanup() {
-	Log(ep, "Endpoint Cleanup", 3)
+	klog.V(3).InfoS("Endpoint cleanup", "endpointsInfo", ep)
 	if !ep.GetIsLocal() && ep.refCount != nil {
 		*ep.refCount--
 
@@ -799,7 +768,7 @@ func CleanupLeftovers() (encounteredError bool) {
 }
 
 func (svcInfo *serviceInfo) cleanupAllPolicies(endpoints []proxy.Endpoint) {
-	Log(svcInfo, "Service Cleanup", 3)
+	klog.V(3).InfoS("Service cleanup", "serviceInfo", svcInfo)
 	// Skip the svcInfo.policyApplied check to remove all the policies
 	svcInfo.deleteAllHnsLoadBalancerPolicy()
 	// Cleanup Endpoints references
@@ -841,7 +810,7 @@ func deleteAllHnsLoadBalancerPolicy() {
 		return
 	}
 	for _, plist := range plists {
-		LogJson("policyList", plist, "Remove Policy", 3)
+		klog.V(3).InfoS("Remove policy", "policies", plist)
 		_, err = plist.Delete()
 		if err != nil {
 			klog.ErrorS(err, "Failed to delete policy list")
@@ -1070,7 +1039,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if svcInfo.policyApplied {
-			klog.V(4).InfoS("Policy already applied", "spewConfig", spewSdump(svcInfo))
+			klog.V(4).InfoS("Policy already applied", "serviceInfo", svcInfo)
 			continue
 		}
 
@@ -1167,7 +1136,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 					newHnsEndpoint, err = hns.createEndpoint(hnsEndpoint, hnsNetworkName)
 					if err != nil {
-						klog.ErrorS(err, "Remote endpoint creation failed", "spewConfig", spewSdump(hnsEndpoint))
+						klog.ErrorS(err, "Remote endpoint creation failed", "endpointsInfo", hnsEndpoint)
 						continue
 					}
 				} else {
@@ -1209,7 +1178,8 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 
 			// Save the hnsId for reference
-			LogJson("endpointInfo", newHnsEndpoint, "Hns Endpoint resource", 1)
+			klog.V(1).InfoS("Hns endpoint resource", "endpointsInfo", newHnsEndpoint)
+
 			hnsEndpoints = append(hnsEndpoints, *newHnsEndpoint)
 			if newHnsEndpoint.GetIsLocal() {
 				hnsLocalEndpoints = append(hnsLocalEndpoints, *newHnsEndpoint)
@@ -1221,10 +1191,10 @@ func (proxier *Proxier) syncProxyRules() {
 
 			ep.hnsID = newHnsEndpoint.hnsID
 
-			Log(ep, "Endpoint resource found", 3)
+			klog.V(3).InfoS("Endpoint resource found", "endpointsInfo", ep)
 		}
 
-		klog.V(3).InfoS("Associated endpoints for service", "spewConfig", spewSdump(hnsEndpoints), "svcName", svcName.String())
+		klog.V(3).InfoS("Associated endpoints for service", "endpointsInfo", hnsEndpoints, "svcName", svcName.String())
 
 		if len(svcInfo.hnsID) > 0 {
 			// This should not happen
@@ -1236,7 +1206,7 @@ func (proxier *Proxier) syncProxyRules() {
 			continue
 		}
 
-		klog.V(4).Infof("Trying to Apply Policies for service", "spewConfig", spewSdump(svcInfo))
+		klog.V(4).Infof("Trying to apply Policies for service", "serviceInfo", svcInfo)
 		var hnsLoadBalancer *loadBalancerInfo
 		var sourceVip = proxier.sourceVip
 		if containsPublicIP || containsNodeIP {
@@ -1339,7 +1309,7 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 		}
 		svcInfo.policyApplied = true
-		Log(svcInfo, "+++Policy Successfully applied for service +++", 2)
+		klog.V(2).InfoS("Policy successfully applied for service", "serviceInfo", svcInfo)
 	}
 
 	if proxier.healthzServer != nil {

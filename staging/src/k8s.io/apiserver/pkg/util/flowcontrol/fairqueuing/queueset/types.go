@@ -59,6 +59,9 @@ type request struct {
 	// arrivalTime is the real time when the request entered this system
 	arrivalTime time.Time
 
+	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
+	arrivalR float64
+
 	// descr1 and descr2 are not used in any logic but they appear in
 	// log messages
 	descr1, descr2 interface{}

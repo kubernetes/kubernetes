@@ -235,14 +235,24 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 			// testsuites/volumelimits.go `should support volume limits`
 			// test.
 			"--maxvolumespernode=10",
-			// Disable volume lifecycle checks due to issue #103651
-			// TODO: enable this check once issue is resolved for csi-host-path driver.
-			"--check-volume-lifecycle=false",
+			// Enable volume lifecycle checks, to report failure if
+			// the volume is not unpublished / unstaged correctly.
+			"--check-volume-lifecycle=true",
 		},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	}
+
+	// Disable volume lifecycle checks due to issue #103651 for the one
+	// test that it breaks.
+	// TODO: enable this check once issue is resolved for csi-host-path driver
+	// (https://github.com/kubernetes/kubernetes/pull/104858).
+	if strings.Contains(ginkgo.CurrentGinkgoTestDescription().FullTestText,
+		"should unmount if pod is gracefully deleted while kubelet is down") {
+		o.DriverContainerArguments = append(o.DriverContainerArguments, "--check-volume-lifecycle=false")
+	}
+
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
 			return err

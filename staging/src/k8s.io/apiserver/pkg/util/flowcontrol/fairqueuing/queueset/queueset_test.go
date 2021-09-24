@@ -333,9 +333,9 @@ func (uss *uniformScenarioState) evalTo(lim time.Time, last, expectFair bool, ma
 		}
 
 		if gotFair != expectFair {
-			uss.t.Errorf("%s client %d last=%v got an Average of %v but the expected average was %v", uss.name, i, last, averages[i], expectedAverage)
+			uss.t.Errorf("%s client %d last=%v expectFair=%v margin=%v got an Average of %v but the expected average was %v", uss.name, i, last, expectFair, margin, averages[i], expectedAverage)
 		} else {
-			uss.t.Logf("%s client %d last=%v got an Average of %v and the expected average was %v", uss.name, i, last, averages[i], expectedAverage)
+			uss.t.Logf("%s client %d last=%v expectFair=%v margin=%v got an Average of %v and the expected average was %v", uss.name, i, last, expectFair, margin, averages[i], expectedAverage)
 		}
 	}
 }
@@ -413,29 +413,44 @@ func TestMain(m *testing.M) {
 }
 
 // TestNoRestraint tests whether the no-restraint factory gives every client what it asks for
+// even though that is unfair.
+// Expects fairness when there is no competition, unfairness when there is competition.
 func TestNoRestraint(t *testing.T) {
 	metrics.Register()
-	now := time.Now()
-	clk, counter := testeventclock.NewFake(now, 0, nil)
-	nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk))
-	if err != nil {
-		t.Fatal(err)
+	testCases := []struct {
+		concurrency int
+		margin      float64
+		fair        bool
+		name        string
+	}{
+		{concurrency: 10, margin: 0.001, fair: true, name: "no-competition"},
+		{concurrency: 2, margin: 0.25, fair: false, name: "with-competition"},
 	}
-	nr := nrc.Complete(fq.DispatchingConfig{})
-	uniformScenario{name: "NoRestraint",
-		qs: nr,
-		clients: []uniformClient{
-			newUniformClient(1001001001, 5, 10, time.Second, time.Second),
-			newUniformClient(2002002002, 2, 10, time.Second, time.Second/2),
-		},
-		concurrencyLimit:       10,
-		evalDuration:           time.Second * 15,
-		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.1},
-		expectAllRequests:      true,
-		clk:                    clk,
-		counter:                counter,
-	}.exercise(t)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			now := time.Now()
+			clk, counter := testeventclock.NewFake(now, 0, nil)
+			nrc, err := test.NewNoRestraintFactory().BeginConstruction(fq.QueuingConfig{}, newObserverPair(clk))
+			if err != nil {
+				t.Fatal(err)
+			}
+			nr := nrc.Complete(fq.DispatchingConfig{})
+			uniformScenario{name: "NoRestraint/" + testCase.name,
+				qs: nr,
+				clients: []uniformClient{
+					newUniformClient(1001001001, 5, 15, time.Second, time.Second),
+					newUniformClient(2002002002, 2, 15, time.Second, time.Second/2),
+				},
+				concurrencyLimit:       testCase.concurrency,
+				evalDuration:           time.Second * 18,
+				expectedFair:           []bool{testCase.fair},
+				expectedFairnessMargin: []float64{testCase.margin},
+				expectAllRequests:      true,
+				clk:                    clk,
+				counter:                counter,
+			}.exercise(t)
+		})
+	}
 }
 
 func TestBaseline(t *testing.T) {
@@ -550,7 +565,7 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 50,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.1},
+		expectedFairnessMargin: []float64{0.01},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -568,7 +583,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	qCfg := fq.QueuingConfig{
 		Name:             "TestUniformFlowsHandSize3",
 		DesiredNumQueues: 8,
-		QueueLengthLimit: 4,
+		QueueLengthLimit: 16,
 		HandSize:         3,
 		RequestWaitLimit: 10 * time.Minute,
 	}
@@ -580,13 +595,13 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			newUniformClient(1001001001, 8, 30, time.Second, time.Second-1),
-			newUniformClient(2002002002, 8, 30, time.Second, time.Second-1),
+			newUniformClient(400900100100, 8, 30, time.Second, time.Second-1),
+			newUniformClient(300900200200, 8, 30, time.Second, time.Second-1),
 		},
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 60,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.1},
+		expectedFairnessMargin: []float64{0.01},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -623,7 +638,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 40,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.1},
+		expectedFairnessMargin: []float64{0.01},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -660,7 +675,7 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 		concurrencyLimit:       3,
 		evalDuration:           time.Second * 20,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.1},
+		expectedFairnessMargin: []float64{0.01},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -678,7 +693,7 @@ func TestDifferentWidths(t *testing.T) {
 	qCfg := fq.QueuingConfig{
 		Name:             "TestDifferentWidths",
 		DesiredNumQueues: 64,
-		QueueLengthLimit: 4,
+		QueueLengthLimit: 13,
 		HandSize:         7,
 		RequestWaitLimit: 10 * time.Minute,
 	}
@@ -696,7 +711,7 @@ func TestDifferentWidths(t *testing.T) {
 		concurrencyLimit:       6,
 		evalDuration:           time.Second * 20,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.16},
+		expectedFairnessMargin: []float64{0.125},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -714,7 +729,7 @@ func TestTooWide(t *testing.T) {
 	qCfg := fq.QueuingConfig{
 		Name:             "TestTooWide",
 		DesiredNumQueues: 64,
-		QueueLengthLimit: 7,
+		QueueLengthLimit: 35,
 		HandSize:         7,
 		RequestWaitLimit: 10 * time.Minute,
 	}
@@ -733,9 +748,9 @@ func TestTooWide(t *testing.T) {
 			newUniformClient(90090090090090, 15, 21, time.Second, time.Second-1).seats(7),
 		},
 		concurrencyLimit:       6,
-		evalDuration:           time.Second * 40,
+		evalDuration:           time.Second * 225,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.38},
+		expectedFairnessMargin: []float64{0.33},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -744,40 +759,64 @@ func TestTooWide(t *testing.T) {
 	}.exercise(t)
 }
 
+// TestWindup exercises a scenario with the windup problem.
+// That is, a flow that can not use all the seats that it is allocated
+// for a while.  During that time, the queues that serve that flow
+// advance their `virtualStart` (that is, R(next dispatch in virtual world))
+// more slowly than the other queues (which are using more seats than they
+// are allocated).  The implementation has a hack that addresses part of
+// this imbalance but not all of it.  In this test, flow 1 can not use all
+// of its allocation during the first half, and *can* (and does) use all of
+// its allocation and more during the second half.
+// Thus we expect the fair (not equal) result
+// in the first half and an unfair result in the second half.
+// This func has two test cases, bounding the amount of unfairness
+// in the second half.
 func TestWindup(t *testing.T) {
 	metrics.Register()
-	now := time.Now()
-
-	clk, counter := testeventclock.NewFake(now, 0, nil)
-	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
-	qCfg := fq.QueuingConfig{
-		Name:             "TestWindup",
-		DesiredNumQueues: 9,
-		QueueLengthLimit: 6,
-		HandSize:         1,
-		RequestWaitLimit: 10 * time.Minute,
+	testCases := []struct {
+		margin2     float64
+		expectFair2 bool
+		name        string
+	}{
+		{margin2: 0.26, expectFair2: true, name: "upper-bound"},
+		{margin2: 0.1, expectFair2: false, name: "lower-bound"},
 	}
-	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
-	if err != nil {
-		t.Fatal(err)
-	}
-	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			now := time.Now()
+			clk, counter := testeventclock.NewFake(now, 0, nil)
+			qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+			qCfg := fq.QueuingConfig{
+				Name:             "TestWindup/" + testCase.name,
+				DesiredNumQueues: 9,
+				QueueLengthLimit: 6,
+				HandSize:         1,
+				RequestWaitLimit: 10 * time.Minute,
+			}
+			qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+			if err != nil {
+				t.Fatal(err)
+			}
+			qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 3})
 
-	uniformScenario{name: qCfg.Name, qs: qs,
-		clients: []uniformClient{
-			newUniformClient(1001001001, 2, 40, time.Second, -1),
-			newUniformClient(2002002002, 2, 40, time.Second, -1).setSplit(),
-		},
-		concurrencyLimit:       3,
-		evalDuration:           time.Second * 40,
-		expectedFair:           []bool{true, true},
-		expectedFairnessMargin: []float64{0.1, 0.26},
-		expectAllRequests:      true,
-		evalInqueueMetrics:     true,
-		evalExecutingMetrics:   true,
-		clk:                    clk,
-		counter:                counter,
-	}.exercise(t)
+			uniformScenario{name: qCfg.Name, qs: qs,
+				clients: []uniformClient{
+					newUniformClient(1001001001, 2, 40, time.Second, -1),
+					newUniformClient(2002002002, 2, 40, time.Second, -1).setSplit(),
+				},
+				concurrencyLimit:       3,
+				evalDuration:           time.Second * 40,
+				expectedFair:           []bool{true, testCase.expectFair2},
+				expectedFairnessMargin: []float64{0.01, testCase.margin2},
+				expectAllRequests:      true,
+				evalInqueueMetrics:     true,
+				evalExecutingMetrics:   true,
+				clk:                    clk,
+				counter:                counter,
+			}.exercise(t)
+		})
+	}
 }
 
 func TestDifferentFlowsWithoutQueuing(t *testing.T) {
@@ -805,7 +844,7 @@ func TestDifferentFlowsWithoutQueuing(t *testing.T) {
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 13,
 		expectedFair:           []bool{false},
-		expectedFairnessMargin: []float64{0.1},
+		expectedFairnessMargin: []float64{0.20},
 		evalExecutingMetrics:   true,
 		rejectReason:           "concurrency-limit",
 		clk:                    clk,
@@ -840,7 +879,7 @@ func TestTimeout(t *testing.T) {
 		concurrencyLimit:       1,
 		evalDuration:           time.Second * 10,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.1},
+		expectedFairnessMargin: []float64{0.01},
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
 		rejectReason:           "time-out",
@@ -1033,7 +1072,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	}
 }
 
-func TestSelectQueueLocked(t *testing.T) {
+func TestFindDispatchQueueLocked(t *testing.T) {
 	var G float64 = 0.003
 	tests := []struct {
 		name                    string
@@ -1188,7 +1227,7 @@ func TestSelectQueueLocked(t *testing.T) {
 					minQueueExpected = test.queues[queueIdx]
 				}
 
-				minQueueGot := qs.selectQueueLocked()
+				minQueueGot := qs.findDispatchQueueLocked()
 				if minQueueExpected != minQueueGot {
 					t.Errorf("Expected queue: %#v, but got: %#v", minQueueExpected, minQueueGot)
 				}

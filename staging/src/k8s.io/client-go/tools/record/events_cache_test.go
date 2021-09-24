@@ -25,8 +25,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
+	testclocks "k8s.io/utils/clock/testing"
 )
 
 func makeObjectReference(kind, name, namespace string) v1.ObjectReference {
@@ -234,7 +234,7 @@ func TestEventCorrelator(t *testing.T) {
 
 	for testScenario, testInput := range scenario {
 		eventInterval := time.Duration(testInput.intervalSeconds) * time.Second
-		clock := clock.IntervalClock{Time: time.Now(), Duration: eventInterval}
+		clock := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
 		correlator := NewEventCorrelator(&clock)
 		for i := range testInput.previousEvents {
 			event := testInput.previousEvents[i]
@@ -320,9 +320,9 @@ func TestEventSpamFilter(t *testing.T) {
 			spamKeyFunc:  spamKeyFuncBasedOnObjectsAndReason,
 		},
 	}
-	for testDescription, testInput := range testCases {
 
-		c := clock.IntervalClock{Time: time.Now(), Duration: eventInterval}
+	for testDescription, testInput := range testCases {
+		c := testclocks.SimpleIntervalClock{Time: time.Now(), Duration: eventInterval}
 		correlator := NewEventCorrelatorWithOptions(CorrelatorOptions{
 			Clock:       &c,
 			SpamKeyFunc: testInput.spamKeyFunc,

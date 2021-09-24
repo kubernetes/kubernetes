@@ -49,7 +49,9 @@ fi
 
 # smoke test
 echo "Smoke testing examples by compiling..."
-go build "./${SCRIPT_ROOT}/examples/crd/..."
-go build "./${SCRIPT_ROOT}/examples/apiserver/..."
-go build "./${SCRIPT_ROOT}/examples/MixedCase/..."
-go build "./${SCRIPT_ROOT}/examples/HyphenGroup/..."
+pushd "./${SCRIPT_ROOT}/examples"
+  go build "k8s.io/code-generator/examples/crd/..."
+  go build "k8s.io/code-generator/examples/apiserver/..."
+  go build "k8s.io/code-generator/examples/MixedCase/..."
+  go build "k8s.io/code-generator/examples/HyphenGroup/..."
+popd
