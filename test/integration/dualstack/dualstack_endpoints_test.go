@@ -28,14 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/endpointslice"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	netutils "k8s.io/utils/net"
 )
@@ -47,9 +44,6 @@ func TestDualStackEndpoints(t *testing.T) {
 	labelMap := func() map[string]string {
 		return map[string]string{"foo": "bar"}
 	}
-
-	dualStack := true
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, dualStack)()
 
 	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := netutils.ParseCIDRSloppy(serviceCIDR)
