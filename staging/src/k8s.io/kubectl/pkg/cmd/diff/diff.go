@@ -25,8 +25,7 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/cli-runtime/pkg/printers"
+	"k8s.io/kubectl/pkg/util/prune"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/spf13/cobra"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
@@ -110,25 +110,18 @@ type DiffOptions struct {
 	FieldManager    string
 	ForceConflicts  bool
 
-	Selector          string
-	OpenAPISchema     openapi.Resources
-	DiscoveryClient   discovery.DiscoveryInterface
-	DynamicClient     dynamic.Interface
-	DryRunVerifier    *resource.DryRunVerifier
-	CmdNamespace      string
-	EnforceNamespace  bool
-	Builder           *resource.Builder
-	Diff              *DiffProgram
-	Mapper            meta.RESTMapper
-	Prune             bool
-	PruneResources    []pruneResource
-	VisitedUids       sets.String
-	VisitedNamespaces sets.String
-	ToPrinter         func(string) (printers.ResourcePrinter, error)
-	PrintFlags        *genericclioptions.PrintFlags
-	All               bool
-	PruneWhitelist    []string
-	genericclioptions.IOStreams
+	Selector         string
+	OpenAPISchema    openapi.Resources
+	DiscoveryClient  discovery.DiscoveryInterface
+	DynamicClient    dynamic.Interface
+	DryRunVerifier   *resource.DryRunVerifier
+	CmdNamespace     string
+	EnforceNamespace bool
+	Builder          *resource.Builder
+	Diff             *DiffProgram
+	Prune            bool
+	PruneWhitelist   []string
+	pruner           *pruner
 }
 
 func validateArgs(cmd *cobra.Command, args []string) error {
@@ -144,10 +137,10 @@ func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
 			Exec:      exec.New(),
 			IOStreams: ioStreams,
 		},
-		VisitedUids:       sets.NewString(),
-		VisitedNamespaces: sets.NewString(),
-		PrintFlags:        genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		IOStreams:         ioStreams,
+		pruner: &pruner{
+			visitedUids:       sets.NewString(),
+			visitedNamespaces: sets.NewString(),
+		},
 	}
 }
 
@@ -162,7 +155,6 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckDiffErr(options.Complete(f, cmd))
 			cmdutil.CheckDiffErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(validatePruneAll(options.Prune, options.All, options.Selector))
 			// `kubectl diff` propagates the error code from
 			// diff or `KUBECTL_EXTERNAL_DIFF`. Also, we
 			// don't want to print an error if diff returns
@@ -189,23 +181,12 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringArrayVar(&options.PruneWhitelist, "prune-whitelist", options.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Automatically diff for possibly will be deleted resource objects, Should be used with either -l or --all.")
-	cmd.Flags().BoolVar(&options.All, "all", options.All, "Select all resources in the namespace of the specified resource types.")
+	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Automatically diff for possibly will be deleted resource objects, Should be used with either -l or --prune-all.")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
 
 	return cmd
-}
-
-func validatePruneAll(prune, all bool, selector string) error {
-	if all && len(selector) > 0 {
-		return fmt.Errorf("cannot set --all and --selector at the same time")
-	}
-	if prune && !all && selector == "" {
-		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
-	}
-	return nil
 }
 
 // DiffProgram finds and run the diff program. The value of
@@ -649,12 +630,6 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
-	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
-		o.PrintFlags.NamePrintFlags.Operation = operation
-		cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, cmdutil.DryRunServer)
-		return o.PrintFlags.ToPrinter()
-	}
-
 	if !o.ServerSideApply {
 		o.OpenAPISchema, err = f.OpenAPISchema()
 		if err != nil {
@@ -680,12 +655,13 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	}
 
 	if o.Prune {
-		o.Mapper, err = f.ToRESTMapper()
+		o.pruner.dynamicClient = o.DynamicClient
+		o.pruner.mapper, err = f.ToRESTMapper()
 		if err != nil {
 			return err
 		}
 
-		o.PruneResources, err = parsePruneResources(o.Mapper, o.PruneWhitelist)
+		o.pruner.resources, err = prune.ParseResources(o.pruner.mapper, o.PruneWhitelist)
 		if err != nil {
 			return err
 		}
@@ -756,9 +732,9 @@ func (o *DiffOptions) Run() error {
 				IOStreams:       o.Diff.IOStreams,
 			}
 
+			o.markVisited(info)
+
 			err = differ.Diff(obj, printer)
-			o.MarkNamespaceVisited(info)
-			o.MarkObjectVisited(info)
 			if !isConflict(err) {
 				break
 			}
@@ -770,8 +746,18 @@ func (o *DiffOptions) Run() error {
 	})
 
 	if o.Prune {
-		prune := newPruner(o)
-		prune.pruneAll(o)
+		prunedObjs, err := o.pruner.pruneAll()
+		if err != nil {
+			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
+		}
+
+		// Print pruned objects into old file and thus, diff
+		// command will show them as pruned.
+		for _, p := range prunedObjs {
+			if err := differ.From.Print(o.pruner.GetObjectName(p), p, printer); err != nil {
+				return err
+			}
+		}
 	}
 
 	if err != nil {
@@ -781,21 +767,14 @@ func (o *DiffOptions) Run() error {
 	return differ.Run(o.Diff)
 }
 
-// MarkObjectVisited keeps track of UIDs of the applied
-// objects. Used for pruning.
-func (o *DiffOptions) MarkObjectVisited(info *resource.Info) error {
+func (o *DiffOptions) markVisited(info *resource.Info) {
+	if info.Namespaced() {
+		o.pruner.visitedNamespaces.Insert(info.Namespace)
+	}
+
 	metadata, err := meta.Accessor(info.Object)
 	if err != nil {
-		return err
+		return
 	}
-	o.VisitedUids.Insert(string(metadata.GetUID()))
-	return nil
-}
-
-// MarkNamespaceVisited keeps track of which namespaces the applied
-// objects belong to. Used for pruning.
-func (o *DiffOptions) MarkNamespaceVisited(info *resource.Info) {
-	if info.Namespaced() {
-		o.VisitedNamespaces.Insert(info.Namespace)
-	}
+	o.pruner.visitedUids.Insert(string(metadata.GetUID()))
 }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package diff
+package prune
 
 import (
 	"testing"
@@ -46,11 +46,38 @@ func (m *testRESTMapper) RESTMapping(gk schema.GroupKind, versions ...string) (*
 	}, nil
 }
 
+func TestGetRESTMappings(t *testing.T) {
+	tests := []struct {
+		mapper      *testRESTMapper
+		pr          *[]Resource
+		expectedns  int
+		expectednns int
+		expectederr error
+	}{
+		{
+			mapper:      &testRESTMapper{},
+			pr:          &[]Resource{},
+			expectedns:  14,
+			expectednns: 2,
+			expectederr: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		actualns, actualnns, actualerr := GetRESTMappings(tc.mapper, tc.pr)
+		if tc.expectederr != nil {
+			assert.NotEmptyf(t, actualerr, "getRESTMappings error expected but not fired")
+		}
+		assert.Equal(t, len(actualns), tc.expectedns, "getRESTMappings failed expected number namespaced %d actual %d", tc.expectedns, len(actualns))
+		assert.Equal(t, len(actualnns), tc.expectednns, "getRESTMappings failed expected number nonnamespaced %d actual %d", tc.expectednns, len(actualnns))
+	}
+}
+
 func TestParsePruneResources(t *testing.T) {
 	tests := []struct {
 		mapper   *testRESTMapper
 		gvks     []string
-		expected []pruneResource
+		expected []Resource
 		err      bool
 	}{
 		{
@@ -58,7 +85,7 @@ func TestParsePruneResources(t *testing.T) {
 				scope: meta.RESTScopeNamespace,
 			},
 			gvks:     nil,
-			expected: []pruneResource{},
+			expected: []Resource{},
 			err:      false,
 		},
 		{
@@ -66,7 +93,7 @@ func TestParsePruneResources(t *testing.T) {
 				scope: meta.RESTScopeNamespace,
 			},
 			gvks:     []string{"group/kind/version/test"},
-			expected: []pruneResource{},
+			expected: []Resource{},
 			err:      true,
 		},
 		{
@@ -74,7 +101,7 @@ func TestParsePruneResources(t *testing.T) {
 				scope: meta.RESTScopeNamespace,
 			},
 			gvks:     []string{"group/kind/version"},
-			expected: []pruneResource{{group: "group", version: "kind", kind: "version", namespaced: true}},
+			expected: []Resource{{group: "group", version: "kind", kind: "version", namespaced: true}},
 			err:      false,
 		},
 		{
@@ -82,13 +109,13 @@ func TestParsePruneResources(t *testing.T) {
 				scope: meta.RESTScopeRoot,
 			},
 			gvks:     []string{"group/kind/version"},
-			expected: []pruneResource{{group: "group", version: "kind", kind: "version", namespaced: false}},
+			expected: []Resource{{group: "group", version: "kind", kind: "version", namespaced: false}},
 			err:      false,
 		},
 	}
 
 	for _, tc := range tests {
-		actual, err := parsePruneResources(tc.mapper, tc.gvks)
+		actual, err := ParseResources(tc.mapper, tc.gvks)
 		if tc.err {
 			assert.NotEmptyf(t, err, "parsePruneResources error expected but not fired")
 		} else {
