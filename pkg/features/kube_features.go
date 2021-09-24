@@ -177,14 +177,6 @@ const (
 	// and hence is the best candidate instead.
 	PreferNominatedNode featuregate.Feature = "PreferNominatedNode"
 
-	// owner: @tallclair
-	// alpha: v1.12
-	// beta:  v1.14
-	// GA: v1.20
-	//
-	// Enables RuntimeClass, for selecting between multiple runtimes to run a pod.
-	RuntimeClass featuregate.Feature = "RuntimeClass"
-
 	// owner: @mtaufen
 	// alpha: v1.12
 	// beta:  v1.14
@@ -785,7 +777,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIServiceAccountToken:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.Beta},
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
-	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	NetworkPolicyEndPort:                           {Default: true, PreRelease: featuregate.Beta},
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},

@@ -1101,7 +1101,6 @@ type PodSecurityPolicySpec struct {
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
 	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
 	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
-	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.
 	// +optional
 	RuntimeClass *RuntimeClassStrategyOptions `json:"runtimeClass,omitempty" protobuf:"bytes,24,opt,name=runtimeClass"`
 }
