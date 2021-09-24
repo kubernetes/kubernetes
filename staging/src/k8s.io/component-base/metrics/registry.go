@@ -173,7 +173,18 @@ func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 			kr.trackHiddenCollector(c)
 		}
 	}
-	kr.PromRegistry.MustRegister(metrics...)
+
+	// implement MustRegister to ignore AlreadyRegisteredError
+	for _, c := range metrics {
+		err := kr.PromRegistry.Register(c)
+		if err != nil {
+			// skip if it is already registered
+			_, ok := err.(prometheus.AlreadyRegisteredError)
+			if !ok {
+				panic(err)
+			}
+		}
+	}
 }
 
 // CustomRegister registers a new custom collector.
