@@ -46,7 +46,7 @@ var _ = SIGDescribe("NodeLease", func() {
 		nodeName = node.Name
 	})
 
-	ginkgo.Context("when the NodeLease feature is enabled", func() {
+	ginkgo.Context("NodeLease", func() {
 		ginkgo.It("the kubelet should create and update a lease in the kube-node-lease namespace", func() {
 			leaseClient := f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease)
 			var (
