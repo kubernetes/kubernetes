@@ -92,78 +92,42 @@ func TestDropFields(t *testing.T) {
 		node                    *api.Node
 		oldNode                 *api.Node
 		compareNode             *api.Node
-		enableDualStack         bool
 		enableNodeDynamicConfig bool
 	}{
 		{
-			name:            "nil pod cidrs",
-			enableDualStack: false,
-			node:            makeNode(nil, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode(nil, false, false),
+			name:        "nil pod cidrs",
+			node:        makeNode(nil, false, false),
+			oldNode:     nil,
+			compareNode: makeNode(nil, false, false),
 		},
 		{
-			name:            "empty pod ips",
-			enableDualStack: false,
-			node:            makeNode([]string{}, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode([]string{}, false, false),
+			name:        "empty pod ips",
+			node:        makeNode([]string{}, false, false),
+			oldNode:     nil,
+			compareNode: makeNode([]string{}, false, false),
 		},
 		{
-			name:            "single family ipv6",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10"}, false, false),
+			name:        "single family ipv6",
+			node:        makeNode([]string{"2000::/10"}, false, false),
+			compareNode: makeNode([]string{"2000::/10"}, false, false),
 		},
 		{
-			name:            "single family ipv4",
-			enableDualStack: false,
-			node:            makeNode([]string{"10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"10.0.0.0/8"}, false, false),
+			name:        "single family ipv4",
+			node:        makeNode([]string{"10.0.0.0/8"}, false, false),
+			compareNode: makeNode([]string{"10.0.0.0/8"}, false, false),
 		},
 		{
-			name:            "dualstack 4-6",
-			enableDualStack: true,
-			node:            makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
-			compareNode:     makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
+			name:        "dualstack 4-6",
+			node:        makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
+			compareNode: makeNode([]string{"10.0.0.0/8", "2000::/10"}, false, false),
 		},
 		{
-			name:            "dualstack 6-4",
-			enableDualStack: true,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-		},
-		{
-			name:            "not dualstack 6-4=>4only",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode([]string{"2000::/10"}, false, false),
-		},
-		{
-			name:            "not dualstack 6-4=>as is (used in old)",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-		},
-		{
-			name:            "not dualstack 6-4=>6only",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         nil,
-			compareNode:     makeNode([]string{"2000::/10"}, false, false),
-		},
-		{
-			name:            "not dualstack 6-4=>as is (used in old)",
-			enableDualStack: false,
-			node:            makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			oldNode:         makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
-			compareNode:     makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			name:        "dualstack 6-4",
+			node:        makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
+			compareNode: makeNode([]string{"2000::/10", "10.0.0.0/8"}, false, false),
 		},
 		{
 			name:                    "new with no Spec.ConfigSource and no Status.Config , enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
 			enableNodeDynamicConfig: false,
 			node:                    makeNode(nil, false, false),
 			oldNode:                 nil,
@@ -171,7 +135,6 @@ func TestDropFields(t *testing.T) {
 		},
 		{
 			name:                    "new with Spec.ConfigSource and no Status.Config, enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
 			enableNodeDynamicConfig: false,
 			node:                    makeNode(nil, true, false),
 			oldNode:                 nil,
@@ -179,7 +142,6 @@ func TestDropFields(t *testing.T) {
 		},
 		{
 			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
 			enableNodeDynamicConfig: false,
 			node:                    makeNode(nil, true, true),
 			oldNode:                 nil,
@@ -187,7 +149,6 @@ func TestDropFields(t *testing.T) {
 		},
 		{
 			name:                    "update with Spec.ConfigSource and Status.Config (old has none), enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
 			enableNodeDynamicConfig: false,
 			node:                    makeNode(nil, true, true),
 			oldNode:                 makeNode(nil, false, false),
@@ -195,7 +156,6 @@ func TestDropFields(t *testing.T) {
 		},
 		{
 			name:                    "update with Spec.ConfigSource and Status.Config (old has them), enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
 			enableNodeDynamicConfig: false,
 			node:                    makeNode(nil, true, true),
 			oldNode:                 makeNode(nil, true, true),
@@ -203,7 +163,6 @@ func TestDropFields(t *testing.T) {
 		},
 		{
 			name:                    "update with Spec.ConfigSource and Status.Config (old has Status.Config), enableNodeDynamicConfig disabled",
-			enableDualStack:         false,
 			enableNodeDynamicConfig: false,
 			node:                    makeNode(nil, true, true),
 			oldNode:                 makeNode(nil, false, true),
@@ -211,7 +170,6 @@ func TestDropFields(t *testing.T) {
 		},
 		{
 			name:                    "new with Spec.ConfigSource and Status.Config, enableNodeDynamicConfig enabled",
-			enableDualStack:         false,
 			enableNodeDynamicConfig: true,
 			node:                    makeNode(nil, true, true),
 			oldNode:                 nil,
@@ -221,7 +179,6 @@ func TestDropFields(t *testing.T) {
 
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, tc.enableNodeDynamicConfig)()
 
 			dropDisabledFields(tc.node, tc.oldNode)

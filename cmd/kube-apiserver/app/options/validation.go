@@ -27,7 +27,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -54,13 +53,7 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		errs = append(errs, err)
 	}
 
-	// Secondary IP validation
-	// ControllerManager needs DualStack feature flags
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
-	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v feature is enabled", string(features.IPv6DualStack)))
-	}
-
 	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
 	// to only ingress traffic within and into the cluster on one IP family only. this family is decided
 	// by the range set on --service-cluster-ip-range. If/when the user decides to use dual stack services

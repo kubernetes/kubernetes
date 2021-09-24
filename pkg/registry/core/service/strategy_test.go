@@ -144,15 +144,6 @@ func TestServiceStatusStrategy(t *testing.T) {
 	}
 }
 
-func makeServiceWithIPFamilies(ipfamilies []api.IPFamily, ipFamilyPolicy *api.IPFamilyPolicyType) *api.Service {
-	return &api.Service{
-		Spec: api.ServiceSpec{
-			IPFamilies:     ipfamilies,
-			IPFamilyPolicy: ipFamilyPolicy,
-		},
-	}
-}
-
 func makeServiceWithConditions(conditions []metav1.Condition) *api.Service {
 	return &api.Service{
 		Status: api.ServiceStatus{
@@ -192,15 +183,10 @@ func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPoli
 }
 
 func TestDropDisabledField(t *testing.T) {
-	requireDualStack := api.IPFamilyPolicyRequireDualStack
-	preferDualStack := api.IPFamilyPolicyPreferDualStack
-	singleStack := api.IPFamilyPolicySingleStack
-
 	localInternalTrafficPolicy := api.ServiceInternalTrafficPolicyLocal
 
 	testCases := []struct {
 		name                        string
-		enableDualStack             bool
 		enableMixedProtocol         bool
 		enableLoadBalancerClass     bool
 		enableInternalTrafficPolicy bool
@@ -208,64 +194,6 @@ func TestDropDisabledField(t *testing.T) {
 		oldSvc                      *api.Service
 		compareSvc                  *api.Service
 	}{
-		{
-			name:            "not dual stack, field not used",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, nil),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "not dual stack, field used in old and new",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
-			oldSvc:          makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
-			compareSvc:      makeServiceWithIPFamilies([]api.IPFamily{api.IPv4Protocol}, nil),
-		},
-		{
-			name:            "dualstack, field used",
-			enableDualStack: true,
-			svc:             makeServiceWithIPFamilies([]api.IPFamily{api.IPv6Protocol}, nil),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies([]api.IPFamily{api.IPv6Protocol}, nil),
-		},
-		/* preferDualStack field */
-		{
-			name:            "not dual stack, fields is not use",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, nil),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "not dual stack, fields used in new, not in old",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, &preferDualStack),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "not dual stack, fields used in new, not in old",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, &requireDualStack),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-
-		{
-			name:            "not dual stack, fields not used in old (single stack)",
-			enableDualStack: false,
-			svc:             makeServiceWithIPFamilies(nil, nil),
-			oldSvc:          makeServiceWithIPFamilies(nil, &singleStack),
-			compareSvc:      makeServiceWithIPFamilies(nil, nil),
-		},
-		{
-			name:            "dualstack, field used",
-			enableDualStack: true,
-			svc:             makeServiceWithIPFamilies(nil, &singleStack),
-			oldSvc:          nil,
-			compareSvc:      makeServiceWithIPFamilies(nil, &singleStack),
-		},
 		/* svc.Status.Conditions */
 		{
 			name:                "mixed protocol not enabled, field not used in old, not used in new",
@@ -463,7 +391,6 @@ func TestDropDisabledField(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		func() {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, tc.enableLoadBalancerClass)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.enableInternalTrafficPolicy)()

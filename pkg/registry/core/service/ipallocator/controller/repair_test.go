@@ -29,10 +29,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	netutils "k8s.io/utils/net"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 type mockRangeRegistry struct {
@@ -328,8 +324,6 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 }
 
 func TestRepairDualStack(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-
 	fakeClient := fake.NewSimpleClientset()
 	ipregistry := &mockRangeRegistry{
 		item: &api.RangeAllocation{Range: "192.168.1.0/24"},
@@ -368,8 +362,6 @@ func TestRepairDualStack(t *testing.T) {
 }
 
 func TestRepairLeakDualStack(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-
 	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
@@ -466,7 +458,6 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 	// we can saftly create tests that has ipFamilyPolicy:nil
 	// this will work every where except alloc & validation
 
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
 	_, cidr, _ := netutils.ParseCIDRSloppy("192.168.1.0/24")
 	previous, err := ipallocator.NewInMemory(cidr)
 	if err != nil {
