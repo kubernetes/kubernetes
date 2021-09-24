@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	cliResource "k8s.io/cli-runtime/pkg/resource"
+	runtimeresource "k8s.io/cli-runtime/pkg/resource"
 )
 
 // Copied from k8s.io/cli-runtime/pkg/resource because unexported
@@ -40,7 +40,7 @@ func splitResourceTypeName(s string) (resourceTuple, bool, error) {
 		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form may not have more than one slash")
 	}
 	resource, name := seg[0], seg[1]
-	if len(resource) == 0 || len(name) == 0 || len(cliResource.SplitResourceArgument(resource)) != 1 {
+	if len(resource) == 0 || len(name) == 0 || len(runtimeresource.SplitResourceArgument(resource)) != 1 {
 		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form must have a single resource and name")
 	}
 	return resourceTuple{Resource: resource, Name: name}, true, nil
