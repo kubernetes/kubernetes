@@ -1,0 +1,64 @@
+#data
+<body><template><yt-icon-button></yt-icon-button><form><paper-input></paper-input></form><style></style></template>
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     <template>
+|       content
+|         <yt-icon-button>
+|         <form>
+|           <paper-input>
+|         <style>
+
+#data
+<template><tBody><isindex/action=0>
+#errors
+#document
+| <html>
+|   <head>
+|     <template>
+|       content
+|         <tbody>
+|         <isindex>
+|           action="0"
+|   <body>
+
+#data
+<math><template><mo><template>
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math template>
+|         <math mo>
+|           <template>
+|             content
+
+#data
+<svg><template><desc><t><svg></template>
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg template>
+|         <svg desc>
+|           <t>
+|             <svg svg>
+
+#data
+<math><template><mn><b></template>
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math template>
+|         <math mn>
+|           <b>

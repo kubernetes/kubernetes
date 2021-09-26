@@ -1,0 +1,78 @@
+[
+    {
+        "description": "a schema given for items",
+        "schema": {
+            "items": {"type": "integer"}
+        },
+        "tests": [
+            {
+                "description": "valid items",
+                "data": [ 1, 2, 3 ],
+                "valid": true
+            },
+            {
+                "description": "wrong type of items",
+                "data": [1, "x"],
+                "valid": false
+            },
+            {
+                "description": "ignores non-arrays",
+                "data": {"foo" : "bar"},
+                "valid": true
+            },
+            {
+                "description": "JavaScript pseudo-array is valid",
+                "data": {
+                    "0": "invalid",
+                    "length": 1
+                },
+                "valid": true
+            }
+        ]
+    },
+    {
+        "description": "an array of schemas for items",
+        "schema": {
+            "items": [
+                {"type": "integer"},
+                {"type": "string"}
+            ]
+        },
+        "tests": [
+            {
+                "description": "correct types",
+                "data": [ 1, "foo" ],
+                "valid": true
+            },
+            {
+                "description": "wrong types",
+                "data": [ "foo", 1 ],
+                "valid": false
+            },
+            {
+                "description": "incomplete array of items",
+                "data": [ 1 ],
+                "valid": true
+            },
+            {
+                "description": "array with additional items",
+                "data": [ 1, "foo", true ],
+                "valid": true
+            },
+            {
+                "description": "empty array",
+                "data": [ ],
+                "valid": true
+            },
+            {
+                "description": "JavaScript pseudo-array is valid",
+                "data": {
+                    "0": "invalid",
+                    "1": "valid",
+                    "length": 2
+                },
+                "valid": true
+            }
+        ]
+    }
+]

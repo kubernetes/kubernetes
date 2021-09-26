@@ -1,0 +1,46 @@
+name: Continuous Integration
+on:
+  push:
+    branches:
+      - ghworkflow
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build_and_test:
+    name: go ${{ matrix.go_version }} - pb-${{ matrix.protobuf_version }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go_version: [1.15.x, 1.12.x]
+        protobuf_version: [3.14.0, 3.0.2, 2.6.1]
+      fail-fast: false
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v1
+        with:
+          path: gopath/src/github.com/gogo/protobuf
+          fetch-depth: 5
+
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go_version }}
+
+      - name: Setup protoc
+        env:
+          PROTOBUF_VERSION: ${{ matrix.protobuf_version }}
+        run: ./install-protobuf.sh
+
+      - name: Protoc version
+        run: PATH=$HOME/bin:$PATH protoc --version
+      - name: env
+        run: env && go env && pwd
+
+      - name: Build server all
+        run: GOPATH=/home/runner/work/protobuf/gopath GOBIN=$GOPATH/bin PATH=$HOME/bin:$GOBIN:$PATH make buildserverall
+
+      - name: Diff check
+        if: matrix.protobuf_version == '3.14.0' && matrix.go_version == '1.15.x'
+        run: (! git status --porcelain | read || (git status; git diff; exit 1))

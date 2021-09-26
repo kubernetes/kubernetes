@@ -1,0 +1,16 @@
+syntax = "proto3";
+package importing;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "github.com/gogo/protobuf/test/importcustom-issue389/imported/a.proto";
+
+option (gogoproto.sizer_all) = true;
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.testgen_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.equal_all) = true;
+
+message C {
+    imported.A f2 = 1 [(gogoproto.customtype) = "github.com/gogo/protobuf/test/importcustom-issue389/imported.B"];
+}

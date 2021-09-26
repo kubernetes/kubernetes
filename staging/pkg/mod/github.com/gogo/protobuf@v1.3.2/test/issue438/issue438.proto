@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package issue438;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/api.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/source_context.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/type.proto";
+import "google/protobuf/wrappers.proto";
+
+option (gogoproto.protosizer_all) = true;
+option (gogoproto.sizer_all) = false;
+
+message Types {
+  google.protobuf.Any any = 1;
+  google.protobuf.Api api = 2;
+  google.protobuf.Method met = 3;
+  google.protobuf.Mixin mx = 4;
+  google.protobuf.Duration dur = 5;
+  google.protobuf.Empty em = 6;
+  google.protobuf.FieldMask fm = 7;
+  google.protobuf.SourceContext sc = 8;
+  google.protobuf.Struct st = 9;
+  google.protobuf.Value val = 10;
+  google.protobuf.NullValue nlval = 11;
+  google.protobuf.StringValue stval = 12;
+  google.protobuf.BoolValue bval = 13;
+  google.protobuf.Struct strval = 14;
+  google.protobuf.ListValue lstv = 15;
+  google.protobuf.Timestamp ts = 16;
+  google.protobuf.Type t = 17;
+  google.protobuf.Field f = 18;
+  google.protobuf.Enum en = 19;
+  google.protobuf.EnumValue enval = 20;
+  google.protobuf.Option opt = 21;
+  google.protobuf.DoubleValue dbl = 22;
+  google.protobuf.FloatValue flt = 23;
+  google.protobuf.Int64Value i64 = 24;
+  google.protobuf.UInt64Value u64 = 25;
+  google.protobuf.Int32Value i32 = 26;
+  google.protobuf.UInt32Value u32 = 27;
+  google.protobuf.BoolValue bool = 28;
+  google.protobuf.StringValue str = 29;
+  google.protobuf.BytesValue bytes = 30;
+}
+
+

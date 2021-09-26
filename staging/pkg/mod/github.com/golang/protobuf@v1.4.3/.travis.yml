@@ -1,0 +1,22 @@
+language: go
+before_install:
+  - mkdir /tmp/go1.12
+  - curl -L -s https://dl.google.com/go/go1.12.linux-amd64.tar.gz | tar -zxf - -C /tmp/go1.12 --strip-components 1
+  - unset GOROOT
+  - (GO111MODULE=on /tmp/go1.12/bin/go mod vendor)
+matrix:
+  include:
+    - go: 1.9.x
+      script: go test -tags protolegacy -v ./...
+    - go: 1.10.x
+      script: go test -tags protolegacy -v ./...
+    - go: 1.11.x
+      script: go test -tags protolegacy -v ./...
+    - go: 1.12.x
+      script: go test -tags protolegacy -v ./...
+    - go: 1.13.x
+      script: go test -tags protolegacy -v ./...
+    - go: 1.14.x
+      script: go test -tags protolegacy -v ./...
+    - go: 1.15.x
+      script: ./test.bash

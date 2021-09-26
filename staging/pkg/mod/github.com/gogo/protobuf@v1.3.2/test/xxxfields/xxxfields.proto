@@ -1,0 +1,92 @@
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2018, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto2";
+package test;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.testgen_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.equal_all) = true;
+
+message NativeWithSizeCache {
+    option (gogoproto.goproto_unrecognized) = false;
+    option (gogoproto.goproto_unkeyed) = false;
+	optional double Field1 = 1;
+	optional float Field2 = 2;
+	optional int32 Field3 = 3;
+	optional int64 Field4 = 4;
+	optional fixed64 Field11 = 11 [(gogoproto.nullable) = false];
+	optional bool Field13 = 13;
+	optional string Field14 = 14;
+    optional bytes Field15 = 15;
+}
+
+message StructWithSizeCache {
+    option (gogoproto.goproto_unrecognized) = false;
+    option (gogoproto.goproto_unkeyed) = false;
+	optional double Field1 = 1 [(gogoproto.nullable) = false];
+	optional float Field2 = 2 [(gogoproto.nullable) = false];
+	optional NativeWithSizeCache Field3 = 3 [(gogoproto.nullable) = false];
+	optional uint64 Field6 = 6 ;
+	optional sint32 Field7 = 7 [(gogoproto.nullable) = false];
+	optional NativeWithoutSizeCache Field8 = 8 [(gogoproto.nullable) = false];
+	repeated bool Field13 = 13;
+	optional string Field14 = 14;
+	optional bytes Field15 = 15 [(gogoproto.nullable) = false];
+}
+
+message NativeWithoutSizeCache {
+    option (gogoproto.goproto_unrecognized) = false;
+    option (gogoproto.goproto_unkeyed) = false;
+    option (gogoproto.goproto_sizecache) = false;
+	optional double Field1 = 1;
+	optional float Field2 = 2;
+	optional int32 Field3 = 3;
+	optional int64 Field4 = 4;
+	optional fixed64 Field11 = 11 [(gogoproto.nullable) = false];
+	optional bool Field13 = 13;
+	optional string Field14 = 14;
+    optional bytes Field15 = 15;
+}
+
+message StructWithoutSizeCache {
+    option (gogoproto.goproto_unrecognized) = false;
+    option (gogoproto.goproto_unkeyed) = false;
+    option (gogoproto.goproto_sizecache) = false;
+	optional double Field1 = 1 [(gogoproto.nullable) = false];
+	optional float Field2 = 2 [(gogoproto.nullable) = false];
+	optional NativeWithSizeCache Field3 = 3 [(gogoproto.nullable) = false];
+	optional uint64 Field6 = 6;
+	optional sint32 Field7 = 7 [(gogoproto.nullable) = false];
+	optional NativeWithoutSizeCache Field8 = 8 [(gogoproto.nullable) = false];
+	repeated bool Field13 = 13;
+	optional string Field14 = 14;
+	optional bytes Field15 = 15 [(gogoproto.nullable) = false];
+}

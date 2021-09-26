@@ -1,0 +1,63 @@
+---
+version: 2.1
+
+commands:
+  default:
+    steps:
+    - run: make style check_license test lint
+  no-test:
+    steps:
+    - run: make style check_license lint
+
+jobs:
+  test:
+    parameters:
+      command:
+        type: string
+      go_version:
+        type: string
+      os:
+        type: string
+    docker:
+    - image: circleci/golang:<< parameters.go_version >>
+    environment:
+      GOOS: "<< parameters.os >>"
+    working_directory: /go/src/github.com/prometheus/procfs
+    steps:
+    - checkout
+    - << parameters.command >>
+
+  codespell:
+    docker:
+    - image: circleci/python
+
+    steps:
+    - checkout
+    - run: sudo pip install codespell
+    - run: codespell --skip=".git,./vendor,ttar,fixtures.ttar,./fixtures,go.mod,go.sum" -L uint,packages\',ded,alo,als,te,sie,hart
+
+workflows:
+  version: 2
+  procfs:
+    jobs:
+    - test:
+        command: default
+        name: linux-1-13
+        os: linux
+        go_version: "1.13"
+    - test:
+        command: default
+        name: linux-1-14
+        os: linux
+        go_version: "1.14"
+    - test:
+        command: no-test
+        name: windows-1-13
+        os: windows
+        go_version: "1.13"
+    - test:
+        command: no-test
+        name: windows-1-14
+        os: windows
+        go_version: "1.14"
+    - codespell

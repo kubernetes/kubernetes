@@ -1,0 +1,646 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ldml>
+	<identity>
+		<language type="root"/>
+	</identity>
+	<dates>
+		<calendars>
+			<calendar type="buddhist">
+				<months>
+					<alias source="locale" path="../../calendar[@type='generic']/months"/> <!-- gregorian in original -->
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">BE</era>
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+			<calendar type="chinese">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">chineseWideM01</month>
+							<month type="2">chineseWideM02</month>
+							<month type="3">chineseWideM03</month>
+							<month type="4">chineseWideM04</month>
+							<month type="5">chineseWideM05</month>
+							<month type="6">chineseWideM06</month>
+							<month type="7">chineseWideM07</month>
+							<month type="8">chineseWideM08</month>
+							<month type="9">chineseWideM09</month>
+							<month type="10">chineseWideM10</month>
+							<month type="11">chineseWideM11</month>
+							<month type="12">chineseWideM12</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">chineseNarrowM1</month>
+							<month type="2">chineseNarrowM2</month>
+							<month type="3">chineseNarrowM3</month>
+							<month type="4">chineseNarrowM4</month>
+							<month type="5">chineseNarrowM5</month>
+							<month type="6">chineseNarrowM6</month>
+							<month type="7">chineseNarrowM7</month>
+							<month type="8">chineseNarrowM8</month>
+							<month type="9">chineseNarrowM9</month>
+							<month type="10">chineseNarrowM10</month>
+							<month type="11">chineseNarrowM11</month>
+							<month type="12">chineseNarrowM12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<!-- chinese eras are computed, and don't fall back to gregorian -->
+				<cyclicNameSets>
+					<cyclicNameSet type="dayParts">
+						<cyclicNameContext type="format">
+							<cyclicNameWidth type="abbreviated">
+								<cyclicName type="1">dpAbbr1</cyclicName>
+								<cyclicName type="2">dpAbbr2</cyclicName>
+								<cyclicName type="3">dpAbbr3</cyclicName>
+								<cyclicName type="4">dpAbbr4</cyclicName>
+								<cyclicName type="5">dpAbbr5</cyclicName>
+								<cyclicName type="6">dpAbbr6</cyclicName>
+								<cyclicName type="7">dpAbbr7</cyclicName>
+								<cyclicName type="8">dpAbbr8</cyclicName>
+								<cyclicName type="9">dpAbbr9</cyclicName>
+								<cyclicName type="10">dpAbbr10</cyclicName>
+								<cyclicName type="11">dpAbbr11</cyclicName>
+								<cyclicName type="12">dpAbbr12</cyclicName>
+							</cyclicNameWidth>
+							<cyclicNameWidth type="narrow">
+								<alias source="locale" path="../cyclicNameWidth[@type='abbreviated']"/>
+							</cyclicNameWidth>
+							<cyclicNameWidth type="wide">
+								<alias source="locale" path="../cyclicNameWidth[@type='abbreviated']"/>
+							</cyclicNameWidth>
+						</cyclicNameContext>
+					</cyclicNameSet>
+					<cyclicNameSet type="days">
+						<alias source="locale" path="../cyclicNameSet[@type='years']"/>
+					</cyclicNameSet>
+					<cyclicNameSet type="months">
+						<alias source="locale" path="../cyclicNameSet[@type='years']"/>
+					</cyclicNameSet>
+					<cyclicNameSet type="years">
+						<cyclicNameContext type="format">
+							<cyclicNameWidth type="abbreviated">
+								<cyclicName type="1">year1</cyclicName>
+								<cyclicName type="2">year2</cyclicName>
+								<cyclicName type="3">year3</cyclicName>
+								<cyclicName type="4">year4</cyclicName>
+								<cyclicName type="5">year5</cyclicName>
+								<cyclicName type="6">year6</cyclicName>
+								<cyclicName type="7">year7</cyclicName>
+								<cyclicName type="8">year8</cyclicName>
+								<cyclicName type="9">year9</cyclicName>
+								<cyclicName type="10">year10</cyclicName>
+								<cyclicName type="11">year11</cyclicName>
+								<cyclicName type="12">year12</cyclicName>
+								<cyclicName type="13">year13</cyclicName>
+								<cyclicName type="14">year14</cyclicName>
+								<cyclicName type="15">year15</cyclicName>
+								<cyclicName type="16">year16</cyclicName>
+								<cyclicName type="17">year17</cyclicName>
+								<cyclicName type="18">year18</cyclicName>
+								<cyclicName type="19">year19</cyclicName>
+								<cyclicName type="20">year20</cyclicName>
+								<cyclicName type="21">year21</cyclicName>
+								<cyclicName type="22">year22</cyclicName>
+								<cyclicName type="23">year23</cyclicName>
+								<cyclicName type="24">year24</cyclicName>
+								<cyclicName type="25">year25</cyclicName>
+								<cyclicName type="26">year26</cyclicName>
+								<cyclicName type="27">year27</cyclicName>
+								<cyclicName type="28">year28</cyclicName>
+								<cyclicName type="29">year29</cyclicName>
+								<cyclicName type="30">year30</cyclicName>
+								<cyclicName type="31">year31</cyclicName>
+								<cyclicName type="32">year32</cyclicName>
+								<cyclicName type="33">year33</cyclicName>
+								<cyclicName type="34">year34</cyclicName>
+								<cyclicName type="35">year35</cyclicName>
+								<cyclicName type="36">year36</cyclicName>
+								<cyclicName type="37">year37</cyclicName>
+								<cyclicName type="38">year38</cyclicName>
+								<cyclicName type="39">year39</cyclicName>
+								<cyclicName type="40">year40</cyclicName>
+								<cyclicName type="41">year41</cyclicName>
+								<cyclicName type="42">year42</cyclicName>
+								<cyclicName type="43">year43</cyclicName>
+								<cyclicName type="44">year44</cyclicName>
+								<cyclicName type="45">year45</cyclicName>
+								<cyclicName type="46">year46</cyclicName>
+								<cyclicName type="47">year47</cyclicName>
+								<cyclicName type="48">year48</cyclicName>
+								<cyclicName type="49">year49</cyclicName>
+								<cyclicName type="50">year50</cyclicName>
+								<cyclicName type="51">year51</cyclicName>
+								<cyclicName type="52">year52</cyclicName>
+								<cyclicName type="53">year53</cyclicName>
+								<cyclicName type="54">year54</cyclicName>
+								<cyclicName type="55">year55</cyclicName>
+								<cyclicName type="56">year56</cyclicName>
+								<cyclicName type="57">year57</cyclicName>
+								<cyclicName type="58">year58</cyclicName>
+								<cyclicName type="59">year59</cyclicName>
+								<cyclicName type="60">year60</cyclicName>
+							</cyclicNameWidth>
+							<cyclicNameWidth type="narrow">
+								<alias source="locale" path="../cyclicNameWidth[@type='abbreviated']"/>
+							</cyclicNameWidth>
+							<cyclicNameWidth type="wide">
+								<alias source="locale" path="../cyclicNameWidth[@type='abbreviated']"/>
+							</cyclicNameWidth>
+						</cyclicNameContext>
+					</cyclicNameSet>
+					<cyclicNameSet type="zodiacs">
+						<cyclicNameContext type="format">
+							<cyclicNameWidth type="abbreviated">
+								<alias source="locale" path="../../../cyclicNameSet[@type='dayParts']/cyclicNameContext[@type='format']/cyclicNameWidth[@type='abbreviated']"/>
+							</cyclicNameWidth>
+							<cyclicNameWidth type="narrow">
+								<alias source="locale" path="../cyclicNameWidth[@type='abbreviated']"/>
+							</cyclicNameWidth>
+							<cyclicNameWidth type="wide">
+								<alias source="locale" path="../cyclicNameWidth[@type='abbreviated']"/>
+							</cyclicNameWidth>
+						</cyclicNameContext>
+					</cyclicNameSet>
+				</cyclicNameSets>
+			</calendar>
+			<calendar type="dangi">
+				<months>
+					<alias source="locale" path="../../calendar[@type='chinese']/months"/>
+				</months>
+				<cyclicNameSets>
+					<alias source="locale" path="../../calendar[@type='chinese']/cyclicNameSets"/>
+				</cyclicNameSets>
+			</calendar>
+			<calendar type="ethiopic">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">Meskerem</month>
+							<month type="2">Tekemt</month>
+							<month type="3">Hedar</month>
+							<month type="4">Tahsas</month>
+							<month type="5">Ter</month>
+							<month type="6">Yekatit</month>
+							<month type="7">Megabit</month>
+							<month type="8">Miazia</month>
+							<month type="9">Genbot</month>
+							<month type="10">Sene</month>
+							<month type="11">Hamle</month>
+							<month type="12">Nehasse</month>
+							<month type="13">Pagumen</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">1</month>
+							<month type="2">2</month>
+							<month type="3">3</month>
+							<month type="4">4</month>
+							<month type="5">5</month>
+							<month type="6">6</month>
+							<month type="7">7</month>
+							<month type="8">8</month>
+							<month type="9">9</month>
+							<month type="10">10</month>
+							<month type="11">11</month>
+							<month type="12">12</month>
+							<month type="13">13</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">ERA0</era>
+						<era type="1">ERA1</era>
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+			<calendar type="ethiopic-amete-alem">
+				<months>
+					<alias source="locale" path="../../calendar[@type='ethiopic']/months"/>
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">ERA0</era>
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+			<calendar type="generic">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">genWideM01</month>
+							<month type="2">genWideM02</month>
+							<month type="3">genWideM03</month>
+							<month type="4">genWideM04</month>
+							<month type="5">genWideM05</month>
+							<month type="6">genWideM06</month>
+							<month type="7">genWideM07</month>
+							<month type="8">genWideM08</month>
+							<month type="9">genWideM09</month>
+							<month type="10">genWideM10</month>
+							<month type="11">genWideM11</month>
+							<month type="12">genWideM12</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">genNarrowM1</month>
+							<month type="2">genNarrowM2</month>
+							<month type="3">genNarrowM3</month>
+							<month type="4">genNarrowM4</month>
+							<month type="5">genNarrowM5</month>
+							<month type="6">genNarrowM6</month>
+							<month type="7">genNarrowM7</month>
+							<month type="8">genNarrowM8</month>
+							<month type="9">genNarrowM9</month>
+							<month type="10">genNarrowM10</month>
+							<month type="11">genNarrowM11</month>
+							<month type="12">genNarrowM12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">ERA0</era>
+						<era type="1">ERA1</era>
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+			<calendar type="gregorian">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">gregWideM01</month>
+							<month type="2">gregWideM02</month>
+							<month type="3">gregWideM03</month>
+							<month type="4">gregWideM04</month>
+							<month type="5">gregWideM05</month>
+							<month type="6">gregWideM06</month>
+							<month type="7">gregWideM07</month>
+							<month type="8">gregWideM08</month>
+							<month type="9">gregWideM09</month>
+							<month type="10">gregWideM10</month>
+							<month type="11">gregWideM11</month>
+							<month type="12">gregWideM12</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">gregNarrowM1</month>
+							<month type="2">gregNarrowM2</month>
+							<month type="3">gregNarrowM3</month>
+							<month type="4">gregNarrowM4</month>
+							<month type="5">gregNarrowM5</month>
+							<month type="6">gregNarrowM6</month>
+							<month type="7">gregNarrowM7</month>
+							<month type="8">gregNarrowM8</month>
+							<month type="9">gregNarrowM9</month>
+							<month type="10">gregNarrowM10</month>
+							<month type="11">gregNarrowM11</month>
+							<month type="12">gregNarrowM12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">BCE</era>
+						<era type="1">CE</era>
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+			<calendar type="hebrew">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">Tishri</month>
+							<month type="2">Heshvan</month>
+							<month type="3">Kislev</month>
+							<month type="4">Tevet</month>
+							<month type="5">Shevat</month>
+							<month type="6">Adar I</month>
+							<month type="7">Adar</month>
+							<month type="7" yeartype="leap">Adar II</month>
+							<month type="8">Nisan</month>
+							<month type="9">Iyar</month>
+							<month type="10">Sivan</month>
+							<month type="11">Tamuz</month>
+							<month type="12">Av</month>
+							<month type="13">Elul</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">1</month>
+							<month type="2">2</month>
+							<month type="3">3</month>
+							<month type="4">4</month>
+							<month type="5">5</month>
+							<month type="6">6</month>
+							<month type="7">7</month>
+							<month type="7" yeartype="leap">7</month>
+							<month type="8">8</month>
+							<month type="9">9</month>
+							<month type="10">10</month>
+							<month type="11">11</month>
+							<month type="12">12</month>
+							<month type="13">13</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">AM</era>
+						<!-- HY = Anno Mundi = -180799862400000 milliseconds since 1/1/1970 AD -->
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+			<calendar type="islamic">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<month type="1">islAbbr1</month>
+							<month type="2">islAbbr2</month>
+							<month type="3">islAbbr3</month>
+							<month type="4">islAbbr4</month>
+							<month type="5">islAbbr5</month>
+							<month type="6">islAbbr6</month>
+							<month type="7">islAbbr7</month>
+							<month type="8">islAbbr8</month>
+							<month type="9">islAbbr9</month>
+							<month type="10">islAbbr10</month>
+							<month type="11">islAbbr11</month>
+							<month type="12">islAbbr12</month>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">islWide1</month>
+							<month type="2">islWide2</month>
+							<month type="3">islWide3</month>
+							<month type="4">islWide4</month>
+							<month type="5">islWide5</month>
+							<month type="6">islWide6</month>
+							<month type="7">islWide7</month>
+							<month type="8">islWide8</month>
+							<month type="9">islWide9</month>
+							<month type="10">islWide10</month>
+							<month type="11">islWide11</month>
+							<month type="12">islWide12</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">1</month>
+							<month type="2">2</month>
+							<month type="3">3</month>
+							<month type="4">4</month>
+							<month type="5">5</month>
+							<month type="6">6</month>
+							<month type="7">7</month>
+							<month type="8">8</month>
+							<month type="9">9</month>
+							<month type="10">10</month>
+							<month type="11">11</month>
+							<month type="12">12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">AH</era>
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+			<calendar type="islamic-civil">
+				<months>
+					<alias source="locale" path="../../calendar[@type='islamic']/months"/>
+				</months>
+				<eras>
+					<alias source="locale" path="../../calendar[@type='islamic']/eras"/>
+				</eras>
+			</calendar>
+			<calendar type="islamic-rgsa">
+				<months>
+					<alias source="locale" path="../../calendar[@type='islamic']/months"/>
+				</months>
+				<eras>
+					<alias source="locale" path="../../calendar[@type='islamic']/eras"/>
+				</eras>
+			</calendar>
+			<calendar type="islamic-tbla">
+				<months>
+					<alias source="locale" path="../../calendar[@type='islamic']/months"/>
+				</months>
+			</calendar>
+			<calendar type="islamic-umalqura">
+				<months>
+					<alias source="locale" path="../../calendar[@type='islamic']/months"/>
+				</months>
+			</calendar>
+			<calendar type="persian">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">Farvardin</month>
+							<month type="2">Ordibehesht</month>
+							<month type="3">Khordad</month>
+							<month type="4">Tir</month>
+							<month type="5">Mordad</month>
+							<month type="6">Shahrivar</month>
+							<month type="7">Mehr</month>
+							<month type="8">Aban</month>
+							<month type="9">Azar</month>
+							<month type="10">Dey</month>
+							<month type="11">Bahman</month>
+							<month type="12">Esfand</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">1</month>
+							<month type="2">2</month>
+							<month type="3">3</month>
+							<month type="4">4</month>
+							<month type="5">5</month>
+							<month type="6">6</month>
+							<month type="7">7</month>
+							<month type="8">8</month>
+							<month type="9">9</month>
+							<month type="10">10</month>
+							<month type="11">11</month>
+							<month type="12">12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+				<eras>
+					<eraNames>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNames>
+					<eraAbbr>
+						<era type="0">AP</era>
+					</eraAbbr>
+					<eraNarrow>
+						<alias source="locale" path="../eraAbbr"/>
+					</eraNarrow>
+				</eras>
+			</calendar>
+		</calendars>
+		<fields>
+			<field type="era">
+				<displayName>Era</displayName>
+			</field>
+			<field type="era-short">
+				<alias source="locale" path="../field[@type='era']"/>
+			</field>
+			<field type="era-narrow">
+				<alias source="locale" path="../field[@type='era-short']"/>
+			</field>
+			<field type="month">
+				<displayName>Month</displayName>
+				<relative type="-1">last month</relative>
+				<relative type="0">this month</relative>
+				<relative type="1">next month</relative>
+				<relativeTime type="future">
+					<relativeTimePattern count="other">+{0} m</relativeTimePattern>
+				</relativeTime>
+				<relativeTime type="past">
+					<relativeTimePattern count="other">-{0} m</relativeTimePattern>
+				</relativeTime>
+			</field>
+			<field type="month-short">
+				<alias source="locale" path="../field[@type='month']"/>
+			</field>
+			<field type="month-narrow">
+				<alias source="locale" path="../field[@type='month-short']"/>
+			</field>
+		</fields>
+	</dates>
+</ldml>

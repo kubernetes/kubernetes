@@ -1,0 +1,156 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:EuIanGvik529AwD1Z1bEntqE9Og/GMww06b/q3arwM8=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:35:38 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-41blobsasurisuitetestblobsas?restype=container
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:35:38 GMT
+      Etag:
+      - '"0x8D6E3BCCF213ABC"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:35:38 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 37814448-e01e-00b7-04a5-15d5a7000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat
+      eleifend scelerisque. Phase
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:SE1lWzIBzwdNJb0owHqgSfqIvaCJZOtGRvDOw32EgjE=
+      Content-Length:
+      - "100"
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-blob-type:
+      - BlockBlob
+      x-ms-date:
+      - Tue, 28 May 2019 22:35:38 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-41blobsasurisuitetestblobsas/Lorem/Lorem-._~:%3F%23%5B%5D@%21$&%27%28%29%2A,;+=%20Lorem
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Content-Md5:
+      - Bcz94Jycda959ev/eJWOhw==
+      Date:
+      - Tue, 28 May 2019 22:35:38 GMT
+      Etag:
+      - '"0x8D6E3BCCF24566A"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:35:38 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 3781445f-e01e-00b7-1aa5-15d5a7000000
+      X-Ms-Request-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers: {}
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-41blobsasurisuitetestblobsas/Lorem/Lorem-._~:%3F%23%5B%5D@%21$&%27%28%29%2A,;+=%20Lorem?se=2050-12-20T22%3A55%3A06Z&sig=BSYr7g5zxAZbQey2tCI8nmmsYAdNJ0TSXI1l%2Bp3fVRs%3D&sp=r&sr=b&sv=2018-03-28
+    method: GET
+  response:
+    body: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer feugiat
+      eleifend scelerisque. Phase
+    headers:
+      Accept-Ranges:
+      - bytes
+      Content-Length:
+      - "100"
+      Content-Md5:
+      - Bcz94Jycda959ev/eJWOhw==
+      Content-Type:
+      - application/octet-stream
+      Date:
+      - Tue, 28 May 2019 22:35:38 GMT
+      Etag:
+      - '"0x8D6E3BCCF24566A"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:35:38 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Blob-Type:
+      - BlockBlob
+      X-Ms-Creation-Time:
+      - Tue, 28 May 2019 22:35:38 GMT
+      X-Ms-Lease-State:
+      - available
+      X-Ms-Lease-Status:
+      - unlocked
+      X-Ms-Request-Id:
+      - 37814482-e01e-00b7-3ba5-15d5a7000000
+      X-Ms-Server-Encrypted:
+      - "true"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:4MsRUKbFg22KKe1F3X0B+Qsuc1ZSGpZk21xVUB7qJU8=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        blob
+      x-ms-date:
+      - Tue, 28 May 2019 22:35:38 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.blob.core.windows.net/cnt-41blobsasurisuitetestblobsas?restype=container
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:35:38 GMT
+      Server:
+      - Windows-Azure-Blob/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - 37814491-e01e-00b7-49a5-15d5a7000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""

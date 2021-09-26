@@ -1,0 +1,16 @@
+#data
+<body><table><tr><td><svg><td><foreignObject><span></td>Foo
+#errors
+#document
+| <html>
+|   <head>
+|   <body>
+|     "Foo"
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <svg svg>
+|               <svg td>
+|                 <svg foreignObject>
+|                   <span>

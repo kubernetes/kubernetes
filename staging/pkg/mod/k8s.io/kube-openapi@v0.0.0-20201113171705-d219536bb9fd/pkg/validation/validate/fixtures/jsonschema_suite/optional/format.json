@@ -1,0 +1,223 @@
+[
+    {
+        "description": "validation of date-time strings",
+        "schema": {"format": "date-time"},
+        "tests": [
+            {
+                "description": "a valid date-time string",
+                "data": "1963-06-19T08:30:06.283185Z",
+                "valid": true
+            },
+            {
+                "description": "an invalid date-time string",
+                "data": "06/19/1963 08:30:06 PST",
+                "valid": false
+            },
+            {
+                "description": "only RFC3339 not all of ISO 8601 are valid",
+                "data": "2013-350T01:01:01",
+                "valid": false
+            }
+        ]
+    },
+    {
+        "description": "validation of URIs",
+        "schema": {"format": "uri"},
+        "tests": [
+            {
+                "description": "a valid URL with anchor tag",
+                "data": "http://foo.bar/?baz=qux#quux",
+                "valid": true
+            },
+            {
+                "description": "a valid URL with anchor tag and parantheses",
+                "data": "http://foo.com/blah_(wikipedia)_blah#cite-1",
+                "valid": true
+            },
+            {
+                "description": "a valid URL with URL-encoded stuff",
+                "data": "http://foo.bar/?q=Test%20URL-encoded%20stuff",
+                "valid": true
+            },
+            {
+                "description": "a valid puny-coded URL ",
+                "data": "http://xn--nw2a.xn--j6w193g/",
+                "valid": true
+            },
+            {
+                "description": "a valid URL with many special characters",
+                "data": "http://-.~_!$&'()*+,;=:%40:80%2f::::::@example.com",
+                "valid": true
+            },
+            {
+                "description": "a valid URL based on IPv4",
+                "data": "http://223.255.255.254",
+                "valid": true
+            },
+            {
+                "description": "a valid URL with ftp scheme",
+                "data": "ftp://ftp.is.co.za/rfc/rfc1808.txt",
+                "valid": true
+            },
+            {
+                "description": "a valid URL for a simple text file",
+                "data": "http://www.ietf.org/rfc/rfc2396.txt",
+                "valid": true
+            },
+            {
+                "description": "a valid URL ",
+                "data": "ldap://[2001:db8::7]/c=GB?objectClass?one",
+                "valid": true
+            },
+            {
+                "description": "a valid mailto URI",
+                "data": "mailto:John.Doe@example.com",
+                "valid": true
+            },
+            {
+                "description": "a valid newsgroup URI",
+                "data": "news:comp.infosystems.www.servers.unix",
+                "valid": true
+            },
+            {
+                "description": "a valid tel URI",
+                "data": "tel:+1-816-555-1212",
+                "valid": true
+            },
+            {
+                "description": "a valid URN",
+                "data": "urn:oasis:names:specification:docbook:dtd:xml:4.1.2",
+                "valid": true
+            },
+            {
+                "description": "an invalid protocol-relative URI Reference",
+                "data": "//foo.bar/?baz=qux#quux",
+                "valid": false
+            },
+            {
+                "description": "an invalid relative URI Reference",
+                "data": "/abc",
+                "valid": false
+            },
+            {
+                "description": "an invalid URI",
+                "data": "\\\\WINDOWS\\fileshare",
+                "valid": false
+            },
+            {
+                "description": "an invalid URI though valid URI reference",
+                "data": "abc",
+                "valid": false
+            },
+            {
+                "description": "an invalid URI with spaces",
+                "data": "http:// shouldfail.com",
+                "valid": false
+            },
+            {
+                "description": "an invalid URI with spaces and missing scheme",
+                "data": ":// should fail",
+                "valid": false
+            }
+        ]
+    },
+    {
+        "description": "validation of e-mail addresses",
+        "schema": {"format": "email"},
+        "tests": [
+            {
+                "description": "a valid e-mail address",
+                "data": "joe.bloggs@example.com",
+                "valid": true
+            },
+            {
+                "description": "an invalid e-mail address",
+                "data": "2962",
+                "valid": false
+            }
+        ]
+    },
+    {
+        "description": "validation of IP addresses",
+        "schema": {"format": "ipv4"},
+        "tests": [
+            {
+                "description": "a valid IP address",
+                "data": "192.168.0.1",
+                "valid": true
+            },
+            {
+                "description": "an IP address with too many components",
+                "data": "127.0.0.0.1",
+                "valid": false
+            },
+            {
+                "description": "an IP address with out-of-range values",
+                "data": "256.256.256.256",
+                "valid": false
+            },
+            {
+                "description": "an IP address without 4 components",
+                "data": "127.0",
+                "valid": false
+            },
+            {
+                "description": "an IP address as an integer",
+                "data": "0x7f000001",
+                "valid": false
+            }
+        ]
+    },
+    {
+        "description": "validation of IPv6 addresses",
+        "schema": {"format": "ipv6"},
+        "tests": [
+            {
+                "description": "a valid IPv6 address",
+                "data": "::1",
+                "valid": true
+            },
+            {
+                "description": "an IPv6 address with out-of-range values",
+                "data": "12345::",
+                "valid": false
+            },
+            {
+                "description": "an IPv6 address with too many components",
+                "data": "1:1:1:1:1:1:1:1:1:1:1:1:1:1:1:1",
+                "valid": false
+            },
+            {
+                "description": "an IPv6 address containing illegal characters",
+                "data": "::laptop",
+                "valid": false
+            }
+        ]
+    },
+    {
+        "description": "validation of host names",
+        "schema": {"format": "hostname"},
+        "tests": [
+            {
+                "description": "a valid host name",
+                "data": "www.example.com",
+                "valid": true
+            },
+            {
+                "description": "a host name starting with an illegal character",
+                "data": "-a-host-name-that-starts-with--",
+                "valid": false
+            },
+            {
+                "description": "a host name containing illegal characters",
+                "data": "not_a_valid_host_name",
+                "valid": false
+            },
+            {
+                "description": "a host name with a component too long",
+                "data": "a-vvvvvvvvvvvvvvvveeeeeeeeeeeeeeeerrrrrrrrrrrrrrrryyyyyyyyyyyyyyyy-long-host-name-component",
+                "valid": false
+            }
+        ]
+    }
+]

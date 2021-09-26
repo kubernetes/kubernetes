@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ldml>
+	<identity>
+		<language type="root"/>
+	</identity>
+	<dates>
+		<calendars>
+			<calendar type="chinese">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">cM01</month>
+							<month type="2">cM02</month>
+							<month type="3">cM03</month>
+							<month type="4">cM04</month>
+							<month type="5">cM05</month>
+							<month type="6">cM06</month>
+							<month type="7">cM07</month>
+							<month type="8">cM08</month>
+							<month type="9">cM09</month>
+							<month type="10">cM10</month>
+							<month type="11">cM11</month>
+							<month type="12">cM12</month>
+						</monthWidth>
+					</monthContext>
+				</months>
+			</calendar>
+			<calendar type="dangi">
+				<months>
+					<alias source="locale" path="../../calendar[@type='chinese']/months"/>
+				</months>
+			</calendar>
+			<calendar type="gregorian">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../monthWidth[@type='wide']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<alias source="locale" path="../../monthContext[@type='stand-alone']/monthWidth[@type='narrow']"/>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">gM01</month>
+							<month type="2">gM02</month>
+							<month type="3">gM03</month>
+							<month type="4">gM04</month>
+							<month type="5">gM05</month>
+							<month type="6">gM06</month>
+							<month type="7">gM07</month>
+							<month type="8">gM08</month>
+							<month type="9">gM09</month>
+							<month type="10">gM10</month>
+							<month type="11">gM11</month>
+							<month type="12">gM12</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="abbreviated">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='abbreviated']"/>
+						</monthWidth>
+						<monthWidth type="narrow">
+							<month type="1">1</month>
+							<month type="2">2</month>
+							<month type="3">3</month>
+							<month type="4">4</month>
+							<month type="5">5</month>
+							<month type="6">6</month>
+							<month type="7">7</month>
+							<month type="8">8</month>
+							<month type="9">9</month>
+							<month type="10">10</month>
+							<month type="11">11</month>
+							<month type="12">12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<alias source="locale" path="../../monthContext[@type='format']/monthWidth[@type='wide']"/>
+						</monthWidth>
+					</monthContext>
+				</months>
+			</calendar>
+		</calendars>
+	</dates>
+</ldml>

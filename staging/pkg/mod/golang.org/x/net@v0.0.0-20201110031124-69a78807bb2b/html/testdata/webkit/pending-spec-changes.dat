@@ -1,0 +1,46 @@
+#data
+<input type="hidden"><frameset>
+#errors
+(1,21): expected-doctype-but-got-start-tag
+(1,31): unexpected-start-tag
+(1,31): eof-in-frameset
+#document
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!DOCTYPE html><table><caption><svg>foo</table>bar
+#errors
+(1,47): unexpected-end-tag
+(1,47): end-table-tag-in-caption
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <caption>
+|         <svg svg>
+|           "foo"
+|     "bar"
+
+#data
+<table><tr><td><svg><desc><td></desc><circle>
+#errors
+(1,7): expected-doctype-but-got-start-tag
+(1,30): unexpected-cell-end-tag
+(1,37): unexpected-end-tag
+(1,45): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <svg svg>
+|               <svg desc>
+|           <td>
+|             <circle>

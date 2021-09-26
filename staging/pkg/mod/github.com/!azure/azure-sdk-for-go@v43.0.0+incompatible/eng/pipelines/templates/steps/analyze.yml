@@ -1,0 +1,35 @@
+# This step is designed to work against linux only
+parameters:
+  ServiceDirectory: ''
+  GoWorkspace: ''
+  LintVersion: ''
+  Scope: 'sdk/...'
+
+steps:
+  - script: |
+      curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${{parameters.LintVersion}}
+      golangci-lint --version
+    displayName: 'Install GoLintCLI and dependencies.'
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - script: |
+      cd ./sdk
+      golangci-lint run -c ../eng/.golangci.yml
+      exit 0
+    displayName: 'Lint'
+    failOnStderr: false
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - script: |
+      grep -L -r --include \*.go -P "Copyright (\d{4}|\(c\)) Microsoft" ./sdk | tee >&2
+    displayName: 'Copyright Header Check'
+    condition: succeededOrFailed()
+    failOnStderr: true
+    workingDirectory: '${{parameters.GoWorkspace}}'
+
+  - script: |
+      gofmt -s -l -w $(find ./sdk -name '*.go' -print) >&2
+    displayName: 'Format Check'
+    condition: succeededOrFailed()
+    failOnStderr: true
+    workingDirectory: '${{parameters.GoWorkspace}}'

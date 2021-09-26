@@ -1,0 +1,54 @@
+#data
+<button>1</foo>
+#errors
+(1,8): expected-doctype-but-got-start-tag
+(1,15): unexpected-end-tag
+(1,15): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <button>
+|       "1"
+
+#data
+<foo>1<p>2</foo>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,16): unexpected-end-tag
+(1,16): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <foo>
+|       "1"
+|       <p>
+|         "2"
+
+#data
+<dd>1</foo>
+#errors
+(1,4): expected-doctype-but-got-start-tag
+(1,11): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <dd>
+|       "1"
+
+#data
+<foo>1<dd>2</foo>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+(1,17): unexpected-end-tag
+(1,17): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <foo>
+|       "1"
+|       <dd>
+|         "2"

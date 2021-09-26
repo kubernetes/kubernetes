@@ -1,0 +1,15 @@
+[
+    {
+        "description": "some languages do not distinguish between different types of numeric value",
+        "schema": {
+            "type": "integer"
+        },
+        "tests": [
+            {
+                "description": "a float is not an integer even without fractional part",
+                "data": 1.0,
+                "valid": false
+            }
+        ]
+    }
+]

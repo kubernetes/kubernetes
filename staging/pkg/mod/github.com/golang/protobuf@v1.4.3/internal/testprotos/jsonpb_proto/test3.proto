@@ -1,0 +1,44 @@
+// Copyright 2015 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+option go_package = "github.com/golang/protobuf/internal/testprotos/jsonpb_proto";
+
+package jsonpb_test;
+
+message Simple3 {
+  double dub = 1;
+}
+
+message SimpleSlice3 {
+  repeated string slices = 1;
+}
+
+message SimpleMap3 {
+  map<string,string> stringy = 1;
+}
+
+message SimpleNull3 {
+  Simple3 simple = 1;
+}
+
+enum Numeral {
+  UNKNOWN = 0;
+  ARABIC = 1;
+  ROMAN = 2;
+}
+
+message Mappy {
+  map<int64, int32> nummy = 1;
+  map<string, string> strry = 2;
+  map<int32, Simple3> objjy = 3;
+  map<int64, string> buggy = 4;
+  map<bool, bool> booly = 5;
+  map<string, Numeral> enumy = 6;
+  map<int32, bool> s32booly = 7;
+  map<int64, bool> s64booly = 8;
+  map<uint32, bool> u32booly = 9;
+  map<uint64, bool> u64booly = 10;
+}

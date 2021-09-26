@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ldml>
+	<identity>
+		<language type="en"/>
+		<territory type="001"/>
+	</identity>
+	<dates>
+		<calendars>
+			<calendar type="chinese">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<month type="1">001AbbrMo1</month>
+							<month type="2">001AbbrMo2</month>
+							<month type="3">001AbbrMo3</month>
+							<month type="4">001AbbrMo4</month>
+							<month type="5">001AbbrMo5</month>
+							<month type="6">001AbbrMo6</month>
+							<month type="7">001AbbrMo7</month>
+							<month type="8">001AbbrMo8</month>
+							<month type="9">001AbbrMo9</month>
+							<month type="10">001AbbrMo10</month>
+							<month type="11">001AbbrMo11</month>
+							<month type="12">001AbbrMo12</month>
+						</monthWidth>
+					</monthContext>
+				</months>
+			</calendar>
+			<calendar type="generic">
+			</calendar>
+			<calendar type="gregorian">
+			</calendar>
+		</calendars>
+		<fields>
+			<field type="month-short">
+				<displayName>mo</displayName>
+				<relativeTime type="future">
+					<relativeTimePattern count="one">001ShortFutMOne</relativeTimePattern>
+					<relativeTimePattern count="other">001ShortFutMOther</relativeTimePattern>
+				</relativeTime>
+				<relativeTime type="past">
+					<!-- missing -->
+					<relativeTimePattern count="other">001ShortPastMOther</relativeTimePattern>
+				</relativeTime>
+			</field>
+			<field type="month-narrow">
+				<displayName>mo</displayName>
+				<relativeTime type="future">
+					<relativeTimePattern count="one">001NarrowFutMOne</relativeTimePattern>
+					<relativeTimePattern count="two">001NarrowFutMTwo</relativeTimePattern>
+					<relativeTimePattern count="other">001NarrowFutMOther</relativeTimePattern>
+				</relativeTime>
+				<relativeTime type="past">
+					<relativeTimePattern count="one">001NarrowPastMOne</relativeTimePattern>
+					<relativeTimePattern count="other">001NarrowPastMOther</relativeTimePattern>
+				</relativeTime>
+			</field>
+		</fields>
+	</dates>
+</ldml>

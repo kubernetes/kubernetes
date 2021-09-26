@@ -1,0 +1,137 @@
+{
+    "language": "zh",
+    "messages": [
+        {
+            "id": "Hello world!",
+            "message": "Hello world!",
+            "translation": ""
+        },
+        {
+            "id": "Hello {City}!",
+            "message": "Hello {City}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "City",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "city"
+                }
+            ]
+        },
+        {
+            "id": "{Person} is visiting {Place}!",
+            "message": "{Person} is visiting {Place}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Person",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "person",
+                    "comment": "The person of matter."
+                },
+                {
+                    "id": "Place",
+                    "string": "%[2]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 2,
+                    "expr": "place",
+                    "comment": "Place the person is visiting."
+                }
+            ]
+        },
+        {
+            "id": "{2} files remaining!",
+            "message": "{2} files remaining!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "2",
+                    "string": "%[1]d",
+                    "type": "int",
+                    "underlyingType": "int",
+                    "argNum": 1,
+                    "expr": "2"
+                }
+            ]
+        },
+        {
+            "id": "{N} more files remaining!",
+            "message": "{N} more files remaining!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "N",
+                    "string": "%[1]d",
+                    "type": "int",
+                    "underlyingType": "int",
+                    "argNum": 1,
+                    "expr": "n"
+                }
+            ]
+        },
+        {
+            "id": "Use the following code for your discount: {ReferralCode}",
+            "message": "Use the following code for your discount: {ReferralCode}",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "ReferralCode",
+                    "string": "%[1]d",
+                    "type": "golang.org/x/text/cmd/gotext/examples/extract.referralCode",
+                    "underlyingType": "int",
+                    "argNum": 1,
+                    "expr": "c"
+                }
+            ]
+        },
+        {
+            "id": [
+                "msgOutOfOrder",
+                "{Device} is out of order!"
+            ],
+            "message": "{Device} is out of order!",
+            "translation": "",
+            "comment": "FOO\n",
+            "placeholders": [
+                {
+                    "id": "Device",
+                    "string": "%[1]s",
+                    "type": "string",
+                    "underlyingType": "string",
+                    "argNum": 1,
+                    "expr": "device"
+                }
+            ]
+        },
+        {
+            "id": "{Miles} miles traveled ({Miles_1})",
+            "message": "{Miles} miles traveled ({Miles_1})",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Miles",
+                    "string": "%.2[1]f",
+                    "type": "float64",
+                    "underlyingType": "float64",
+                    "argNum": 1,
+                    "expr": "miles"
+                },
+                {
+                    "id": "Miles_1",
+                    "string": "%[1]f",
+                    "type": "float64",
+                    "underlyingType": "float64",
+                    "argNum": 1,
+                    "expr": "miles"
+                }
+            ]
+        }
+    ]
+}

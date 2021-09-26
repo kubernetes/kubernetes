@@ -1,0 +1,224 @@
+#data
+FOO<!-- BAR -->BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR  -->
+|     "BAZ"
+
+#data
+FOO<!-- BAR --!>BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,15): unexpected-bang-after-double-dash-in-comment
+#new-errors
+(1:16) incorrectly-closed-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR  -->
+|     "BAZ"
+
+#data
+FOO<!-- BAR --! >BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+#new-errors
+(1:20) eof-in-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR --! >BAZ -->
+
+#data
+FOO<!-- BAR --!
+>BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+#new-errors
+(1:20) eof-in-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR --!
+>BAZ -->
+
+#data
+FOO<!-- BAR --   >BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,15): unexpected-char-in-comment
+(1,21): eof-in-comment
+#new-errors
+(1:22) eof-in-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR --   >BAZ -->
+
+#data
+FOO<!-- BAR -- <QUX> -- MUX -->BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,15): unexpected-char-in-comment
+(1,24): unexpected-char-in-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR -- <QUX> -- MUX  -->
+|     "BAZ"
+
+#data
+FOO<!-- BAR -- <QUX> -- MUX --!>BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,15): unexpected-char-in-comment
+(1,24): unexpected-char-in-comment
+(1,31): unexpected-bang-after-double-dash-in-comment
+#new-errors
+(1:32) incorrectly-closed-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR -- <QUX> -- MUX  -->
+|     "BAZ"
+
+#data
+FOO<!-- BAR -- <QUX> -- MUX -- >BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,15): unexpected-char-in-comment
+(1,24): unexpected-char-in-comment
+(1,31): unexpected-char-in-comment
+(1,35): eof-in-comment
+#new-errors
+(1:36) eof-in-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  BAR -- <QUX> -- MUX -- >BAZ -->
+
+#data
+FOO<!---->BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  -->
+|     "BAZ"
+
+#data
+FOO<!--->BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,9): incorrect-comment
+#new-errors
+(1:9) abrupt-closing-of-empty-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  -->
+|     "BAZ"
+
+#data
+FOO<!-->BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,8): incorrect-comment
+#new-errors
+(1:8) abrupt-closing-of-empty-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!--  -->
+|     "BAZ"
+
+#data
+<?xml version="1.0">Hi
+#errors
+(1,1): expected-tag-name-but-got-question-mark
+(1,22): expected-doctype-but-got-chars
+#new-errors
+(1:2) unexpected-question-mark-instead-of-tag-name
+#document
+| <!-- ?xml version="1.0" -->
+| <html>
+|   <head>
+|   <body>
+|     "Hi"
+
+#data
+<?xml version="1.0">
+#errors
+(1,1): expected-tag-name-but-got-question-mark
+(1,20): expected-doctype-but-got-eof
+#new-errors
+(1:2) unexpected-question-mark-instead-of-tag-name
+#document
+| <!-- ?xml version="1.0" -->
+| <html>
+|   <head>
+|   <body>
+
+#data
+<?xml version
+#errors
+(1,1): expected-tag-name-but-got-question-mark
+(1,13): expected-doctype-but-got-eof
+#new-errors
+(1:2) unexpected-question-mark-instead-of-tag-name
+#document
+| <!-- ?xml version -->
+| <html>
+|   <head>
+|   <body>
+
+#data
+FOO<!----->BAZ
+#errors
+(1,3): expected-doctype-but-got-chars
+(1,10): unexpected-dash-after-double-dash-in-comment
+#document
+| <html>
+|   <head>
+|   <body>
+|     "FOO"
+|     <!-- - -->
+|     "BAZ"
+
+#data
+<html><!-- comment --><title>Comment before head</title>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <!--  comment  -->
+|   <head>
+|     <title>
+|       "Comment before head"
+|   <body>

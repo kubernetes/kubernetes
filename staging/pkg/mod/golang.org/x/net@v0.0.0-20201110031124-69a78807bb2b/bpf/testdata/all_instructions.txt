@@ -1,0 +1,88 @@
+# This filter is compiled to all_instructions.bpf by the `bpf_asm`
+# tool, which can be found in the linux kernel source tree under
+# tools/bpf.
+
+# Load immediate
+ld #42
+ldx #42
+
+# Load scratch
+ld M[3]
+ldx M[3]
+
+# Load absolute
+ldb [42]
+ldh [42]
+ld [42]
+
+# Load indirect
+ldb [x + 42]
+ldh [x + 42]
+ld [x + 42]
+
+# Load IPv4 header length
+ldx 4*([42]&0xf)
+
+# Run extension function
+ld #len
+ld #proto
+ld #type
+ld #rand
+
+# Store scratch
+st M[3]
+stx M[3]
+
+# A <op> constant
+add #42
+sub #42
+mul #42
+div #42
+or #42
+and #42
+lsh #42
+rsh #42
+mod #42
+xor #42
+
+# A <op> X
+add x
+sub x
+mul x
+div x
+or x
+and x
+lsh x
+rsh x
+mod x
+xor x
+
+# !A
+neg
+
+# Jump A <op> constant
+ja end
+jeq #42,prev,end
+jne #42,end
+jlt #42,end
+jle #42,end
+jgt #42,prev,end
+jge #42,prev,end
+jset #42,prev,end
+
+# Jump A <op> X
+jeq x,prev,end
+jne x,end
+jlt x,end
+jle x,end
+jgt x,prev,end
+jge x,prev,end
+jset x,prev,end
+
+# Register transfers
+tax
+txa
+
+# Returns
+prev: ret a
+end: ret #42

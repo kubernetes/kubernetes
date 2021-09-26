@@ -1,0 +1,27 @@
+{
+    "name":                         "--unit-test--",
+    "managementPortalURL":          "--management-portal-url",
+    "publishSettingsURL":           "--publish-settings-url--",
+    "serviceManagementEndpoint":    "--service-management-endpoint--",
+    "resourceManagerEndpoint":      "--resource-management-endpoint--",
+    "activeDirectoryEndpoint":      "--active-directory-endpoint--",
+    "galleryEndpoint":              "--gallery-endpoint--",
+    "keyVaultEndpoint":             "--key-vault--endpoint--",
+    "graphEndpoint":                "--graph-endpoint--",
+    "storageEndpointSuffix":        "--storage-endpoint-suffix--",
+    "sqlDatabaseDNSSuffix":         "--sql-database-dns-suffix--",
+    "trafficManagerDNSSuffix":      "--traffic-manager-dns-suffix--",
+    "keyVaultDNSSuffix":            "--key-vault-dns-suffix--",
+    "serviceBusEndpointSuffix":     "--service-bus-endpoint-suffix--",
+    "serviceManagementVMDNSSuffix": "--asm-vm-dns-suffix--",
+    "resourceManagerVMDNSSuffix":   "--arm-vm-dns-suffix--",
+    "containerRegistryDNSSuffix":   "--container-registry-dns-suffix--",
+    "tokenAudience":                "--token-audience",
+    "resourceIdentifiers": {
+        "batch": "--batch-resource-id--",
+        "datalake": "--datalake-resource-id--",
+        "graph": "--graph-resource-id--",
+        "keyVault": "--keyvault-resource-id--",
+        "operationalInsights": "--operational-insights-resource-id--"
+    }
+}

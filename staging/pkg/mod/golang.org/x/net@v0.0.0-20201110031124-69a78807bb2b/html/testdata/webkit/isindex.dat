@@ -1,0 +1,49 @@
+#data
+<isindex>
+#errors
+(1,9): expected-doctype-but-got-start-tag
+(1,9): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <isindex>
+
+#data
+<isindex name="A" action="B" prompt="C" foo="D">
+#errors
+(1,48): expected-doctype-but-got-start-tag
+(1,48): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <isindex>
+|       action="B"
+|       foo="D"
+|       name="A"
+|       prompt="C"
+
+#data
+<form><isindex>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,15): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <form>
+|       <isindex>
+
+#data
+<!doctype html><isindex>x</isindex>x
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <isindex>
+|       "x"
+|     "x"

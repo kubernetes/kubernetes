@@ -1,0 +1,302 @@
+#data
+<div<div>
+#errors
+(1,9): expected-doctype-but-got-start-tag
+(1,9): expected-closing-tag-but-got-eof
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div<div>
+
+#data
+<div foo<bar=''>
+#errors
+(1,9): invalid-character-in-attribute-name
+(1,16): expected-doctype-but-got-start-tag
+(1,16): expected-closing-tag-but-got-eof
+#new-errors
+(1:9) unexpected-character-in-attribute-name
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       foo<bar=""
+
+#data
+<div foo=`bar`>
+#errors
+(1,10): equals-in-unquoted-attribute-value
+(1,14): unexpected-character-in-unquoted-attribute-value
+(1,15): expected-doctype-but-got-start-tag
+(1,15): expected-closing-tag-but-got-eof
+#new-errors
+(1:10) unexpected-character-in-unquoted-attribute-value
+(1:14) unexpected-character-in-unquoted-attribute-value
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       foo="`bar`"
+
+#data
+<div \"foo=''>
+#errors
+(1,7): invalid-character-in-attribute-name
+(1,14): expected-doctype-but-got-start-tag
+(1,14): expected-closing-tag-but-got-eof
+#new-errors
+(1:7) unexpected-character-in-attribute-name
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       \"foo=""
+
+#data
+<a href='\nbar'></a>
+#errors
+(1,16): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <a>
+|       href="\nbar"
+
+#data
+<!DOCTYPE html>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+&lang;&rang;
+#errors
+(1,6): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "⟨⟩"
+
+#data
+&apos;
+#errors
+(1,6): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "'"
+
+#data
+&ImaginaryI;
+#errors
+(1,12): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "ⅈ"
+
+#data
+&Kopf;
+#errors
+(1,6): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "𝕂"
+
+#data
+&notinva;
+#errors
+(1,9): expected-doctype-but-got-chars
+#document
+| <html>
+|   <head>
+|   <body>
+|     "∉"
+
+#data
+<?import namespace="foo" implementation="#bar">
+#errors
+(1,1): expected-tag-name-but-got-question-mark
+(1,47): expected-doctype-but-got-eof
+#new-errors
+(1:2) unexpected-question-mark-instead-of-tag-name
+#document
+| <!-- ?import namespace="foo" implementation="#bar" -->
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!--foo--bar-->
+#errors
+(1,10): unexpected-char-in-comment
+(1,15): expected-doctype-but-got-eof
+#document
+| <!-- foo--bar -->
+| <html>
+|   <head>
+|   <body>
+
+#data
+<![CDATA[x]]>
+#errors
+(1,2): expected-dashes-or-doctype
+(1,13): expected-doctype-but-got-eof
+#new-errors
+(1:9) cdata-in-html-content
+#document
+| <!-- [CDATA[x]] -->
+| <html>
+|   <head>
+|   <body>
+
+#data
+<textarea><!--</textarea>--></textarea>
+#errors
+(1,10): expected-doctype-but-got-start-tag
+(1,39): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "<!--"
+|     "-->"
+
+#data
+<textarea><!--</textarea>-->
+#errors
+(1,10): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+|       "<!--"
+|     "-->"
+
+#data
+<style><!--</style>--></style>
+#errors
+(1,7): expected-doctype-but-got-start-tag
+(1,30): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|     <style>
+|       "<!--"
+|   <body>
+|     "-->"
+
+#data
+<style><!--</style>-->
+#errors
+(1,7): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|     <style>
+|       "<!--"
+|   <body>
+|     "-->"
+
+#data
+<ul><li>A </li> <li>B</li></ul>
+#errors
+(1,4): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ul>
+|       <li>
+|         "A "
+|       " "
+|       <li>
+|         "B"
+
+#data
+<table><form><input type=hidden><input></form><div></div></table>
+#errors
+(1,7): expected-doctype-but-got-start-tag
+(1,13): unexpected-form-in-table
+(1,32): unexpected-hidden-input-in-table
+(1,39): unexpected-start-tag-implies-table-voodoo
+(1,46): unexpected-end-tag-implies-table-voodoo
+(1,46): unexpected-end-tag
+(1,51): unexpected-start-tag-implies-table-voodoo
+(1,57): unexpected-end-tag-implies-table-voodoo
+#document
+| <html>
+|   <head>
+|   <body>
+|     <input>
+|     <div>
+|     <table>
+|       <form>
+|       <input>
+|         type="hidden"
+
+#data
+<i>A<b>B<p></i>C</b>D
+#errors
+(1,3): expected-doctype-but-got-start-tag
+(1,15): adoption-agency-1.3
+(1,20): adoption-agency-1.3
+#document
+| <html>
+|   <head>
+|   <body>
+|     <i>
+|       "A"
+|       <b>
+|         "B"
+|     <b>
+|     <p>
+|       <b>
+|         <i>
+|         "C"
+|       "D"
+
+#data
+<div></div>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <div>
+
+#data
+<svg></svg>
+#errors
+(1,5): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+
+#data
+<math></math>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <math math>

@@ -1,0 +1,13 @@
+[
+    {
+        "description": "ECMA 262 regex non-compliance",
+        "schema": { "format": "regex" },
+        "tests": [
+            {
+                "description": "ECMA 262 has no support for \\Z anchor from .NET",
+                "data": "^\\S(|(.|\\n)*\\S)\\Z",
+                "valid": false
+            }
+        ]
+    }
+]

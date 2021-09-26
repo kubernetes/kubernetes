@@ -1,0 +1,135 @@
+{
+    "language": "zh",
+    "messages": [
+        {
+            "id": "Hello world!",
+            "key": "Hello world!\n",
+            "message": "Hello world!",
+            "translation": ""
+        },
+        {
+            "id": "Hello {City}!",
+            "key": "Hello %s!\n",
+            "message": "Hello {City}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "City",
+                    "string": "%[1]s"
+                }
+            ]
+        },
+        {
+            "id": "Hello {Town}!",
+            "key": "Hello %s!\n",
+            "message": "Hello {Town}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Town",
+                    "string": "%[1]s"
+                }
+            ]
+        },
+        {
+            "id": "{Person} is visiting {Place}!",
+            "key": "%s is visiting %s!\n",
+            "message": "{Person} is visiting {Place}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Person",
+                    "string": "%[1]s"
+                },
+                {
+                    "id": "Place",
+                    "string": "%[2]s"
+                }
+            ]
+        },
+        {
+            "id": "{Person} is visiting {Place}!",
+            "key": "%[1]s is visiting %[3]s!\n",
+            "message": "{Person} is visiting {Place}!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Person",
+                    "string": "%[1]s"
+                },
+                {
+                    "id": "Place",
+                    "string": "%[3]s"
+                },
+                {
+                    "id": "Extra",
+                    "string": "%[2]v"
+                }
+            ]
+        },
+        {
+            "id": "{2} files remaining!",
+            "key": "%d files remaining!",
+            "message": "{2} files remaining!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "",
+                    "string": "%[1]d"
+                }
+            ]
+        },
+        {
+            "id": "{N} more files remaining!",
+            "key": "%d more files remaining!",
+            "message": "{N} more files remaining!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "N",
+                    "string": "%[1]d"
+                }
+            ]
+        },
+        {
+            "id": "Use the following code for your discount: {ReferralCode}",
+            "key": "Use the following code for your discount: %d\n",
+            "message": "Use the following code for your discount: {ReferralCode}",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "ReferralCode",
+                    "string": "%[1]d"
+                }
+            ]
+        },
+        {
+            "id": [ "{Device} is out of order!", "msgOutOfOrder" ],
+            "key": "%s is out of order!",
+            "message": "{Device} is out of order!",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Device",
+                    "string": "%[1]s"
+                }
+            ]
+        },
+        {
+            "id": "{Miles} miles traveled ({Miles_1})",
+            "key": "%.2[1]f miles traveled (%[1]f)",
+            "message": "{Miles} miles traveled ({Miles_1})",
+            "translation": "",
+            "placeholders": [
+                {
+                    "id": "Miles",
+                    "string": "%.2[1]f"
+                },
+                {
+                    "id": "Miles_1",
+                    "string": "%[1]f"
+                }
+            ]
+        }
+    ]
+}

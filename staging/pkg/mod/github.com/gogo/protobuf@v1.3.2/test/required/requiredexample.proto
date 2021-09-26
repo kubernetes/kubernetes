@@ -1,0 +1,83 @@
+// Protocol Buffers for Go with Gadgets
+//
+// Copyright (c) 2013, The GoGo Authors. All rights reserved.
+// http://github.com/gogo/protobuf
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto2";
+package required;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option (gogoproto.marshaler_all) = true;
+option (gogoproto.sizer_all) = true;
+option (gogoproto.unmarshaler_all) = true;
+option (gogoproto.populate_all) = true;
+
+message RequiredExample {
+    required string theRequiredString = 1;
+    optional string theOptionalString = 2;
+    repeated string theRepeatedStrings = 3;
+}
+
+message NidOptNative {
+    required double Field1 = 1 [(gogoproto.nullable) = false];
+    required float Field2 = 2 [(gogoproto.nullable) = false];
+    required int32 Field3 = 3 [(gogoproto.nullable) = false];
+    required int64 Field4 = 4 [(gogoproto.nullable) = false];
+    required uint32 Field5 = 5 [(gogoproto.nullable) = false];
+    required uint64 Field6 = 6 [(gogoproto.nullable) = false];
+    required sint32 Field7 = 7 [(gogoproto.nullable) = false];
+    required sint64 Field8 = 8 [(gogoproto.nullable) = false];
+    required fixed32 Field9 = 9 [(gogoproto.nullable) = false];
+    required sfixed32 Field10 = 10 [(gogoproto.nullable) = false];
+    required fixed64 Field11 = 11 [(gogoproto.nullable) = false];
+    required sfixed64 Field12 = 12 [(gogoproto.nullable) = false];
+    required bool Field13 = 13 [(gogoproto.nullable) = false];
+    required string Field14 = 14 [(gogoproto.nullable) = false];
+    required bytes Field15 = 15 [(gogoproto.nullable) = false];
+}
+
+message NinOptNative {
+    required double Field1 = 1;
+    required float Field2 = 2;
+    required int32 Field3 = 3;
+    required int64 Field4 = 4;
+    required uint32 Field5 = 5;
+    required uint64 Field6 = 6;
+    required sint32 Field7 = 7;
+    required sint64 Field8 = 8;
+    required fixed32 Field9 = 9;
+    required sfixed32 Field10 = 10;
+    required fixed64 Field11 = 11;
+    required sfixed64 Field12 = 12;
+    required bool Field13 = 13;
+    required string Field14 = 14;
+    required bytes Field15 = 15;
+}
+
+message NestedNinOptNative {
+    repeated NinOptNative NestedNinOpts = 1;
+}

@@ -1,0 +1,67 @@
+---
+version: 2.1
+
+orbs:
+  go: circleci/go@0.2.0
+
+jobs:
+  test:
+    parameters:
+      go_version:
+        type: string
+      run_style:
+        type: boolean
+        default: false
+      use_gomod_cache:
+        type: boolean
+        default: true
+    docker:
+    - image: circleci/golang:<< parameters.go_version >>
+    working_directory: /go/src/github.com/prometheus/common
+    steps:
+    - checkout
+    - when:
+        condition: << parameters.use_gomod_cache >>
+        steps:
+        - go/load-cache:
+            key: v1-go<< parameters.go_version >>
+    - run: make test
+    - when:
+        condition: << parameters.run_style >>
+        steps:
+        - run: make style
+    - when:
+        condition: << parameters.use_gomod_cache >>
+        steps:
+        - go/save-cache:
+            key: v1-go<< parameters.go_version >>
+    - store_test_results:
+        path: test-results
+
+workflows:
+  version: 2
+  tests:
+    jobs:
+    # Supported Go versions are synced with github.com/prometheus/client_golang.
+    - test:
+        name: go-1-9
+        go_version: "1.9"
+        use_gomod_cache: false
+    - test:
+        name: go-1-10
+        go_version: "1.10"
+        use_gomod_cache: false
+    - test:
+        name: go-1-11
+        go_version: "1.11"
+    - test:
+        name: go-1-12
+        go_version: "1.12"
+    - test:
+        name: go-1-13
+        go_version: "1.13"
+    - test:
+        name: go-1-14
+        go_version: "1.14"
+        # Style is only checked against the latest supported Go version.
+        run_style: true

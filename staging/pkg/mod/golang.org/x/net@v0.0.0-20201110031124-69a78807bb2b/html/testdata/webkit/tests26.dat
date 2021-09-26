@@ -1,0 +1,393 @@
+#data
+<!DOCTYPE html><body><a href='#1'><nobr>1<nobr></a><br><a href='#2'><nobr>2<nobr></a><br><a href='#3'><nobr>3<nobr></a>
+#errors
+(1,47): unexpected-start-tag-implies-end-tag
+(1,51): adoption-agency-1.3
+(1,74): unexpected-start-tag-implies-end-tag
+(1,74): adoption-agency-1.3
+(1,81): unexpected-start-tag-implies-end-tag
+(1,85): adoption-agency-1.3
+(1,108): unexpected-start-tag-implies-end-tag
+(1,108): adoption-agency-1.3
+(1,115): unexpected-start-tag-implies-end-tag
+(1,119): adoption-agency-1.3
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <a>
+|       href="#1"
+|       <nobr>
+|         "1"
+|       <nobr>
+|     <nobr>
+|       <br>
+|       <a>
+|         href="#2"
+|     <a>
+|       href="#2"
+|       <nobr>
+|         "2"
+|       <nobr>
+|     <nobr>
+|       <br>
+|       <a>
+|         href="#3"
+|     <a>
+|       href="#3"
+|       <nobr>
+|         "3"
+|       <nobr>
+
+#data
+<!DOCTYPE html><body><b><nobr>1<nobr></b><i><nobr>2<nobr></i>3
+#errors
+(1,37): unexpected-start-tag-implies-end-tag
+(1,41): adoption-agency-1.3
+(1,50): unexpected-start-tag-implies-end-tag
+(1,50): adoption-agency-1.3
+(1,57): unexpected-start-tag-implies-end-tag
+(1,61): adoption-agency-1.3
+(1,62): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       <nobr>
+|         "1"
+|       <nobr>
+|     <nobr>
+|       <i>
+|     <i>
+|       <nobr>
+|         "2"
+|       <nobr>
+|     <nobr>
+|       "3"
+
+#data
+<!DOCTYPE html><body><b><nobr>1<table><nobr></b><i><nobr>2<nobr></i>3
+#errors
+(1,44): foster-parenting-start-tag
+(1,48): foster-parenting-end-tag
+(1,48): adoption-agency-1.3
+(1,51): foster-parenting-start-tag
+(1,57): foster-parenting-start-tag
+(1,57): nobr-already-in-scope
+(1,57): adoption-agency-1.2
+(1,58): foster-parenting-character
+(1,64): foster-parenting-start-tag
+(1,64): nobr-already-in-scope
+(1,68): foster-parenting-end-tag
+(1,68): adoption-agency-1.2
+(1,69): foster-parenting-character
+(1,69): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       <nobr>
+|         "1"
+|         <nobr>
+|           <i>
+|         <i>
+|           <nobr>
+|             "2"
+|           <nobr>
+|         <nobr>
+|           "3"
+|         <table>
+
+#data
+<!DOCTYPE html><body><b><nobr>1<table><tr><td><nobr></b><i><nobr>2<nobr></i>3
+#errors
+(1,56): unexpected-end-tag
+(1,65): unexpected-start-tag-implies-end-tag
+(1,65): adoption-agency-1.3
+(1,72): unexpected-start-tag-implies-end-tag
+(1,76): adoption-agency-1.3
+(1,77): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       <nobr>
+|         "1"
+|         <table>
+|           <tbody>
+|             <tr>
+|               <td>
+|                 <nobr>
+|                   <i>
+|                 <i>
+|                   <nobr>
+|                     "2"
+|                   <nobr>
+|                 <nobr>
+|                   "3"
+
+#data
+<!DOCTYPE html><body><b><nobr>1<div><nobr></b><i><nobr>2<nobr></i>3
+#errors
+(1,42): unexpected-start-tag-implies-end-tag
+(1,42): adoption-agency-1.3
+(1,46): adoption-agency-1.3
+(1,46): adoption-agency-1.3
+(1,55): unexpected-start-tag-implies-end-tag
+(1,55): adoption-agency-1.3
+(1,62): unexpected-start-tag-implies-end-tag
+(1,66): adoption-agency-1.3
+(1,67): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       <nobr>
+|         "1"
+|     <div>
+|       <b>
+|         <nobr>
+|         <nobr>
+|       <nobr>
+|         <i>
+|       <i>
+|         <nobr>
+|           "2"
+|         <nobr>
+|       <nobr>
+|         "3"
+
+#data
+<!DOCTYPE html><body><b><nobr>1<nobr></b><div><i><nobr>2<nobr></i>3
+#errors
+(1,37): unexpected-start-tag-implies-end-tag
+(1,41): adoption-agency-1.3
+(1,55): unexpected-start-tag-implies-end-tag
+(1,55): adoption-agency-1.3
+(1,62): unexpected-start-tag-implies-end-tag
+(1,66): adoption-agency-1.3
+(1,67): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       <nobr>
+|         "1"
+|       <nobr>
+|     <div>
+|       <nobr>
+|         <i>
+|       <i>
+|         <nobr>
+|           "2"
+|         <nobr>
+|       <nobr>
+|         "3"
+
+#data
+<!DOCTYPE html><body><b><nobr>1<nobr><ins></b><i><nobr>
+#errors
+(1,37): unexpected-start-tag-implies-end-tag
+(1,46): adoption-agency-1.3
+(1,55): unexpected-start-tag-implies-end-tag
+(1,55): adoption-agency-1.3
+(1,55): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       <nobr>
+|         "1"
+|       <nobr>
+|         <ins>
+|     <nobr>
+|       <i>
+|     <i>
+|       <nobr>
+
+#data
+<!DOCTYPE html><body><b><nobr>1<ins><nobr></b><i>2
+#errors
+(1,42): unexpected-start-tag-implies-end-tag
+(1,42): adoption-agency-1.3
+(1,46): adoption-agency-1.3
+(1,50): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       <nobr>
+|         "1"
+|         <ins>
+|       <nobr>
+|     <nobr>
+|       <i>
+|         "2"
+
+#data
+<!DOCTYPE html><body><b>1<nobr></b><i><nobr>2</i>
+#errors
+(1,35): adoption-agency-1.3
+(1,44): unexpected-start-tag-implies-end-tag
+(1,44): adoption-agency-1.3
+(1,49): adoption-agency-1.3
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <b>
+|       "1"
+|       <nobr>
+|     <nobr>
+|       <i>
+|     <i>
+|       <nobr>
+|         "2"
+
+#data
+<p><code x</code></p>
+
+#errors
+(1,3): expected-doctype-but-got-start-tag
+(1,11): invalid-character-in-attribute-name
+(1,12): unexpected-character-after-solidus-in-tag
+(1,21): unexpected-end-tag
+(2,0): expected-closing-tag-but-got-eof
+#new-errors
+(1:11) unexpected-character-in-attribute-name
+(1:13) unexpected-solidus-in-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <code>
+|         code=""
+|         x<=""
+|     <code>
+|       code=""
+|       x<=""
+|       "
+"
+
+#data
+<!DOCTYPE html><svg><foreignObject><p><i></p>a
+#errors
+(1,45): unexpected-end-tag
+(1,46): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       <svg foreignObject>
+|         <p>
+|           <i>
+|         <i>
+|           "a"
+
+#data
+<!DOCTYPE html><table><tr><td><svg><foreignObject><p><i></p>a
+#errors
+(1,60): unexpected-end-tag
+(1,61): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <svg svg>
+|               <svg foreignObject>
+|                 <p>
+|                   <i>
+|                 <i>
+|                   "a"
+
+#data
+<!DOCTYPE html><math><mtext><p><i></p>a
+#errors
+(1,38): unexpected-end-tag
+(1,39): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mtext>
+|         <p>
+|           <i>
+|         <i>
+|           "a"
+
+#data
+<!DOCTYPE html><table><tr><td><math><mtext><p><i></p>a
+#errors
+(1,53): unexpected-end-tag
+(1,54): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <math math>
+|               <math mtext>
+|                 <p>
+|                   <i>
+|                 <i>
+|                   "a"
+
+#data
+<!DOCTYPE html><body><div><!/div>a
+#errors
+(1,28): expected-dashes-or-doctype
+(1,34): expected-closing-tag-but-got-eof
+#new-errors
+(1:29) incorrectly-opened-comment
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       <!-- /div -->
+|       "a"
+
+#data
+<button><p><button>
+#errors
+Line 1 Col 8 Unexpected start tag (button). Expected DOCTYPE.
+Line 1 Col 19 Unexpected start tag (button) implies end tag (button).
+Line 1 Col 19 Expected closing tag. Unexpected end of file.
+#document
+| <html>
+|   <head>
+|   <body>
+|     <button>
+|       <p>
+|     <button>

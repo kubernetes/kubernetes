@@ -1,0 +1,73 @@
+# Deploys resources to a cloud type specified by the variable (not parameter)
+# 'CloudType'. Use this as part of a matrix to deploy resources to a particular
+# cloud instance. Normally we would use template parameters instead of variables
+# but matrix variables are not available during template expansion so any
+# benefits of parameters are lost.
+
+parameters:
+  ServiceDirectory: not-set
+  ArmTemplateParameters: '@{}'
+  DeleteAfterHours: 24
+  Location: ''
+
+steps:
+  # New-TestResources command requires Az module
+  - pwsh: Install-Module -Name Az -Scope CurrentUser -AllowClobber -Force -Verbose
+    displayName: Install Azure PowerShell module
+
+  - pwsh: >
+      eng/common/TestResources/New-TestResources.ps1
+      -BaseName 'Generated'
+      -ServiceDirectory '${{ parameters.ServiceDirectory }}'
+      -TenantId '$(aad-azure-sdk-test-tenant-id)'
+      -TestApplicationId '$(aad-azure-sdk-test-client-id)'
+      -TestApplicationSecret '$(aad-azure-sdk-test-client-secret)'
+      -ProvisionerApplicationId '$(aad-azure-sdk-test-client-id)'
+      -ProvisionerApplicationSecret '$(aad-azure-sdk-test-client-secret)'
+      -AdditionalParameters ${{ parameters.ArmTemplateParameters }}
+      -DeleteAfterHours ${{ parameters.DeleteAfterHours }}
+      -Location '${{ parameters.Location }}'
+      -Environment 'AzureCloud'
+      -CI
+      -Force
+      -Verbose
+    displayName: Deploy test resources (AzureCloud)
+    condition: and(succeeded(), eq(variables['CloudType'], 'AzureCloud'))
+
+  - pwsh: >
+      eng/common/TestResources/New-TestResources.ps1
+      -BaseName 'Generated'
+      -ServiceDirectory '${{ parameters.ServiceDirectory }}'
+      -TenantId '$(aad-azure-sdk-test-tenant-id-gov)'
+      -TestApplicationId '$(aad-azure-sdk-test-client-id-gov)'
+      -TestApplicationSecret '$(aad-azure-sdk-test-client-secret-gov)'
+      -ProvisionerApplicationId '$(aad-azure-sdk-test-client-id-gov)'
+      -ProvisionerApplicationSecret '$(aad-azure-sdk-test-client-secret-gov)'
+      -AdditionalParameters ${{ parameters.ArmTemplateParameters }}
+      -DeleteAfterHours ${{ parameters.DeleteAfterHours }}
+      -Location '${{ parameters.Location }}'
+      -Environment 'AzureUSGovernment'
+      -CI
+      -Force
+      -Verbose
+    displayName: Deploy test resources (AzureUSGovernment)
+    condition: and(succeeded(), eq(variables['CloudType'], 'AzureUSGovernment'))
+
+  - pwsh: >
+      eng/common/TestResources/New-TestResources.ps1
+      -BaseName 'Generated'
+      -ServiceDirectory '${{ parameters.ServiceDirectory }}'
+      -TenantId '$(aad-azure-sdk-test-tenant-id-cn)'
+      -TestApplicationId '$(aad-azure-sdk-test-client-id-cn)'
+      -TestApplicationSecret '$(aad-azure-sdk-test-client-secret-cn)'
+      -ProvisionerApplicationId '$(aad-azure-sdk-test-client-id-cn)'
+      -ProvisionerApplicationSecret '$(aad-azure-sdk-test-client-secret-cn)'
+      -AdditionalParameters ${{ parameters.ArmTemplateParameters }}
+      -DeleteAfterHours ${{ parameters.DeleteAfterHours }}
+      -Location '${{ parameters.Location }}'
+      -Environment 'AzureChinaCloud'
+      -CI
+      -Force
+      -Verbose
+    displayName: Deploy test resources (AzureChinaCloud)
+    condition: and(succeeded(), eq(variables['CloudType'], 'AzureChinaCloud'))

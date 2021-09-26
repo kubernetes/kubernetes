@@ -1,0 +1,485 @@
+// Copyright 2010 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// A feature-rich test file for the protocol compiler and libraries.
+
+syntax = "proto2";
+
+option go_package = "github.com/golang/protobuf/internal/testprotos/proto2_proto";
+
+package proto2_test;
+
+enum FOO { FOO1 = 1; };
+
+message GoEnum {
+  required FOO foo = 1;
+}
+
+message GoTestField {
+  required string Label = 1;
+  required string Type = 2;
+}
+
+message GoTest {
+  // An enum, for completeness.
+  enum KIND {
+    VOID = 0;
+
+    // Basic types
+    BOOL = 1;
+    BYTES = 2;
+    FINGERPRINT = 3;
+    FLOAT = 4;
+    INT = 5;
+    STRING = 6;
+    TIME = 7;
+
+    // Groupings
+    TUPLE = 8;
+    ARRAY = 9;
+    MAP = 10;
+
+    // Table types
+    TABLE = 11;
+
+    // Functions
+    FUNCTION = 12;  // last tag
+  };
+
+  // Some typical parameters
+  required KIND Kind = 1;
+  optional string Table = 2;
+  optional int32 Param = 3;
+
+  // Required, repeated and optional foreign fields.
+  required GoTestField RequiredField = 4;
+  repeated GoTestField RepeatedField = 5;
+  optional GoTestField OptionalField = 6;
+
+  // Required fields of all basic types
+  required bool F_Bool_required = 10;
+  required int32 F_Int32_required = 11;
+  required int64 F_Int64_required = 12;
+  required fixed32 F_Fixed32_required = 13;
+  required fixed64 F_Fixed64_required = 14;
+  required uint32 F_Uint32_required = 15;
+  required uint64 F_Uint64_required = 16;
+  required float F_Float_required = 17;
+  required double F_Double_required = 18;
+  required string F_String_required = 19;
+  required bytes F_Bytes_required = 101;
+  required sint32 F_Sint32_required = 102;
+  required sint64 F_Sint64_required = 103;
+  required sfixed32 F_Sfixed32_required = 104;
+  required sfixed64 F_Sfixed64_required = 105;
+
+  // Repeated fields of all basic types
+  repeated bool F_Bool_repeated = 20;
+  repeated int32 F_Int32_repeated = 21;
+  repeated int64 F_Int64_repeated = 22;
+  repeated fixed32 F_Fixed32_repeated = 23;
+  repeated fixed64 F_Fixed64_repeated = 24;
+  repeated uint32 F_Uint32_repeated = 25;
+  repeated uint64 F_Uint64_repeated = 26;
+  repeated float F_Float_repeated = 27;
+  repeated double F_Double_repeated = 28;
+  repeated string F_String_repeated = 29;
+  repeated bytes F_Bytes_repeated = 201;
+  repeated sint32 F_Sint32_repeated = 202;
+  repeated sint64 F_Sint64_repeated = 203;
+  repeated sfixed32 F_Sfixed32_repeated = 204;
+  repeated sfixed64 F_Sfixed64_repeated = 205;
+
+  // Optional fields of all basic types
+  optional bool F_Bool_optional = 30;
+  optional int32 F_Int32_optional = 31;
+  optional int64 F_Int64_optional = 32;
+  optional fixed32 F_Fixed32_optional = 33;
+  optional fixed64 F_Fixed64_optional = 34;
+  optional uint32 F_Uint32_optional = 35;
+  optional uint64 F_Uint64_optional = 36;
+  optional float F_Float_optional = 37;
+  optional double F_Double_optional = 38;
+  optional string F_String_optional = 39;
+  optional bytes F_Bytes_optional = 301;
+  optional sint32 F_Sint32_optional = 302;
+  optional sint64 F_Sint64_optional = 303;
+  optional sfixed32 F_Sfixed32_optional = 304;
+  optional sfixed64 F_Sfixed64_optional = 305;
+
+  // Default-valued fields of all basic types
+  optional bool F_Bool_defaulted = 40 [default=true];
+  optional int32 F_Int32_defaulted = 41 [default=32];
+  optional int64 F_Int64_defaulted = 42 [default=64];
+  optional fixed32 F_Fixed32_defaulted = 43 [default=320];
+  optional fixed64 F_Fixed64_defaulted = 44 [default=640];
+  optional uint32 F_Uint32_defaulted = 45 [default=3200];
+  optional uint64 F_Uint64_defaulted = 46 [default=6400];
+  optional float F_Float_defaulted = 47 [default=314159.];
+  optional double F_Double_defaulted = 48 [default=271828.];
+  optional string F_String_defaulted = 49 [default="hello, \"world!\"\n"];
+  optional bytes F_Bytes_defaulted = 401 [default="Bignose"];
+  optional sint32 F_Sint32_defaulted = 402 [default = -32];
+  optional sint64 F_Sint64_defaulted = 403 [default = -64];
+  optional sfixed32 F_Sfixed32_defaulted = 404 [default = -32];
+  optional sfixed64 F_Sfixed64_defaulted = 405 [default = -64];
+
+  // Packed repeated fields (no string or bytes).
+  repeated bool F_Bool_repeated_packed = 50 [packed=true];
+  repeated int32 F_Int32_repeated_packed = 51 [packed=true];
+  repeated int64 F_Int64_repeated_packed = 52 [packed=true];
+  repeated fixed32 F_Fixed32_repeated_packed = 53 [packed=true];
+  repeated fixed64 F_Fixed64_repeated_packed = 54 [packed=true];
+  repeated uint32 F_Uint32_repeated_packed = 55 [packed=true];
+  repeated uint64 F_Uint64_repeated_packed = 56 [packed=true];
+  repeated float F_Float_repeated_packed = 57 [packed=true];
+  repeated double F_Double_repeated_packed = 58 [packed=true];
+  repeated sint32 F_Sint32_repeated_packed = 502 [packed=true];
+  repeated sint64 F_Sint64_repeated_packed = 503 [packed=true];
+  repeated sfixed32 F_Sfixed32_repeated_packed = 504 [packed=true];
+  repeated sfixed64 F_Sfixed64_repeated_packed = 505 [packed=true];
+
+  // Required, repeated, and optional groups.
+  required group RequiredGroup = 70 {
+    required string RequiredField = 71;
+  };
+
+  repeated group RepeatedGroup = 80 {
+    required string RequiredField = 81;
+  };
+
+  optional group OptionalGroup = 90 {
+    required string RequiredField = 91;
+  };
+}
+
+// For testing a group containing a required field.
+message GoTestRequiredGroupField {
+  required group Group = 1 {
+    required int32 Field = 2;
+  };
+}
+
+// For testing skipping of unrecognized fields.
+// Numbers are all big, larger than tag numbers in GoTestField,
+// the message used in the corresponding test.
+message GoSkipTest {
+  required int32 skip_int32 = 11;
+  required fixed32 skip_fixed32 = 12;
+  required fixed64 skip_fixed64 = 13;
+  required string skip_string = 14;
+  required group SkipGroup = 15 {
+    required int32 group_int32 = 16;
+    required string group_string = 17;
+  }
+}
+
+// For testing packed/non-packed decoder switching.
+// A serialized instance of one should be deserializable as the other.
+message NonPackedTest {
+  repeated int32 a = 1;
+}
+
+message PackedTest {
+  repeated int32 b = 1 [packed=true];
+}
+
+message MaxTag {
+  // Maximum possible tag number.
+  optional string last_field = 536870911;
+}
+
+message OldMessage {
+  message Nested {
+    optional string name = 1;
+  }
+  optional Nested nested = 1;
+
+  optional int32 num = 2;
+}
+
+// NewMessage is wire compatible with OldMessage;
+// imagine it as a future version.
+message NewMessage {
+  message Nested {
+    optional string name = 1;
+    optional string food_group = 2;
+  }
+  optional Nested nested = 1;
+
+  // This is an int32 in OldMessage.
+  optional int64 num = 2;
+}
+
+// Smaller tests for ASCII formatting.
+
+message InnerMessage {
+  required string host = 1;
+  optional int32 port = 2 [default=4000];
+  optional bool connected = 3;
+}
+
+message OtherMessage {
+  optional int64 key = 1;
+  optional bytes value = 2;
+  optional float weight = 3;
+  optional InnerMessage inner = 4;
+
+  extensions 100 to max;
+}
+
+message RequiredInnerMessage {
+  required InnerMessage leo_finally_won_an_oscar = 1;
+}
+
+message MyMessage {
+  required int32 count = 1;
+  optional string name = 2;
+  optional string quote = 3;
+  repeated string pet = 4;
+  optional InnerMessage inner = 5;
+  repeated OtherMessage others = 6;
+  optional RequiredInnerMessage we_must_go_deeper = 13;
+  repeated InnerMessage rep_inner = 12;
+
+  enum Color {
+    RED = 0;
+    GREEN = 1;
+    BLUE = 2;
+  };
+  optional Color bikeshed = 7;
+
+  optional group SomeGroup = 8 {
+    optional int32 group_field = 9;
+  }
+
+  // This field becomes [][]byte in the generated code.
+  repeated bytes rep_bytes = 10;
+
+  optional double bigfloat = 11;
+
+  extensions 100 to max;
+}
+
+message Ext {
+  extend MyMessage {
+    optional Ext more = 103;
+    optional string text = 104;
+    optional int32 number = 105;
+  }
+
+  optional string data = 1;
+  map<int32, int32> map_field = 2;
+}
+
+extend MyMessage {
+  repeated string greeting = 106;
+  // leave field 200 unregistered for testing
+}
+
+message ComplexExtension {
+  optional int32 first = 1;
+  optional int32 second = 2;
+  repeated int32 third = 3;
+}
+
+extend OtherMessage {
+  optional ComplexExtension complex = 200;
+  repeated ComplexExtension r_complex = 201;
+}
+
+message DefaultsMessage {
+  enum DefaultsEnum {
+    ZERO = 0;
+    ONE = 1;
+    TWO = 2;
+  };
+  extensions 100 to max;
+}
+
+extend DefaultsMessage {
+  optional double no_default_double = 101;
+  optional float no_default_float = 102;
+  optional int32 no_default_int32 = 103;
+  optional int64 no_default_int64 = 104;
+  optional uint32 no_default_uint32 = 105;
+  optional uint64 no_default_uint64 = 106;
+  optional sint32 no_default_sint32 = 107;
+  optional sint64 no_default_sint64 = 108;
+  optional fixed32 no_default_fixed32 = 109;
+  optional fixed64 no_default_fixed64 = 110;
+  optional sfixed32 no_default_sfixed32 = 111;
+  optional sfixed64 no_default_sfixed64 = 112;
+  optional bool no_default_bool = 113;
+  optional string no_default_string = 114;
+  optional bytes no_default_bytes = 115;
+  optional DefaultsMessage.DefaultsEnum no_default_enum = 116;
+
+  optional double default_double = 201 [default = 3.1415];
+  optional float default_float = 202 [default = 3.14];
+  optional int32 default_int32 = 203 [default = 42];
+  optional int64 default_int64 = 204 [default = 43];
+  optional uint32 default_uint32 = 205 [default = 44];
+  optional uint64 default_uint64 = 206 [default = 45];
+  optional sint32 default_sint32 = 207 [default = 46];
+  optional sint64 default_sint64 = 208 [default = 47];
+  optional fixed32 default_fixed32 = 209 [default = 48];
+  optional fixed64 default_fixed64 = 210 [default = 49];
+  optional sfixed32 default_sfixed32 = 211 [default = 50];
+  optional sfixed64 default_sfixed64 = 212 [default = 51];
+  optional bool default_bool = 213 [default = true];
+  optional string default_string = 214 [default = "Hello, string,def=foo"];
+  optional bytes default_bytes = 215 [default = "Hello, bytes"];
+  optional DefaultsMessage.DefaultsEnum default_enum = 216 [default = ONE];
+}
+
+message Empty {
+}
+
+message MessageList {
+  repeated group Message = 1 {
+    required string name = 2;
+    required int32 count = 3;
+  }
+}
+
+message Strings {
+  optional string string_field = 1;
+  optional bytes bytes_field = 2;
+}
+
+message Defaults {
+  enum Color {
+    RED = 0;
+    GREEN = 1;
+    BLUE = 2;
+  }
+
+  // Default-valued fields of all basic types.
+  // Same as GoTest, but copied here to make testing easier.
+  optional bool F_Bool = 1 [default=true];
+  optional int32 F_Int32 = 2 [default=32];
+  optional int64 F_Int64 = 3 [default=64];
+  optional fixed32 F_Fixed32 = 4 [default=320];
+  optional fixed64 F_Fixed64 = 5 [default=640];
+  optional uint32 F_Uint32 = 6 [default=3200];
+  optional uint64 F_Uint64 = 7 [default=6400];
+  optional float F_Float = 8 [default=314159.];
+  optional double F_Double = 9 [default=271828.];
+  optional string F_String = 10 [default="hello, \"world!\"\n"];
+  optional bytes F_Bytes = 11 [default="Bignose"];
+  optional sint32 F_Sint32 = 12 [default=-32];
+  optional sint64 F_Sint64 = 13 [default=-64];
+  optional Color F_Enum = 14 [default=GREEN];
+
+  // More fields with crazy defaults.
+  optional float F_Pinf = 15 [default=inf];
+  optional float F_Ninf = 16 [default=-inf];
+  optional float F_Nan = 17 [default=nan];
+
+  // Sub-message.
+  optional SubDefaults sub = 18;
+
+  // Redundant but explicit defaults.
+  optional string str_zero = 19 [default=""];
+}
+
+message SubDefaults {
+  optional int64 n = 1 [default=7];
+}
+
+message RepeatedEnum {
+  enum Color {
+    RED = 1;
+  }
+  repeated Color color = 1;
+}
+
+message MoreRepeated {
+  repeated bool bools = 1;
+  repeated bool bools_packed = 2 [packed=true];
+  repeated int32 ints = 3;
+  repeated int32 ints_packed = 4 [packed=true];
+  repeated int64 int64s_packed = 7 [packed=true];
+  repeated string strings = 5;
+  repeated fixed32 fixeds = 6;
+}
+
+// GroupOld and GroupNew have the same wire format.
+// GroupNew has a new field inside a group.
+
+message GroupOld {
+  optional group G = 101 {
+    optional int32 x = 2;
+  }
+}
+
+message GroupNew {
+  optional group G = 101 {
+    optional int32 x = 2;
+    optional int32 y = 3;
+  }
+}
+
+message FloatingPoint {
+  required double f = 1;
+  optional bool exact = 2;
+}
+
+message MessageWithMap {
+  map<int32, string> name_mapping = 1;
+  map<sint64, FloatingPoint> msg_mapping = 2;
+  map<bool, bytes> byte_mapping = 3;
+  map<string, string> str_to_str = 4;
+}
+
+message Oneof {
+  oneof union {
+    bool F_Bool = 1;
+    int32 F_Int32 = 2;
+    int64 F_Int64 = 3;
+    fixed32 F_Fixed32 = 4;
+    fixed64 F_Fixed64 = 5;
+    uint32 F_Uint32 = 6;
+    uint64 F_Uint64 = 7;
+    float F_Float = 8;
+    double F_Double = 9;
+    string F_String = 10;
+    bytes F_Bytes = 11;
+    sint32 F_Sint32 = 12;
+    sint64 F_Sint64 = 13;
+    MyMessage.Color F_Enum = 14;
+    GoTestField F_Message = 15;
+    group F_Group = 16 {
+      optional int32 x = 17;
+    }
+    int32 F_Largest_Tag = 536870911;
+  }
+
+  oneof tormato {
+    int32 value = 100;
+  }
+}
+
+message Communique {
+  optional bool make_me_cry = 1;
+
+  // This is a oneof, called "union".
+  oneof union {
+    int32 number = 5;
+    string name = 6;
+    bytes data = 7;
+    double temp_c = 8;
+    MyMessage.Color col = 9;
+    Strings msg = 10;
+  }
+}
+
+message TestUTF8 {
+  optional string scalar = 1;
+  repeated string vector = 2;
+  oneof oneof { string field = 3; }
+  map<string, int64> map_key = 4;
+  map<int64, string> map_value = 5;
+}

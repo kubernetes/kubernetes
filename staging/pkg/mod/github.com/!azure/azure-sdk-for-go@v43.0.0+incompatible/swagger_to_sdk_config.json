@@ -1,0 +1,31 @@
+{
+  "$schema": "https://openapistorageprod.blob.core.windows.net/sdkautomation/prod/schemas/swagger_to_sdk_config.schema.json",
+  "meta": {
+    "after_scripts": [
+      "dep ensure",
+      "go generate ./profiles/generate.go",
+      "gofmt -w ./profiles/",
+      "gofmt -w ./services/"
+    ],
+    "autorest_options": {
+      "use": "@microsoft.azure/autorest.go@~2.1.145",
+      "go": "",
+      "verbose": "",
+      "sdkrel:go-sdk-folder": ".",
+      "multiapi": "",
+      "use-onever": "",
+      "preview-chk": "",
+      "version": "previous"
+    },
+    "repotag": "azure-sdk-for-go",
+    "envs": {
+      "sdkrel:GOPATH": "../../../.."
+    },
+    "advanced_options": {
+      "clone_dir": "./src/github.com/Azure/azure-sdk-for-go",
+      "sdk_generation_pull_request_base": "integration_branch",
+      "create_sdk_pull_requests": true
+    },
+    "version": "0.2.0"
+  }
+}

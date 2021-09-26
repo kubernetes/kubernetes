@@ -1,0 +1,147 @@
+---
+version: 1
+interactions:
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:BSmK/9xx4JqFgHwGC+DDl/pgm34fWh8XTs4qltr5gwQ=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        file
+      x-ms-date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-46storagesharesuitetestgetandsetshareproperties?restype=share
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:38:26 GMT
+      Etag:
+      - '"0x8D6E3BD33C1E928"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:38:27 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - af9af880-d01a-00de-69a6-15eceb000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 201 Created
+    code: 201
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:CWrBEjVg7QNckj/4faMvoT1boq+/1v7tQ+mmrSo8jSw=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        file
+      x-ms-date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      x-ms-share-quota:
+      - "55"
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-46storagesharesuitetestgetandsetshareproperties?comp=properties&restype=share
+    method: PUT
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      Etag:
+      - '"0x8D6E3BD33C73DA5"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:38:27 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - af9af882-d01a-00de-6aa6-15eceb000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:s7ko0r8MRUkn7Uft4YK4STGAneltvfifnf3TS3tWrgA=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        file
+      x-ms-date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-46storagesharesuitetestgetandsetshareproperties?restype=share
+    method: HEAD
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      Etag:
+      - '"0x8D6E3BD33C73DA5"'
+      Last-Modified:
+      - Tue, 28 May 2019 22:38:27 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Has-Immutability-Policy:
+      - "false"
+      X-Ms-Has-Legal-Hold:
+      - "false"
+      X-Ms-Request-Id:
+      - af9af883-d01a-00de-6ba6-15eceb000000
+      X-Ms-Share-Quota:
+      - "55"
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 200 OK
+    code: 200
+    duration: ""
+- request:
+    body: ""
+    form: {}
+    headers:
+      Authorization:
+      - SharedKey golangrocksonazure:cpuela+d07eK3W6xcu6uoHjPVxT1pG4NBfx89EG8PpY=
+      User-Agent:
+      - Go/go1.12.4 (amd64-windows) azure-storage-go/latest api-version/2018-03-28
+        file
+      x-ms-date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      x-ms-version:
+      - "2018-03-28"
+    url: https://golangrocksonazure.file.core.windows.net/share-46storagesharesuitetestgetandsetshareproperties?restype=share
+    method: DELETE
+  response:
+    body: ""
+    headers:
+      Content-Length:
+      - "0"
+      Date:
+      - Tue, 28 May 2019 22:38:27 GMT
+      Server:
+      - Windows-Azure-File/1.0 Microsoft-HTTPAPI/2.0
+      X-Ms-Request-Id:
+      - af9af884-d01a-00de-6ca6-15eceb000000
+      X-Ms-Version:
+      - "2018-03-28"
+    status: 202 Accepted
+    code: 202
+    duration: ""

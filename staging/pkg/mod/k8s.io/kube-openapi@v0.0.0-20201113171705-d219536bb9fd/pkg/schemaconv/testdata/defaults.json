@@ -1,0 +1,25 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "title": "Atomic Types",
+        "version": "v1.0.0"
+    },
+    "paths": {},
+    "definitions": {
+        "List": {
+            "type": "array",
+            "x-kubernetes-list-type": "map",
+            "x-kubernetes-list-map-keys": ["foo"],
+            "default": {"foo": "bar"},
+            "items": {
+                "type": "object",
+                "properties": {
+                    "foo": {
+                        "default": "buz",
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}

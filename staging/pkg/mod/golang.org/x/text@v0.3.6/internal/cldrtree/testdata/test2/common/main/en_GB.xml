@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<ldml>
+	<identity>
+		<language type="en"/>
+		<territory type="GB"/>
+	</identity>
+	<dates>
+		<calendars>
+			<calendar type="gregorian">
+				<months>
+					<monthContext type="format">
+						<monthWidth type="abbreviated">
+							<month type="1">gbAbbrM1</month>
+							<month type="2">gbAbbrM2</month>
+							<month type="3">gbAbbrM3</month>
+							<month type="4">gbAbbrM4</month>
+							<month type="5">gbAbbrM5</month>
+							<month type="6">gbAbbrM6</month>
+							<month type="7">gbAbbrM7</month>
+							<month type="8">gbAbbrM8</month>
+							<month type="9">gbAbbrM9</month>
+							<month type="10">gbAbbrM10</month>
+							<month type="11">gbAbbrM11</month>
+							<month type="12">gbAbbrM12</month>
+						</monthWidth>
+						<monthWidth type="wide">
+							<month type="1">gbWideM1</month>
+							<month type="2">gbWideM2</month>
+							<month type="3">gbWideM3</month>
+							<month type="4">gbWideM4</month>
+							<month type="5">gbWideM5</month>
+							<month type="6">gbWideM6</month>
+							<month type="7">gbWideM7</month>
+							<month type="8">gbWideM8</month>
+							<month type="9">gbWideM9</month>
+							<month type="10">gbWideM10</month>
+							<month type="11">gbWideM11</month>
+							<month type="12">gbWideM12</month>
+						</monthWidth>
+					</monthContext>
+					<monthContext type="stand-alone">
+						<monthWidth type="narrow">
+							<month type="1">gbNarrowM1</month>
+							<month type="2">gbNarrowM2</month>
+							<month type="3">gbNarrowM3</month>
+							<!-- missing -->
+							<month type="5">gbNarrowM5</month>
+							<month type="6">gbNarrowM6</month>
+							<!-- missing -->
+							<month type="8">gbNarrowM8</month>
+							<month type="9">gbNarrowM9</month>
+							<month type="10">gbNarrowM10</month>
+							<month type="11">gbNarrowM11</month>
+							<month type="12">gbNarrowM12</month>
+						</monthWidth>
+					</monthContext>
+				</months>
+			</calendar>
+			<calendar type="islamic">
+			</calendar>
+		</calendars>
+	</dates>
+</ldml>

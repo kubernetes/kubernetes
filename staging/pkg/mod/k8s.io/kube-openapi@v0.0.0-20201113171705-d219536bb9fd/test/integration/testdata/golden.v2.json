@@ -1,0 +1,800 @@
+{
+  "swagger": "2.0",
+  "info": {
+   "title": "Integration Test",
+   "version": "1.0"
+  },
+  "paths": {
+   "/test/custom/bac": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func12",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/custom.Bac"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/custom/bah": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func13",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/custom.Bah"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/custom/bak": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func11",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/custom.Bak"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/custom/bal": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func10",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/custom.Bal"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/defaults/defaulted": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func19",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/defaults.Defaulted"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/dummytype/bar": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func2",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/dummytype.Bar"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/dummytype/baz": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func3",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/dummytype.Baz"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/dummytype/foo": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func1",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/dummytype.Foo"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/dummytype/waldo": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func4",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/dummytype.Waldo"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/listtype/atomiclist": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func5",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/listtype.AtomicList"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/listtype/maplist": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func6",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/listtype.MapList"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/listtype/setlist": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func7",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/listtype.SetList"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/maptype/atomicmap": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func15",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/maptype.AtomicMap"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/maptype/granularmap": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func14",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/maptype.GranularMap"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/structtype/atomicstruct": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func17",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/structtype.AtomicStruct"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/structtype/declaredatomicstruct": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func18",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/structtype.DeclaredAtomicStruct"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/structtype/granularstruct": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func16",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/structtype.GranularStruct"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/uniontype/inlinedunion": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func9",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/uniontype.InlinedUnion"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   },
+   "/test/uniontype/toplevelunion": {
+    "get": {
+     "schemes": [
+      "https"
+     ],
+     "operationId": "func8",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/uniontype.TopLevelUnion"
+       }
+      },
+      "404": {
+       "$ref": "#/responses/NotFound"
+      }
+     }
+    }
+   }
+  },
+  "definitions": {
+   "custom.Bac": {
+    "type": "string"
+   },
+   "custom.Bah": {
+    "type": "test-type",
+    "format": "test-format"
+   },
+   "custom.Bak": {
+    "type": "integer"
+   },
+   "custom.Bal": {
+    "type": "string"
+   },
+   "defaults.Defaulted": {
+    "type": "object",
+    "required": [
+     "OtherField",
+     "List",
+     "Sub",
+     "OtherSub",
+     "Map"
+    ],
+    "properties": {
+     "Field": {
+      "type": "string",
+      "default": "bar"
+     },
+     "List": {
+      "type": "array",
+      "default": [
+       "foo",
+       "bar"
+      ],
+      "items": {
+       "type": "string",
+       "default": ""
+      }
+     },
+     "Map": {
+      "type": "object",
+      "default": {
+       "foo": "bar"
+      },
+      "additionalProperties": {
+       "type": "string",
+       "default": ""
+      }
+     },
+     "OtherField": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     },
+     "OtherSub": {
+      "default": {},
+      "$ref": "#/definitions/defaults.SubStruct"
+     },
+     "Sub": {
+      "default": {
+       "i": 5,
+       "s": "foo"
+      },
+      "$ref": "#/definitions/defaults.SubStruct"
+     }
+    }
+   },
+   "defaults.SubStruct": {
+    "type": "object",
+    "required": [
+     "S"
+    ],
+    "properties": {
+     "I": {
+      "type": "integer",
+      "format": "int32",
+      "default": 1
+     },
+     "S": {
+      "type": "string",
+      "default": ""
+     }
+    }
+   },
+   "dummytype.Bar": {
+    "type": "object",
+    "required": [
+     "ViolationBehind",
+     "Violation"
+    ],
+    "properties": {
+     "Violation": {
+      "type": "boolean",
+      "default": false
+     },
+     "ViolationBehind": {
+      "type": "boolean",
+      "default": false
+     }
+    }
+   },
+   "dummytype.Baz": {
+    "type": "object",
+    "required": [
+     "Violation",
+     "ViolationBehind"
+    ],
+    "properties": {
+     "Violation": {
+      "type": "boolean",
+      "default": false
+     },
+     "ViolationBehind": {
+      "type": "boolean",
+      "default": false
+     }
+    }
+   },
+   "dummytype.Foo": {
+    "type": "object",
+    "required": [
+     "Second",
+     "First"
+    ],
+    "properties": {
+     "First": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     },
+     "Second": {
+      "type": "string",
+      "default": ""
+     }
+    }
+   },
+   "dummytype.Waldo": {
+    "type": "object",
+    "required": [
+     "First",
+     "Second"
+    ],
+    "properties": {
+     "First": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     },
+     "Second": {
+      "type": "string",
+      "default": ""
+     }
+    }
+   },
+   "listtype.AtomicList": {
+    "type": "object",
+    "required": [
+     "Field"
+    ],
+    "properties": {
+     "Field": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "default": ""
+      },
+      "x-kubernetes-list-type": "atomic"
+     }
+    }
+   },
+   "listtype.Item": {
+    "type": "object",
+    "required": [
+     "Protocol",
+     "Port"
+    ],
+    "properties": {
+     "Port": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     },
+     "Protocol": {
+      "type": "string",
+      "default": ""
+     },
+     "a": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     },
+     "b": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "c": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     }
+    }
+   },
+   "listtype.MapList": {
+    "type": "object",
+    "required": [
+     "Field"
+    ],
+    "properties": {
+     "Field": {
+      "type": "array",
+      "items": {
+       "default": {},
+       "$ref": "#/definitions/listtype.Item"
+      },
+      "x-kubernetes-list-map-keys": [
+       "port"
+      ],
+      "x-kubernetes-list-type": "map"
+     }
+    }
+   },
+   "listtype.SetList": {
+    "type": "object",
+    "required": [
+     "Field"
+    ],
+    "properties": {
+     "Field": {
+      "type": "array",
+      "items": {
+       "type": "string",
+       "default": ""
+      },
+      "x-kubernetes-list-type": "set"
+     }
+    }
+   },
+   "maptype.AtomicMap": {
+    "type": "object",
+    "required": [
+     "KeyValue"
+    ],
+    "properties": {
+     "KeyValue": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string",
+       "default": ""
+      },
+      "x-kubernetes-map-type": "atomic"
+     }
+    }
+   },
+   "maptype.GranularMap": {
+    "type": "object",
+    "required": [
+     "KeyValue"
+    ],
+    "properties": {
+     "KeyValue": {
+      "type": "object",
+      "additionalProperties": {
+       "type": "string",
+       "default": ""
+      },
+      "x-kubernetes-map-type": "granular"
+     }
+    }
+   },
+   "structtype.AtomicStruct": {
+    "type": "object",
+    "required": [
+     "Field",
+     "OtherField"
+    ],
+    "properties": {
+     "Field": {
+      "default": {},
+      "x-kubernetes-map-type": "atomic",
+      "$ref": "#/definitions/structtype.ContainedStruct"
+     },
+     "OtherField": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     }
+    }
+   },
+   "structtype.ContainedStruct": {
+    "type": "object"
+   },
+   "structtype.DeclaredAtomicStruct": {
+    "type": "object",
+    "required": [
+     "Field"
+    ],
+    "properties": {
+     "Field": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     }
+    },
+    "x-kubernetes-map-type": "atomic"
+   },
+   "structtype.GranularStruct": {
+    "type": "object",
+    "required": [
+     "Field",
+     "OtherField"
+    ],
+    "properties": {
+     "Field": {
+      "default": {},
+      "x-kubernetes-map-type": "granular",
+      "$ref": "#/definitions/structtype.ContainedStruct"
+     },
+     "OtherField": {
+      "type": "integer",
+      "format": "int32",
+      "default": 0
+     }
+    }
+   },
+   "uniontype.InlinedUnion": {
+    "type": "object",
+    "required": [
+     "name",
+     "type"
+    ],
+    "properties": {
+     "alpha": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "beta": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "field1": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "field2": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "fieldA": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "fieldB": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "name": {
+      "type": "string",
+      "default": ""
+     },
+     "type": {
+      "type": "string",
+      "default": ""
+     },
+     "unionType": {
+      "type": "string",
+      "default": ""
+     }
+    },
+    "x-kubernetes-unions": [
+     {
+      "discriminator": "unionType",
+      "fields-to-discriminateBy": {
+       "fieldA": "FieldA",
+       "fieldB": "FieldB"
+      }
+     },
+     {
+      "discriminator": "type",
+      "fields-to-discriminateBy": {
+       "alpha": "Alpha",
+       "beta": "Beta"
+      }
+     },
+     {
+      "fields-to-discriminateBy": {
+       "field1": "Field1",
+       "field2": "Field2"
+      }
+     }
+    ]
+   },
+   "uniontype.TopLevelUnion": {
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "fieldA": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "fieldB": {
+      "type": "integer",
+      "format": "int32"
+     },
+     "name": {
+      "type": "string",
+      "default": ""
+     },
+     "unionType": {
+      "type": "string",
+      "default": ""
+     }
+    },
+    "x-kubernetes-unions": [
+     {
+      "discriminator": "unionType",
+      "fields-to-discriminateBy": {
+       "fieldA": "FieldA",
+       "fieldB": "FieldB"
+      }
+     }
+    ]
+   }
+  },
+  "responses": {
+   "NotFound": {
+    "description": "Entity not found."
+   }
+  }
+ }

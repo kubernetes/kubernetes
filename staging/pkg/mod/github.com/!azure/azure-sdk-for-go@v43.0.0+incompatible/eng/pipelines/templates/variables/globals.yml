@@ -1,0 +1,2 @@
+variables:
+  GoLintCLIVersion: 'v1.23.6'

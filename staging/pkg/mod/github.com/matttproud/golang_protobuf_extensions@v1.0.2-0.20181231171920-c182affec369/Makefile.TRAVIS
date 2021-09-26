@@ -1,0 +1,15 @@
+all: build cover test vet
+
+build:
+	go build -v ./...
+
+cover: test
+	$(MAKE) -C pbutil cover
+
+test: build
+	go test -v ./...
+
+vet: build
+	go vet -v ./...
+
+.PHONY: build cover test vet

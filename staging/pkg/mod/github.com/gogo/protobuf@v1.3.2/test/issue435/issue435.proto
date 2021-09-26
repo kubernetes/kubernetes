@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+package issue435;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option go_package = "issue435";
+
+message Message {
+  optional SubMessage nonnullable_optional = 1 [(gogoproto.nullable) = false];
+  repeated SubMessage nonnullable_repeated = 2 [(gogoproto.nullable) = false];
+}
+
+message SubMessage {
+  optional int64 value = 1 [default = 7];
+}

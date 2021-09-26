@@ -1,0 +1,92 @@
+// Copyright 2017 Google Inc. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Model an API surface for code generation.
+
+syntax = "proto3";
+
+package surface.v1;
+
+enum FieldKind {
+    SCALAR = 0;
+    MAP = 1;
+    ARRAY = 2;
+    REFERENCE = 3;
+    ANY = 4;
+}
+
+enum TypeKind {
+    STRUCT = 0; // implement with named fields
+    OBJECT = 1; // implement with a map
+}
+
+enum Position {
+    BODY = 0;
+    HEADER = 1;
+    FORMDATA = 2;
+    QUERY = 3;
+    PATH = 4;
+}
+
+// Field is a field in a definition and can be associated with
+// a position in a request structure.
+message Field {
+    string name = 1; // the name as specified in the API description
+    string type = 2; // the specified content type of the field
+    FieldKind kind = 3; // what kind of thing is this field? scalar, reference, array, map of strings to the specified type
+    string format = 4; // the specified format of the field
+    Position position = 5; // "body", "header", "formdata", "query", or "path"
+
+    string native_type = 6; // the programming-language native type of the field
+    string field_name = 7; // the name to use for a data structure field
+    string parameter_name = 8; // the name to use for a function parameter
+
+    bool serialize = 9; // true if this field should be serialized (to JSON, etc)
+}
+
+// Type typically corresponds to a definition, parameter, or response
+// in an API and is represented by a type in generated code.
+message Type {
+    string name = 1; // the name to use for the type
+    TypeKind kind = 2; // a meta-description of the type (struct, map, etc)
+    string description = 3; // a comment describing the type
+    string content_type = 4; // if the type is a map, this is its content type
+    repeated Field fields = 5; // the fields of the type
+
+    string type_name = 6; // language-specific type name
+}
+
+// Method is an operation of an API and typically has associated client and server code.
+message Method {
+    string operation = 1; // Operation ID
+    string path = 2; // HTTP path
+    string method = 3; // HTTP method name
+    string description = 4; // description of method
+
+    string name = 5; // Operation name, possibly generated from method and path
+    string handler_name = 6; // name of the generated handler
+    string processor_name = 7; // name of the processing function in the service interface
+    string client_name = 8; // name of client
+
+    string parameters_type_name = 9; // parameters (input), with fields corresponding to input parameters
+    string responses_type_name = 10; // responses (output), with fields corresponding to possible response values
+}
+
+// Model represents an API for code generation.
+message Model {
+    string name = 1; // a free-form title for the API
+    repeated Type types = 2; // the types used by the API
+    repeated Method methods = 3; // the methods (functions) of the API
+    repeated string symbolic_references = 4; // references to other OpenAPI files. Currently only supported for OpenAPI v3.
+}

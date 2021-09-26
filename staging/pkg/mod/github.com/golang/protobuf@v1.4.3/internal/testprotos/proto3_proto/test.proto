@@ -1,0 +1,72 @@
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+option go_package = "github.com/golang/protobuf/internal/testprotos/proto3_proto";
+
+import "google/protobuf/any.proto";
+import "proto2_proto/test.proto";
+
+package proto3_test;
+
+message Message {
+  enum Humour {
+    UNKNOWN = 0;
+    PUNS = 1;
+    SLAPSTICK = 2;
+    BILL_BAILEY = 3;
+  }
+
+  string name = 1;
+  Humour hilarity = 2;
+  uint32 height_in_cm = 3;
+  bytes data = 4;
+  int64 result_count = 7;
+  bool true_scotsman = 8;
+  float score = 9;
+
+  repeated uint64 key = 5;
+  repeated int32 short_key = 19;
+  Nested nested = 6;
+  repeated Humour r_funny = 16;
+
+  map<string, Nested> terrain = 10;
+  proto2_test.SubDefaults proto2_field = 11;
+  map<string, proto2_test.SubDefaults> proto2_value = 13;
+
+  google.protobuf.Any anything = 14;
+  repeated google.protobuf.Any many_things = 15;
+
+  Message submessage = 17;
+  repeated Message children = 18;
+
+  map<string, string> string_map = 20;
+}
+
+message Nested {
+  string bunny = 1;
+  bool cute = 2;
+}
+
+message MessageWithMap {
+  map<bool, bytes> byte_mapping = 1;
+}
+
+
+message IntMap {
+  map<int32, int32> rtt = 1;
+}
+
+message IntMaps {
+  repeated IntMap maps = 1;
+}
+
+message TestUTF8 {
+  string scalar = 1;
+  repeated string vector = 2;
+  oneof oneof { string field = 3; }
+  map<string, int64> map_key = 4;
+  map<int64, string> map_value = 5;
+}

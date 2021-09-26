@@ -1,0 +1,4 @@
+The export directory contains packages that are generated using the x/text
+infrastructure, but live elsewhere.
+At some point we can expose some of the infrastructure, but for now this
+is not done.

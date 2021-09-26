@@ -1,0 +1,17 @@
+syntax = "proto2";
+
+package issue312;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+
+option go_package = "issue312";
+option (gogoproto.gostring_all) = true;
+option (gogoproto.populate_all) = true;
+option (gogoproto.equal_all) = true;
+option (gogoproto.testgen_all) = true;
+
+enum TaskState {
+  TASK_STAGING = 6;
+  TASK_STARTING = 0;
+  TASK_RUNNING = 1;
+}

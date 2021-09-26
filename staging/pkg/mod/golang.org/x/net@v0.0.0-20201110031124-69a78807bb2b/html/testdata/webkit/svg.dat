@@ -1,0 +1,81 @@
+#data
+<svg><tr><td><title><tr>
+#errors
+#document-fragment
+td
+#document
+| <svg svg>
+|   <svg tr>
+|     <svg td>
+|       <svg title>
+
+#data
+<svg><tr><td><title><tr>
+#errors
+#document-fragment
+tr
+#document
+| <svg svg>
+|   <svg tr>
+|     <svg td>
+|       <svg title>
+
+#data
+<svg><thead><title><tbody>
+#errors
+#document-fragment
+thead
+#document
+| <svg svg>
+|   <svg thead>
+|     <svg title>
+
+#data
+<svg><tfoot><title><tbody>
+#errors
+#document-fragment
+tfoot
+#document
+| <svg svg>
+|   <svg tfoot>
+|     <svg title>
+
+#data
+<svg><tbody><title><tfoot>
+#errors
+#document-fragment
+tbody
+#document
+| <svg svg>
+|   <svg tbody>
+|     <svg title>
+
+#data
+<svg><tbody><title></table>
+#errors
+#document-fragment
+tbody
+#document
+| <svg svg>
+|   <svg tbody>
+|     <svg title>
+
+#data
+<svg><thead><title></table>
+#errors
+#document-fragment
+tbody
+#document
+| <svg svg>
+|   <svg thead>
+|     <svg title>
+
+#data
+<svg><tfoot><title></table>
+#errors
+#document-fragment
+tbody
+#document
+| <svg svg>
+|   <svg tfoot>
+|     <svg title>

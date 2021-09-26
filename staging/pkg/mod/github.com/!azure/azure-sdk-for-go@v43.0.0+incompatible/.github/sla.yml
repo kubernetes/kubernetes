@@ -1,0 +1,12 @@
+---
+- scheduleTask:
+    action: sendEmail
+    scope: issue
+    args:
+      booleanFilterExpression: "needs-triage"
+      limit: 2d
+      subject: "Action Required: Please respond to ${URL}"
+      message: "<p> Dear SDK owner, <br> <br>Please response to issue ${URL} , the PR is waiting for response over 2 days. Thanks."
+      to: azure-go-sdk@microsoft.com
+    description: "send email to SDK owner for over 2 days issues labelled with triage"
+    name: "notification of SLA"

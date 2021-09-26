@@ -1,0 +1,48 @@
+﻿<!DOCTYPE html>
+<html  lang="en" >
+<head>
+  <title>HTTP vs UTF-8 BOM</title>
+<link rel='author' title='Richard Ishida' href='mailto:ishida@w3.org'>
+<link rel='help' href='http://www.w3.org/TR/html5/syntax.html#the-input-byte-stream'>
+<link rel="stylesheet" type="text/css" href="./generatedtests.css">
+<script src="http://w3c-test.org/resources/testharness.js"></script>
+<script src="http://w3c-test.org/resources/testharnessreport.js"></script>
+<meta name='flags' content='http'>
+<meta name="assert" content="A character encoding set in the HTTP header has lower precedence than the UTF-8 signature.">
+<style type='text/css'>
+.test div { width: 50px; }</style>
+<link rel="stylesheet" type="text/css" href="the-input-byte-stream/support/encodingtests-utf8.css">
+</head>
+<body>
+<p class='title'>HTTP vs UTF-8 BOM</p>
+
+
+<div id='log'></div>
+
+
+<div class='test'><div id='box' class='ýäè'>&#xA0;</div></div>
+
+
+
+
+
+<div class='description'>
+<p class="assertion" title="Assertion">A character encoding set in the HTTP header has lower precedence than the UTF-8 signature.</p>
+<div class="notes"><p><p>The HTTP header attempts to set the character encoding to ISO 8859-15. The page starts with a UTF-8 signature.</p><p>The test contains a div with a class name that contains the following sequence of bytes: 0xC3 0xBD 0xC3 0xA4 0xC3 0xA8. These represent different sequences of characters in ISO 8859-15, ISO 8859-1 and UTF-8. The external, UTF-8-encoded stylesheet contains a selector <code>.test div.&#x00FD;&#x00E4;&#x00E8;</code>. This matches the sequence of bytes above when they are interpreted as UTF-8. If the class name matches the selector then the test will pass.</p><p>If the test is unsuccessful, the characters &#x00EF;&#x00BB;&#x00BF; should appear at the top of the page.  These represent the bytes that make up the UTF-8 signature when encountered in the ISO 8859-15 encoding.</p></p>
+</div>
+</div>
+<div class="nexttest"><div><a href="generate?test=the-input-byte-stream-022">Next test</a></div><div class="doctype">HTML5</div>
+<p class="jump">the-input-byte-stream-034<br /><a href="/International/tests/html5/the-input-byte-stream/results-basics#precedence" target="_blank">Result summary &amp; related tests</a><br /><a href="http://w3c-test.org/framework/details/i18n-html5/the-input-byte-stream-034" target="_blank">Detailed results for this test</a><br/>	<a href="http://www.w3.org/TR/html5/syntax.html#the-input-byte-stream" target="_blank">Link to spec</a></p>
+<div class='prereq'>Assumptions: <ul><li>The default encoding for the browser you are testing is not set to ISO 8859-15.</li>
+				<li>The test is read from a server that supports HTTP.</li></ul></div>
+</div>
+<script>
+test(function() {
+assert_equals(document.getElementById('box').offsetWidth, 100);
+}, " ");
+</script>
+
+</body>
+</html>
+
+

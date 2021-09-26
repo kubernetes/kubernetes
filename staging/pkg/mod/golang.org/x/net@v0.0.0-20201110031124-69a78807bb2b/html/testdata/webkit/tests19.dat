@@ -1,0 +1,1454 @@
+#data
+<!doctype html><math><mn DefinitionUrl="foo">
+#errors
+(1,45): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|       <math mn>
+|         definitionURL="foo"
+
+#data
+<!doctype html><html></p><!--foo-->
+#errors
+(1,25): end-tag-after-implied-root
+#document
+| <!DOCTYPE html>
+| <html>
+|   <!-- foo -->
+|   <head>
+|   <body>
+
+#data
+<!doctype html><head></head></p><!--foo-->
+#errors
+(1,32): unexpected-end-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <!-- foo -->
+|   <body>
+
+#data
+<!doctype html><body><p><pre>
+#errors
+(1,29): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     <pre>
+
+#data
+<!doctype html><body><p><listing>
+#errors
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     <listing>
+
+#data
+<!doctype html><p><plaintext>
+#errors
+(1,29): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     <plaintext>
+
+#data
+<!doctype html><p><h1>
+#errors
+(1,22): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|     <h1>
+
+#data
+<!doctype html><isindex type="hidden">
+#errors
+(1,38): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <isindex>
+|       type="hidden"
+
+#data
+<!doctype html><ruby><p><rp>
+#errors
+(1,28): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <p>
+|       <rp>
+
+#data
+<!doctype html><ruby><div><span><rp>
+#errors
+(1,36): XXX-undefined-error
+(1,36): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <div>
+|         <span>
+|           <rp>
+
+#data
+<!doctype html><ruby><div><p><rp>
+#errors
+(1,33): XXX-undefined-error
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <div>
+|         <p>
+|         <rp>
+
+#data
+<!doctype html><ruby><p><rt>
+#errors
+(1,28): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <p>
+|       <rt>
+
+#data
+<!doctype html><ruby><div><span><rt>
+#errors
+(1,36): XXX-undefined-error
+(1,36): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <div>
+|         <span>
+|           <rt>
+
+#data
+<!doctype html><ruby><div><p><rt>
+#errors
+(1,33): XXX-undefined-error
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       <div>
+|         <p>
+|         <rt>
+
+#data
+<html><ruby>a<rb>b<rt></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rb>
+|         "b"
+|       <rt>
+
+#data
+<html><ruby>a<rp>b<rt></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rp>
+|         "b"
+|       <rt>
+
+#data
+<html><ruby>a<rt>b<rt></ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rt>
+|         "b"
+|       <rt>
+
+#data
+<html><ruby>a<rtc>b<rt>c<rb>d</ruby></html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     <ruby>
+|       "a"
+|       <rtc>
+|         "b"
+|         <rt>
+|           "c"
+|       <rb>
+|         "d"
+
+#data
+<!doctype html><math/><foo>
+#errors
+(1,27): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+|     <foo>
+
+#data
+<!doctype html><svg/><foo>
+#errors
+(1,26): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|     <foo>
+
+#data
+<!doctype html><div></body><!--foo-->
+#errors
+(1,27): expected-one-end-tag-but-got-another
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|   <!-- foo -->
+
+#data
+<!doctype html><h1><div><h3><span></h1>foo
+#errors
+(1,39): end-tag-too-early
+(1,42): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <h1>
+|       <div>
+|         <h3>
+|           <span>
+|         "foo"
+
+#data
+<!doctype html><p></h3>foo
+#errors
+(1,23): end-tag-too-early
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "foo"
+
+#data
+<!doctype html><h3><li>abc</h2>foo
+#errors
+(1,31): end-tag-too-early
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <h3>
+|       <li>
+|         "abc"
+|     "foo"
+
+#data
+<!doctype html><table>abc<!--foo-->
+#errors
+(1,23): foster-parenting-character
+(1,24): foster-parenting-character
+(1,25): foster-parenting-character
+(1,35): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "abc"
+|     <table>
+|       <!-- foo -->
+
+#data
+<!doctype html><table>  <!--foo-->
+#errors
+(1,34): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       "  "
+|       <!-- foo -->
+
+#data
+<!doctype html><table> b <!--foo-->
+#errors
+(1,23): foster-parenting-character
+(1,24): foster-parenting-character
+(1,25): foster-parenting-character
+(1,35): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     " b "
+|     <table>
+|       <!-- foo -->
+
+#data
+<!doctype html><select><option><option>
+#errors
+(1,39): eof-in-select
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <option>
+|       <option>
+
+#data
+<!doctype html><select><option></optgroup>
+#errors
+(1,42): unexpected-end-tag-in-select
+(1,42): eof-in-select
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <option>
+
+#data
+<!doctype html><select><option></optgroup>
+#errors
+(1,42): unexpected-end-tag-in-select
+(1,42): eof-in-select
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+|       <option>
+
+#data
+<!doctype html><dd><optgroup><dd>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dd>
+|       <optgroup>
+|     <dd>
+
+#data
+<!doctype html><p><math><mi><p><h1>
+#errors
+(1,35): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <math math>
+|         <math mi>
+|           <p>
+|           <h1>
+
+#data
+<!doctype html><p><math><mo><p><h1>
+#errors
+(1,35): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <math math>
+|         <math mo>
+|           <p>
+|           <h1>
+
+#data
+<!doctype html><p><math><mn><p><h1>
+#errors
+(1,35): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <math math>
+|         <math mn>
+|           <p>
+|           <h1>
+
+#data
+<!doctype html><p><math><ms><p><h1>
+#errors
+(1,35): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <math math>
+|         <math ms>
+|           <p>
+|           <h1>
+
+#data
+<!doctype html><p><math><mtext><p><h1>
+#errors
+(1,38): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <math math>
+|         <math mtext>
+|           <p>
+|           <h1>
+
+#data
+<!doctype html><frameset></noframes>
+#errors
+(1,36): unexpected-end-tag-in-frameset
+(1,36): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!doctype html><html c=d><body></html><html a=b>
+#errors
+(1,48): non-html-root
+#document
+| <!DOCTYPE html>
+| <html>
+|   a="b"
+|   c="d"
+|   <head>
+|   <body>
+
+#data
+<!doctype html><html c=d><frameset></frameset></html><html a=b>
+#errors
+(1,63): non-html-root
+#document
+| <!DOCTYPE html>
+| <html>
+|   a="b"
+|   c="d"
+|   <head>
+|   <frameset>
+
+#data
+<!doctype html><html><frameset></frameset></html><!--foo-->
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+| <!-- foo -->
+
+#data
+<!doctype html><html><frameset></frameset></html>  
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|   "  "
+
+#data
+<!doctype html><html><frameset></frameset></html>abc
+#errors
+(1,50): expected-eof-but-got-char
+(1,51): expected-eof-but-got-char
+(1,52): expected-eof-but-got-char
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!doctype html><html><frameset></frameset></html><p>
+#errors
+(1,52): expected-eof-but-got-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!doctype html><html><frameset></frameset></html></p>
+#errors
+(1,53): expected-eof-but-got-end-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<html><frameset></frameset></html><!doctype html>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,49): unexpected-doctype
+#document
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!doctype html><body><frameset>
+#errors
+(1,31): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+
+#data
+<!doctype html><p><frameset><frame>
+#errors
+(1,28): unexpected-start-tag
+(1,35): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|     <frame>
+
+#data
+<!doctype html><p>a<frameset>
+#errors
+(1,29): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       "a"
+
+#data
+<!doctype html><p> <frameset><frame>
+#errors
+(1,29): unexpected-start-tag
+(1,36): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|     <frame>
+
+#data
+<!doctype html><pre><frameset>
+#errors
+(1,30): unexpected-start-tag
+(1,30): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <pre>
+
+#data
+<!doctype html><listing><frameset>
+#errors
+(1,34): unexpected-start-tag
+(1,34): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <listing>
+
+#data
+<!doctype html><li><frameset>
+#errors
+(1,29): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <li>
+
+#data
+<!doctype html><dd><frameset>
+#errors
+(1,29): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dd>
+
+#data
+<!doctype html><dt><frameset>
+#errors
+(1,29): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <dt>
+
+#data
+<!doctype html><button><frameset>
+#errors
+(1,33): unexpected-start-tag
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <button>
+
+#data
+<!doctype html><applet><frameset>
+#errors
+(1,33): unexpected-start-tag
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <applet>
+
+#data
+<!doctype html><marquee><frameset>
+#errors
+(1,34): unexpected-start-tag
+(1,34): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <marquee>
+
+#data
+<!doctype html><object><frameset>
+#errors
+(1,33): unexpected-start-tag
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <object>
+
+#data
+<!doctype html><table><frameset>
+#errors
+(1,32): unexpected-start-tag-implies-table-voodoo
+(1,32): unexpected-start-tag
+(1,32): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+
+#data
+<!doctype html><area><frameset>
+#errors
+(1,31): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <area>
+
+#data
+<!doctype html><basefont><frameset>
+#errors
+(1,35): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <basefont>
+|   <frameset>
+
+#data
+<!doctype html><bgsound><frameset>
+#errors
+(1,34): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <bgsound>
+|   <frameset>
+
+#data
+<!doctype html><br><frameset>
+#errors
+(1,29): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <br>
+
+#data
+<!doctype html><embed><frameset>
+#errors
+(1,32): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <embed>
+
+#data
+<!doctype html><img><frameset>
+#errors
+(1,30): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <img>
+
+#data
+<!doctype html><input><frameset>
+#errors
+(1,32): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <input>
+
+#data
+<!doctype html><keygen><frameset>
+#errors
+(1,33): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <keygen>
+
+#data
+<!doctype html><wbr><frameset>
+#errors
+(1,30): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <wbr>
+
+#data
+<!doctype html><hr><frameset>
+#errors
+(1,29): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <hr>
+
+#data
+<!doctype html><textarea></textarea><frameset>
+#errors
+(1,46): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <textarea>
+
+#data
+<!doctype html><xmp></xmp><frameset>
+#errors
+(1,36): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <xmp>
+
+#data
+<!doctype html><iframe></iframe><frameset>
+#errors
+(1,42): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <iframe>
+
+#data
+<!doctype html><select></select><frameset>
+#errors
+(1,42): unexpected-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <select>
+
+#data
+<!doctype html><svg></svg><frameset><frame>
+#errors
+(1,36): unexpected-start-tag
+(1,43): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|     <frame>
+
+#data
+<!doctype html><math></math><frameset><frame>
+#errors
+(1,38): unexpected-start-tag
+(1,45): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|     <frame>
+
+#data
+<!doctype html><svg><foreignObject><div> <frameset><frame>
+#errors
+(1,51): unexpected-start-tag
+(1,58): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|     <frame>
+
+#data
+<!doctype html><svg>a</svg><frameset><frame>
+#errors
+(1,37): unexpected-start-tag
+(1,44): unexpected-start-tag-ignored
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <svg svg>
+|       "a"
+
+#data
+<!doctype html><svg> </svg><frameset><frame>
+#errors
+(1,37): unexpected-start-tag
+(1,44): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+|     <frame>
+
+#data
+<html>aaa<frameset></frameset>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,19): unexpected-start-tag
+(1,30): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     "aaa"
+
+#data
+<html> a <frameset></frameset>
+#errors
+(1,6): expected-doctype-but-got-start-tag
+(1,19): unexpected-start-tag
+(1,30): unexpected-end-tag
+#document
+| <html>
+|   <head>
+|   <body>
+|     "a "
+
+#data
+<!doctype html><div><frameset>
+#errors
+(1,30): unexpected-start-tag
+(1,30): eof-in-frameset
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <frameset>
+
+#data
+<!doctype html><div><body><frameset>
+#errors
+(1,26): unexpected-start-tag
+(1,36): unexpected-start-tag
+(1,36): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <div>
+
+#data
+<!doctype html><p><math></p>a
+#errors
+(1,28): unexpected-end-tag
+(1,28): unexpected-end-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <math math>
+|     "a"
+
+#data
+<!doctype html><p><math><mn><span></p>a
+#errors
+(1,38): unexpected-end-tag
+(1,39): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <math math>
+|         <math mn>
+|           <span>
+|             <p>
+|             "a"
+
+#data
+<!doctype html><math></html>
+#errors
+(1,28): unexpected-end-tag
+(1,28): expected-one-end-tag-but-got-another
+(1,28): unexpected-end-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <math math>
+
+#data
+<!doctype html><meta charset="ascii">
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <meta>
+|       charset="ascii"
+|   <body>
+
+#data
+<!doctype html><meta http-equiv="content-type" content="text/html;charset=ascii">
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <meta>
+|       content="text/html;charset=ascii"
+|       http-equiv="content-type"
+|   <body>
+
+#data
+<!doctype html><head><!--aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa--><meta charset="utf8">
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|     <!-- aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa -->
+|     <meta>
+|       charset="utf8"
+|   <body>
+
+#data
+<!doctype html><html a=b><head></head><html c=d>
+#errors
+(1,48): non-html-root
+#document
+| <!DOCTYPE html>
+| <html>
+|   a="b"
+|   c="d"
+|   <head>
+|   <body>
+
+#data
+<!doctype html><image/>
+#errors
+(1,23): image-start-tag
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <img>
+
+#data
+<!doctype html>a<i>b<table>c<b>d</i>e</b>f
+#errors
+(1,28): foster-parenting-character
+(1,31): foster-parenting-start-tag
+(1,32): foster-parenting-character
+(1,36): foster-parenting-end-tag
+(1,36): adoption-agency-1.3
+(1,37): foster-parenting-character
+(1,41): foster-parenting-end-tag
+(1,42): foster-parenting-character
+(1,42): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     "a"
+|     <i>
+|       "bc"
+|       <b>
+|         "de"
+|       "f"
+|       <table>
+
+#data
+<!doctype html><table><i>a<b>b<div>c<a>d</i>e</b>f
+#errors
+(1,25): foster-parenting-start-tag
+(1,26): foster-parenting-character
+(1,29): foster-parenting-start-tag
+(1,30): foster-parenting-character
+(1,35): foster-parenting-start-tag
+(1,36): foster-parenting-character
+(1,39): foster-parenting-start-tag
+(1,40): foster-parenting-character
+(1,44): foster-parenting-end-tag
+(1,44): adoption-agency-1.3
+(1,44): adoption-agency-1.3
+(1,45): foster-parenting-character
+(1,49): foster-parenting-end-tag
+(1,49): adoption-agency-1.3
+(1,49): adoption-agency-1.3
+(1,50): foster-parenting-character
+(1,50): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <i>
+|       "a"
+|       <b>
+|         "b"
+|     <b>
+|     <div>
+|       <b>
+|         <i>
+|           "c"
+|           <a>
+|             "d"
+|         <a>
+|           "e"
+|       <a>
+|         "f"
+|     <table>
+
+#data
+<!doctype html><i>a<b>b<div>c<a>d</i>e</b>f
+#errors
+(1,37): adoption-agency-1.3
+(1,37): adoption-agency-1.3
+(1,42): adoption-agency-1.3
+(1,42): adoption-agency-1.3
+(1,43): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <i>
+|       "a"
+|       <b>
+|         "b"
+|     <b>
+|     <div>
+|       <b>
+|         <i>
+|           "c"
+|           <a>
+|             "d"
+|         <a>
+|           "e"
+|       <a>
+|         "f"
+
+#data
+<!doctype html><table><i>a<b>b<div>c</i>
+#errors
+(1,25): foster-parenting-start-tag
+(1,26): foster-parenting-character
+(1,29): foster-parenting-start-tag
+(1,30): foster-parenting-character
+(1,35): foster-parenting-start-tag
+(1,36): foster-parenting-character
+(1,40): foster-parenting-end-tag
+(1,40): adoption-agency-1.3
+(1,40): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <i>
+|       "a"
+|       <b>
+|         "b"
+|     <b>
+|       <div>
+|         <i>
+|           "c"
+|     <table>
+
+#data
+<!doctype html><table><i>a<b>b<div>c<a>d</i>e</b>f
+#errors
+(1,25): foster-parenting-start-tag
+(1,26): foster-parenting-character
+(1,29): foster-parenting-start-tag
+(1,30): foster-parenting-character
+(1,35): foster-parenting-start-tag
+(1,36): foster-parenting-character
+(1,39): foster-parenting-start-tag
+(1,40): foster-parenting-character
+(1,44): foster-parenting-end-tag
+(1,44): adoption-agency-1.3
+(1,44): adoption-agency-1.3
+(1,45): foster-parenting-character
+(1,49): foster-parenting-end-tag
+(1,44): adoption-agency-1.3
+(1,44): adoption-agency-1.3
+(1,50): foster-parenting-character
+(1,50): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <i>
+|       "a"
+|       <b>
+|         "b"
+|     <b>
+|     <div>
+|       <b>
+|         <i>
+|           "c"
+|           <a>
+|             "d"
+|         <a>
+|           "e"
+|       <a>
+|         "f"
+|     <table>
+
+#data
+<!doctype html><table><i>a<div>b<tr>c<b>d</i>e
+#errors
+(1,25): foster-parenting-start-tag
+(1,26): foster-parenting-character
+(1,31): foster-parenting-start-tag
+(1,32): foster-parenting-character
+(1,37): foster-parenting-character
+(1,40): foster-parenting-start-tag
+(1,41): foster-parenting-character
+(1,45): foster-parenting-end-tag
+(1,45): adoption-agency-1.3
+(1,46): foster-parenting-character
+(1,46): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <i>
+|       "a"
+|       <div>
+|         "b"
+|     <i>
+|       "c"
+|       <b>
+|         "d"
+|     <b>
+|       "e"
+|     <table>
+|       <tbody>
+|         <tr>
+
+#data
+<!doctype html><table><td><table><i>a<div>b<b>c</i>d
+#errors
+(1,26): unexpected-cell-in-table-body
+(1,36): foster-parenting-start-tag
+(1,37): foster-parenting-character
+(1,42): foster-parenting-start-tag
+(1,43): foster-parenting-character
+(1,46): foster-parenting-start-tag
+(1,47): foster-parenting-character
+(1,51): foster-parenting-end-tag
+(1,51): adoption-agency-1.3
+(1,51): adoption-agency-1.3
+(1,52): foster-parenting-character
+(1,52): eof-in-table
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <table>
+|       <tbody>
+|         <tr>
+|           <td>
+|             <i>
+|               "a"
+|             <div>
+|               <i>
+|                 "b"
+|                 <b>
+|                   "c"
+|               <b>
+|                 "d"
+|             <table>
+
+#data
+<!doctype html><body><bgsound>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <bgsound>
+
+#data
+<!doctype html><body><basefont>
+#errors
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <basefont>
+
+#data
+<!doctype html><a><b></a><basefont>
+#errors
+(1,25): adoption-agency-1.3
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <a>
+|       <b>
+|     <basefont>
+
+#data
+<!doctype html><a><b></a><bgsound>
+#errors
+(1,25): adoption-agency-1.3
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <a>
+|       <b>
+|     <bgsound>
+
+#data
+<!doctype html><figcaption><article></figcaption>a
+#errors
+(1,49): end-tag-too-early
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <figcaption>
+|       <article>
+|     "a"
+
+#data
+<!doctype html><summary><article></summary>a
+#errors
+(1,43): end-tag-too-early
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <summary>
+|       <article>
+|     "a"
+
+#data
+<!doctype html><p><a><plaintext>b
+#errors
+(1,32): unexpected-end-tag
+(1,33): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <p>
+|       <a>
+|     <plaintext>
+|       <a>
+|         "b"
+
+#data
+<!DOCTYPE html><div>a<a></div>b<p>c</p>d
+#errors
+(1,30): end-tag-too-early
+(1,40): expected-closing-tag-but-got-eof
+#document
+| <!DOCTYPE html>
+| <html>
+|   <head>
+|   <body>
+|     <div>
+|       "a"
+|       <a>
+|     <a>
+|       "b"
+|       <p>
+|         "c"
+|       "d"

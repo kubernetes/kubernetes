@@ -1,0 +1,41 @@
+# Release automation via GoReleaser (goreleaser.com)
+# Requires a valid GITHUB_TOKEN envar prior to running `goreleaser`
+# See https://goreleaser.com/environment/ for more info
+---
+release:
+  github:
+    owner: golang
+    name: mock
+
+builds:
+  - binary: mockgen
+    goos:
+      - darwin
+      - windows
+      - linux
+    goarch:
+      - amd64
+      - 386
+    env:
+      - CGO_ENABLED=0
+      - GO111MODULE=on
+      - GOPROXY=https://proxy.golang.org
+      - GOSUMDB=sum.golang.org
+    main: ./mockgen/
+
+archives:
+ - format: tar.gz
+   wrap_in_directory: true
+   files:
+     - LICENSE
+     - README.md
+checksum:
+snapshot:
+  name_template: "snap-{{ .Commit }}"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - 'README'

@@ -1,0 +1,13 @@
+language: go
+# Supported Go versions are synced with github.com/prometheus/client_golang.
+go:
+  - 1.9.x
+  - 1.10.x
+  - 1.11.x
+  - 1.12.x
+  - 1.13.x
+
+script:
+  - make test
+  # style is only checked against the latest supported Go version.
+  - if [[ $TRAVIS_GO_VERSION =~ ^1\.(13)\. ]]; then make style; fi
