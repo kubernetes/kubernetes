@@ -69,7 +69,7 @@ type ControllerV2 struct {
 	now func() time.Time
 }
 
-// NewControllerV2 creates and initializes a new Controller.
+// NewControllerV2 creates and initializes a new CronjobController.
 func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
@@ -151,7 +151,7 @@ func (jm *ControllerV2) processNextWorkItem() bool {
 	requeueAfter, err := jm.sync(key.(string))
 	switch {
 	case err != nil:
-		utilruntime.HandleError(fmt.Errorf("error syncing CronJobController %v, requeuing: %v", key.(string), err))
+		utilruntime.HandleError(fmt.Errorf("error syncing CronjobController %v, requeuing: %v", key.(string), err))
 		jm.queue.AddRateLimited(key)
 	case requeueAfter != nil:
 		jm.queue.Forget(key)

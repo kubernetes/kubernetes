@@ -237,7 +237,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, *justAfterTheHour(), F, F, 1, 0},
 		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, *justAfterTheHour(), T, F, 2, 0},
 
-		// Controller should fail to schedule these, as there are too many missed starting times
+		// CronjobController should fail to schedule these, as there are too many missed starting times
 		// and either no deadline or a too long deadline.
 		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0, 1},
 		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, weekAfterTheHour(), F, F, 0, 1},
@@ -324,7 +324,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 						t.Errorf("%s: controllerRef.UID = %q, want %q", name, got, want)
 					}
 					if controllerRef.Controller == nil || *controllerRef.Controller != true {
-						t.Errorf("%s: controllerRef.Controller is not set to true", name)
+						t.Errorf("%s: controllerRef.CronjobController is not set to true", name)
 					}
 				}
 			}

@@ -121,7 +121,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
 		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
 
-		// Controller should fail to schedule these, as there are too many missed starting times
+		// CronjobController should fail to schedule these, as there are too many missed starting times
 		// and either no deadline or a too long deadline.
 		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
 		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
@@ -267,7 +267,7 @@ func TestControllerV2SyncCronJob(t *testing.T) {
 						t.Errorf("%s: controllerRef.UID = %q, want %q", name, got, want)
 					}
 					if controllerRef.Controller == nil || *controllerRef.Controller != true {
-						t.Errorf("%s: controllerRef.Controller is not set to true", name)
+						t.Errorf("%s: controllerRef.CronjobController is not set to true", name)
 					}
 				}
 			}
