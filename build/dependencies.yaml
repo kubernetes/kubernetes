@@ -114,7 +114,7 @@ dependencies:
       match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.23.0-go1.17.1-bullseye.0
+    version: v1.23.0-go1.17.1-bullseye.1
     refPaths:
     - path: build/build-image/cross/VERSION
 
