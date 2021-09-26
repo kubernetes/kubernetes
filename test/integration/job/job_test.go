@@ -877,7 +877,7 @@ func startJobController(restConfig *restclient.Config, clientSet clientset.Inter
 	ctx, cancel := context.WithCancel(context.Background())
 	resyncPeriod := 12 * time.Hour
 	informerSet := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(restConfig, "cronjob-informers")), resyncPeriod)
-	jc := jobcontroller.NewController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
+	jc := jobcontroller.NewJobController(informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(), clientSet)
 	informerSet.Start(ctx.Done())
 	go jc.Run(1, ctx.Done())
 	return ctx, cancel

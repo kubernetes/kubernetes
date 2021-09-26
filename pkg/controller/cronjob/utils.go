@@ -111,7 +111,7 @@ func getRecentUnmetScheduleTimes(cj batchv1.CronJob, now time.Time) ([]time.Time
 		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
 	}
 	if cj.Spec.StartingDeadlineSeconds != nil {
-		// Controller is not going to schedule anything below this point
+		// CronjobController is not going to schedule anything below this point
 		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
 
 		if schedulingDeadline.After(earliestTime) {
@@ -169,7 +169,7 @@ func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedu
 		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
 	}
 	if cj.Spec.StartingDeadlineSeconds != nil {
-		// Controller is not going to schedule anything below this point
+		// CronjobController is not going to schedule anything below this point
 		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
 
 		if schedulingDeadline.After(earliestTime) {

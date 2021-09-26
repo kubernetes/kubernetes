@@ -101,9 +101,9 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 	return j
 }
 
-func newControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*Controller, informers.SharedInformerFactory) {
+func newControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc) (*JobController, informers.SharedInformerFactory) {
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, resyncPeriod())
-	jm := NewController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient)
+	jm := NewJobController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), kubeClient)
 	jm.podControl = &controller.FakePodControl{}
 
 	return jm, sharedInformers
@@ -801,7 +801,7 @@ func TestControllerSyncJob(t *testing.T) {
 						t.Errorf("controllerRef.UID = %q, want %q", got, want)
 					}
 					if controllerRef.Controller == nil || *controllerRef.Controller != true {
-						t.Errorf("controllerRef.Controller is not set to true")
+						t.Errorf("controllerRef.JobController is not set to true")
 					}
 				}
 				// validate status
@@ -2442,7 +2442,7 @@ func TestWatchPods(t *testing.T) {
 func TestWatchOrphanPods(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	sharedInformers := informers.NewSharedInformerFactory(clientset, controller.NoResyncPeriodFunc())
-	manager := NewController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
+	manager := NewJobController(sharedInformers.Core().V1().Pods(), sharedInformers.Batch().V1().Jobs(), clientset)
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 
