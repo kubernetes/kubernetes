@@ -26,7 +26,7 @@ require (
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/container-storage-interface/spec v1.5.0
 	github.com/containernetworking/cni v0.8.1
-	github.com/coredns/corefile-migration v1.0.12
+	github.com/coredns/corefile-migration v1.0.14
 	github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
@@ -207,7 +207,7 @@ replace (
 	github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.2
 	github.com/containernetworking/cni => github.com/containernetworking/cni v0.8.1
 	github.com/coredns/caddy => github.com/coredns/caddy v1.1.0
-	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.12
+	github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.14
 	github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 	github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 	github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.2
