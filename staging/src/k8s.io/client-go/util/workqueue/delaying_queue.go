@@ -199,7 +199,7 @@ func (q *delayingType) waitingLoop() {
 	waitingEntryByData := map[t]*waitFor{}
 
 	for {
-		if q.Interface.ShuttingDown() {
+		if q.ShuttingDown() {
 			return
 		}
 
