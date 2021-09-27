@@ -210,7 +210,7 @@ TestCase:
 			break TestCase
 		default:
 		}
-		w.Stop()
+		w.stopThreadUnsafe()
 	}
 }
 
@@ -551,7 +551,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("expected received a event on ResultChan")
 		}
-		w.Stop()
+		w.stopThreadUnsafe()
 	}
 }
 
