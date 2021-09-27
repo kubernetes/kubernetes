@@ -38,7 +38,7 @@ func (pm PatchMeta) GetPatchStrategies() []string {
 	return pm.patchStrategies
 }
 
-func (pm *PatchMeta) SetPatchStrategies(ps []string) {
+func (pm PatchMeta) SetPatchStrategies(ps []string) {
 	pm.patchStrategies = ps
 }
 
