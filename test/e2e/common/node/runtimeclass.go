@@ -35,6 +35,7 @@ import (
 	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -71,6 +72,10 @@ var _ = SIGDescribe("RuntimeClass", func() {
 
 	// This test requires that the PreconfiguredRuntimeHandler has already been set up on nodes.
 	ginkgo.It("should run a Pod requesting a RuntimeClass with a configured handler [NodeFeature:RuntimeHandler]", func() {
+		// Requires special setup of test-handler which is only done in GCE kube-up environment
+		// see https://github.com/kubernetes/kubernetes/blob/eb729620c522753bc7ae61fc2c7b7ea19d4aad2f/cluster/gce/gci/configure-helper.sh#L3069-L3076
+		e2eskipper.SkipUnlessProviderIs("gce")
+
 		// The built-in docker runtime does not support configuring runtime handlers.
 		handler := e2enode.PreconfiguredRuntimeClassHandler(framework.TestContext.ContainerRuntime)
 
