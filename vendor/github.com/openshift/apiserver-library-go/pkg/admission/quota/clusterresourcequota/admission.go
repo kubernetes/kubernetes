@@ -9,7 +9,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
@@ -93,12 +93,12 @@ func (q *clusterQuotaAdmission) Validate(ctx context.Context, a admission.Attrib
 	// to its name. Namespaces are cluster level object that shouldn't go into this plugin or it get blocked listing
 	// the namespace that is just being created.
 	obj := a.GetObject()
-	objMeta, ok := obj.(metav1.ObjectMetaAccessor)
-	if !ok {
-		klog.Warningf("ClusterQuotaAdmission received non-meta object %T", obj)
+	accessor, err := metav1.Accessor(obj)
+	if err != nil {
+		klog.Warningf("ClusterQuotaAdmission received non object %T: %v", obj, err)
 		return nil
 	}
-	if len(objMeta.GetObjectMeta().GetNamespace()) == 0 {
+	if len(accessor.GetNamespace()) == 0 {
 		return nil
 	}
 
