@@ -194,7 +194,6 @@ func (q *delayingType) waitingLoop() {
 	var nextReadyAtTimer clock.Timer
 
 	waitingForQueue := &waitForPriorityQueue{}
-	heap.Init(waitingForQueue)
 
 	waitingEntryByData := map[t]*waitFor{}
 
