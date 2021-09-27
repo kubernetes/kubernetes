@@ -513,14 +513,14 @@ func (a *Admission) RecordEvaluation(policy api.Policy, decision metrics.Decisio
 	if a.Metrics != nil {
 		if decision == metrics.DecisionDeny {
 			if policy.Audit.Valid() {
-				a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Audit, metrics.ModeAudit, attrs)
+				a.Metrics.RecordEvaluation(decision, policy.Audit, metrics.ModeAudit, attrs)
 			}
 			if policy.Warn.Valid() {
-				a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Warn, metrics.ModeWarn, attrs)
+				a.Metrics.RecordEvaluation(decision, policy.Warn, metrics.ModeWarn, attrs)
 			}
 		}
 		if policy.Enforce.Valid() {
-			a.Metrics.RecordEvaluation(decision, a.defaultPolicy.Enforce, metrics.ModeEnforce, attrs)
+			a.Metrics.RecordEvaluation(decision, policy.Enforce, metrics.ModeEnforce, attrs)
 		}
 	}
 }
