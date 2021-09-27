@@ -222,7 +222,7 @@ func TestPrintEvent(t *testing.T) {
 					FieldPath: "spec.containers{foo}",
 				},
 				Series: &api.EventSeries{
-					Count:            1,
+					Count:            2,
 					LastObservedTime: metav1.MicroTime{Time: time.Now().UTC().AddDate(0, 0, -2)},
 				},
 				Reason:     "Event Reason",
