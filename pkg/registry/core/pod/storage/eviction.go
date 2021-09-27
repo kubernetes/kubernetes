@@ -22,6 +22,8 @@ import (
 	"reflect"
 	"time"
 
+	"k8s.io/apiserver/pkg/util/dryrun"
+
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/util/dryrun"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/client-go/util/retry"
 	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
@@ -194,10 +195,37 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		// we cannot ignored the PDB for this pod, so this is the fall through case.
 	}
 
-	var rtStatus *metav1.Status
-	var pdbName string
-	updateDeletionOptions := false
+	// If the pod isn't ready, then it isn't a part of the application being protected yet.  Since it is not a running part of application,
+	// it can be deleted without charging a disruption because the application is already disrupted.  In this situation,
+	// we can delete the pod without any further checks and should not charge a PDB a disruption.
+	// However, we need to ensure that the pod didn't become ready between the time we check and the pod is deleted.
+	// To ensure that, we add a precondition to the pod delete.
+	if !podutil.IsPodReady(pod) {
+		deleteOptions := originalDeleteOptions.DeepCopy()
 
+		// Set deleteOptions.Preconditions.ResourceVersion to ensure
+		// the pod hasn't been considered ready since we calculated
+		// Take a copy so we can compare to client-provied Options later.
+		deleteOptions = deleteOptions.DeepCopy()
+		setPreconditionsResourceVersion(deleteOptions, &pod.ResourceVersion)
+
+		// Try the delete
+		_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
+		if err != nil {
+			if errors.IsConflict(err) &&
+				(originalDeleteOptions.Preconditions == nil || originalDeleteOptions.Preconditions.ResourceVersion == nil) {
+				// If we encounter a resource conflict error, we updated the deletion options to include them,
+				// and the original deletion options did not specify ResourceVersion, we send back
+				// TooManyRequests so clients will retry.
+				return nil, tryNotReadyPodEvictionAgainError()
+			}
+			return nil, err
+		}
+		return &metav1.Status{Status: metav1.StatusSuccess}, nil
+	}
+
+	var pdbName string
+	var rtStatus *metav1.Status
 	err = func() error {
 		pdbs, err := r.getPodDisruptionBudgets(ctx, pod)
 		if err != nil {
@@ -218,12 +246,6 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 		pdb := &pdbs[0]
 		pdbName = pdb.Name
-
-		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-		if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
-			updateDeletionOptions = true
-			return nil
-		}
 
 		refresh := false
 		err = retry.RetryOnConflict(EvictionsRetry, func() error {
@@ -261,24 +283,9 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 
 	deleteOptions := originalDeleteOptions
 
-	// Set deleteOptions.Preconditions.ResourceVersion to ensure
-	// the pod hasn't been considered ready since we calculated
-	if updateDeletionOptions {
-		// Take a copy so we can compare to client-provied Options later.
-		deleteOptions = deleteOptions.DeepCopy()
-		setPreconditionsResourceVersion(deleteOptions, &pod.ResourceVersion)
-	}
-
 	// Try the delete
 	_, _, err = r.store.Delete(ctx, eviction.Name, rest.ValidateAllObjectFunc, deleteOptions)
 	if err != nil {
-		if errors.IsConflict(err) && updateDeletionOptions &&
-			(originalDeleteOptions.Preconditions == nil || originalDeleteOptions.Preconditions.ResourceVersion == nil) {
-			// If we encounter a resource conflict error, we updated the deletion options to include them,
-			// and the original deletion options did not specify ResourceVersion, we send back
-			// TooManyRequests so clients will retry.
-			return nil, createTooManyRequestsError(pdbName)
-		}
 		return nil, err
 	}
 
@@ -315,6 +322,16 @@ func shouldEnforceResourceVersion(pod *api.Pod) bool {
 
 func resourceVersionIsUnset(options *metav1.DeleteOptions) bool {
 	return options.Preconditions == nil || options.Preconditions.ResourceVersion == nil
+}
+
+func tryNotReadyPodEvictionAgainError() error {
+	// TODO: Once there are time-based
+	// budgets, we can sometimes compute a sensible suggested value.  But
+	// even without that, we can give a suggestion (even if small) that
+	// prevents well-behaved clients from hammering us.
+	err := errors.NewTooManyRequests("Cannot evict pod as it may violate the pod's disruption budget.", 10)
+	err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: policyv1.DisruptionBudgetCause, Message: "The unready pod was updated and cannot be deleted at this time."})
+	return err
 }
 
 func createTooManyRequestsError(name string) error {
