@@ -123,6 +123,7 @@ type TestKubelet struct {
 func (tk *TestKubelet) Cleanup() {
 	if tk.kubelet != nil {
 		os.RemoveAll(tk.kubelet.rootDirectory)
+		tk.kubelet.probeManager.(*probetest.FakeManager).Cleanup()
 		tk.kubelet = nil
 	}
 }
@@ -250,7 +251,7 @@ func newTestKubeletWithImageList(
 		t:         t,
 	}
 
-	kubelet.probeManager = probetest.FakeManager{}
+	kubelet.probeManager = probetest.NewFakeManager()
 	kubelet.livenessManager = proberesults.NewManager()
 	kubelet.readinessManager = proberesults.NewManager()
 	kubelet.startupManager = proberesults.NewManager()
@@ -321,7 +322,6 @@ func newTestKubeletWithImageList(
 
 	// setup shutdown manager
 	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(&nodeshutdown.Config{
-		ProbeManager:                    kubelet.probeManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     kubelet.podManager.GetPods,
@@ -2353,6 +2353,93 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, pod, v1.PodFailed)
+}
+
+func TestSyncPodStartProbe(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "123456781",
+			Name:      "bar1",
+			Namespace: "foo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:          "foo1",
+					LivenessProbe: &v1.Probe{},
+				},
+			},
+		},
+	}
+
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "123456782",
+			Name:      "bar2",
+			Namespace: "foo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:          "foo2",
+					LivenessProbe: &v1.Probe{},
+				},
+			},
+		},
+		Status: v1.PodStatus{
+			Phase:   v1.PodPending,
+			Message: "",
+			Reason:  "ProcMount",
+		},
+	}
+	pods := []*v1.Pod{pod1, pod2}
+	kl.podManager.SetPods(pods)
+	// 1. pod creation
+	err := kl.syncPod(context.Background(), kubetypes.SyncPodCreate, pod1, nil, &kubecontainer.PodStatus{})
+	require.NoError(t, err)
+	assert.True(t, kl.probeManager.(*probetest.FakeManager).IsProbeStarted(pod1))
+
+	kl.statusManager.SetPodStatus(pod2, pod2.Status)
+	// 2. pod admission failure re-sync
+	err = kl.syncPod(context.Background(), kubetypes.SyncPodSync, pod2, nil, &kubecontainer.PodStatus{ID: pod2.UID})
+	require.NoError(t, err)
+	assert.True(t, kl.probeManager.(*probetest.FakeManager).IsProbeStarted(pod2))
+}
+
+func TestSyncTerminatingPodStopProbe(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kl := testKubelet.kubelet
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "foo",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:          "foo",
+					LivenessProbe: &v1.Probe{},
+				},
+			},
+		},
+	}
+	pods := []*v1.Pod{pod}
+	kl.podManager.SetPods(pods)
+	kl.probeManager.AddPod(pod)
+	podStatus := &kubecontainer.PodStatus{ID: pod.UID}
+	gracePeriodOverride := int64(0)
+	err := kl.syncTerminatingPod(context.Background(), pod, podStatus, nil, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+		podStatus.Phase = v1.PodFailed
+		podStatus.Reason = "reason"
+		podStatus.Message = "message"
+	})
+	require.NoError(t, err)
+	assert.True(t, !kl.probeManager.(*probetest.FakeManager).IsProbeStarted(pod))
 }
 
 func TestPreInitRuntimeService(t *testing.T) {

@@ -20,28 +20,72 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"sync"
 )
 
 // FakeManager simulates a prober.Manager for testing.
-type FakeManager struct{}
+type FakeManager struct {
+	// Map of active workers for probes
+	workers map[types.UID]struct{}
+	// Lock for accessing & mutating workers
+	workerLock sync.RWMutex
+}
+
+func NewFakeManager() *FakeManager {
+	return &FakeManager{
+		workers: make(map[types.UID]struct{}),
+	}
+}
 
 // Unused methods below.
 
 // AddPod simulates adding a Pod.
-func (FakeManager) AddPod(_ *v1.Pod) {}
+func (m *FakeManager) AddPod(pod *v1.Pod) {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+	m.workers[pod.UID] = struct{}{}
+
+}
 
 // RemovePod simulates removing a Pod.
-func (FakeManager) RemovePod(_ *v1.Pod) {}
+func (m *FakeManager) RemovePod(pod *v1.Pod, keepReadinessProbe bool) {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+	delete(m.workers, pod.UID)
+}
 
 // CleanupPods simulates cleaning up Pods.
-func (FakeManager) CleanupPods(_ map[types.UID]sets.Empty) {}
+func (m *FakeManager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+	for key := range m.workers {
+		if _, ok := desiredPods[key]; !ok {
+			delete(m.workers, key)
+		}
+	}
+}
 
 // Start simulates start syncing the probe status
-func (FakeManager) Start() {}
+func (m *FakeManager) Start() {}
 
 // UpdatePodStatus simulates updating the Pod Status.
-func (FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
+func (m *FakeManager) UpdatePodStatus(_ types.UID, podStatus *v1.PodStatus) {
 	for i := range podStatus.ContainerStatuses {
 		podStatus.ContainerStatuses[i].Ready = true
 	}
+}
+
+// Cleanup simulates cleaning all workers.
+func (m *FakeManager) Cleanup() {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+	m.workers = make(map[types.UID]struct{})
+}
+
+// IsProbeStarted simulates checking probes exists.
+func (m *FakeManager) IsProbeStarted(pod *v1.Pod) bool {
+	m.workerLock.Lock()
+	defer m.workerLock.Unlock()
+	_, ok := m.workers[pod.UID]
+	return ok
 }

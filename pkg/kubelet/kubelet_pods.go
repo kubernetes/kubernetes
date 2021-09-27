@@ -1202,9 +1202,6 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		klog.V(3).InfoS("Pod is restartable after termination due to UID reuse", "pod", klog.KObj(pod), "podUID", pod.UID)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
-		// TODO: move inside syncPod and make reentrant
-		// https://github.com/kubernetes/kubernetes/issues/105014
-		kl.probeManager.AddPod(pod)
 	}
 
 	return nil

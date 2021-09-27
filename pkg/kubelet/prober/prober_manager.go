@@ -60,7 +60,7 @@ type Manager interface {
 
 	// RemovePod handles cleaning up the removed pod state, including terminating probe workers and
 	// deleting cached results.
-	RemovePod(pod *v1.Pod)
+	RemovePod(pod *v1.Pod, keepReadinessProbe bool)
 
 	// CleanupPods handles cleaning up pods which should no longer be running.
 	// It takes a map of "desired pods" which should not be cleaned up.
@@ -161,7 +161,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.StartupProbe != nil {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Startup probe already exists for container",
+				klog.V(5).InfoS("Startup probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -173,7 +173,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Readiness probe already exists for container",
+				klog.V(5).InfoS("Readiness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -185,7 +185,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
-				klog.ErrorS(nil, "Liveness probe already exists for container",
+				klog.V(5).InfoS("Liveness probe already exists for container",
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
@@ -196,7 +196,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	}
 }
 
-func (m *manager) RemovePod(pod *v1.Pod) {
+func (m *manager) RemovePod(pod *v1.Pod, keepRedinessProbe bool) {
 	m.workerLock.RLock()
 	defer m.workerLock.RUnlock()
 
@@ -204,6 +204,9 @@ func (m *manager) RemovePod(pod *v1.Pod) {
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
 		for _, probeType := range [...]probeType{readiness, liveness, startup} {
+			if keepRedinessProbe && probeType == readiness {
+				continue
+			}
 			key.probeType = probeType
 			if worker, ok := m.workers[key]; ok {
 				worker.stop()

@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
 	"k8s.io/utils/clock"
 )
 
@@ -64,9 +63,8 @@ type dbusInhibiter interface {
 
 // managerImpl has functions that can be used to interact with the Node Shutdown Manager.
 type managerImpl struct {
-	recorder     record.EventRecorder
-	nodeRef      *v1.ObjectReference
-	probeManager prober.Manager
+	recorder record.EventRecorder
+	nodeRef  *v1.ObjectReference
 
 	shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 
@@ -112,7 +110,6 @@ func NewManager(conf *Config) (Manager, lifecycle.PodAdmitHandler) {
 		conf.Clock = clock.RealClock{}
 	}
 	manager := &managerImpl{
-		probeManager:                     conf.ProbeManager,
 		recorder:                         conf.Recorder,
 		nodeRef:                          conf.NodeRef,
 		getPods:                          conf.GetPodsFunc,
@@ -304,9 +301,6 @@ func (m *managerImpl) processShutdownEvent() error {
 				defer wg.Done()
 
 				gracePeriodOverride := group.ShutdownGracePeriodSeconds
-
-				// Stop probes for the pod
-				m.probeManager.RemovePod(pod)
 
 				// If the pod's spec specifies a termination gracePeriod which is less than the gracePeriodOverride calculated, use the pod spec termination gracePeriod.
 				if pod.Spec.TerminationGracePeriodSeconds != nil && *pod.Spec.TerminationGracePeriodSeconds <= gracePeriodOverride {

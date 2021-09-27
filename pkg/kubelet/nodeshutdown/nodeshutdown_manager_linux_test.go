@@ -22,6 +22,7 @@ package nodeshutdown
 import (
 	"bytes"
 	"fmt"
+	testingclock "k8s.io/utils/clock/testing"
 	"strings"
 	"sync"
 	"testing"
@@ -40,10 +41,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
-	"k8s.io/kubernetes/pkg/kubelet/prober"
-	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/utils/clock"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 // lock is to prevent systemDbus from being modified in the case of concurrency.
@@ -238,11 +236,9 @@ func TestManager(t *testing.T) {
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)()
 
-			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager, _ := NewManager(&Config{
-				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
@@ -332,12 +328,10 @@ func TestFeatureEnabled(t *testing.T) {
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)()
 
-			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 			manager, _ := NewManager(&Config{
-				ProbeManager:                    proberManager,
 				Recorder:                        fakeRecorder,
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
@@ -387,11 +381,9 @@ func TestRestart(t *testing.T) {
 		return dbus, nil
 	}
 
-	proberManager := probetest.FakeManager{}
 	fakeRecorder := &record.FakeRecorder{}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager, _ := NewManager(&Config{
-		ProbeManager:                    proberManager,
 		Recorder:                        fakeRecorder,
 		NodeRef:                         nodeRef,
 		GetPodsFunc:                     activePodsFunc,
@@ -616,7 +608,6 @@ func Test_groupByPriority(t *testing.T) {
 
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	var (
-		probeManager   = probetest.FakeManager{}
 		fakeRecorder   = &record.FakeRecorder{}
 		syncNodeStatus = func() {}
 		nodeRef        = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
@@ -626,7 +617,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	type fields struct {
 		recorder                         record.EventRecorder
 		nodeRef                          *v1.ObjectReference
-		probeManager                     prober.Manager
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 		getPods                          eviction.ActivePodsFunc
 		killPodFunc                      eviction.KillPodFunc
@@ -645,9 +635,8 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		{
 			name: "kill pod func take too long",
 			fields: fields{
-				recorder:     fakeRecorder,
-				nodeRef:      nodeRef,
-				probeManager: probeManager,
+				recorder: fakeRecorder,
+				nodeRef:  nodeRef,
 				shutdownGracePeriodByPodPriority: []kubeletconfig.ShutdownGracePeriodByPodPriority{
 					{
 						Priority:                   1,
@@ -688,7 +677,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 			m := &managerImpl{
 				recorder:                         tt.fields.recorder,
 				nodeRef:                          tt.fields.nodeRef,
-				probeManager:                     tt.fields.probeManager,
 				shutdownGracePeriodByPodPriority: tt.fields.shutdownGracePeriodByPodPriority,
 				getPods:                          tt.fields.getPods,
 				killPodFunc:                      tt.fields.killPodFunc,

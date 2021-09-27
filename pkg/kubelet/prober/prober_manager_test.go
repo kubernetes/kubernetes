@@ -109,13 +109,13 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	// Removing un-probed pod.
-	m.RemovePod(&noProbePod)
+	m.RemovePod(&noProbePod, false)
 	if err := expectProbes(m, probePaths); err != nil {
 		t.Error(err)
 	}
 
 	// Removing probed pod.
-	m.RemovePod(&probePod)
+	m.RemovePod(&probePod, false)
 	if err := waitForWorkerExit(t, m, probePaths); err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	// Removing already removed pods should be a no-op.
-	m.RemovePod(&probePod)
+	m.RemovePod(&probePod, false)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
 	}

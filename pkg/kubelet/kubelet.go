@@ -851,7 +851,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 
 	// setup node shutdown manager
 	shutdownManager, shutdownAdmitHandler := nodeshutdown.NewManager(&nodeshutdown.Config{
-		ProbeManager:                     klet.probeManager,
 		Recorder:                         kubeDeps.Recorder,
 		NodeRef:                          nodeRef,
 		GetPodsFunc:                      klet.GetActivePods,
@@ -1589,11 +1588,18 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		metrics.PodStartDuration.Observe(metrics.SinceInSeconds(firstSeenTime))
 	}
 
+	// Start probing once pod creation or soft admission failure last sync
+	if updateType == kubetypes.SyncPodCreate || !ok || existingStatus.Phase == v1.PodPending {
+		kl.probeManager.AddPod(pod)
+	}
+
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Pods that are not runnable must be stopped - return a typed error to the pod worker
 	if !runnable.Admit {
 		klog.V(2).InfoS("Pod is not runnable and must have running containers stopped", "pod", klog.KObj(pod), "podUID", pod.UID, "message", runnable.Message)
+		// We should stop probing once soft admission fails
+		kl.probeManager.RemovePod(pod, false)
 		var syncErr error
 		p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 		if err := kl.killPod(pod, p, nil); err != nil {
@@ -1767,6 +1773,8 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		podStatusFn(&apiPodStatus)
 	}
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	// We should stop liveness and startup probing once the pod kill is acknowledged(also eviction or preemption).
+	kl.probeManager.RemovePod(pod, true)
 
 	if gracePeriod != nil {
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", *gracePeriod)
@@ -1825,6 +1833,9 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	// TODO: should we simply fold this into TerminatePod? that would give a single pod update
 	apiPodStatus := kl.generateAPIPodStatus(pod, podStatus)
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+
+	// We should stop probing once the pod is terminated.
+	kl.probeManager.RemovePod(pod, false)
 
 	// volumes are unmounted after the pod worker reports ShouldPodRuntimeBeRemoved (which is satisfied
 	// before syncTerminatedPod is invoked)
@@ -2218,9 +2229,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		}
 		mirrorPod, _ := kl.podManager.GetMirrorPodByPod(pod)
 		kl.dispatchWork(pod, kubetypes.SyncPodCreate, mirrorPod, start)
-		// TODO: move inside syncPod and make reentrant
-		// https://github.com/kubernetes/kubernetes/issues/105014
-		kl.probeManager.AddPod(pod)
 	}
 }
 
@@ -2254,10 +2262,6 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 		if err := kl.deletePod(pod); err != nil {
 			klog.V(2).InfoS("Failed to delete pod", "pod", klog.KObj(pod), "err", err)
 		}
-		// TODO: move inside syncTerminatingPod|syncTerminatedPod (we should stop probing
-		// once the pod kill is acknowledged and during eviction)
-		// https://github.com/kubernetes/kubernetes/issues/105014
-		kl.probeManager.RemovePod(pod)
 	}
 }
 
