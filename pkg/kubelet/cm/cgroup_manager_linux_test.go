@@ -23,6 +23,8 @@ import (
 	"path"
 	"reflect"
 	"testing"
+
+	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 )
 
 // TestNewCgroupName tests confirms that #68416 is fixed
@@ -166,6 +168,38 @@ func TestParseSystemdToCgroupName(t *testing.T) {
 	for _, testCase := range testCases {
 		if actual := ParseSystemdToCgroupName(testCase.input); !reflect.DeepEqual(actual, testCase.expected) {
 			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", testCase.input, testCase.expected, actual)
+		}
+	}
+}
+
+func TestCpuSharesClampingToResources(t *testing.T) {
+	if libcontainercgroups.IsCgroup2UnifiedMode() {
+		t.Skip("test skipped as CpuShares does not set in cgroup v2 unified mode")
+	}
+	m := cgroupManagerImpl{}
+	testShares := func(v uint64) *uint64 {
+		return &v
+	}
+	for _, tc := range []struct {
+		resourceConfig *ResourceConfig
+		expected       uint64
+	}{
+		{
+			resourceConfig: &ResourceConfig{CpuShares: testShares(1)},
+			expected:       MinShares,
+		},
+		{
+			resourceConfig: &ResourceConfig{CpuShares: testShares(524188)},
+			expected:       MaxShares,
+		},
+		{
+			resourceConfig: &ResourceConfig{CpuShares: testShares(8192)},
+			expected:       8192,
+		},
+	} {
+		res := m.toResources(tc.resourceConfig)
+		if res.CpuShares != tc.expected {
+			t.Errorf("Unexpected result, input: %v, expected: %v, actual: %v", *tc.resourceConfig.CpuShares, tc.expected, res.CpuShares)
 		}
 	}
 }

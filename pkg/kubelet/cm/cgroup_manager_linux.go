@@ -392,7 +392,13 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 		if libcontainercgroups.IsCgroup2UnifiedMode() {
 			resources.CpuWeight = getCpuWeight(resourceConfig.CpuShares)
 		} else {
-			resources.CpuShares = *resourceConfig.CpuShares
+			shares := *resourceConfig.CpuShares
+			if shares < MinShares {
+				shares = MinShares
+			} else if shares > MaxShares {
+				shares = MaxShares
+			}
+			resources.CpuShares = shares
 		}
 	}
 	if resourceConfig.CpuQuota != nil {
