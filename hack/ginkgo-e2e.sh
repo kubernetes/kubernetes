@@ -189,6 +189,7 @@ fi
   --master-tag="${MASTER_TAG:-}" \
   --docker-config-file="${DOCKER_CONFIG_FILE:-}" \
   --dns-domain="${KUBE_DNS_DOMAIN:-cluster.local}" \
+  --prepull-images="${PREPULL_IMAGES:-false}" \
   --ginkgo.slowSpecThreshold="${GINKGO_SLOW_SPEC_THRESHOLD:-300}" \
   ${CONTAINER_RUNTIME:+"--container-runtime=${CONTAINER_RUNTIME}"} \
   ${MASTER_OS_DISTRIBUTION:+"--master-os-distro=${MASTER_OS_DISTRIBUTION}"} \
