@@ -34,8 +34,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/go-cmp/cmp"
+	"github.com/kr/pretty"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -614,7 +614,7 @@ func (is *informerSpy) waitForEvents(t *testing.T, wantEvents bool) {
 			if err != nil {
 				t.Fatalf("wanted no events, but got error: %v", err)
 			} else {
-				t.Fatalf("wanted no events, but got some: %s", spew.Sprintf("%#v", is))
+				t.Fatalf("wanted no events, but got some: %s", pretty.Sprintf("%#v", is))
 			}
 		}
 	}

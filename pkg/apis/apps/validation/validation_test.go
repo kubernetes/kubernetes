@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -2403,7 +2403,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 
 		errs := ValidateDeploymentStatus(&status, field.NewPath("status"))
 		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-			errString := spew.Sprintf("%#v", errs)
+			errString := pretty.Sprintf("%#v", errs)
 			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
 		}
 	}
@@ -2474,7 +2474,7 @@ func TestValidateDeploymentStatusUpdate(t *testing.T) {
 
 		errs := ValidateDeploymentStatusUpdate(to, from)
 		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-			errString := spew.Sprintf("%#v", errs)
+			errString := pretty.Sprintf("%#v", errs)
 			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
 		}
 	}

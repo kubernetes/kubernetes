@@ -21,7 +21,7 @@ import (
 	"hash/adler32"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 )
 
 type A struct {
@@ -93,7 +93,7 @@ func TestDeepHashObject(t *testing.T) {
 }
 
 func toString(obj interface{}) string {
-	return spew.Sprintf("%#v", obj)
+	return pretty.Sprintf("%#v", obj)
 }
 
 type wheel struct {

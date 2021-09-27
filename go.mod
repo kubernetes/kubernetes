@@ -54,6 +54,7 @@ require (
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
 	github.com/ishidawataru/sctp v0.0.0-20190723014705-7c296d48a2b5
 	github.com/json-iterator/go v1.1.12
+	github.com/kr/pretty v0.3.0
 	github.com/libopenstorage/openstorage v1.0.0
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
@@ -319,7 +320,7 @@ replace (
 	github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
 	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.2
 	github.com/kr/fs => github.com/kr/fs v0.1.0
-	github.com/kr/pretty => github.com/kr/pretty v0.2.1
+	github.com/kr/pretty => github.com/kr/pretty v0.3.0
 	github.com/kr/text => github.com/kr/text v0.2.0
 	github.com/libopenstorage/openstorage => github.com/libopenstorage/openstorage v1.0.0
 	github.com/liggitt/tabwriter => github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -369,6 +370,7 @@ replace (
 	github.com/pascaldekloe/goe => github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c
 	github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.9.3
 	github.com/peterbourgon/diskv => github.com/peterbourgon/diskv v2.0.1+incompatible
+	github.com/pkg/diff => github.com/pkg/diff v0.0.0-20210226163009-20ebb0f2a09e
 	github.com/pkg/errors => github.com/pkg/errors v0.9.1
 	github.com/pkg/sftp => github.com/pkg/sftp v1.10.1
 	github.com/pmezard/go-difflib => github.com/pmezard/go-difflib v1.0.0
@@ -382,7 +384,7 @@ replace (
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
 	github.com/robfig/cron/v3 => github.com/robfig/cron/v3 v3.0.1
 	github.com/rogpeppe/fastuuid => github.com/rogpeppe/fastuuid v1.2.0
-	github.com/rogpeppe/go-internal => github.com/rogpeppe/go-internal v1.3.0
+	github.com/rogpeppe/go-internal => github.com/rogpeppe/go-internal v1.8.0
 	github.com/rubiojr/go-vhd => github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
 	github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
