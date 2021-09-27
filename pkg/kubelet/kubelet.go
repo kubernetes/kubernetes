@@ -1312,7 +1312,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 	loggedContainerGCFailure := false
 	go wait.Until(func() {
 		if err := kl.containerGC.GarbageCollect(); err != nil {
-			klog.ErrorS(err, "Container garbage collection failed")
+			klog.ErrorS(err, "Container garbage collection failed ")
 			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, err.Error())
 			loggedContainerGCFailure = true
 		} else {
