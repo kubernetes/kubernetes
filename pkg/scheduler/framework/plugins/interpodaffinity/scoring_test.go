@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -743,12 +744,8 @@ func TestPreferredAffinity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-				return New(plArgs, fh, feature.Features{
-					EnablePodAffinityNamespaceSelector: !test.disableNSSelector,
-				})
-			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
+			fts := feature.Features{EnablePodAffinityNamespaceSelector: !test.disableNSSelector}
+			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(fts, New), &config.InterPodAffinityArgs{HardPodAffinityWeight: 1}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				if !strings.Contains(status.Message(), test.wantStatus.Message()) {
@@ -909,12 +906,8 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-				return New(plArgs, fh, feature.Features{
-					EnablePodAffinityNamespaceSelector: !test.disableNSSelector,
-				})
-			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
+			fts := feature.Features{EnablePodAffinityNamespaceSelector: !test.disableNSSelector}
+			p := plugintesting.SetupPluginWithInformers(ctx, t, frameworkruntime.FactoryAdapter(fts, New), &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes), namespaces)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)

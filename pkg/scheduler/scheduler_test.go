@@ -866,9 +866,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	fns := []st.RegisterPluginFunc{
 		st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 		st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		st.RegisterPluginAsExtensions(noderesources.FitName, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return noderesources.NewFit(plArgs, fh, feature.Features{})
-		}, "Filter", "PreFilter"),
+		st.RegisterPluginAsExtensions(noderesources.FitName, frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit), "Filter", "PreFilter"),
 	}
 	scheduler, _, errChan := setupTestScheduler(queuedPodStore, scache, informerFactory, nil, fns...)
 

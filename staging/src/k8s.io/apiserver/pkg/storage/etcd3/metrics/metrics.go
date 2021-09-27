@@ -85,6 +85,38 @@ var (
 		},
 		[]string{},
 	)
+	listStorageCount = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_total",
+			Help:           "Number of LIST requests served from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumFetched = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_fetched_objects_total",
+			Help:           "Number of objects read from storage in the course of serving a LIST request",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_evaluated_objects_total",
+			Help:           "Number of objects tested in the course of serving a LIST request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
+	listStorageNumReturned = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_returned_objects_total",
+			Help:           "Number of objects returned for a LIST request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -99,6 +131,10 @@ func Register() {
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
+		legacyregistry.MustRegister(listStorageCount)
+		legacyregistry.MustRegister(listStorageNumFetched)
+		legacyregistry.MustRegister(listStorageNumSelectorEvals)
+		legacyregistry.MustRegister(listStorageNumReturned)
 	})
 }
 
@@ -138,4 +174,12 @@ func UpdateLeaseObjectCount(count int64) {
 	// Currently we only store one previous lease, since all the events have the same ttl.
 	// See pkg/storage/etcd3/lease_manager.go
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
+}
+
+// RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
+func RecordStorageListMetrics(resource string, numFetched, numEvald, numReturned int) {
+	listStorageCount.WithLabelValues(resource).Inc()
+	listStorageNumFetched.WithLabelValues(resource).Add(float64(numFetched))
+	listStorageNumSelectorEvals.WithLabelValues(resource).Add(float64(numEvald))
+	listStorageNumReturned.WithLabelValues(resource).Add(float64(numReturned))
 }

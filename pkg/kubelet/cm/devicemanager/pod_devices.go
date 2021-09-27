@@ -384,3 +384,21 @@ func (rdev ResourceDeviceInstances) Clone() ResourceDeviceInstances {
 	}
 	return clone
 }
+
+// Filter takes a condition set expressed as map[string]sets.String and returns a new
+// ResourceDeviceInstances with only the devices matching the condition set.
+func (rdev ResourceDeviceInstances) Filter(cond map[string]sets.String) ResourceDeviceInstances {
+	filtered := NewResourceDeviceInstances()
+	for resourceName, filterIDs := range cond {
+		if _, exists := rdev[resourceName]; !exists {
+			continue
+		}
+		filtered[resourceName] = DeviceInstances{}
+		for instanceID, instance := range rdev[resourceName] {
+			if filterIDs.Has(instanceID) {
+				filtered[resourceName][instanceID] = instance
+			}
+		}
+	}
+	return filtered
+}

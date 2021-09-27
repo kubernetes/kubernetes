@@ -57,6 +57,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 		rt = NewUserAgentRoundTripper(config.UserAgent, rt)
 	}
 	if len(config.Impersonate.UserName) > 0 ||
+		len(config.Impersonate.UID) > 0 ||
 		len(config.Impersonate.Groups) > 0 ||
 		len(config.Impersonate.Extra) > 0 {
 		rt = NewImpersonatingRoundTripper(config.Impersonate, rt)
@@ -199,6 +200,9 @@ const (
 	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
 	ImpersonateUserHeader = "Impersonate-User"
 
+	// ImpersonateUIDHeader is used to impersonate a particular UID during an API server request
+	ImpersonateUIDHeader = "Impersonate-Uid"
+
 	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
 	// It can be repeated multiplied times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
@@ -230,7 +234,9 @@ func (rt *impersonatingRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 	}
 	req = utilnet.CloneRequest(req)
 	req.Header.Set(ImpersonateUserHeader, rt.impersonate.UserName)
-
+	if rt.impersonate.UID != "" {
+		req.Header.Set(ImpersonateUIDHeader, rt.impersonate.UID)
+	}
 	for _, group := range rt.impersonate.Groups {
 		req.Header.Add(ImpersonateGroupHeader, group)
 	}
