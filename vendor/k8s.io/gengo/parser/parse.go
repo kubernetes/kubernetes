@@ -33,6 +33,8 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/tools/go/packages"
+
 	"k8s.io/gengo/types"
 	"k8s.io/klog/v2"
 )
@@ -48,11 +50,18 @@ type Builder struct {
 	// If true, include *_test.go
 	IncludeTestFiles bool
 
+	// Cache of import path to filesystem directory.
+	// Used to optimize loading of individual packages using ImportDir instead of Import.
+	// For context, see https://github.com/golang/go/issues/31087
+	pkgDirs map[string]string
+
 	// Map of package names to more canonical information about the package.
 	// This might hold the same value for multiple names, e.g. if someone
 	// referenced ./pkg/name or in the case of vendoring, which canonicalizes
 	// differently that what humans would type.
-	buildPackages map[string]*build.Package
+	//
+	// This must only be accessed via getLoadedBuildPackage and setLoadedBuildPackage
+	buildPackages map[importPathString]*build.Package
 
 	fset *token.FileSet
 	// map of package path to list of parsed files
@@ -102,7 +111,8 @@ func New() *Builder {
 	c.CgoEnabled = false
 	return &Builder{
 		context:               &c,
-		buildPackages:         map[string]*build.Package{},
+		pkgDirs:               map[string]string{},
+		buildPackages:         map[importPathString]*build.Package{},
 		typeCheckedPackages:   map[importPathString]*tc.Package{},
 		fset:                  token.NewFileSet(),
 		parsed:                map[importPathString][]parsedFile{},
@@ -118,11 +128,37 @@ func (b *Builder) AddBuildTags(tags ...string) {
 	b.context.BuildTags = append(b.context.BuildTags, tags...)
 }
 
+func (b *Builder) getLoadedBuildPackage(importPath string) (*build.Package, bool) {
+	canonicalized := canonicalizeImportPath(importPath)
+	if string(canonicalized) != string(importPath) {
+		klog.V(5).Infof("getLoadedBuildPackage: %s normalized to %s", importPath, canonicalized)
+	}
+	buildPkg, ok := b.buildPackages[canonicalizeImportPath(importPath)]
+	return buildPkg, ok
+}
+func (b *Builder) setLoadedBuildPackage(importPath string, buildPkg *build.Package) {
+	canonicalizedImportPath := canonicalizeImportPath(importPath)
+	if string(canonicalizedImportPath) != string(importPath) {
+		klog.V(5).Infof("setLoadedBuildPackage: importPath %s normalized to %s", importPath, canonicalizedImportPath)
+	}
+
+	canonicalizedBuildPkgImportPath := canonicalizeImportPath(buildPkg.ImportPath)
+	if string(canonicalizedBuildPkgImportPath) != string(buildPkg.ImportPath) {
+		klog.V(5).Infof("setLoadedBuildPackage: buildPkg.ImportPath %s normalized to %s", buildPkg.ImportPath, canonicalizedBuildPkgImportPath)
+	}
+
+	if string(canonicalizedImportPath) != string(canonicalizedBuildPkgImportPath) {
+		klog.V(5).Infof("setLoadedBuildPackage: normalized importPath (%s) differs from buildPkg.ImportPath (%s)", canonicalizedImportPath, canonicalizedBuildPkgImportPath)
+	}
+	b.buildPackages[canonicalizedImportPath] = buildPkg
+	b.buildPackages[canonicalizedBuildPkgImportPath] = buildPkg
+}
+
 // Get package information from the go/build package. Automatically excludes
 // e.g. test files and files for other platforms-- there is quite a bit of
 // logic of that nature in the build package.
 func (b *Builder) importBuildPackage(dir string) (*build.Package, error) {
-	if buildPkg, ok := b.buildPackages[dir]; ok {
+	if buildPkg, ok := b.getLoadedBuildPackage(dir); ok {
 		return buildPkg, nil
 	}
 	// This validates the `package foo // github.com/bar/foo` comments.
@@ -142,17 +178,7 @@ func (b *Builder) importBuildPackage(dir string) (*build.Package, error) {
 
 	// Remember it under the user-provided name.
 	klog.V(5).Infof("saving buildPackage %s", dir)
-	b.buildPackages[dir] = buildPkg
-	canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
-	if dir != string(canonicalPackage) {
-		// Since `dir` is not the canonical name, see if we knew it under another name.
-		if buildPkg, ok := b.buildPackages[string(canonicalPackage)]; ok {
-			return buildPkg, nil
-		}
-		// Must be new, save it under the canonical name, too.
-		klog.V(5).Infof("saving buildPackage %s", canonicalPackage)
-		b.buildPackages[string(canonicalPackage)] = buildPkg
-	}
+	b.setLoadedBuildPackage(dir, buildPkg)
 
 	return buildPkg, nil
 }
@@ -212,18 +238,121 @@ func (b *Builder) addFile(pkgPath importPathString, path string, src []byte, use
 	return nil
 }
 
-// AddDir adds an entire directory, scanning it for go files. 'dir' should have
-// a single go package in it. GOPATH, GOROOT, and the location of your go
-// binary (`which go`) will all be searched if dir doesn't literally resolve.
-func (b *Builder) AddDir(dir string) error {
-	_, err := b.importPackage(dir, true)
+// getResolvedPackageDir returns the resolved absolute path to the directory
+// containing the source for the specified package import path.
+// The returned dir is suitable to pass to build.Context#ImportDir.
+func (b *Builder) getResolvedPackageDir(pkgPath string) (string, bool) {
+	if len(pkgPath) == 0 || !strings.Contains(pkgPath, "/") {
+		return "", false
+	}
+	dir, ok := b.pkgDirs[pkgPath]
+	if ok {
+		return dir, len(dir) > 0
+	}
+	parentDir, ok := b.getResolvedPackageDir(path.Dir(pkgPath))
+	if !ok {
+		return "", false
+	}
+	return filepath.Join(parentDir, filepath.FromSlash(path.Base(pkgPath))), true
+}
+
+func (b *Builder) resolvePackageDirs(patterns []string) {
+	// make packages canonical before loading
+	canonicalPatterns := make([]string, 0, len(patterns))
+	for _, p := range patterns {
+		canonicalPattern := string(canonicalizeImportPath(p))
+		if _, ok := b.getResolvedPackageDir(canonicalPattern); ok {
+			// we already had a module dir resolved for this package
+			continue
+		}
+		// append the pattern
+		canonicalPatterns = append(canonicalPatterns, canonicalPattern)
+		// if this is a recursive pattern, also append the specific root to ensure it resolves (package expansion doesn't work on symlinked paths)
+		if strings.HasSuffix(canonicalPattern, "/...") {
+			canonicalPatterns = append(canonicalPatterns, strings.TrimSuffix(canonicalPattern, "/..."))
+		}
+	}
+
+	// name
+	// module info to get root dir
+	// deps to get downstream dirs to speed up type checking
+	// files to get source location
+	cfg := &packages.Config{
+		Mode: packages.NeedName | packages.NeedFiles | packages.NeedModule | packages.NeedImports | packages.NeedDeps,
+	}
+	if len(b.context.BuildTags) > 0 {
+		cfg.BuildFlags = []string{"-tags", strings.Join(b.context.BuildTags, ",")}
+	}
+	if resolvedWorkingDir, err := os.Getwd(); err != nil {
+		klog.V(2).Infof("error resolving working dir: %v", err)
+	} else if symlinkResolvedWorkingDir, err := filepath.EvalSymlinks(resolvedWorkingDir); err != nil {
+		klog.V(2).Infof("error resolving working dir: %v", err)
+	} else {
+		cfg.Dir = symlinkResolvedWorkingDir
+	}
+	pkgs, err := packages.Load(cfg, canonicalPatterns...)
+	if err != nil {
+		klog.V(2).Infof("Error resolving packages: %v", err)
+		return
+	}
+	packages.Visit(pkgs, func(pkg *packages.Package) bool {
+		if len(pkg.Errors) > 0 {
+			klog.V(2).Info(pkg.Errors)
+		}
+		if pkg.Module != nil {
+			if len(pkg.Module.Dir) > 0 {
+				b.pkgDirs[pkg.Module.Path] = pkg.Module.Dir
+			}
+			if pkg.Module.Replace != nil && len(pkg.Module.Replace.Dir) > 0 {
+				b.pkgDirs[pkg.Module.Path] = pkg.Module.Replace.Dir
+			}
+			if pkg.Module.Error != nil {
+				klog.V(2).Infof("%#v\n", *pkg.Module.Error)
+			}
+		}
+		// use any file info we got to identify the package dir
+		if len(pkg.GoFiles) > 0 {
+			b.pkgDirs[pkg.PkgPath] = filepath.Dir(pkg.GoFiles[0])
+		} else if len(pkg.OtherFiles) > 0 {
+			b.pkgDirs[pkg.PkgPath] = filepath.Dir(pkg.OtherFiles[0])
+		} else if len(pkg.IgnoredFiles) > 0 {
+			b.pkgDirs[pkg.PkgPath] = filepath.Dir(pkg.IgnoredFiles[0])
+		}
+		return true
+	}, nil)
+}
+
+// AddPackagePatterns adds the specified patterns,
+// which may be individual import paths as used in import directives,
+// or recursive paths like `example.com/...`.
+func (b *Builder) AddPackagePatterns(patterns ...string) error {
+	// resolve patterns to speed up load time
+	b.resolvePackageDirs(patterns)
+
+	for _, d := range patterns {
+		var err error
+		if strings.HasSuffix(d, "/...") {
+			err = b.addPackageRecursive(strings.TrimSuffix(d, "/..."))
+		} else {
+			err = b.addPackage(d)
+		}
+		if err != nil {
+			return fmt.Errorf("unable to add directory %q: %v", d, err)
+		}
+	}
+	return nil
+}
+
+// addPackage adds an entire package, scanning it for go files.
+func (b *Builder) addPackage(importPackage string) error {
+	_, err := b.importPackage(importPackage, true)
 	return err
 }
 
-// AddDirRecursive is just like AddDir, but it also recursively adds
-// subdirectories; it returns an error only if the path couldn't be resolved;
+// addPackageRecursive is just like addPackage, but it also recursively adds
+// subpackages; it returns an error only if the path couldn't be resolved;
 // any directories recursed into without go source are ignored.
-func (b *Builder) AddDirRecursive(dir string) error {
+func (b *Builder) addPackageRecursive(dir string) error {
 	// Add the root.
 	if _, err := b.importPackage(dir, true); err != nil {
 		klog.Warningf("Ignoring directory %v: %v", dir, err)
@@ -231,7 +360,11 @@ func (b *Builder) AddDirRecursive(dir string) error {
 
 	// filepath.Walk does not follow symlinks. We therefore evaluate symlinks and use that with
 	// filepath.Walk.
-	realPath, err := filepath.EvalSymlinks(b.buildPackages[dir].Dir)
+	buildPkg, ok := b.getLoadedBuildPackage(dir)
+	if !ok {
+		return fmt.Errorf("no loaded build package for %s", dir)
+	}
+	realPath, err := filepath.EvalSymlinks(buildPkg.Dir)
 	if err != nil {
 		return err
 	}
@@ -241,7 +374,11 @@ func (b *Builder) AddDirRecursive(dir string) error {
 			rel := filepath.ToSlash(strings.TrimPrefix(filePath, realPath))
 			if rel != "" {
 				// Make a pkg path.
-				pkg := path.Join(string(canonicalizeImportPath(b.buildPackages[dir].ImportPath)), rel)
+				buildPkg, ok := b.getLoadedBuildPackage(dir)
+				if !ok {
+					return fmt.Errorf("no loaded build package for %s", dir)
+				}
+				pkg := path.Join(string(canonicalizeImportPath(buildPkg.ImportPath)), rel)
 
 				// Add it.
 				if _, err := b.importPackage(pkg, true); err != nil {
@@ -269,7 +406,11 @@ func (b *Builder) AddDirTo(dir string, u *types.Universe) error {
 	if _, err := b.importPackage(dir, true); err != nil {
 		return err
 	}
-	return b.findTypesIn(canonicalizeImportPath(b.buildPackages[dir].ImportPath), u)
+	pkg, ok := b.getLoadedBuildPackage(dir)
+	if !ok {
+		return fmt.Errorf("no such package: %q", dir)
+	}
+	return b.findTypesIn(canonicalizeImportPath(pkg.ImportPath), u)
 }
 
 // AddDirectoryTo adds an entire directory to a given Universe. Unlike AddDir,
@@ -283,7 +424,11 @@ func (b *Builder) AddDirectoryTo(dir string, u *types.Universe) (*types.Package,
 	if _, err := b.importPackage(dir, true); err != nil {
 		return nil, err
 	}
-	path := canonicalizeImportPath(b.buildPackages[dir].ImportPath)
+	pkg, ok := b.getLoadedBuildPackage(dir)
+	if !ok || pkg == nil {
+		return nil, fmt.Errorf("no such package: %q", dir)
+	}
+	path := canonicalizeImportPath(pkg.ImportPath)
 	if err := b.findTypesIn(path, u); err != nil {
 		return nil, err
 	}
@@ -347,10 +492,11 @@ func isErrPackageNotFound(err error) bool {
 // needs to import a go package. 'path' is the import path.
 func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, error) {
 	klog.V(5).Infof("importPackage %s", dir)
+
 	var pkgPath = importPathString(dir)
 
 	// Get the canonical path if we can.
-	if buildPkg := b.buildPackages[dir]; buildPkg != nil {
+	if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
 		canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
 		klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
 		pkgPath = canonicalPackage
@@ -374,7 +520,7 @@ func (b *Builder) importPackage(dir string, userRequested bool) (*tc.Package, er
 		}
 
 		// Get the canonical path now that it has been added.
-		if buildPkg := b.buildPackages[dir]; buildPkg != nil {
+		if buildPkg, _ := b.getLoadedBuildPackage(dir); buildPkg != nil {
 			canonicalPackage := canonicalizeImportPath(buildPkg.ImportPath)
 			klog.V(5).Infof("importPackage %s, canonical path is %s", dir, canonicalPackage)
 			pkgPath = canonicalPackage
@@ -580,7 +726,7 @@ func (b *Builder) findTypesIn(pkgPath importPathString, u *types.Universe) error
 	return nil
 }
 
-func (b *Builder) importWithMode(dir string, mode build.ImportMode) (*build.Package, error) {
+func (b *Builder) importWithMode(pkgPath string, mode build.ImportMode) (*build.Package, error) {
 	// This is a bit of a hack.  The srcDir argument to Import() should
 	// properly be the dir of the file which depends on the package to be
 	// imported, so that vendoring can work properly and local paths can
@@ -592,7 +738,21 @@ func (b *Builder) importWithMode(dir string, mode build.ImportMode) (*build.Pack
 	if err != nil {
 		return nil, fmt.Errorf("unable to get current directory: %v", err)
 	}
-	buildPkg, err := b.context.Import(filepath.ToSlash(dir), cwd, mode)
+
+	// normalize to drop /vendor/ if present
+	pkgPath = string(canonicalizeImportPath(pkgPath))
+
+	if pkgDir, ok := b.getResolvedPackageDir(pkgPath); ok {
+		buildPkg, err := b.context.ImportDir(pkgDir, mode)
+		if err != nil {
+			return nil, err
+		}
+		// ensure the ImportPath is the canonical one
+		buildPkg.ImportPath = pkgPath
+		return buildPkg, nil
+	}
+
+	buildPkg, err := b.context.Import(pkgPath, cwd, mode)
 	if err != nil {
 		return nil, err
 	}

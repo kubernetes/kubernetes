@@ -15,4 +15,5 @@ replace (
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/csi-translation-lib => ../csi-translation-lib
+	k8s.io/gengo => github.com/liggitt/gengo v0.0.0-20211011145608-112dde69eb87
 )

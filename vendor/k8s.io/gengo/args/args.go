@@ -137,16 +137,8 @@ func (g *GeneratorArgs) NewBuilder() (*parser.Builder, error) {
 	// Ignore all auto-generated files.
 	b.AddBuildTags(g.GeneratedBuildTag)
 
-	for _, d := range g.InputDirs {
-		var err error
-		if strings.HasSuffix(d, "/...") {
-			err = b.AddDirRecursive(strings.TrimSuffix(d, "/..."))
-		} else {
-			err = b.AddDir(d)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("unable to add directory %q: %v", d, err)
-		}
+	if err := b.AddPackagePatterns(g.InputDirs...); err != nil {
+		return nil, err
 	}
 	return b, nil
 }

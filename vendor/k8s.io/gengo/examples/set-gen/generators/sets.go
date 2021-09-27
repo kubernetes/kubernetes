@@ -246,6 +246,15 @@ func (s $.type|public$) HasAny(items ...$.type|raw$) bool {
 	return false
 }
 
+// Clone returns a new set which is a copy of the current set.
+func (s $.type|public$) Clone() $.type|public$ {
+	result := make($.type|public$, len(s))
+	for key := range s {
+		result.Insert(key)
+	}
+	return result
+}
+
 // Difference returns a set of objects that are not in s2
 // For example:
 // s1 = {a1, a2, a3}
@@ -269,10 +278,7 @@ func (s $.type|public$) Difference(s2 $.type|public$) $.type|public$ {
 // s1.Union(s2) = {a1, a2, a3, a4}
 // s2.Union(s1) = {a1, a2, a3, a4}
 func (s1 $.type|public$) Union(s2 $.type|public$) $.type|public$ {
-	result := New$.type|public$()
-	for key := range s1 {
-		result.Insert(key)
-	}
+	result := s1.Clone()
 	for key := range s2 {
 		result.Insert(key)
 	}

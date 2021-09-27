@@ -16,5 +16,6 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cli-runtime => ../cli-runtime
 	k8s.io/client-go => ../client-go
+	k8s.io/gengo => github.com/liggitt/gengo v0.0.0-20211011145608-112dde69eb87
 	k8s.io/sample-cli-plugin => ../sample-cli-plugin
 )
