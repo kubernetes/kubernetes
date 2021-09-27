@@ -4213,17 +4213,18 @@ func validatePodConditions(conditions []core.PodCondition, fldPath *field.Path) 
 // ValidatePodEphemeralContainersUpdate tests that a user update to EphemeralContainers is valid.
 // newPod and oldPod must only differ in their EphemeralContainers.
 func ValidatePodEphemeralContainersUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
-	spec := newPod.Spec
-	specPath := field.NewPath("spec").Child("ephemeralContainers")
+	// Part 1: Validate newPod's spec and updates to metadata
+	fldPath := field.NewPath("metadata")
+	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
+	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"), opts)...)
 
-	vols := make(map[string]core.VolumeSource)
-	for _, vol := range spec.Volumes {
-		vols[vol.Name] = vol.VolumeSource
-	}
-	allErrs := validateEphemeralContainers(spec.EphemeralContainers, spec.Containers, spec.InitContainers, vols, specPath, opts)
-
+	// Part 2: Validate that the changes between oldPod.Spec.EphemeralContainers and
+	// newPod.Spec.EphemeralContainers are allowed.
+	//
 	// Existing EphemeralContainers may not be changed. Order isn't preserved by patch, so check each individually.
 	newContainerIndex := make(map[string]*core.EphemeralContainer)
+	specPath := field.NewPath("spec").Child("ephemeralContainers")
 	for i := range newPod.Spec.EphemeralContainers {
 		newContainerIndex[newPod.Spec.EphemeralContainers[i].Name] = &newPod.Spec.EphemeralContainers[i]
 	}

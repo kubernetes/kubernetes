@@ -10616,9 +10616,31 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 		},
 	}
 
+	makePod := func(ephemeralContainers []core.EphemeralContainer) core.Pod {
+		return core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations:     map[string]string{},
+				Labels:          map[string]string{},
+				Name:            "pod",
+				Namespace:       "ns",
+				ResourceVersion: "1",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{
+					Name:                     "cnt",
+					Image:                    "image",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				}},
+				DNSPolicy:           core.DNSClusterFirst,
+				EphemeralContainers: ephemeralContainers,
+				RestartPolicy:       core.RestartPolicyOnFailure,
+			},
+		}
+	}
+
 	for _, test := range tests {
-		new := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.new}}
-		old := core.Pod{Spec: core.PodSpec{EphemeralContainers: test.old}}
+		new, old := makePod(test.new), makePod(test.old)
 		errs := ValidatePodEphemeralContainersUpdate(&new, &old, PodValidationOptions{})
 		if test.err == "" {
 			if len(errs) != 0 {
