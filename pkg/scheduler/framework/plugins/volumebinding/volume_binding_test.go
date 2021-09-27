@@ -260,7 +260,7 @@ func TestVolumeBinding(t *testing.T) {
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `pvc(s) bound to non-existent pv(s)`),
+				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) unavailable due to one or more pvc(s) bound to non-existent pv(s)`),
 			},
 			wantScores: []int64{
 				0,
