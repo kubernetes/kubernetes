@@ -323,7 +323,7 @@ func (jm *ControllerV2) deleteJob(obj interface{}) {
 		}
 		job, ok = tombstone.Obj.(*batchv1.Job)
 		if !ok {
-			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a ReplicaSet %#v", obj))
+			utilruntime.HandleError(fmt.Errorf("tombstone contained object that is not a Job %#v", obj))
 			return
 		}
 	}
