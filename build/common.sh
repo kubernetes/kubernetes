@@ -90,9 +90,9 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_debian_iptables_version=buster-v1.6.7
-readonly __default_go_runner_version=v2.3.1-go1.17.1-buster.0
-readonly __default_setcap_version=buster-v2.0.4
+readonly __default_debian_iptables_version=bullseye-v1.0.0
+readonly __default_go_runner_version=v2.3.1-go1.17.1-bullseye.0
+readonly __default_setcap_version=bullseye-v1.0.0
 
 # These are the base images for the Docker-wrapped binaries.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
