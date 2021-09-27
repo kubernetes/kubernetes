@@ -164,6 +164,8 @@ type KubeProxyConfiguration struct {
 	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
 	DetectLocalMode LocalMode `json:"detectLocalMode"`
+	// Logs is type made so that kubeadm/kind can specify logging-format.
+	Logs string `json:logs`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server.
