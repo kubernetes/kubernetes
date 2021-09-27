@@ -71,7 +71,7 @@ const (
 )
 
 var defaultRequestWorkEstimator = func(*http.Request) fcrequest.WorkEstimate {
-	return fcrequest.WorkEstimate{Seats: 1}
+	return fcrequest.WorkEstimate{InitialSeats: 1}
 }
 
 type fakeApfFilter struct {
@@ -653,7 +653,7 @@ func TestApfWithRequestDigest(t *testing.T) {
 		RequestInfo: &apirequest.RequestInfo{Verb: "get"},
 		User:        &user.DefaultInfo{Name: "foo"},
 		WorkEstimate: fcrequest.WorkEstimate{
-			Seats: 5,
+			InitialSeats: 5,
 		},
 	}
 
