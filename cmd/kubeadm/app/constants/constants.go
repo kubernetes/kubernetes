@@ -653,7 +653,7 @@ func GetKubernetesServiceCIDR(svcSubnetList string) (*net.IPNet, error) {
 		return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
 	}
 	if len(svcSubnets) == 0 {
-		return nil, errors.New("received empty ServiceSubnet for dual-stack")
+		return nil, errors.New("received empty ServiceSubnet")
 	}
 	return svcSubnets[0], nil
 }

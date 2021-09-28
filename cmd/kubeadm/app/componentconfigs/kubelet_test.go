@@ -127,7 +127,6 @@ func TestKubeletDefault(t *testing.T) {
 		{
 			name: "Service subnet, enabled dual stack defaulting works",
 			clusterCfg: kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{},
 				Networking: kubeadmapi.Networking{
 					ServiceSubnet: "192.168.0.0/16",
 				},
