@@ -540,6 +540,31 @@ func TestGetControllerManagerCommand(t *testing.T) {
 		expected []string
 	}{
 		{
+			name: "custom cluster name for " + cpVersion,
+			cfg: &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: cpVersion,
+				CertificatesDir:   testCertsDir,
+				ClusterName:       "some-other-cluster-name",
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--bind-address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--authentication-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--client-ca-file=" + testCertsDir + "/ca.crt",
+				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
+				"--cluster-name=some-other-cluster-name",
+			},
+		},
+		{
 			name: "custom certs dir for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				CertificatesDir:   testCertsDir,

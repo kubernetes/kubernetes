@@ -28,7 +28,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
 func TestValidateToken(t *testing.T) {
@@ -1115,17 +1114,14 @@ func TestGetClusterNodeMask(t *testing.T) {
 		expectedError bool
 	}{
 		{
-			name: "dual ipv4 default mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
-			},
+			name:         "dual ipv4 default mask",
+			cfg:          &kubeadmapi.ClusterConfiguration{},
 			isIPv6:       false,
 			expectedMask: 24,
 		},
 		{
 			name: "dual ipv4 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "21", "node-cidr-mask-size-ipv4": "23"},
 				},
@@ -1134,17 +1130,14 @@ func TestGetClusterNodeMask(t *testing.T) {
 			expectedMask: 23,
 		},
 		{
-			name: "dual ipv6 default mask",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
-			},
+			name:         "dual ipv6 default mask",
+			cfg:          &kubeadmapi.ClusterConfiguration{},
 			isIPv6:       true,
 			expectedMask: 64,
 		},
 		{
 			name: "dual ipv6 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv6": "83"},
 				},
@@ -1155,7 +1148,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv4 custom mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "23"},
 				},
@@ -1166,7 +1158,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv4 wrong mask",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size-ipv4": "aa"},
 				},
@@ -1177,7 +1168,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv6 default mask and legacy flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "23"},
 				},
@@ -1188,7 +1178,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv6 custom mask and legacy flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "23", "node-cidr-mask-size-ipv6": "83"},
 				},
@@ -1199,7 +1188,6 @@ func TestGetClusterNodeMask(t *testing.T) {
 		{
 			name: "dual ipv6 custom mask and wrong flag",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				FeatureGates: map[string]bool{features.IPv6DualStack: true},
 				ControllerManager: kubeadmapi.ControlPlaneComponent{
 					ExtraArgs: map[string]string{"node-cidr-mask-size": "23", "node-cidr-mask-size-ipv6": "a83"},
 				},
