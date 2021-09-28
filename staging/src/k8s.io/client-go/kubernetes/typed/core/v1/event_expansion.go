@@ -34,6 +34,7 @@ type EventExpansion interface {
 	CreateWithEventNamespace(event *v1.Event) (*v1.Event, error)
 	// UpdateWithEventNamespace is the same as a Update, except that it sends the request to the event.Namespace.
 	UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error)
+	// PatchWithEventNamespace is the same as a Patch, except that it sends the request to the event.Namespace.
 	PatchWithEventNamespace(event *v1.Event, data []byte) (*v1.Event, error)
 	// Search finds events about the specified object
 	Search(scheme *runtime.Scheme, objOrRef runtime.Object) (*v1.EventList, error)
