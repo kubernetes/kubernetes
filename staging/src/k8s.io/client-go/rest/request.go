@@ -403,6 +403,18 @@ func (r *Request) Timeout(d time.Duration) *Request {
 	return r
 }
 
+// TimeoutSeconds makes the request use the given duration as an overall timeout for the
+// request.
+func (r *Request) TimeoutSeconds(d *int64) *Request {
+	if r.err != nil {
+		return r
+	}
+	if d != nil {
+		r.timeout = time.Duration(*d) * time.Second
+	}
+	return r
+}
+
 // MaxRetries makes the request use the given integer as a ceiling of retrying upon receiving
 // "Retry-After" headers and 429 status-code in the response. The default is 10 unless this
 // function is specifically called with a different value.
