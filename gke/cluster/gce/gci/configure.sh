@@ -1061,9 +1061,14 @@ function log-proto {
 log-init
 detect_host_info
 
-if [[ "${IS_PRELOADER:-"false"}" == "true" ]]; then
+# Preloader will source this script, and skip the main function. The preloader
+# will choose what to preload by calling install-X functions directly.
+# When configure.sh is sourced by the preload script, $0 and $BASH_SOURCE are 
+# different. $BASH_SOURCE still contains the path of configure.sh, while $0 is
+# the path of the preload script. 
+if [[ "$0" != "$BASH_SOURCE" && "${IS_PRELOADER:-"false"}" == "true" ]]; then
   echo "Running in preloader instead of VM bootsrapping. Skipping installation steps as preloader script will source configure.sh and call corresponding functions."
-  exit
+  return
 fi
 
 log-start 'ConfigureMain'
