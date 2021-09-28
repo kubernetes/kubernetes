@@ -77,6 +77,10 @@ spec:
         k8s-app: kube-dns
     spec:
       priorityClassName: system-cluster-critical
+      securityContext:
+        sysctls:
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: "53"
       serviceAccountName: coredns
       affinity:
         podAntiAffinity:
@@ -138,10 +142,8 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
-            add:
-            - NET_BIND_SERVICE
             drop:
-            - all
+            - ALL
           readOnlyRootFilesystem: true
       dnsPolicy: Default
       volumes:
