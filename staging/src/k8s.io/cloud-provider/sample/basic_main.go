@@ -23,7 +23,6 @@ package main
 import (
 	"os"
 
-	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"
@@ -39,8 +38,6 @@ import (
 )
 
 func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)

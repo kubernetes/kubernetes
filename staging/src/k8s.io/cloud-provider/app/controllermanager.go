@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -103,7 +102,6 @@ the cloud specific control loops shipped with Kubernetes.`,
 			return nil
 		},
 	}
-	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
 
 	fs := cmd.Flags()
 	namedFlagSets := s.Flags(ControllerNames(controllerInitFuncConstructors), ControllersDisabledByDefault.List())

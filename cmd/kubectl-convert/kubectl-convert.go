@@ -23,15 +23,12 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/convert"
 )
 
 func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	flags := pflag.NewFlagSet("kubectl-convert", pflag.ExitOnError)
-	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 	pflag.CommandLine = flags
 
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()

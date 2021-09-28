@@ -23,10 +23,7 @@ package main
 import (
 	"os"
 
-	"github.com/spf13/pflag"
-
 	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
 	_ "k8s.io/component-base/logs/json/register"          // for JSON log format registration
 	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugin
 	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
@@ -34,8 +31,6 @@ import (
 )
 
 func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	command := app.NewControllerManagerCommand()
 	code := cli.Run(command)
 	os.Exit(code)

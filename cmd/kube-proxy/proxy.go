@@ -19,18 +19,13 @@ package main
 import (
 	"os"
 
-	"github.com/spf13/pflag"
-
 	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
 )
 
 func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	command := app.NewProxyCommand()
 	code := cli.Run(command)
 	os.Exit(code)

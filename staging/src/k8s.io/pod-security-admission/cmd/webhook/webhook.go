@@ -25,9 +25,6 @@ import (
 )
 
 func main() {
-	// Due to historic reasons, this command does *not* normalize command
-	// line flags.
-
 	command := server.NewServerCommand()
 	code := cli.Run(command)
 	os.Exit(code)

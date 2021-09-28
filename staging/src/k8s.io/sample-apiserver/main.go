@@ -19,17 +19,12 @@ package main
 import (
 	"os"
 
-	"github.com/spf13/pflag"
-
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/sample-apiserver/pkg/cmd/server"
 )
 
 func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	stopCh := genericapiserver.SetupSignalHandler()
 	options := server.NewWardleServerOptions(os.Stdout, os.Stderr)
 	cmd := server.NewCommandStartWardleServer(options, stopCh)

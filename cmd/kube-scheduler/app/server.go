@@ -25,7 +25,6 @@ import (
 	goruntime "runtime"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -100,7 +99,6 @@ for more information about scheduling and the kube-scheduler component.`,
 			return nil
 		},
 	}
-	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
 
 	fs := cmd.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))

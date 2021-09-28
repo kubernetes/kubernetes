@@ -25,14 +25,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/component-base/logs"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // Run provides the common boilerplate code around executing a cobra command.
 // For example, it ensures that logging is set up properly. Logging
-// flags get added to the command line if not added already.
+// flags get added to the command line if not added already. Flags get normalized
+// so that help texts show them with hyphens. Underscores are accepted
+// as alternative for the command parameters.
 func Run(cmd *cobra.Command) int {
 	rand.Seed(time.Now().UnixNano())
 	defer logs.FlushLogs()
+
+	cmd.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	// This is idempotent.
 	logs.AddFlags(cmd.PersistentFlags())

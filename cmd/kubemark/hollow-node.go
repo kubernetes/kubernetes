@@ -130,8 +130,6 @@ func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOp
 }
 
 func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	command := newHollowNodeCommand()
 	code := cli.Run(command)
 	os.Exit(code)
@@ -160,7 +158,6 @@ func newHollowNodeCommand() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
 
 	fs := cmd.Flags()
 	fs.AddGoFlagSet(goflag.CommandLine) // for flags like --docker-only

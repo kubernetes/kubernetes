@@ -27,7 +27,7 @@ import (
 func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field.Path) field.ErrorList {
 	errs := field.ErrorList{}
 	if c.Format != DefaultLogFormat {
-		// WordSepNormalizeFunc is just a guess. Most commands use it,
+		// WordSepNormalizeFunc is just a guess. Commands should use it,
 		// but we cannot know for sure.
 		allFlags := UnsupportedLoggingFlags(cliflag.WordSepNormalizeFunc)
 		for _, f := range allFlags {

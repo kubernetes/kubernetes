@@ -19,10 +19,7 @@ package main
 import (
 	"os"
 
-	"github.com/spf13/pflag"
-
 	"k8s.io/component-base/cli"
-	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubectl/pkg/cmd"
 
 	// Import to initialize client auth plugins.
@@ -30,8 +27,6 @@ import (
 )
 
 func main() {
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	command := cmd.NewDefaultKubectlCommand()
 	code := cli.Run(command)
 	os.Exit(code)

@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/config"
 	"k8s.io/klog/v2"
 )
@@ -58,7 +59,10 @@ var supportedLogsFlags = map[string]struct{}{
 
 // BindLoggingFlags binds the Options struct fields to a flagset
 func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
-	unsupportedFlags := strings.Join(unsupportedLoggingFlagNames(fs.GetNormalizeFunc()), ", ")
+	// The help text is generated assuming that flags will eventually use
+	// hyphens, even if currently no normalization function is set for the
+	// flag set yet.
+	unsupportedFlags := strings.Join(unsupportedLoggingFlagNames(cliflag.WordSepNormalizeFunc), ", ")
 	formats := fmt.Sprintf(`"%s"`, strings.Join(LogRegistry.List(), `", "`))
 	fs.StringVar(&c.Format, "logging-format", c.Format, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
 	// No new log formats should be added after generation is of flag options

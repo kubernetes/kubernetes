@@ -510,7 +510,6 @@ with the apiserver API to configure the proxy.`,
 			return nil
 		},
 	}
-	cmd.SetGlobalNormalizationFunc(pflag.CommandLine.GetNormalizeFunc())
 
 	var err error
 	opts.config, err = opts.ApplyDefaults(opts.config)
