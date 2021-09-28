@@ -559,8 +559,8 @@ func TestUniformFlowsHandSize1(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			newUniformClient(1001001001, 8, 20, time.Second, time.Second-1),
-			newUniformClient(2002002002, 8, 20, time.Second, time.Second-1),
+			newUniformClient(1001001001, 8, 20, time.Second, 999999*time.Microsecond),
+			newUniformClient(2002002002, 8, 20, time.Second, 999999*time.Microsecond),
 		},
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 50,
@@ -595,8 +595,8 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			newUniformClient(400900100100, 8, 30, time.Second, time.Second-1),
-			newUniformClient(300900200200, 8, 30, time.Second, time.Second-1),
+			newUniformClient(400900100100, 8, 30, time.Second, 999999*time.Microsecond),
+			newUniformClient(300900200200, 8, 30, time.Second, 999999*time.Microsecond),
 		},
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 60,
@@ -669,8 +669,8 @@ func TestDifferentFlowsExpectUnequal(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			newUniformClient(1001001001, 4, 20, time.Second, time.Second-1),
-			newUniformClient(2002002002, 2, 20, time.Second, time.Second-1),
+			newUniformClient(1001001001, 4, 20, time.Second, 999999*time.Microsecond),
+			newUniformClient(2002002002, 2, 20, time.Second, 999999*time.Microsecond),
 		},
 		concurrencyLimit:       3,
 		evalDuration:           time.Second * 20,
@@ -705,8 +705,8 @@ func TestDifferentWidths(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			newUniformClient(10010010010010, 13, 10, time.Second, time.Second-1),
-			newUniformClient(20020020020020, 7, 10, time.Second, time.Second-1).seats(2),
+			newUniformClient(10010010010010, 13, 10, time.Second, 999999*time.Microsecond),
+			newUniformClient(20020020020020, 7, 10, time.Second, 999999*time.Microsecond).seats(2),
 		},
 		concurrencyLimit:       6,
 		evalDuration:           time.Second * 20,
@@ -741,11 +741,11 @@ func TestTooWide(t *testing.T) {
 	uniformScenario{name: qCfg.Name,
 		qs: qs,
 		clients: []uniformClient{
-			newUniformClient(40040040040040, 15, 21, time.Second, time.Second-1).seats(2),
-			newUniformClient(50050050050050, 15, 21, time.Second, time.Second-1).seats(2),
-			newUniformClient(60060060060060, 15, 21, time.Second, time.Second-1).seats(2),
-			newUniformClient(70070070070070, 15, 21, time.Second, time.Second-1).seats(2),
-			newUniformClient(90090090090090, 15, 21, time.Second, time.Second-1).seats(7),
+			newUniformClient(40040040040040, 15, 21, time.Second, 999999*time.Microsecond).seats(2),
+			newUniformClient(50050050050050, 15, 21, time.Second, 999999*time.Microsecond).seats(2),
+			newUniformClient(60060060060060, 15, 21, time.Second, 999999*time.Microsecond).seats(2),
+			newUniformClient(70070070070070, 15, 21, time.Second, 999999*time.Microsecond).seats(2),
+			newUniformClient(90090090090090, 15, 21, time.Second, 999999*time.Microsecond).seats(7),
 		},
 		concurrencyLimit:       6,
 		evalDuration:           time.Second * 225,
@@ -1073,7 +1073,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 }
 
 func TestFindDispatchQueueLocked(t *testing.T) {
-	var G float64 = 0.003
+	var G int64 = 3000
 	tests := []struct {
 		name                    string
 		robinIndex              int
@@ -1092,13 +1092,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					virtualStart: 200000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
 				},
 				{
-					virtualStart: 100,
+					virtualStart: 100000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
@@ -1115,7 +1115,7 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					virtualStart: 200000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
@@ -1132,13 +1132,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					virtualStart: 200000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 50}},
 					),
 				},
 				{
-					virtualStart: 100,
+					virtualStart: 100000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
@@ -1155,13 +1155,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					virtualStart: 200000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
 					),
 				},
 				{
-					virtualStart: 100,
+					virtualStart: 100000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
@@ -1178,13 +1178,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					virtualStart: 200000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
 					),
 				},
 				{
-					virtualStart: 100,
+					virtualStart: 100000000,
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
@@ -1204,10 +1204,10 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			qs := &queueSet{
-				estimatedServiceSeconds: G,
-				robinIndex:              test.robinIndex,
-				totSeatsInUse:           test.totSeatsInUse,
-				qCfg:                    fq.QueuingConfig{Name: "TestSelectQueueLocked/" + test.name},
+				estimatedServiceMicroseconds: G,
+				robinIndex:                   test.robinIndex,
+				totSeatsInUse:                test.totSeatsInUse,
+				qCfg:                         fq.QueuingConfig{Name: "TestSelectQueueLocked/" + test.name},
 				dCfg: fq.DispatchingConfig{
 					ConcurrencyLimit: test.concurrencyLimit,
 				},

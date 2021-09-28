@@ -229,13 +229,13 @@ func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bo
 	)
 }
 
-func rowForQueue(plName string, index, waitingRequests, executingRequests int, virtualStart float64) string {
+func rowForQueue(plName string, index, waitingRequests, executingRequests int, virtualStart int64) string {
 	return row(
 		plName,
 		strconv.Itoa(index),
 		strconv.Itoa(waitingRequests),
 		strconv.Itoa(executingRequests),
-		fmt.Sprintf("%.4f", virtualStart),
+		strconv.FormatInt(virtualStart, 10),
 	)
 }
 

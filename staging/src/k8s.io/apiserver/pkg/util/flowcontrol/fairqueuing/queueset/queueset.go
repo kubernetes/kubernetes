@@ -76,9 +76,9 @@ type queueSetCompleter struct {
 // not end in "Locked" either acquires the lock or does not care about
 // locking.
 type queueSet struct {
-	clock                   eventclock.Interface
-	estimatedServiceSeconds float64
-	obsPair                 metrics.TimedObserverPair
+	clock                        eventclock.Interface
+	estimatedServiceMicroseconds int64
+	obsPair                      metrics.TimedObserverPair
 
 	promiseFactory promiseFactory
 
@@ -102,9 +102,9 @@ type queueSet struct {
 	// queues are still draining.
 	queues []*queue
 
-	// virtualTime is the amount of seat-seconds allocated per queue since process startup.
+	// virtualTime is the amount of seat-microseconds allocated per queue since process startup.
 	// This is our generalization of the progress meter named R in the original fair queuing work.
-	virtualTime float64
+	virtualTime int64
 
 	// lastRealTime is what `clock.Now()` yielded when `virtualTime` was last updated
 	lastRealTime time.Time
@@ -173,12 +173,12 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 	qs := qsc.theSet
 	if qs == nil {
 		qs = &queueSet{
-			clock:                   qsc.factory.clock,
-			estimatedServiceSeconds: 0.003,
-			obsPair:                 qsc.obsPair,
-			qCfg:                    qsc.qCfg,
-			virtualTime:             0,
-			lastRealTime:            qsc.factory.clock.Now(),
+			clock:                        qsc.factory.clock,
+			estimatedServiceMicroseconds: 3000,
+			obsPair:                      qsc.obsPair,
+			qCfg:                         qsc.qCfg,
+			virtualTime:                  0,
+			lastRealTime:                 qsc.factory.clock.Now(),
 		}
 		qs.promiseFactory = qsc.factory.promiseFactoryFactory(qs)
 	}
@@ -407,9 +407,9 @@ func (qs *queueSet) lockAndSyncTime() {
 // lock and before modifying the state of any queue.
 func (qs *queueSet) syncTimeLocked() {
 	realNow := qs.clock.Now()
-	timeSinceLast := realNow.Sub(qs.lastRealTime).Seconds()
+	nanosecondsSinceLast := realNow.Sub(qs.lastRealTime).Nanoseconds()
 	qs.lastRealTime = realNow
-	qs.virtualTime += timeSinceLast * qs.getVirtualTimeRatioLocked()
+	qs.virtualTime += time.Duration(float64(nanosecondsSinceLast) * qs.getVirtualTimeRatioLocked()).Microseconds()
 	metrics.SetCurrentR(qs.qCfg.Name, qs.virtualTime)
 }
 
@@ -661,7 +661,7 @@ func (qs *queueSet) dispatchLocked() bool {
 			request.workEstimate, queue.index, queue.virtualStart, queue.requests.Length(), queue.requestsExecuting, queue.seatsInUse, qs.totSeatsInUse)
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G * width
-	queue.virtualStart += qs.estimatedServiceSeconds * float64(request.Seats())
+	queue.virtualStart += qs.estimatedServiceMicroseconds * int64(request.Seats())
 	qs.boundNextDispatch(queue)
 	request.decision.Set(decisionExecute)
 	return ok
@@ -694,11 +694,10 @@ func (qs *queueSet) canAccommodateSeatsLocked(seats int) bool {
 // returns the first one of those for which the virtual finish time of
 // the oldest waiting request is minimal.
 func (qs *queueSet) findDispatchQueueLocked() *queue {
-	minVirtualFinish := math.Inf(1)
-	sMin := math.Inf(1)
-	dsMin := math.Inf(1)
-	sMax := math.Inf(-1)
-	dsMax := math.Inf(-1)
+	minVirtualFinish := int64(math.MaxInt64)
+	sMin, sMax := int64(math.MaxInt64), int64(math.MinInt64)
+	dsMin, dsMax := int64(math.MaxInt64), int64(math.MinInt64)
+
 	var minQueue *queue
 	var minIndex int
 	nq := len(qs.queues)
@@ -707,12 +706,12 @@ func (qs *queueSet) findDispatchQueueLocked() *queue {
 		queue := qs.queues[qs.robinIndex]
 		oldestWaiting, _ := queue.requests.Peek()
 		if oldestWaiting != nil {
-			sMin = math.Min(sMin, queue.virtualStart)
-			sMax = math.Max(sMax, queue.virtualStart)
-			estimatedWorkInProgress := qs.estimatedServiceSeconds * float64(queue.seatsInUse)
-			dsMin = math.Min(dsMin, queue.virtualStart-estimatedWorkInProgress)
-			dsMax = math.Max(dsMax, queue.virtualStart-estimatedWorkInProgress)
-			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceSeconds*float64(oldestWaiting.Seats())
+			sMin = minInt64(sMin, queue.virtualStart)
+			sMax = maxInt64(sMax, queue.virtualStart)
+			estimatedWorkInProgress := qs.estimatedServiceMicroseconds * int64(queue.seatsInUse)
+			dsMin = minInt64(dsMin, queue.virtualStart-estimatedWorkInProgress)
+			dsMax = maxInt64(dsMax, queue.virtualStart-estimatedWorkInProgress)
+			currentVirtualFinish := queue.virtualStart + qs.estimatedServiceMicroseconds*int64(oldestWaiting.Seats())
 			klog.V(11).InfoS("Considering queue to dispatch", "queueSet", qs.qCfg.Name, "queue", qs.robinIndex, "finishR", currentVirtualFinish)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
@@ -773,7 +772,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 	metrics.AddRequestsExecuting(r.ctx, qs.qCfg.Name, r.fsName, -1)
 	qs.obsPair.RequestsExecuting.Add(-1)
 
-	S := now.Sub(r.startTime).Seconds()
+	S := now.Sub(r.startTime).Microseconds()
 
 	// TODO: for now we keep the logic localized so it is easier to see
 	//  how the counters are tracked for queueset and queue, in future we
@@ -839,7 +838,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 
 		// When a request finishes being served, and the actual service time was S,
 		// the queue’s start R is decremented by (G - S)*width.
-		r.queue.virtualStart -= (qs.estimatedServiceSeconds - S) * float64(r.Seats())
+		r.queue.virtualStart -= (qs.estimatedServiceMicroseconds - S) * int64(r.Seats())
 		qs.boundNextDispatch(r.queue)
 	}
 }
@@ -913,4 +912,18 @@ func (qs *queueSet) Dump(includeRequestDetails bool) debug.QueueSetDump {
 		d.Queues[i] = q.dump(includeRequestDetails)
 	}
 	return d
+}
+
+func minInt64(a, b int64) int64 {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxInt64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }

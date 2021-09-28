@@ -303,18 +303,18 @@ func AddRequestsExecuting(ctx context.Context, priorityLevel, flowSchema string,
 }
 
 // SetCurrentR sets the current-R (virtualTime) gauge for the given priority level
-func SetCurrentR(priorityLevel string, r float64) {
-	apiserverCurrentR.WithLabelValues(priorityLevel).Set(r)
+func SetCurrentR(priorityLevel string, r int64) {
+	apiserverCurrentR.WithLabelValues(priorityLevel).Set(float64(r))
 }
 
 // SetLatestS sets the latest-S (virtual time of dispatched request) gauge for the given priority level
-func SetDispatchMetrics(priorityLevel string, r, s, sMin, sMax, discountedSMin, discountedSMax float64) {
-	apiserverDispatchR.WithLabelValues(priorityLevel).Set(r)
-	apiserverLatestS.WithLabelValues(priorityLevel).Set(s)
-	apiserverNextSBounds.WithLabelValues(priorityLevel, "min").Set(sMin)
-	apiserverNextSBounds.WithLabelValues(priorityLevel, "max").Set(sMax)
-	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "min").Set(discountedSMin)
-	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "max").Set(discountedSMax)
+func SetDispatchMetrics(priorityLevel string, r, s, sMin, sMax, discountedSMin, discountedSMax int64) {
+	apiserverDispatchR.WithLabelValues(priorityLevel).Set(float64(r))
+	apiserverLatestS.WithLabelValues(priorityLevel).Set(float64(s))
+	apiserverNextSBounds.WithLabelValues(priorityLevel, "min").Set(float64(sMin))
+	apiserverNextSBounds.WithLabelValues(priorityLevel, "max").Set(float64(sMax))
+	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "min").Set(float64(discountedSMin))
+	apiserverNextDiscountedSBounds.WithLabelValues(priorityLevel, "max").Set(float64(discountedSMax))
 }
 
 // AddRequestConcurrencyInUse adds the given delta to the gauge of concurrency in use by

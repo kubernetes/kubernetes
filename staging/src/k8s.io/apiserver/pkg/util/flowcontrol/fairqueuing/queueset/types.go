@@ -60,7 +60,7 @@ type request struct {
 	arrivalTime time.Time
 
 	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
-	arrivalR float64
+	arrivalR int64
 
 	// descr1 and descr2 are not used in any logic but they appear in
 	// log messages
@@ -84,7 +84,7 @@ type queue struct {
 
 	// virtualStart is the "virtual time" (R progress meter reading) at
 	// which the next request will be dispatched in the virtual world.
-	virtualStart float64
+	virtualStart int64
 
 	// requestsExecuting is the count in the real world
 	requestsExecuting int
