@@ -2145,7 +2145,7 @@ func TestEnsureHostsInPool(t *testing.T) {
 			expectedVMSSVMPutTimes: 1,
 		},
 		{
-			description: "EnsureHostsInPool should gather report the error if something goes wrong in EnsureHostInPool",
+			description: "EnsureHostsInPool should skip not found nodes",
 			nodes: []*v1.Node{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -2159,7 +2159,7 @@ func TestEnsureHostsInPool(t *testing.T) {
 			backendpoolID:          testLBBackendpoolID1,
 			vmSetName:              testVMSSName,
 			expectedVMSSVMPutTimes: 0,
-			expectedErr:            true,
+			expectedErr:            false,
 		},
 	}
 
@@ -2205,9 +2205,8 @@ func TestEnsureBackendPoolDeletedFromNode(t *testing.T) {
 		expectedErr               error
 	}{
 		{
-			description: "ensureBackendPoolDeletedFromNode should report the error that occurs during getVmssVM",
+			description: "ensureBackendPoolDeletedFromNode should skip not found nodes",
 			nodeName:    "vmss-vm-000001",
-			expectedErr: cloudprovider.InstanceNotFound,
 		},
 		{
 			description:           "ensureBackendPoolDeletedFromNode skip the node if the VM's NIC config is nil",
