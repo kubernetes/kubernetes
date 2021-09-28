@@ -69,8 +69,8 @@ const (
 	ErrReasonNodeConflict ConflictReason = "node(s) had volume node affinity conflict"
 	// ErrReasonNotEnoughSpace is used when a pod cannot start on a node because not enough storage space is available.
 	ErrReasonNotEnoughSpace = "node(s) did not have enough free storage"
-	// ErrReasonPVNotExist is used when a PVC can't find the bound persistent volumes"
-	ErrReasonPVNotExist = "pvc(s) bound to non-existent pv(s)"
+	// ErrReasonPVNotExist is used when a pod has one or more PVC(s) bound to non-existent persistent volume(s)"
+	ErrReasonPVNotExist = "node(s) unavailable due to one or more pvc(s) bound to non-existent pv(s)"
 )
 
 // BindingInfo holds a binding between PV and PVC.
