@@ -414,7 +414,11 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	response := allowedResponse()
 	if enforce {
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
-			response = forbiddenResponse(result.ForbiddenDetail())
+			response = forbiddenResponse(fmt.Sprintf(
+				"Pod violates PodSecurity %q: %s",
+				nsPolicy.Enforce.String(),
+				result.ForbiddenDetail(),
+			))
 			a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
 		} else {
 			a.Metrics.RecordEvaluation(metrics.DecisionAllow, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
@@ -423,7 +427,11 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
 	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
-		auditAnnotations["audit"] = result.ForbiddenDetail()
+		auditAnnotations["audit"] = fmt.Sprintf(
+			"Would violate PodSecurity %q: %s",
+			nsPolicy.Audit.String(),
+			result.ForbiddenDetail(),
+		)
 		a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Audit, metrics.ModeAudit, attrs)
 	}
 
@@ -433,9 +441,8 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec)); !result.Allowed {
 			// TODO: Craft a better user-facing warning message
 			response.Warnings = append(response.Warnings, fmt.Sprintf(
-				"would violate %q version of %q PodSecurity profile: %s",
-				nsPolicy.Warn.Version.String(),
-				nsPolicy.Warn.Level,
+				"Would violate PodSecurity %q: %s",
+				nsPolicy.Warn.String(),
 				result.ForbiddenDetail(),
 			))
 			a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Warn, metrics.ModeWarn, attrs)
