@@ -1468,8 +1468,10 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
 
 	if kl.kubeClient != nil {
-		// Start syncing node status immediately, this may set up things the runtime needs to run.
-		go wait.Until(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, wait.NeverStop)
+		// Introduce some small jittering to ensure that over time the requests won't start
+		// accumulating at approximately the same time from the set of nodes due to priority and
+		// fairness effect.
+		go wait.JitterUntil(kl.syncNodeStatus, kl.nodeStatusUpdateFrequency, 0.04, true, wait.NeverStop)
 		go kl.fastStatusUpdateOnce()
 
 		// start syncing lease
