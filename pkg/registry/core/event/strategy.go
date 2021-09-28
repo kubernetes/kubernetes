@@ -78,7 +78,7 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 func (eventStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
-	oldEvent := obj.(*api.Event)
+	oldEvent := old.(*api.Event)
 	return validation.ValidateEventUpdate(event, oldEvent, groupVersion)
 }
 
