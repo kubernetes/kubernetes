@@ -57,6 +57,7 @@ type respLogger struct {
 	addedInfo          strings.Builder
 	addedKeyValuePairs []interface{}
 	startTime          time.Time
+	responseSize       int
 
 	captureErrorOutput bool
 
@@ -124,6 +125,7 @@ func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime 
 		req:               req,
 		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
+		responseSize:      0,
 	}
 }
 
@@ -232,6 +234,8 @@ func (rl *respLogger) Log() {
 		if len(info) > 0 {
 			keysAndValues = append(keysAndValues, "addedInfo", info)
 		}
+
+		keysAndValues = append(keysAndValues, "responseSize", rl.responseSize)
 	}
 
 	klog.InfoSDepth(1, "HTTP", keysAndValues...)
@@ -250,7 +254,11 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 	if rl.captureErrorOutput {
 		rl.Addf("logging error output: %q\n", string(b))
 	}
-	return rl.w.Write(b)
+
+	n, err := rl.w.Write(b)
+	rl.responseSize += n
+
+	return n, err
 }
 
 // Flush implements http.Flusher even if the underlying http.Writer doesn't implement it.
