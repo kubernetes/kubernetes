@@ -57,13 +57,13 @@ func NewLazyErrorNodeSelector(ns *v1.NodeSelector, opts ...field.PathOption) *La
 	p := field.ToPath(opts...)
 	parsedTerms := make([]nodeSelectorTerm, 0, len(ns.NodeSelectorTerms))
 	path := p.Child("nodeSelectorTerms")
-	for i, term := range ns.NodeSelectorTerms {
+	for i := range ns.NodeSelectorTerms {
 		// nil or empty term selects no objects
-		if isEmptyNodeSelectorTerm(&term) {
+		if isEmptyNodeSelectorTerm(&ns.NodeSelectorTerms[i]) {
 			continue
 		}
 		p := path.Index(i)
-		parsedTerms = append(parsedTerms, newNodeSelectorTerm(&term, p))
+		parsedTerms = append(parsedTerms, newNodeSelectorTerm(&ns.NodeSelectorTerms[i], p))
 	}
 	return &LazyErrorNodeSelector{
 		terms: parsedTerms,
@@ -113,14 +113,14 @@ func NewPreferredSchedulingTerms(terms []v1.PreferredSchedulingTerm, opts ...fie
 	p := field.ToPath(opts...)
 	var errs []error
 	parsedTerms := make([]preferredSchedulingTerm, 0, len(terms))
-	for i, term := range terms {
+	for i := range terms {
 		path := p.Index(i)
-		if term.Weight == 0 || isEmptyNodeSelectorTerm(&term.Preference) {
+		if terms[i].Weight == 0 || isEmptyNodeSelectorTerm(&terms[i].Preference) {
 			continue
 		}
 		parsedTerm := preferredSchedulingTerm{
-			nodeSelectorTerm: newNodeSelectorTerm(&term.Preference, path),
-			weight:           int(term.Weight),
+			nodeSelectorTerm: newNodeSelectorTerm(&terms[i].Preference, path),
+			weight:           int(terms[i].Weight),
 		}
 		if len(parsedTerm.parseErrs) > 0 {
 			errs = append(errs, parsedTerm.parseErrs...)

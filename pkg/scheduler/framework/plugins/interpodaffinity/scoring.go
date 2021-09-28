@@ -22,7 +22,7 @@ import (
 	"math"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -58,8 +58,8 @@ func (m scoreMap) processTerm(term *framework.AffinityTerm, weight int32, pod *v
 }
 
 func (m scoreMap) processTerms(terms []framework.WeightedAffinityTerm, pod *v1.Pod, nsLabels labels.Set, node *v1.Node, multiplier int32, enableNamespaceSelector bool) {
-	for _, term := range terms {
-		m.processTerm(&term.AffinityTerm, term.Weight, pod, nsLabels, node, multiplier, enableNamespaceSelector)
+	for i := range terms {
+		m.processTerm(&terms[i].AffinityTerm, terms[i].Weight, pod, nsLabels, node, multiplier, enableNamespaceSelector)
 	}
 }
 
