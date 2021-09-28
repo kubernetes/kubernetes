@@ -565,16 +565,16 @@ func TestValidatePodController(t *testing.T) {
 			desc:                   "bad deploy creates produce correct user-visible warnings and correct auditAnnotations",
 			newObject:              &badDeploy,
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			expectAuditAnnotations: map[string]string{"audit": "forbidden sysctls (unknown)"},
-			expectWarnings:         []string{"would violate \"latest\" version of \"baseline\" PodSecurity profile: forbidden sysctls (unknown)"},
+			expectAuditAnnotations: map[string]string{"audit": "Would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
+			expectWarnings:         []string{"Would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 		},
 		{
 			desc:                   "bad spec updates don't block on enforce failures and returns correct information",
 			newObject:              &badDeploy,
 			oldObject:              &goodDeploy,
 			gvr:                    schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
-			expectAuditAnnotations: map[string]string{"audit": "forbidden sysctls (unknown)"},
-			expectWarnings:         []string{"would violate \"latest\" version of \"baseline\" PodSecurity profile: forbidden sysctls (unknown)"},
+			expectAuditAnnotations: map[string]string{"audit": "Would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
+			expectWarnings:         []string{"Would violate PodSecurity \"baseline:latest\": forbidden sysctls (unknown)"},
 		},
 	}
 
