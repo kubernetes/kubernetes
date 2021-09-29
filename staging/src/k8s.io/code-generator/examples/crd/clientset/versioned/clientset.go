@@ -24,6 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	"k8s.io/code-generator/examples/crd/clientset/versioned/scheme"
 	examplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example/v1"
 	secondexamplev1 "k8s.io/code-generator/examples/crd/clientset/versioned/typed/example2/v1"
 )
@@ -71,16 +72,21 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
+	restClient, err := rest.RESTClientFor(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+
 	var cs Clientset
-	var err error
-	cs.exampleV1, err = examplev1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.secondExampleV1, err = secondexamplev1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
+	cs.exampleV1 = examplev1.New(restClient)
+	cs.secondExampleV1 = secondexamplev1.New(restClient)
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -92,12 +98,11 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
-	var cs Clientset
-	cs.exampleV1 = examplev1.NewForConfigOrDie(c)
-	cs.secondExampleV1 = secondexamplev1.NewForConfigOrDie(c)
-
-	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &cs
+	cs, err := NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return cs
 }
 
 // New creates a new Clientset for the given RESTClient.

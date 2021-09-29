@@ -24,6 +24,7 @@ import (
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
+	"k8s.io/code-generator/examples/apiserver/clientset/internalversion/scheme"
 	exampleinternalversion "k8s.io/code-generator/examples/apiserver/clientset/internalversion/typed/example/internalversion"
 	secondexampleinternalversion "k8s.io/code-generator/examples/apiserver/clientset/internalversion/typed/example2/internalversion"
 	thirdexampleinternalversion "k8s.io/code-generator/examples/apiserver/clientset/internalversion/typed/example3.io/internalversion"
@@ -79,20 +80,22 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = rest.DefaultKubernetesUserAgent()
+	}
+
+	restClient, err := rest.RESTClientFor(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+
 	var cs Clientset
-	var err error
-	cs.example, err = exampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.secondExample, err = secondexampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.thirdExample, err = thirdexampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
+	cs.example = exampleinternalversion.New(restClient)
+	cs.secondExample = secondexampleinternalversion.New(restClient)
+	cs.thirdExample = thirdexampleinternalversion.New(restClient)
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -104,13 +107,11 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
-	var cs Clientset
-	cs.example = exampleinternalversion.NewForConfigOrDie(c)
-	cs.secondExample = secondexampleinternalversion.NewForConfigOrDie(c)
-	cs.thirdExample = thirdexampleinternalversion.NewForConfigOrDie(c)
-
-	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &cs
+	cs, err := NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return cs
 }
 
 // New creates a new Clientset for the given RESTClient.
