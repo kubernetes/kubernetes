@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"strconv"
 	"testing"
@@ -30,6 +31,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	core "k8s.io/client-go/testing"
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
@@ -856,6 +858,71 @@ func TestHandleNodeSelector(t *testing.T) {
 	// Check pod status stored in the status map.
 	checkPodStatus(t, kl, notfittingPod, v1.PodFailed)
 	checkPodStatus(t, kl, fittingPod, v1.PodPending)
+}
+
+// Tests that we handle not matching labels selector correctly by setting the failed status in status map.
+func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
+	tests := []struct {
+		name        string
+		nodeLabels  map[string]string
+		podSelector map[string]string
+		podStatus   v1.PodPhase
+	}{
+		{
+			name:        "correct OS label, wrong pod selector, admission denied",
+			nodeLabels:  map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH},
+			podSelector: map[string]string{v1.LabelOSStable: "dummyOS"},
+			podStatus:   v1.PodFailed,
+		},
+		{
+			name:        "correct OS label, correct pod selector, admission denied",
+			nodeLabels:  map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH},
+			podSelector: map[string]string{v1.LabelOSStable: goruntime.GOOS},
+			podStatus:   v1.PodPending,
+		},
+		{
+			// Expect no patching to happen, label B should be preserved and can be used for nodeAffinity.
+			name:        "new node label, correct pod selector, admitted",
+			nodeLabels:  map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH, "key": "B"},
+			podSelector: map[string]string{"key": "B"},
+			podStatus:   v1.PodPending,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			nodes := []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: testKubeletHostname, Labels: test.nodeLabels},
+					Status: v1.NodeStatus{
+						Allocatable: v1.ResourceList{
+							v1.ResourcePods: *resource.NewQuantity(110, resource.DecimalSI),
+						},
+					},
+				},
+			}
+			kl.nodeLister = testNodeLister{nodes: nodes}
+
+			recorder := record.NewFakeRecorder(20)
+			nodeRef := &v1.ObjectReference{
+				Kind:      "Node",
+				Name:      string("testNode"),
+				UID:       types.UID("testNode"),
+				Namespace: "",
+			}
+			testClusterDNSDomain := "TEST"
+			kl.dnsConfigurer = dns.NewConfigurer(recorder, nodeRef, nil, nil, testClusterDNSDomain, "")
+
+			pod := podWithUIDNameNsSpec("123456789", "podA", "foo", v1.PodSpec{NodeSelector: test.podSelector})
+
+			kl.HandlePodAdditions([]*v1.Pod{pod})
+
+			// Check pod status stored in the status map.
+			checkPodStatus(t, kl, pod, test.podStatus)
+		})
+	}
 }
 
 // Tests that we handle exceeded resources correctly by setting the failed status in status map.
@@ -2288,6 +2355,97 @@ func TestPreInitRuntimeService(t *testing.T) {
 	err := PreInitRuntimeService(nil, nil, nil, "", "", "", "", "")
 	if err == nil {
 		t.Fatal("PreInitRuntimeService should fail when not configured with a container runtime")
+	}
+}
+
+func TestSyncLabels(t *testing.T) {
+	tests := []struct {
+		name             string
+		existingNode     *v1.Node
+		isPatchingNeeded bool
+	}{
+		{
+			name:             "no labels",
+			existingNode:     &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}},
+			isPatchingNeeded: true,
+		},
+		{
+			name:             "wrong labels",
+			existingNode:     &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: "dummyOS", v1.LabelArchStable: "dummyArch"}}},
+			isPatchingNeeded: true,
+		},
+		{
+			name:             "correct labels",
+			existingNode:     &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: goruntime.GOARCH}}},
+			isPatchingNeeded: false,
+		},
+		{
+			name:             "partially correct labels",
+			existingNode:     &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS, v1.LabelArchStable: "dummyArch"}}},
+			isPatchingNeeded: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+			kubeClient := testKubelet.fakeKubeClient
+
+			test.existingNode.Name = string(kl.nodeName)
+
+			kl.nodeLister = testNodeLister{nodes: []*v1.Node{test.existingNode}}
+			go func() { kl.syncNodeStatus() }()
+
+			err := retryWithExponentialBackOff(
+				100*time.Millisecond,
+				func() (bool, error) {
+					var savedNode *v1.Node
+					if test.isPatchingNeeded {
+						actions := kubeClient.Actions()
+						if len(actions) == 0 {
+							t.Logf("No action yet")
+							return false, nil
+						}
+						action := actions[1]
+						if action.GetVerb() == "patch" {
+							patchAction := action.(core.PatchActionImpl)
+							var err error
+							savedNode, err = applyNodeStatusPatch(test.existingNode, patchAction.GetPatch())
+							if err != nil {
+								t.Logf("node patching failed, %v", err)
+								return false, nil
+							}
+						}
+					} else {
+						savedNode = test.existingNode
+					}
+					val, ok := savedNode.Labels[v1.LabelOSStable]
+					if !ok {
+						t.Logf("expected kubernetes.io/os label to be present")
+						return false, nil
+					}
+					if val != goruntime.GOOS {
+						t.Logf("expected kubernetes.io/os to match runtime.GOOS but got %v", val)
+						return false, nil
+					}
+					val, ok = savedNode.Labels[v1.LabelArchStable]
+					if !ok {
+						t.Logf("expected kubernetes.io/arch label to be present")
+						return false, nil
+					}
+					if val != goruntime.GOARCH {
+						t.Logf("expected kubernetes.io/arch to match runtime.GOARCH but got %v", val)
+						return false, nil
+					}
+					return true, nil
+				},
+			)
+			if err != nil {
+				t.Fatalf("expected labels to be reconciled but it failed with %v", err)
+			}
+		})
 	}
 }
 

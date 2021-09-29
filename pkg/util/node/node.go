@@ -251,7 +251,7 @@ func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) 
 	return nil
 }
 
-// PatchNodeStatus patches node status.
+// PatchNodeStatus patches node status along with objectmetadata
 func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) (*v1.Node, []byte, error) {
 	patchBytes, err := preparePatchBytesforNodeStatus(nodeName, oldNode, newNode)
 	if err != nil {
@@ -265,6 +265,7 @@ func PatchNodeStatus(c v1core.CoreV1Interface, nodeName types.NodeName, oldNode 
 	return updatedNode, patchBytes, nil
 }
 
+// preparePatchBytesforNodeStatus updates the node objectmetadata and status
 func preparePatchBytesforNodeStatus(nodeName types.NodeName, oldNode *v1.Node, newNode *v1.Node) ([]byte, error) {
 	oldData, err := json.Marshal(oldNode)
 	if err != nil {

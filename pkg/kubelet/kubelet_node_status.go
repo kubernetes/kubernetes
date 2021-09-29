@@ -509,11 +509,30 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 		}
 	}
 
+	areRequiredLabelsNotPresent := false
+	osName, osLabelExists := node.Labels[v1.LabelOSStable]
+	if !osLabelExists || osName != goruntime.GOOS {
+		if len(node.Labels) == 0 {
+			node.Labels = make(map[string]string)
+		}
+		node.Labels[v1.LabelOSStable] = goruntime.GOOS
+		areRequiredLabelsNotPresent = true
+	}
+	// Set the arch if there is a mismatch
+	arch, archLabelExists := node.Labels[v1.LabelArchStable]
+	if !archLabelExists || arch != goruntime.GOARCH {
+		if len(node.Labels) == 0 {
+			node.Labels = make(map[string]string)
+		}
+		node.Labels[v1.LabelArchStable] = goruntime.GOARCH
+		areRequiredLabelsNotPresent = true
+	}
+
 	kl.setNodeStatus(node)
 
 	now := kl.clock.Now()
 	if now.Before(kl.lastStatusReportTime.Add(kl.nodeStatusReportFrequency)) {
-		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) {
+		if !podCIDRChanged && !nodeStatusHasChanged(&originalNode.Status, &node.Status) && !areRequiredLabelsNotPresent {
 			// We must mark the volumes as ReportedInUse in volume manager's dsw even
 			// if no changes were made to the node status (no volumes were added or removed
 			// from the VolumesInUse list).
