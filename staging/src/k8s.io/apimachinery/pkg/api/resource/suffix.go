@@ -17,7 +17,7 @@ limitations under the License.
 package resource
 
 import (
-	"strconv"
+  "strconv"
   "unicode"
 )
 
