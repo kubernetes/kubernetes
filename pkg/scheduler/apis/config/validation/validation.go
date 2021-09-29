@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
@@ -140,6 +141,10 @@ var removedPluginsByVersion = []removedPlugins{
 			"NodeResourcesMostAllocated",
 			"RequestedToCapacityRatio",
 		},
+	},
+	{
+		schemeGroupVersion: v1beta3.SchemeGroupVersion.String(),
+		plugins:            []string{},
 	},
 }
 

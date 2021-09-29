@@ -163,7 +163,7 @@ profiles:
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": defaults.PluginsV1beta2,
+				"default-scheduler": defaults.PluginsV1beta3,
 			},
 		},
 		{
