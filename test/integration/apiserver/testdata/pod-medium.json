@@ -1,0 +1,37 @@
+{
+	"kind": "Pod",
+	"apiVersion": "v1",
+	"metadata": {
+		"name": %s
+	},
+	"spec": {
+		"containers": [
+			{
+				"name": "healthz",
+				"image": "k8s.gcr.io/exechealthz-amd64:1.2",
+				"args": [
+					"-cmd=nslookup localhost"
+				],
+				"ports": [
+					{
+						"containerPort": 8080,
+						"protocol": "TCP"
+					}
+				]
+			},
+			{
+				"name":"test-container",
+				"image":"ubuntu:14.04",
+				"command": ["bash", "-c", "while true; do sleep 100; done"],
+				"livenessProbe": {
+					"httpGet": {
+						"path": "/healthz",
+						"port":8080
+					},
+				"initialDelaySeconds": 10,
+				"timeoutSeconds": 2
+				}
+			}
+		]
+	}
+}

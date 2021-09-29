@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path"
 	"reflect"
 	"strconv"
@@ -2330,18 +2331,17 @@ func TestDedupOwnerReferences(t *testing.T) {
 	}
 }
 
-// Benchmark field validation for strict vs non-strict
-// TODO: add actual correctness integration tests too
-func BenchmarkFieldValidation(b *testing.B) {
-	_, client, closeFn := setup(b)
-	defer closeFn()
-	flag.Lookup("v").Value.Set("0")
+func TestFieldValidationPut(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
 
-	baseDeploy := `{
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	postBody := []byte(`{
 		"apiVersion": "apps/v1",
 		"kind": "Deployment",
 		"metadata": {
-			"name": %s,
+			"name": "test-dep",
 			"labels": {"app": "nginx"}
                 },
 		"spec": {
@@ -2364,26 +2364,233 @@ func BenchmarkFieldValidation(b *testing.B) {
 				}
 			}
 		}
-	}`
+	}`)
 
-	// TODO: add bigger objects to benchmarks table once confirmed that this is how we want to do benchmarking.
+	putBody := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "test-dep",
+			"labels": {"app": "nginx"}
+                },
+		"spec": {
+			"foo": "bar",
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	var testcases = []struct {
+		name string
+		// TODO: use PostOptions for fieldValidation param instead of raw strings.
+		params      map[string]string
+		errContains string
+	}{
+		{
+			name:        "putStrictValidation",
+			params:      map[string]string{"fieldValidation": "Strict"},
+			errContains: "found unknown field",
+		},
+		{
+			name:        "putDefaultIgnoreValidation",
+			params:      map[string]string{},
+			errContains: "",
+		},
+		{
+			name:        "putIgnoreValidation",
+			params:      map[string]string{"fieldValidation": "Ignore"},
+			errContains: "",
+		},
+	}
+
+	if _, err := client.CoreV1().RESTClient().Post().
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Body(postBody).
+		DoRaw(context.TODO()); err != nil {
+		t.Fatalf("failed to create initial deployment: %v", err)
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := client.CoreV1().RESTClient().Put().
+				AbsPath("/apis/apps/v1").
+				Namespace("default").
+				Resource("deployments").
+				Name("test-dep")
+			for k, v := range tc.params {
+				req.Param(k, v)
+
+			}
+			result, err := req.Body(putBody).DoRaw(context.TODO())
+			if err == nil && tc.errContains != "" {
+				t.Fatalf("unexpected post succeeded")
+
+			}
+			if err != nil && !strings.Contains(string(result), tc.errContains) {
+				t.Fatalf("unexpected response: %v", string(result))
+
+			}
+		})
+
+	}
+
+}
+func TestFieldValidationPost(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	body := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "test-dep",
+			"labels": {"app": "nginx"}
+                },
+		"spec": {
+			"foo": "bar",
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	var testcases = []struct {
+		name string
+		// TODO: use PostOptions for fieldValidation param instead of raw strings.
+		params      map[string]string
+		errContains string
+	}{
+		{
+			name:        "postStrictValidation",
+			params:      map[string]string{"fieldValidation": "Strict"},
+			errContains: "found unknown field",
+		},
+		{
+			name:        "postDefaultIgnoreValidation",
+			params:      map[string]string{},
+			errContains: "",
+		},
+		{
+			name:        "postIgnoreValidation",
+			params:      map[string]string{"fieldValidation": "Ignore"},
+			errContains: "",
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := client.CoreV1().RESTClient().Post().
+				AbsPath("/apis/apps/v1").
+				Namespace("default").
+				Resource("deployments")
+			for k, v := range tc.params {
+				req.Param(k, v)
+
+			}
+			result, err := req.Body([]byte(body)).DoRaw(context.TODO())
+			if err == nil && tc.errContains != "" {
+				t.Fatalf("unexpected post succeeded")
+
+			}
+			if err != nil && !strings.Contains(string(result), tc.errContains) {
+				t.Fatalf("unexpected response: %v", string(result))
+			}
+		})
+	}
+}
+
+// Benchmark field validation for strict vs non-strict
+func BenchmarkFieldValidation(b *testing.B) {
+	_, client, closeFn := setup(b)
+	defer closeFn()
+
+	flag.Lookup("v").Value.Set("0")
+	corePath := "/api/v1"
+	appsPath := "/apis/apps/v1"
 	// TODO: split POST and PUT into their own test-cases.
 	// TODO: add test for "Warn" validation once it is implemented.
 	benchmarks := []struct {
-		name   string
-		params map[string]string
+		name     string
+		params   map[string]string
+		bodyFile string
+		resource string
+		absPath  string
 	}{
 		{
-			name:   "default-ignore-validation-deployment",
-			params: map[string]string{},
+			name:     "ignore-validation-deployment",
+			params:   map[string]string{"fieldValidation": "Ignore"},
+			bodyFile: "./testdata/deploy-small.json",
+			resource: "deployments",
+			absPath:  appsPath,
 		},
 		{
-			name:   "ignore-validation-deployment",
-			params: map[string]string{"fieldValidation": "Ignore"},
+			name:     "strict-validation-deployment",
+			params:   map[string]string{"fieldValidation": "Strict"},
+			bodyFile: "./testdata/deploy-small.json",
+			resource: "deployments",
+			absPath:  appsPath,
 		},
 		{
-			name:   "strict-validation-deployment",
-			params: map[string]string{"fieldValidation": "Strict"},
+			name:     "ignore-validation-pod",
+			params:   map[string]string{"fieldValidation": "Ignore"},
+			bodyFile: "./testdata/pod-medium.json",
+			resource: "pods",
+			absPath:  corePath,
+		},
+		{
+			name:     "strict-validation-pod",
+			params:   map[string]string{"fieldValidation": "Strict"},
+			bodyFile: "./testdata/pod-medium.json",
+			resource: "pods",
+			absPath:  corePath,
+		},
+		{
+			name:     "ignore-validation-big-pod",
+			params:   map[string]string{"fieldValidation": "Ignore"},
+			bodyFile: "./testdata/pod-large.json",
+			resource: "pods",
+			absPath:  corePath,
+		},
+		{
+			name:     "strict-validation-big-pod",
+			params:   map[string]string{"fieldValidation": "Strict"},
+			bodyFile: "./testdata/pod-large.json",
+			resource: "pods",
+			absPath:  corePath,
 		},
 	}
 
@@ -2394,20 +2601,24 @@ func BenchmarkFieldValidation(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				// append the timestamp to the name so that we don't hit conflicts when running the test multiple times
 				// (i.e. without it -count=n for n>1 will fail, this might be from not tearing stuff down properly).
-				deployName := fmt.Sprintf("dep-%s-%d-%d-%d", bm.name, n, b.N, time.Now().UnixNano())
-				deployString := fmt.Sprintf(baseDeploy, fmt.Sprintf(`"%s"`, deployName))
-				deploy := []byte(deployString)
+				bodyBase, err := os.ReadFile(bm.bodyFile)
+				if err != nil {
+					panic(err)
+				}
 
-				appsPath := "/apis/apps/v1"
+				objName := fmt.Sprintf("obj-%s-%d-%d-%d", bm.name, n, b.N, time.Now().UnixNano())
+				objString := fmt.Sprintf(string(bodyBase), fmt.Sprintf(`"%s"`, objName))
+				body := []byte(objString)
+
 				postReq := client.CoreV1().RESTClient().Post().
-					AbsPath(appsPath).
+					AbsPath(bm.absPath).
 					Namespace("default").
-					Resource("deployments")
+					Resource(bm.resource)
 				for k, v := range bm.params {
 					postReq = postReq.Param(k, v)
 				}
 
-				_, err := postReq.Body(deploy).
+				_, err = postReq.Body(body).
 					DoRaw(context.TODO())
 				if err != nil {
 					panic(err)
@@ -2415,15 +2626,15 @@ func BenchmarkFieldValidation(b *testing.B) {
 
 				// TODO: put PUT in a different bench case than POST (ie. have a baseReq) be a part of the test case.
 				putReq := client.CoreV1().RESTClient().Put().
-					AbsPath(appsPath).
+					AbsPath(bm.absPath).
 					Namespace("default").
-					Resource("deployments").
-					Name(deployName)
+					Resource(bm.resource).
+					Name(objName)
 				for k, v := range bm.params {
 					putReq = putReq.Param(k, v)
 				}
 
-				_, err = putReq.Body(deploy).
+				_, err = putReq.Body(body).
 					DoRaw(context.TODO())
 				if err != nil {
 					panic(err)

@@ -471,14 +471,13 @@ const (
 // all supported media types (only json and yaml supports field validation).
 func fieldValidation(req *http.Request) (fieldValidationDirective, error) {
 	supportedContentTypes := []string{runtime.ContentTypeJSON, runtime.ContentTypeJSONMergePatch, runtime.ContentTypeYAML}
-	supported := false
 	contentType := req.Header.Get("Content-Type")
-	//contentType := req.Header.Get("ContentType")
 	// TODO: not sure if it is okay to assume empty content type is a valid one
+	supported := true
 	if contentType != "" {
+		supported = false
 		for _, v := range strings.Split(contentType, ",") {
 			t, _, err := mime.ParseMediaType(v)
-			fmt.Printf("t = %+v\n", t)
 			if err != nil {
 				return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("could not parse media type: %v", v))
 			}
@@ -489,9 +488,6 @@ func fieldValidation(req *http.Request) (fieldValidationDirective, error) {
 				}
 			}
 		}
-		if !supported {
-			return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter only supports content types %v\n content type provided: %s", supportedContentTypes, contentType))
-		}
 	}
 
 	validationParam := req.URL.Query()["fieldValidation"]
@@ -499,12 +495,18 @@ func fieldValidation(req *http.Request) (fieldValidationDirective, error) {
 	case 0:
 		return ignoreFieldValidation, nil
 	case 1:
-		switch validationParam[0] {
-		case "Ignore":
+		switch strings.ToLower(validationParam[0]) {
+		case "ignore":
 			return ignoreFieldValidation, nil
-		case "Strict":
+		case "strict":
+			if !supported {
+				return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter only supports content types %v\n content type provided: %s", supportedContentTypes, contentType))
+			}
 			return strictFieldValidation, nil
-		case "Warn":
+		case "warn":
+			if !supported {
+				return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter only supports content types %v\n content type provided: %s", supportedContentTypes, contentType))
+			}
 			return warnFieldValidation, nil
 		default:
 			return ignoreFieldValidation, errors.NewBadRequest(fmt.Sprintf("fieldValidation parameter unsupported: %v", validationParam))

@@ -4390,17 +4390,26 @@ func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx conte
 
 func TestFieldValidation(t *testing.T) {
 	strictDecoderErr := "strict decoder error for"
-	// TODO: add test cases for yaml validation and protobuf early exit.
+	badRequestErr := "fieldValidation parameter only supports content types"
+	strictFieldValidation := "?fieldValidation=strict"
+	// TODO: add test cases for yaml validation, multiple fieldValidation values
 	tests := []struct {
+		name        string
 		path        string
 		verb        string
 		data        []byte
+		queryParams string
 		contentType string
 		errContains string
 	}{
 
-		{path: "/namespaces/default/simples", verb: "POST", data: []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar","unknown":"baz"}`), errContains: strictDecoderErr},
-		{path: "/namespaces/default/simples/id", verb: "PUT", data: []byte(`{"kind": "Simple", "apiVersion": "test.group/version", "metadata": {"name": "id", "creationTimestamp": null}, "other": "bar", "unknown": "baz"}`), errContains: strictDecoderErr},
+		{name: "post-unknown-strict-validation", path: "/namespaces/default/simples", verb: "POST", data: []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar","unknown":"baz"}`), queryParams: strictFieldValidation, errContains: strictDecoderErr},
+		{name: "put-unknown-strict-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: []byte(`{"kind": "Simple", "apiVersion": "test.group/version", "metadata": {"name": "id", "creationTimestamp": null}, "other": "bar", "unknown": "baz"}`), queryParams: strictFieldValidation, errContains: strictDecoderErr},
+		{name: "post-unknown-ignore-validation", path: "/namespaces/default/simples", verb: "POST", data: []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar","unknown":"baz"}`)},
+		{name: "put-unknown-ignore-validation", path: "/namespaces/default/simples/id", verb: "PUT", data: []byte(`{"kind": "Simple", "apiVersion": "test.group/version", "metadata": {"name": "id", "creationTimestamp": null}, "other": "bar", "unknown": "baz"}`)},
+		{name: "post-unknown-strict-vaidation-json", path: "/namespaces/default/simples", verb: "POST", data: []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar","unknown":"baz"}`), queryParams: strictFieldValidation, errContains: strictDecoderErr, contentType: runtime.ContentTypeJSON},
+		{name: "post-unknown-strict-validation-protobuf", path: "/namespaces/default/simples", verb: "POST", data: []byte(`{"kind":"Simple","apiVersion":"test.group/version","metadata":{"creationTimestamp":null},"other":"bar","unknown":"baz"}`), queryParams: strictFieldValidation, errContains: badRequestErr, contentType: runtime.ContentTypeProtobuf},
+
 		// TODO: there's a bug currently where query params are being stripped so this test does not pass yet.
 		//{path: "/namespaces/default/simples/id", verb: "PATCH", data: []byte(`{"labels":{"foo":"bar"}}`), contentType: "application/merge-patch+json; charset=UTF-8", errContains: notImplementedErr},
 	}
@@ -4427,18 +4436,16 @@ func TestFieldValidation(t *testing.T) {
 	}))
 	defer server.Close()
 	for _, test := range tests {
-		baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
-		response := runRequest(t, baseURL+test.path, test.verb, test.data, test.contentType)
-		if response.StatusCode == http.StatusBadRequest {
-			t.Fatalf("unexpected BadRequest: %#v", response)
-		}
-		response = runRequest(t, baseURL+test.path+"?fieldValidation=Strict", test.verb, test.data, test.contentType)
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(response.Body)
-		// TODO: better way of doing than string comparison since we are getting a response instead of a regular go error?
-		if response.StatusCode != http.StatusBadRequest && !strings.Contains(buf.String(), test.errContains) {
-			t.Fatalf("unexpected response: %#v", response)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			baseURL := server.URL + "/" + prefix + "/" + testGroupVersion.Group + "/" + testGroupVersion.Version
+			response := runRequest(t, baseURL+test.path+test.queryParams, test.verb, test.data, test.contentType)
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(response.Body)
+			// TODO: better way of doing than string comparison since we are getting a response instead of a regular go error?
+			if response.StatusCode != http.StatusBadRequest && !strings.Contains(buf.String(), test.errContains) {
+				t.Fatalf("unexpected response: %#v, errContains: %#v", response, test.errContains)
+			}
+		})
 	}
 
 }

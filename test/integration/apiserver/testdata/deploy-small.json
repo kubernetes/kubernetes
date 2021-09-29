@@ -1,0 +1,28 @@
+{
+	"apiVersion": "apps/v1",
+	"kind": "Deployment",
+	"metadata": {
+		"name": %s,
+		"labels": {"app": "nginx"}
+	},
+	"spec": {
+		"selector": {
+			"matchLabels": {
+				"app": "nginx"
+			}
+		},
+		"template": {
+			"metadata": {
+				"labels": {
+					"app": "nginx"
+				}
+			},
+			"spec": {
+				"containers": [{
+					"name":  "nginx",
+					"image": "nginx:latest"
+				}]
+			}
+		}
+	}
+}
