@@ -72,7 +72,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 			ExpectedEtcdPath: "/registry/namespaces/namespace1",
 		},
 		gvr("", "v1", "nodes"): {
-			Stub:             `{"metadata": {"name": "node1"}, "spec": {"unschedulable": true}}`,
+			Stub:             `{"metadata": {"name": "node1"}, "spec": {"unschedulable": true}, "status": {"conditions":[{"type":"Ready", "status":"True"}]}}`,
 			ExpectedEtcdPath: "/registry/minions/node1",
 		},
 		gvr("", "v1", "persistentvolumes"): {
