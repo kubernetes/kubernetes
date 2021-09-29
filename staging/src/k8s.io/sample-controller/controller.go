@@ -289,7 +289,7 @@ func (c *Controller) syncHandler(key string) error {
 	if !metav1.IsControlledBy(deployment, foo) {
 		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
 		c.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	// If this number of the replicas on the Foo resource is specified, and the

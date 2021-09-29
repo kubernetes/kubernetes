@@ -369,3 +369,7 @@ func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName ut
 func (f *fakeIPTables) HasRandomFully() bool {
 	return false
 }
+
+func (f *fakeIPTables) Present() bool {
+	return true
+}

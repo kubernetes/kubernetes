@@ -180,11 +180,6 @@ type StackCompatTester interface {
 type DualStackCompatTester struct{}
 
 func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
-	dualStackFeatureEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack)
-	if !dualStackFeatureEnabled {
-		return false
-	}
-
 	// First tag of hcsshim that has a proper check for dual stack support is v0.8.22 due to a bug.
 	if err := hcn.IPv6DualStackSupported(); err != nil {
 		// Hcn *can* fail the query to grab the version of hcn itself (which this call will do internally before parsing

@@ -39,9 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/metrics"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -263,19 +260,6 @@ func getOnePodIP(execer utilexec.Interface, nsenterPath, netnsPath, interfaceNam
 // TODO (khenidak). The "primary ip" in dual stack world does not really exist. For now
 // we are defaulting to v4 as primary
 func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName string) ([]net.IP, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
-		ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4")
-		if err != nil {
-			// Fall back to IPv6 address if no IPv4 address is present
-			ip, err = getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6")
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		return []net.IP{ip}, nil
-	}
-
 	var (
 		list []net.IP
 		errs []error

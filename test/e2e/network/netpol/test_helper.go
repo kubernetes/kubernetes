@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"github.com/pkg/errors"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -105,7 +104,7 @@ func waitForHTTPServers(k *kubeManager, model *Model) error {
 		}
 		time.Sleep(waitInterval)
 	}
-	return errors.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
+	return fmt.Errorf("after %d tries, %d HTTP servers are not ready", maxTries, len(notReady))
 }
 
 // ValidateOrFail validates connectivity

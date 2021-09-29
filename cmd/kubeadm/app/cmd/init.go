@@ -525,7 +525,7 @@ func (d *initData) OutputWriter() io.Writer {
 func (d *initData) Client() (clientset.Interface, error) {
 	if d.client == nil {
 		if d.dryRun {
-			svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet, features.Enabled(d.cfg.FeatureGates, features.IPv6DualStack))
+			svcSubnetCIDR, err := kubeadmconstants.GetKubernetesServiceCIDR(d.cfg.Networking.ServiceSubnet)
 			if err != nil {
 				return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", d.cfg.Networking.ServiceSubnet)
 			}

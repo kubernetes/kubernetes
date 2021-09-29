@@ -878,7 +878,7 @@ func TestGetStandardInstanceIDByNodeName(t *testing.T) {
 		{
 			name:           "GetInstanceIDByNodeName should report error if Error encountered when invoke mockVMClient.Get",
 			nodeName:       "vm3",
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: VMGet error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("VMGet error")),
 		},
 		{
 			name:           "GetInstanceIDByNodeName should report error if ResourceID is invalid",

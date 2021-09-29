@@ -375,7 +375,7 @@ func ValidateHostPort(endpoint string, fldPath *field.Path) field.ErrorList {
 }
 
 // ValidateIPNetFromString validates network portion of ip address
-func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool, fldPath *field.Path) field.ErrorList {
+func ValidateIPNetFromString(subnetStr string, minAddrs int64, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	subnets, err := netutils.ParseCIDRs(strings.Split(subnetStr, ","))
 	if err != nil {
@@ -384,19 +384,16 @@ func ValidateIPNetFromString(subnetStr string, minAddrs int64, isDualStack bool,
 	}
 	switch {
 	// if DualStack only 2 CIDRs allowed
-	case isDualStack && len(subnets) > 2:
+	case len(subnets) > 2:
 		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
 	// if DualStack and there are 2 CIDRs validate if there is at least one of each IP family
-	case isDualStack && len(subnets) == 2:
+	case len(subnets) == 2:
 		areDualStackCIDRs, err := netutils.IsDualStackCIDRs(subnets)
 		if err != nil {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, err.Error()))
 		} else if !areDualStackCIDRs {
 			allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "expected one (IPv4 or IPv6) CIDR or two CIDRs from each family for dual-stack networking"))
 		}
-	// if not DualStack only one CIDR allowed
-	case !isDualStack && len(subnets) > 1:
-		allErrs = append(allErrs, field.Invalid(fldPath, subnetStr, "only one CIDR allowed for single-stack networking"))
 	}
 	// validate the subnet/s
 	for _, s := range subnets {
@@ -470,14 +467,11 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 	var maskSize int
 	var maskArg string
 	var err error
-	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
 
-	if isDualStack && isIPv6 {
+	if isIPv6 {
 		maskArg = "node-cidr-mask-size-ipv6"
-	} else if isDualStack && !isIPv6 {
-		maskArg = "node-cidr-mask-size-ipv4"
 	} else {
-		maskArg = "node-cidr-mask-size"
+		maskArg = "node-cidr-mask-size-ipv4"
 	}
 
 	if v, ok := c.ControllerManager.ExtraArgs[maskArg]; ok && v != "" {
@@ -513,16 +507,14 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 	for _, err := range validation.IsDNS1123Subdomain(c.Networking.DNSDomain) {
 		allErrs = append(allErrs, field.Invalid(dnsDomainFldPath, c.Networking.DNSDomain, err))
 	}
-	// check if dual-stack feature-gate is enabled
-	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
 
 	if len(c.Networking.ServiceSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, field.NewPath("serviceSubnet"))...)
 		// Service subnet was already validated, we need to validate now the subnet size
 		allErrs = append(allErrs, ValidateServiceSubnetSize(c.Networking.ServiceSubnet, field.NewPath("serviceSubnet"))...)
 	}
 	if len(c.Networking.PodSubnet) != 0 {
-		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, isDualStack, field.NewPath("podSubnet"))...)
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInPodSubnet, field.NewPath("podSubnet"))...)
 		if c.ControllerManager.ExtraArgs["allocate-node-cidrs"] != "false" {
 			// Pod subnet was already validated, we need to validate now against the node-mask
 			allErrs = append(allErrs, ValidatePodSubnetNodeMask(c.Networking.PodSubnet, c, field.NewPath("podSubnet"))...)

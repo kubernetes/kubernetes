@@ -612,14 +612,6 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	framework.ExpectNotEqual(len(claims), 0)
 	namespace := claims[0].Namespace
 
-	ginkgo.By("creating a storage class " + t.Class.Name)
-	class, err := t.Client.StorageV1().StorageClasses().Create(context.TODO(), t.Class, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
-	defer func() {
-		err = storageutils.DeleteStorageClass(t.Client, class.Name)
-		framework.ExpectNoError(err, "While deleting storage class")
-	}()
-
 	ginkgo.By("creating claims")
 	var claimNames []string
 	var createdClaims []*v1.PersistentVolumeClaim

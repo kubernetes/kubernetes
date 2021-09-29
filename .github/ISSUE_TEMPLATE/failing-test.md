@@ -18,3 +18,7 @@ labels: kind/failing-test
 #### Reason for failure:
 
 #### Anything else we need to know:
+
+#### Relevant SIG
+<!-- You can identify the SIG from the "prowjob_config_url" on the testgrid dashboard for a test -->
+/sig 

@@ -154,7 +154,7 @@ func TestFIFOSeatsSum(t *testing.T) {
 	list := newRequestFIFO()
 
 	newRequest := func(width uint) *request {
-		return &request{workEstimate: fcrequest.WorkEstimate{Seats: width}}
+		return &request{workEstimate: fcrequest.WorkEstimate{InitialSeats: width}}
 	}
 	arrival := []*request{newRequest(1), newRequest(2), newRequest(3)}
 	removeFn := make([]removeFromFIFOFunc, 0)

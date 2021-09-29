@@ -266,7 +266,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	if k >= ust.nCalls {
 		return
 	}
-	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{Seats: ust.uc.width, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
+	req, idle := ust.uss.qs.StartRequest(context.Background(), &fcrequest.WorkEstimate{InitialSeats: ust.uc.width, AdditionalLatency: ust.uc.padDuration}, ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {
 		atomic.AddUint64(&ust.uss.failedCount, 1)
@@ -945,7 +945,7 @@ func TestContextCancel(t *testing.T) {
 		expectQNCount(fn, false, expectF)
 		expectQNCount(fn, true, expectT)
 	}
-	req1, _ := qs.StartRequest(ctx1, &fcrequest.WorkEstimate{Seats: 1}, 1, "", "fs1", "test", "one", queueNoteFn(1))
+	req1, _ := qs.StartRequest(ctx1, &fcrequest.WorkEstimate{InitialSeats: 1}, 1, "", "fs1", "test", "one", queueNoteFn(1))
 	if req1 == nil {
 		t.Error("Request rejected")
 		return
@@ -968,7 +968,7 @@ func TestContextCancel(t *testing.T) {
 				counter.Add(1)
 				cancel2()
 			}()
-			req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{Seats: 1}, 2, "", "fs2", "test", "two", queueNoteFn(2))
+			req2, idle2a := qs.StartRequest(ctx2, &fcrequest.WorkEstimate{InitialSeats: 1}, 2, "", "fs2", "test", "two", queueNoteFn(2))
 			if idle2a {
 				t.Error("2nd StartRequest returned idle")
 			}
@@ -1041,7 +1041,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	req, _ := qs.StartRequest(ctx, &fcrequest.WorkEstimate{Seats: 1}, 1, "", "fs", "test", "one", func(inQueue bool) {})
+	req, _ := qs.StartRequest(ctx, &fcrequest.WorkEstimate{InitialSeats: 1}, 1, "", "fs", "test", "one", func(inQueue bool) {})
 	if req == nil {
 		t.Fatal("expected a Request object from StartRequest, but got nil")
 	}
@@ -1094,13 +1094,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 1}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 1}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
 				},
 			},
@@ -1117,7 +1117,7 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 1}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
 				},
 			},
@@ -1134,13 +1134,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 50}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 50}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 25}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
 				},
 			},
@@ -1157,13 +1157,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 10}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 25}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
 				},
 			},
@@ -1180,13 +1180,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					virtualStart: 200,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 10}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
 					),
 				},
 				{
 					virtualStart: 100,
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{Seats: 25}},
+						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
 				},
 			},
@@ -1249,14 +1249,14 @@ func TestFinishRequestLocked(t *testing.T) {
 		{
 			name: "request has additional latency",
 			workEstimate: fcrequest.WorkEstimate{
-				Seats:             10,
+				InitialSeats:      10,
 				AdditionalLatency: time.Minute,
 			},
 		},
 		{
 			name: "request has no additional latency",
 			workEstimate: fcrequest.WorkEstimate{
-				Seats: 10,
+				InitialSeats: 10,
 			},
 		},
 	}
@@ -1288,9 +1288,9 @@ func TestFinishRequestLocked(t *testing.T) {
 
 			var (
 				queuesetTotalRequestsExecutingExpected = qs.totRequestsExecuting - 1
-				queuesetTotalSeatsInUseExpected        = qs.totSeatsInUse - int(test.workEstimate.Seats)
+				queuesetTotalSeatsInUseExpected        = qs.totSeatsInUse - int(test.workEstimate.InitialSeats)
 				queueRequestsExecutingExpected         = queue.requestsExecuting - 1
-				queueSeatsInUseExpected                = queue.seatsInUse - int(test.workEstimate.Seats)
+				queueSeatsInUseExpected                = queue.seatsInUse - int(test.workEstimate.InitialSeats)
 			)
 
 			qs.finishRequestLocked(r)

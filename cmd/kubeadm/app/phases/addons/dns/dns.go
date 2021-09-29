@@ -37,7 +37,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
@@ -120,7 +119,7 @@ func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 		return errors.Wrap(err, "error when parsing CoreDNS configMap template")
 	}
 
-	dnsip, err := kubeadmconstants.GetDNSIP(cfg.Networking.ServiceSubnet, features.Enabled(cfg.FeatureGates, features.IPv6DualStack))
+	dnsip, err := kubeadmconstants.GetDNSIP(cfg.Networking.ServiceSubnet)
 	if err != nil {
 		return err
 	}
