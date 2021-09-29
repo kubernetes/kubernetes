@@ -32,6 +32,7 @@ import (
 	"k8s.io/cloud-provider/app"
 	"k8s.io/cloud-provider/app/config"
 	"k8s.io/cloud-provider/options"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // TearDownFunc is to be called to tear down a test server.

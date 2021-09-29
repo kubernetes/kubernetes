@@ -421,7 +421,7 @@ run_deprecated_api_tests() {
   kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
   output_message=$(! kubectl get podsecuritypolicies.v1beta1.policy --warnings-as-errors 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
-  kube::test::if_has_string "${output_message}" 'Error: 1 warning received'
+  kube::test::if_has_string "${output_message}" 'err="1 warning received"'
 
   set +o nounset
   set +o errexit
