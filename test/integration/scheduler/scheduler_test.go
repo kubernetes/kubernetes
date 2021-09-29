@@ -37,7 +37,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -320,14 +320,14 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	stopCh := make(chan struct{})
 	eventBroadcaster.StartRecordingToSink(stopCh)
 
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			PluginConfig: []v1beta2.PluginConfig{
+			PluginConfig: []v1beta3.PluginConfig{
 				{
 					Name: "VolumeBinding",
 					Args: runtime.RawExtension{
-						Object: &v1beta2.VolumeBindingArgs{
+						Object: &v1beta3.VolumeBindingArgs{
 							BindTimeoutSeconds: pointer.Int64Ptr(30),
 						},
 					},
@@ -558,14 +558,14 @@ func TestMultipleSchedulers(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(fooScheduler),
-			PluginConfig: []v1beta2.PluginConfig{
+			PluginConfig: []v1beta3.PluginConfig{
 				{
 					Name: "VolumeBinding",
 					Args: runtime.RawExtension{
-						Object: &v1beta2.VolumeBindingArgs{
+						Object: &v1beta3.VolumeBindingArgs{
 							BindTimeoutSeconds: pointer.Int64Ptr(30),
 						},
 					},
@@ -634,8 +634,8 @@ func TestMultipleSchedulers(t *testing.T) {
 }
 
 func TestMultipleSchedulingProfiles(t *testing.T) {
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{
 			{SchedulerName: pointer.StringPtr("default-scheduler")},
 			{SchedulerName: pointer.StringPtr("custom-scheduler")},
 		},
