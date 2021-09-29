@@ -233,6 +233,7 @@
   - k8s.io/cloud-provider
   - k8s.io/component-base
   - k8s.io/controller-manager
+  - k8s.io/component-helpers
   - k8s.io/klog
   - k8s.io/utils
 

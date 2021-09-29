@@ -19,7 +19,7 @@ package testing
 import (
 	"os"
 
-	"k8s.io/component-helpers/node/utils/sysctl"
+	"k8s.io/component-helpers/node/util/sysctl"
 )
 
 // Fake is a map-backed implementation of sysctl.Interface, for testing/mocking.

@@ -1295,6 +1295,8 @@ rules:
       branch: master
     - repository: controller-manager
       branch: master
+    - repository: component-helpers
+      branch: master
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/cloud-provider
@@ -1308,6 +1310,8 @@ rules:
     - repository: client-go
       branch: release-1.19
     - repository: component-base
+      branch: release-1.19
+    - repository: component-helpers
       branch: release-1.19
   - source:
       branch: release-1.20
@@ -1327,6 +1331,8 @@ rules:
       branch: release-1.20
     - repository: controller-manager
       branch: release-1.20
+    - repository: component-helpers
+      branch: release-1.20
   - source:
       branch: release-1.21
       dir: staging/src/k8s.io/cloud-provider
@@ -1345,6 +1351,8 @@ rules:
       branch: release-1.21
     - repository: controller-manager
       branch: release-1.21
+    - repository: component-helpers
+      branch: release-1.21
   - source:
       branch: release-1.22
       dir: staging/src/k8s.io/cloud-provider
@@ -1362,6 +1370,8 @@ rules:
     - repository: component-base
       branch: release-1.22
     - repository: controller-manager
+      branch: release-1.22
+    - repository: component-helpers
       branch: release-1.22
 
 - destination: kube-controller-manager
@@ -1386,6 +1396,8 @@ rules:
       branch: master
     - repository: cloud-provider
       branch: master
+    - repository: component-helpers
+      branch: master
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/kube-controller-manager
@@ -1399,6 +1411,8 @@ rules:
     - repository: api
       branch: release-1.19
     - repository: client-go
+      branch: release-1.19
+    - repository: component-helpers
       branch: release-1.19
   - source:
       branch: release-1.20
@@ -1420,6 +1434,8 @@ rules:
       branch: release-1.20
     - repository: cloud-provider
       branch: release-1.20
+    - repository: component-helpers
+      branch: release-1.20
   - source:
       branch: release-1.21
       dir: staging/src/k8s.io/kube-controller-manager
@@ -1440,6 +1456,8 @@ rules:
       branch: release-1.21
     - repository: cloud-provider
       branch: release-1.21
+    - repository: component-helpers
+      branch: release-1.21
   - source:
       branch: release-1.22
       dir: staging/src/k8s.io/kube-controller-manager
@@ -1459,6 +1477,8 @@ rules:
     - repository: controller-manager
       branch: release-1.22
     - repository: cloud-provider
+      branch: release-1.22
+    - repository: component-helpers
       branch: release-1.22
 
 - destination: cluster-bootstrap
@@ -1622,6 +1642,8 @@ rules:
       branch: master
     - repository: mount-utils
       branch: master
+    - repository: component-helpers
+      branch: master
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/legacy-cloud-providers
@@ -1641,6 +1663,8 @@ rules:
     - repository: apiserver
       branch: release-1.19
     - repository: component-base
+      branch: release-1.19
+    - repository: component-helpers
       branch: release-1.19
   - source:
       branch: release-1.20
@@ -1664,6 +1688,8 @@ rules:
       branch: release-1.20
     - repository: controller-manager
       branch: release-1.20
+    - repository: component-helpers
+      branch: release-1.20
   - source:
       branch: release-1.21
       dir: staging/src/k8s.io/legacy-cloud-providers
@@ -1685,6 +1711,8 @@ rules:
     - repository: component-base
       branch: release-1.21
     - repository: controller-manager
+      branch: release-1.21
+    - repository: component-helpers
       branch: release-1.21
   - source:
       branch: release-1.22
@@ -1709,6 +1737,8 @@ rules:
     - repository: controller-manager
       branch: release-1.22
     - repository: mount-utils
+      branch: release-1.22
+    - repository: component-helpers
       branch: release-1.22
 
 - destination: cri-api

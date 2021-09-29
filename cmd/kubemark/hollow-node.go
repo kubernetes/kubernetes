@@ -41,7 +41,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	fakesysctl "k8s.io/component-helpers/node/utils/sysctl/testing"
+	fakesysctl "k8s.io/component-helpers/node/util/sysctl/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"

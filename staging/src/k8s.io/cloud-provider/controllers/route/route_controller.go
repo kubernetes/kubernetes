@@ -41,8 +41,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
-	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	nodeutil "k8s.io/component-helpers/node/util"
 )
 
 const (
@@ -290,7 +290,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 }
 
 func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreated bool) error {
-	_, condition := cloudnodeutil.GetNodeCondition(&(node.Status), v1.NodeNetworkUnavailable)
+	_, condition := nodeutil.GetNodeCondition(&(node.Status), v1.NodeNetworkUnavailable)
 	if routesCreated && condition != nil && condition.Status == v1.ConditionFalse {
 		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=false was canceled because it is already set", node.Name)
 		return nil
@@ -311,7 +311,7 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 		// patch in the retry loop.
 		currentTime := metav1.Now()
 		if routesCreated {
-			err = cloudnodeutil.SetNodeCondition(rc.kubeClient, types.NodeName(node.Name), v1.NodeCondition{
+			err = nodeutil.SetNodeCondition(rc.kubeClient, types.NodeName(node.Name), v1.NodeCondition{
 				Type:               v1.NodeNetworkUnavailable,
 				Status:             v1.ConditionFalse,
 				Reason:             "RouteCreated",
@@ -319,7 +319,7 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 				LastTransitionTime: currentTime,
 			})
 		} else {
-			err = cloudnodeutil.SetNodeCondition(rc.kubeClient, types.NodeName(node.Name), v1.NodeCondition{
+			err = nodeutil.SetNodeCondition(rc.kubeClient, types.NodeName(node.Name), v1.NodeCondition{
 				Type:               v1.NodeNetworkUnavailable,
 				Status:             v1.ConditionTrue,
 				Reason:             "NoRouteCreated",
