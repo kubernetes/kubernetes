@@ -27,6 +27,7 @@ import (
 	"k8s.io/gengo/types"
 
 	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	genpath "k8s.io/code-generator/cmd/client-gen/path"
 )
 
 // genClientForType produces a file for each top-level type.
@@ -169,6 +170,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: filepath.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
 		"jsonMarshal":          c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
+		"SchemeGroupVersion":   c.Universe.Variable(types.Name{Package: genpath.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
 	}
 
 	if generateApply {
@@ -463,6 +465,7 @@ func (c *$.type|privatePlural$) List(ctx context.Context, opts $.ListOptions|raw
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
@@ -482,6 +485,7 @@ func (c *$.type|privatePlural$) List(ctx context.Context, $.type|private$Name st
 	result = &$.resultType|raw$List{}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -499,6 +503,7 @@ func (c *$.type|privatePlural$) Get(ctx context.Context, name string, options $.
 	result = &$.resultType|raw${}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name(name).
 		VersionedParams(&options, $.schemeParameterCodec|raw$).
@@ -514,6 +519,7 @@ func (c *$.type|privatePlural$) Get(ctx context.Context, $.type|private$Name str
 	result = &$.resultType|raw${}
 	err = c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -529,6 +535,7 @@ var deleteTemplate = `
 func (c *$.type|privatePlural$) Delete(ctx context.Context, name string, opts $.DeleteOptions|raw$) error {
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name(name).
 		Body(&opts).
@@ -546,6 +553,7 @@ func (c *$.type|privatePlural$) DeleteCollection(ctx context.Context, opts $.Del
 	}
 	return c.client.Delete().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		VersionedParams(&listOpts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
@@ -561,6 +569,7 @@ func (c *$.type|privatePlural$) Create(ctx context.Context, $.type|private$Name 
 	result = &$.resultType|raw${}
 	err = c.client.Post().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -578,6 +587,7 @@ func (c *$.type|privatePlural$) Create(ctx context.Context, $.inputType|private$
 	result = &$.resultType|raw${}
 	err = c.client.Post().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Body($.inputType|private$).
@@ -593,6 +603,7 @@ func (c *$.type|privatePlural$) Update(ctx context.Context, $.type|private$Name 
 	result = &$.resultType|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
@@ -610,6 +621,7 @@ func (c *$.type|privatePlural$) Update(ctx context.Context, $.inputType|private$
 	result = &$.resultType|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.inputType|private$.Name).
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
@@ -627,6 +639,7 @@ func (c *$.type|privatePlural$) UpdateStatus(ctx context.Context, $.type|private
 	result = &$.type|raw${}
 	err = c.client.Put().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.type|private$.Name).
 		SubResource("status").
@@ -648,6 +661,7 @@ func (c *$.type|privatePlural$) Watch(ctx context.Context, opts $.ListOptions|ra
 	opts.Watch = true
 	return c.client.Get().
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		VersionedParams(&opts, $.schemeParameterCodec|raw$).
 		Timeout(timeout).
@@ -661,6 +675,7 @@ func (c *$.type|privatePlural$) Patch(ctx context.Context, name string, pt $.Pat
 	result = &$.resultType|raw${}
 	err = c.client.Patch(pt).
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name(name).
 		SubResource(subresources...).
@@ -690,6 +705,7 @@ func (c *$.type|privatePlural$) Apply(ctx context.Context, $.inputType|private$ 
 	result = &$.resultType|raw${}
 	err = c.client.Patch($.ApplyPatchType|raw$).
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name(*name).
 		VersionedParams(&patchOpts, $.schemeParameterCodec|raw$).
@@ -721,6 +737,7 @@ func (c *$.type|privatePlural$) ApplyStatus(ctx context.Context, $.inputType|pri
 	result = &$.resultType|raw${}
 	err = c.client.Patch($.ApplyPatchType|raw$).
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name(*name).
 		SubResource("status").
@@ -748,6 +765,7 @@ func (c *$.type|privatePlural$) Apply(ctx context.Context, $.type|private$Name s
 	result = &$.resultType|raw${}
 	err = c.client.Patch($.ApplyPatchType|raw$).
 		$if .namespaced$Namespace(c.ns).$end$
+		GroupVersion($.SchemeGroupVersion|raw$).
 		Resource("$.type|resource$").
 		Name($.type|private$Name).
 		SubResource("$.subresourcePath$").
