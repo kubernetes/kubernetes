@@ -1167,7 +1167,34 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 		robinIndexExpected      []int
 	}{
 		{
-			name:             "width1=1, seats are available, the queue with less virtual start time wins",
+			name:             "width=1, all queues are empty",
+			concurrencyLimit: 1,
+			totSeatsInUse:    0,
+			robinIndex:       -1,
+			queues: []*queue{
+				{
+					requests: newFIFO(),
+				},
+				{
+					requests: newFIFO(),
+				},
+			},
+			attempts:              1,
+			minQueueIndexExpected: []int{-1},
+			robinIndexExpected:    []int{1},
+		},
+		{
+			name:                  "width=1, the queueset has no queues",
+			concurrencyLimit:      1,
+			totSeatsInUse:         0,
+			robinIndex:            -1,
+			queues:                []*queue{},
+			attempts:              1,
+			minQueueIndexExpected: []int{-1},
+			robinIndexExpected:    []int{-1},
+		},
+		{
+			name:             "width=1, seats are available, the queue with less virtual start time wins",
 			concurrencyLimit: 1,
 			totSeatsInUse:    0,
 			robinIndex:       -1,

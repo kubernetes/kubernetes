@@ -380,7 +380,7 @@ func (cfgCtlr *configController) syncOne() (specificDelay time.Duration, err err
 // cope with the various dependencies between objects.  The process of
 // digestion is done in four passes over config objects --- three
 // passes over PriorityLevelConfigurations and one pass over the
-// FlowSchemas --- with the work dvided among the passes according to
+// FlowSchemas --- with the work divided among the passes according to
 // those dependencies.
 type cfgMeal struct {
 	cfgCtlr *configController

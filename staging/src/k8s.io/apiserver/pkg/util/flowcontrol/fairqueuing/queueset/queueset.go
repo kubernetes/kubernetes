@@ -779,6 +779,10 @@ func (qs *queueSet) findDispatchQueueLocked() *queue {
 		}
 	}
 
+	if minQueue == nil {
+		klog.ErrorS(errors.New("selected queue is nil"), "Impossible", "queueSet", qs.qCfg.Name)
+		return nil
+	}
 	oldestReqFromMinQueue, _ := minQueue.requests.Peek()
 	if oldestReqFromMinQueue == nil {
 		// This cannot happen
