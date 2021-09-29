@@ -61,6 +61,7 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 			typedClientPath := filepath.Join(g.clientsetPackage, "typed", strings.ToLower(group.PackageName), strings.ToLower(version.NonEmpty()))
 			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}])
 			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), typedClientPath))
+			imports = append(imports, filepath.Join(g.clientsetPackage, "scheme"))
 		}
 	}
 	return
@@ -144,12 +145,20 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var cs Clientset
-	var err error
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$, err =$.PackageAlias$.NewForConfig(&configShallowCopy)
-	if err!=nil {
+
+	configShallowCopy.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+
+	if configShallowCopy.UserAgent == "" {
+		configShallowCopy.UserAgent = $.DefaultKubernetesUserAgent|raw$()
+	}
+
+	restClient, err := rest.RESTClientFor(&configShallowCopy)
+	if err != nil {
 		return nil, err
 	}
+
+	var cs Clientset
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.New(restClient)
 $end$
 	cs.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
 	if err!=nil {
@@ -163,11 +172,11 @@ var newClientsetForConfigOrDieTemplate = `
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *$.Config|raw$) *Clientset {
-	var cs Clientset
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.NewForConfigOrDie(c)
-$end$
-	cs.DiscoveryClient = $.NewDiscoveryClientForConfigOrDie|raw$(c)
-	return &cs
+	cs, err := NewForConfig(c)
+	if err!=nil {
+		panic(err)
+	}
+	return cs
 }
 `
 
