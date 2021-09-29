@@ -234,7 +234,7 @@ function download-or-bust {
 
         echo "Getting the scope of service account configured for VM."
         if ! valid-storage-scope ; then
-          canUseCredentials=$?
+          canUseCredentials=1
           # this behavior is preserved for backward compatibility. We want to fail fast if SA is not available
           # and try to download without SA if scope does not exist on SA
           echo "No service account or service account without storage scope. Attempt to download without service account token."
@@ -246,9 +246,8 @@ function download-or-bust {
           if access_token=$(get-credentials); then
             echo "Service account access token is received. Downloading ${url} using this token."
           else
-            local exit_code=$?
             echo "Cannot get a service account token. Exiting."
-            exit ${exit_code}
+            exit 1
           fi
 
           curl_headers=${access_token:+Authorization: Bearer "${access_token}"}
