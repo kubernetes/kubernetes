@@ -18,6 +18,7 @@ package resource
 
 import (
 	"strconv"
+  "unicode"
 )
 
 type suffix string
@@ -177,22 +178,38 @@ func (sh *suffixHandler) constructBytes(base, exponent int32, format Format) (s 
 	return nil, false
 }
 
-func (sh *suffixHandler) interpret(suffix suffix) (base, exponent int32, fmt Format, ok bool) {
+func (sh *suffixHandler) interpret(s suffix) (base, exponent int32, fmt Format, ok bool) {
 	// Try lookup tables first
-	if b, e, ok := sh.decSuffixes.lookup(suffix); ok {
+	if b, e, ok := sh.decSuffixes.lookup(s); ok {
 		return b, e, DecimalSI, true
 	}
-	if b, e, ok := sh.binSuffixes.lookup(suffix); ok {
+	if b, e, ok := sh.binSuffixes.lookup(s); ok {
 		return b, e, BinarySI, true
 	}
 
-	if len(suffix) > 1 && (suffix[0] == 'E' || suffix[0] == 'e') {
-		parsed, err := strconv.ParseInt(string(suffix[1:]), 10, 64)
+	if len(s) > 1 && (s[0] == 'E' || s[0] == 'e') {
+		parsed, err := strconv.ParseInt(string(s[1:]), 10, 64)
 		if err != nil {
 			return 0, 0, DecimalExponent, false
 		}
 		return 10, int32(parsed), DecimalExponent, true
 	}
 
+  // Check if changing case solves it.
+  // This is only meant to handle an accidental incorrect case for the first letter only.
+  var altered_suffix suffix
+  rune_suffix := []rune(s)
+  if unicode.IsLower(rune_suffix[0]) {
+    rune_suffix[0] = unicode.ToUpper(rune_suffix[0])
+    altered_suffix = suffix(rune_suffix)
+  } else if unicode.IsUpper(rune_suffix[0]) {
+    rune_suffix[0] = unicode.ToLower(rune_suffix[0])
+    altered_suffix = suffix(rune_suffix)
+  }
+  if _, _, ok := sh.binSuffixes.lookup(altered_suffix); ok {
+    return sh.interpret(altered_suffix)
+  } else if _, _, ok := sh.decSuffixes.lookup(altered_suffix); ok {
+    return sh.interpret(altered_suffix)
+  }
 	return 0, 0, DecimalExponent, false
 }
