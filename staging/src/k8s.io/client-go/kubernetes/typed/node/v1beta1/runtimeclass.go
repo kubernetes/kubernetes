@@ -69,6 +69,7 @@ func newRuntimeClasses(c *NodeV1beta1Client) *runtimeClasses {
 func (c *runtimeClasses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.RuntimeClass, err error) {
 	result = &v1beta1.RuntimeClass{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +86,7 @@ func (c *runtimeClasses) List(ctx context.Context, opts v1.ListOptions) (result 
 	}
 	result = &v1beta1.RuntimeClassList{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +103,7 @@ func (c *runtimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +114,7 @@ func (c *runtimeClasses) Watch(ctx context.Context, opts v1.ListOptions) (watch.
 func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1beta1.RuntimeClass, opts v1.CreateOptions) (result *v1beta1.RuntimeClass, err error) {
 	result = &v1beta1.RuntimeClass{}
 	err = c.client.Post().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(runtimeClass).
@@ -123,6 +127,7 @@ func (c *runtimeClasses) Create(ctx context.Context, runtimeClass *v1beta1.Runti
 func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1beta1.RuntimeClass, opts v1.UpdateOptions) (result *v1beta1.RuntimeClass, err error) {
 	result = &v1beta1.RuntimeClass{}
 	err = c.client.Put().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		Name(runtimeClass.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +140,7 @@ func (c *runtimeClasses) Update(ctx context.Context, runtimeClass *v1beta1.Runti
 // Delete takes name of the runtimeClass and deletes it. Returns an error if one occurs.
 func (c *runtimeClasses) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		Name(name).
 		Body(&opts).
@@ -149,6 +155,7 @@ func (c *runtimeClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +168,7 @@ func (c *runtimeClasses) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 func (c *runtimeClasses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.RuntimeClass, err error) {
 	result = &v1beta1.RuntimeClass{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +195,7 @@ func (c *runtimeClasses) Apply(ctx context.Context, runtimeClass *nodev1beta1.Ru
 	}
 	result = &v1beta1.RuntimeClass{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("runtimeclasses").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

@@ -80,6 +80,7 @@ func (c *deployments) Get(ctx context.Context, name string, options metav1.GetOp
 	result = &v1.Deployment{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -97,6 +98,7 @@ func (c *deployments) List(ctx context.Context, opts metav1.ListOptions) (result
 	result = &v1.DeploymentList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -114,6 +116,7 @@ func (c *deployments) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -125,6 +128,7 @@ func (c *deployments) Create(ctx context.Context, deployment *v1.Deployment, opt
 	result = &v1.Deployment{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(deployment).
@@ -138,6 +142,7 @@ func (c *deployments) Update(ctx context.Context, deployment *v1.Deployment, opt
 	result = &v1.Deployment{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deployment.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -153,6 +158,7 @@ func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1.Deploymen
 	result = &v1.Deployment{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deployment.Name).
 		SubResource("status").
@@ -167,6 +173,7 @@ func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1.Deploymen
 func (c *deployments) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(name).
 		Body(&opts).
@@ -182,6 +189,7 @@ func (c *deployments) DeleteCollection(ctx context.Context, opts metav1.DeleteOp
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -195,6 +203,7 @@ func (c *deployments) Patch(ctx context.Context, name string, pt types.PatchType
 	result = &v1.Deployment{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(name).
 		SubResource(subresources...).
@@ -222,6 +231,7 @@ func (c *deployments) Apply(ctx context.Context, deployment *appsv1.DeploymentAp
 	result = &v1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -251,6 +261,7 @@ func (c *deployments) ApplyStatus(ctx context.Context, deployment *appsv1.Deploy
 	result = &v1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(*name).
 		SubResource("status").
@@ -266,6 +277,7 @@ func (c *deployments) GetScale(ctx context.Context, deploymentName string, optio
 	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
@@ -280,6 +292,7 @@ func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, sc
 	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
@@ -305,6 +318,7 @@ func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, sca
 	result = &autoscalingv1.Scale{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").

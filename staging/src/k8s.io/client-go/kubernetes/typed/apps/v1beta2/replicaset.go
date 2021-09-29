@@ -74,6 +74,7 @@ func (c *replicaSets) Get(ctx context.Context, name string, options v1.GetOption
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *replicaSets) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	result = &v1beta2.ReplicaSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *replicaSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *replicaSets) Create(ctx context.Context, replicaSet *v1beta2.ReplicaSet
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(replicaSet).
@@ -132,6 +136,7 @@ func (c *replicaSets) Update(ctx context.Context, replicaSet *v1beta2.ReplicaSet
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		Name(replicaSet.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta2.Repl
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		Name(replicaSet.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *replicaSets) UpdateStatus(ctx context.Context, replicaSet *v1beta2.Repl
 func (c *replicaSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *replicaSets) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *replicaSets) Patch(ctx context.Context, name string, pt types.PatchType
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *replicaSets) Apply(ctx context.Context, replicaSet *appsv1beta2.Replica
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *replicaSets) ApplyStatus(ctx context.Context, replicaSet *appsv1beta2.R
 	result = &v1beta2.ReplicaSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("replicasets").
 		Name(*name).
 		SubResource("status").

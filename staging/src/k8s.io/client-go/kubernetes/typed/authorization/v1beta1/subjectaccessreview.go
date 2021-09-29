@@ -55,6 +55,7 @@ func newSubjectAccessReviews(c *AuthorizationV1beta1Client) *subjectAccessReview
 func (c *subjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1beta1.SubjectAccessReview, opts v1.CreateOptions) (result *v1beta1.SubjectAccessReview, err error) {
 	result = &v1beta1.SubjectAccessReview{}
 	err = c.client.Post().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("subjectaccessreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(subjectAccessReview).

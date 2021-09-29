@@ -69,6 +69,7 @@ func newComponentStatuses(c *CoreV1Client) *componentStatuses {
 func (c *componentStatuses) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.ComponentStatus, err error) {
 	result = &v1.ComponentStatus{}
 	err = c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +86,7 @@ func (c *componentStatuses) List(ctx context.Context, opts metav1.ListOptions) (
 	}
 	result = &v1.ComponentStatusList{}
 	err = c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +103,7 @@ func (c *componentStatuses) Watch(ctx context.Context, opts metav1.ListOptions) 
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +114,7 @@ func (c *componentStatuses) Watch(ctx context.Context, opts metav1.ListOptions) 
 func (c *componentStatuses) Create(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.CreateOptions) (result *v1.ComponentStatus, err error) {
 	result = &v1.ComponentStatus{}
 	err = c.client.Post().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(componentStatus).
@@ -123,6 +127,7 @@ func (c *componentStatuses) Create(ctx context.Context, componentStatus *v1.Comp
 func (c *componentStatuses) Update(ctx context.Context, componentStatus *v1.ComponentStatus, opts metav1.UpdateOptions) (result *v1.ComponentStatus, err error) {
 	result = &v1.ComponentStatus{}
 	err = c.client.Put().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		Name(componentStatus.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +140,7 @@ func (c *componentStatuses) Update(ctx context.Context, componentStatus *v1.Comp
 // Delete takes name of the componentStatus and deletes it. Returns an error if one occurs.
 func (c *componentStatuses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		Name(name).
 		Body(&opts).
@@ -149,6 +155,7 @@ func (c *componentStatuses) DeleteCollection(ctx context.Context, opts metav1.De
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +168,7 @@ func (c *componentStatuses) DeleteCollection(ctx context.Context, opts metav1.De
 func (c *componentStatuses) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.ComponentStatus, err error) {
 	result = &v1.ComponentStatus{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +195,7 @@ func (c *componentStatuses) Apply(ctx context.Context, componentStatus *corev1.C
 	}
 	result = &v1.ComponentStatus{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("componentstatuses").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

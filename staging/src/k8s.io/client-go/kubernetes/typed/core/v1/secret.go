@@ -72,6 +72,7 @@ func (c *secrets) Get(ctx context.Context, name string, options metav1.GetOption
 	result = &v1.Secret{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *secrets) List(ctx context.Context, opts metav1.ListOptions) (result *v1
 	result = &v1.SecretList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *secrets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Int
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *secrets) Create(ctx context.Context, secret *v1.Secret, opts metav1.Cre
 	result = &v1.Secret{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(secret).
@@ -130,6 +134,7 @@ func (c *secrets) Update(ctx context.Context, secret *v1.Secret, opts metav1.Upd
 	result = &v1.Secret{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		Name(secret.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *secrets) Update(ctx context.Context, secret *v1.Secret, opts metav1.Upd
 func (c *secrets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *secrets) DeleteCollection(ctx context.Context, opts metav1.DeleteOption
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *secrets) Patch(ctx context.Context, name string, pt types.PatchType, da
 	result = &v1.Secret{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *secrets) Apply(ctx context.Context, secret *corev1.SecretApplyConfigura
 	result = &v1.Secret{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("secrets").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

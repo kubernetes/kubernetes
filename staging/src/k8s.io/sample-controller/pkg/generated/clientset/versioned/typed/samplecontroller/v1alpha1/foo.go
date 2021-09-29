@@ -69,6 +69,7 @@ func (c *foos) Get(ctx context.Context, name string, options v1.GetOptions) (res
 	result = &v1alpha1.Foo{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -86,6 +87,7 @@ func (c *foos) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.
 	result = &v1alpha1.FooList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,6 +105,7 @@ func (c *foos) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface,
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -114,6 +117,7 @@ func (c *foos) Create(ctx context.Context, foo *v1alpha1.Foo, opts v1.CreateOpti
 	result = &v1alpha1.Foo{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(foo).
@@ -127,6 +131,7 @@ func (c *foos) Update(ctx context.Context, foo *v1alpha1.Foo, opts v1.UpdateOpti
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		Name(foo.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -142,6 +147,7 @@ func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.Upda
 	result = &v1alpha1.Foo{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		Name(foo.Name).
 		SubResource("status").
@@ -156,6 +162,7 @@ func (c *foos) UpdateStatus(ctx context.Context, foo *v1alpha1.Foo, opts v1.Upda
 func (c *foos) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		Name(name).
 		Body(&opts).
@@ -171,6 +178,7 @@ func (c *foos) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, list
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -184,6 +192,7 @@ func (c *foos) Patch(ctx context.Context, name string, pt types.PatchType, data 
 	result = &v1alpha1.Foo{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("foos").
 		Name(name).
 		SubResource(subresources...).

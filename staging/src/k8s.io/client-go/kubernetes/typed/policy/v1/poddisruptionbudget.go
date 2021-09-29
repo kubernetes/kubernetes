@@ -74,6 +74,7 @@ func (c *podDisruptionBudgets) Get(ctx context.Context, name string, options met
 	result = &v1.PodDisruptionBudget{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *podDisruptionBudgets) List(ctx context.Context, opts metav1.ListOptions
 	result = &v1.PodDisruptionBudgetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *podDisruptionBudgets) Watch(ctx context.Context, opts metav1.ListOption
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *podDisruptionBudgets) Create(ctx context.Context, podDisruptionBudget *
 	result = &v1.PodDisruptionBudget{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podDisruptionBudget).
@@ -132,6 +136,7 @@ func (c *podDisruptionBudgets) Update(ctx context.Context, podDisruptionBudget *
 	result = &v1.PodDisruptionBudget{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		Name(podDisruptionBudget.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *podDisruptionBudgets) UpdateStatus(ctx context.Context, podDisruptionBu
 	result = &v1.PodDisruptionBudget{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		Name(podDisruptionBudget.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *podDisruptionBudgets) UpdateStatus(ctx context.Context, podDisruptionBu
 func (c *podDisruptionBudgets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *podDisruptionBudgets) DeleteCollection(ctx context.Context, opts metav1
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *podDisruptionBudgets) Patch(ctx context.Context, name string, pt types.
 	result = &v1.PodDisruptionBudget{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *podDisruptionBudgets) Apply(ctx context.Context, podDisruptionBudget *p
 	result = &v1.PodDisruptionBudget{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *podDisruptionBudgets) ApplyStatus(ctx context.Context, podDisruptionBud
 	result = &v1.PodDisruptionBudget{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("poddisruptionbudgets").
 		Name(*name).
 		SubResource("status").

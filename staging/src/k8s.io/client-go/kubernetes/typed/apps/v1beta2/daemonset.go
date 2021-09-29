@@ -74,6 +74,7 @@ func (c *daemonSets) Get(ctx context.Context, name string, options v1.GetOptions
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *daemonSets) List(ctx context.Context, opts v1.ListOptions) (result *v1b
 	result = &v1beta2.DaemonSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *daemonSets) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *daemonSets) Create(ctx context.Context, daemonSet *v1beta2.DaemonSet, o
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(daemonSet).
@@ -132,6 +136,7 @@ func (c *daemonSets) Update(ctx context.Context, daemonSet *v1beta2.DaemonSet, o
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		Name(daemonSet.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *daemonSets) UpdateStatus(ctx context.Context, daemonSet *v1beta2.Daemon
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		Name(daemonSet.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *daemonSets) UpdateStatus(ctx context.Context, daemonSet *v1beta2.Daemon
 func (c *daemonSets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *daemonSets) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *daemonSets) Patch(ctx context.Context, name string, pt types.PatchType,
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *daemonSets) Apply(ctx context.Context, daemonSet *appsv1beta2.DaemonSet
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *daemonSets) ApplyStatus(ctx context.Context, daemonSet *appsv1beta2.Dae
 	result = &v1beta2.DaemonSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("daemonsets").
 		Name(*name).
 		SubResource("status").

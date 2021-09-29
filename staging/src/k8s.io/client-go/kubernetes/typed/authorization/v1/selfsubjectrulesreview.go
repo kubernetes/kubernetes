@@ -55,6 +55,7 @@ func newSelfSubjectRulesReviews(c *AuthorizationV1Client) *selfSubjectRulesRevie
 func (c *selfSubjectRulesReviews) Create(ctx context.Context, selfSubjectRulesReview *v1.SelfSubjectRulesReview, opts metav1.CreateOptions) (result *v1.SelfSubjectRulesReview, err error) {
 	result = &v1.SelfSubjectRulesReview{}
 	err = c.client.Post().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("selfsubjectrulesreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(selfSubjectRulesReview).

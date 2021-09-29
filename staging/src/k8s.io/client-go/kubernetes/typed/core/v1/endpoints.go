@@ -72,6 +72,7 @@ func (c *endpoints) Get(ctx context.Context, name string, options metav1.GetOpti
 	result = &v1.Endpoints{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *endpoints) List(ctx context.Context, opts metav1.ListOptions) (result *
 	result = &v1.EndpointsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *endpoints) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *endpoints) Create(ctx context.Context, endpoints *v1.Endpoints, opts me
 	result = &v1.Endpoints{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(endpoints).
@@ -130,6 +134,7 @@ func (c *endpoints) Update(ctx context.Context, endpoints *v1.Endpoints, opts me
 	result = &v1.Endpoints{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		Name(endpoints.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *endpoints) Update(ctx context.Context, endpoints *v1.Endpoints, opts me
 func (c *endpoints) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *endpoints) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *endpoints) Patch(ctx context.Context, name string, pt types.PatchType, 
 	result = &v1.Endpoints{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *endpoints) Apply(ctx context.Context, endpoints *corev1.EndpointsApplyC
 	result = &v1.Endpoints{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpoints").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

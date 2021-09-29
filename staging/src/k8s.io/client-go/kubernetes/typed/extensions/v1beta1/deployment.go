@@ -78,6 +78,7 @@ func (c *deployments) Get(ctx context.Context, name string, options v1.GetOption
 	result = &v1beta1.Deployment{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -95,6 +96,7 @@ func (c *deployments) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	result = &v1beta1.DeploymentList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -112,6 +114,7 @@ func (c *deployments) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -123,6 +126,7 @@ func (c *deployments) Create(ctx context.Context, deployment *v1beta1.Deployment
 	result = &v1beta1.Deployment{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(deployment).
@@ -136,6 +140,7 @@ func (c *deployments) Update(ctx context.Context, deployment *v1beta1.Deployment
 	result = &v1beta1.Deployment{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deployment.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -151,6 +156,7 @@ func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Depl
 	result = &v1beta1.Deployment{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deployment.Name).
 		SubResource("status").
@@ -165,6 +171,7 @@ func (c *deployments) UpdateStatus(ctx context.Context, deployment *v1beta1.Depl
 func (c *deployments) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(name).
 		Body(&opts).
@@ -180,6 +187,7 @@ func (c *deployments) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -193,6 +201,7 @@ func (c *deployments) Patch(ctx context.Context, name string, pt types.PatchType
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(name).
 		SubResource(subresources...).
@@ -220,6 +229,7 @@ func (c *deployments) Apply(ctx context.Context, deployment *extensionsv1beta1.D
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -249,6 +259,7 @@ func (c *deployments) ApplyStatus(ctx context.Context, deployment *extensionsv1b
 	result = &v1beta1.Deployment{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(*name).
 		SubResource("status").
@@ -264,6 +275,7 @@ func (c *deployments) GetScale(ctx context.Context, deploymentName string, optio
 	result = &v1beta1.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
@@ -278,6 +290,7 @@ func (c *deployments) UpdateScale(ctx context.Context, deploymentName string, sc
 	result = &v1beta1.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").
@@ -303,6 +316,7 @@ func (c *deployments) ApplyScale(ctx context.Context, deploymentName string, sca
 	result = &v1beta1.Scale{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("deployments").
 		Name(deploymentName).
 		SubResource("scale").

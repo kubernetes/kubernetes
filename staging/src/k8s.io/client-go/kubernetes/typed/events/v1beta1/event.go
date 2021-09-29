@@ -72,6 +72,7 @@ func (c *events) Get(ctx context.Context, name string, options v1.GetOptions) (r
 	result = &v1beta1.Event{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *events) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1
 	result = &v1beta1.EventList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *events) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interfac
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *events) Create(ctx context.Context, event *v1beta1.Event, opts v1.Creat
 	result = &v1beta1.Event{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(event).
@@ -130,6 +134,7 @@ func (c *events) Update(ctx context.Context, event *v1beta1.Event, opts v1.Updat
 	result = &v1beta1.Event{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		Name(event.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *events) Update(ctx context.Context, event *v1beta1.Event, opts v1.Updat
 func (c *events) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *events) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, li
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, dat
 	result = &v1beta1.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *events) Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfi
 	result = &v1beta1.Event{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("events").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

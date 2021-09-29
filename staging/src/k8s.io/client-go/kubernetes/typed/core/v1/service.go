@@ -73,6 +73,7 @@ func (c *services) Get(ctx context.Context, name string, options metav1.GetOptio
 	result = &v1.Service{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -90,6 +91,7 @@ func (c *services) List(ctx context.Context, opts metav1.ListOptions) (result *v
 	result = &v1.ServiceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -107,6 +109,7 @@ func (c *services) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -118,6 +121,7 @@ func (c *services) Create(ctx context.Context, service *v1.Service, opts metav1.
 	result = &v1.Service{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(service).
@@ -131,6 +135,7 @@ func (c *services) Update(ctx context.Context, service *v1.Service, opts metav1.
 	result = &v1.Service{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		Name(service.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -146,6 +151,7 @@ func (c *services) UpdateStatus(ctx context.Context, service *v1.Service, opts m
 	result = &v1.Service{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		Name(service.Name).
 		SubResource("status").
@@ -160,6 +166,7 @@ func (c *services) UpdateStatus(ctx context.Context, service *v1.Service, opts m
 func (c *services) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		Name(name).
 		Body(&opts).
@@ -172,6 +179,7 @@ func (c *services) Patch(ctx context.Context, name string, pt types.PatchType, d
 	result = &v1.Service{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		Name(name).
 		SubResource(subresources...).
@@ -199,6 +207,7 @@ func (c *services) Apply(ctx context.Context, service *corev1.ServiceApplyConfig
 	result = &v1.Service{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -228,6 +237,7 @@ func (c *services) ApplyStatus(ctx context.Context, service *corev1.ServiceApply
 	result = &v1.Service{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("services").
 		Name(*name).
 		SubResource("status").

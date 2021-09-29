@@ -74,6 +74,7 @@ func (c *persistentVolumeClaims) Get(ctx context.Context, name string, options m
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *persistentVolumeClaims) List(ctx context.Context, opts metav1.ListOptio
 	result = &v1.PersistentVolumeClaimList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *persistentVolumeClaims) Watch(ctx context.Context, opts metav1.ListOpti
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *persistentVolumeClaims) Create(ctx context.Context, persistentVolumeCla
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(persistentVolumeClaim).
@@ -132,6 +136,7 @@ func (c *persistentVolumeClaims) Update(ctx context.Context, persistentVolumeCla
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *persistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVol
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		Name(persistentVolumeClaim.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *persistentVolumeClaims) UpdateStatus(ctx context.Context, persistentVol
 func (c *persistentVolumeClaims) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *persistentVolumeClaims) DeleteCollection(ctx context.Context, opts meta
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *persistentVolumeClaims) Patch(ctx context.Context, name string, pt type
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *persistentVolumeClaims) Apply(ctx context.Context, persistentVolumeClai
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *persistentVolumeClaims) ApplyStatus(ctx context.Context, persistentVolu
 	result = &v1.PersistentVolumeClaim{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("persistentvolumeclaims").
 		Name(*name).
 		SubResource("status").

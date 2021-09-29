@@ -71,6 +71,7 @@ func newPriorityLevelConfigurations(c *FlowcontrolV1alpha1Client) *priorityLevel
 func (c *priorityLevelConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Get().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -87,6 +88,7 @@ func (c *priorityLevelConfigurations) List(ctx context.Context, opts v1.ListOpti
 	}
 	result = &v1alpha1.PriorityLevelConfigurationList{}
 	err = c.client.Get().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,6 +105,7 @@ func (c *priorityLevelConfigurations) Watch(ctx context.Context, opts v1.ListOpt
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,6 +116,7 @@ func (c *priorityLevelConfigurations) Watch(ctx context.Context, opts v1.ListOpt
 func (c *priorityLevelConfigurations) Create(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.CreateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Post().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(priorityLevelConfiguration).
@@ -125,6 +129,7 @@ func (c *priorityLevelConfigurations) Create(ctx context.Context, priorityLevelC
 func (c *priorityLevelConfigurations) Update(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Put().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		Name(priorityLevelConfiguration.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -139,6 +144,7 @@ func (c *priorityLevelConfigurations) Update(ctx context.Context, priorityLevelC
 func (c *priorityLevelConfigurations) UpdateStatus(ctx context.Context, priorityLevelConfiguration *v1alpha1.PriorityLevelConfiguration, opts v1.UpdateOptions) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Put().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		Name(priorityLevelConfiguration.Name).
 		SubResource("status").
@@ -152,6 +158,7 @@ func (c *priorityLevelConfigurations) UpdateStatus(ctx context.Context, priority
 // Delete takes name of the priorityLevelConfiguration and deletes it. Returns an error if one occurs.
 func (c *priorityLevelConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		Name(name).
 		Body(&opts).
@@ -166,6 +173,7 @@ func (c *priorityLevelConfigurations) DeleteCollection(ctx context.Context, opts
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -178,6 +186,7 @@ func (c *priorityLevelConfigurations) DeleteCollection(ctx context.Context, opts
 func (c *priorityLevelConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.PriorityLevelConfiguration, err error) {
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		Name(name).
 		SubResource(subresources...).
@@ -204,6 +213,7 @@ func (c *priorityLevelConfigurations) Apply(ctx context.Context, priorityLevelCo
 	}
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -232,6 +242,7 @@ func (c *priorityLevelConfigurations) ApplyStatus(ctx context.Context, priorityL
 
 	result = &v1alpha1.PriorityLevelConfiguration{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("prioritylevelconfigurations").
 		Name(*name).
 		SubResource("status").

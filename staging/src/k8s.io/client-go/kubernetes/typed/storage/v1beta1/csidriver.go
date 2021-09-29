@@ -69,6 +69,7 @@ func newCSIDrivers(c *StorageV1beta1Client) *cSIDrivers {
 func (c *cSIDrivers) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +86,7 @@ func (c *cSIDrivers) List(ctx context.Context, opts v1.ListOptions) (result *v1b
 	}
 	result = &v1beta1.CSIDriverList{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +103,7 @@ func (c *cSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +114,7 @@ func (c *cSIDrivers) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inte
 func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.CreateOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Post().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cSIDriver).
@@ -123,6 +127,7 @@ func (c *cSIDrivers) Create(ctx context.Context, cSIDriver *v1beta1.CSIDriver, o
 func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, opts v1.UpdateOptions) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Put().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		Name(cSIDriver.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +140,7 @@ func (c *cSIDrivers) Update(ctx context.Context, cSIDriver *v1beta1.CSIDriver, o
 // Delete takes name of the cSIDriver and deletes it. Returns an error if one occurs.
 func (c *cSIDrivers) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		Name(name).
 		Body(&opts).
@@ -149,6 +155,7 @@ func (c *cSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +168,7 @@ func (c *cSIDrivers) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 func (c *cSIDrivers) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSIDriver, err error) {
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +195,7 @@ func (c *cSIDrivers) Apply(ctx context.Context, cSIDriver *storagev1beta1.CSIDri
 	}
 	result = &v1beta1.CSIDriver{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csidrivers").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

@@ -72,6 +72,7 @@ func (c *cSIStorageCapacities) Get(ctx context.Context, name string, options v1.
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *cSIStorageCapacities) List(ctx context.Context, opts v1.ListOptions) (r
 	result = &v1alpha1.CSIStorageCapacityList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *cSIStorageCapacities) Watch(ctx context.Context, opts v1.ListOptions) (
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *cSIStorageCapacities) Create(ctx context.Context, cSIStorageCapacity *v
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cSIStorageCapacity).
@@ -130,6 +134,7 @@ func (c *cSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *v
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		Name(cSIStorageCapacity.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *cSIStorageCapacities) Update(ctx context.Context, cSIStorageCapacity *v
 func (c *cSIStorageCapacities) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *cSIStorageCapacities) DeleteCollection(ctx context.Context, opts v1.Del
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *cSIStorageCapacities) Patch(ctx context.Context, name string, pt types.
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *cSIStorageCapacities) Apply(ctx context.Context, cSIStorageCapacity *st
 	result = &v1alpha1.CSIStorageCapacity{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("csistoragecapacities").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

@@ -74,6 +74,7 @@ func (c *ingresses) Get(ctx context.Context, name string, options metav1.GetOpti
 	result = &v1.Ingress{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *ingresses) List(ctx context.Context, opts metav1.ListOptions) (result *
 	result = &v1.IngressList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *ingresses) Watch(ctx context.Context, opts metav1.ListOptions) (watch.I
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *ingresses) Create(ctx context.Context, ingress *v1.Ingress, opts metav1
 	result = &v1.Ingress{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(ingress).
@@ -132,6 +136,7 @@ func (c *ingresses) Update(ctx context.Context, ingress *v1.Ingress, opts metav1
 	result = &v1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		Name(ingress.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1.Ingress, opts 
 	result = &v1.Ingress{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		Name(ingress.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *ingresses) UpdateStatus(ctx context.Context, ingress *v1.Ingress, opts 
 func (c *ingresses) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *ingresses) DeleteCollection(ctx context.Context, opts metav1.DeleteOpti
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *ingresses) Patch(ctx context.Context, name string, pt types.PatchType, 
 	result = &v1.Ingress{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *ingresses) Apply(ctx context.Context, ingress *networkingv1.IngressAppl
 	result = &v1.Ingress{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *ingresses) ApplyStatus(ctx context.Context, ingress *networkingv1.Ingre
 	result = &v1.Ingress{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("ingresses").
 		Name(*name).
 		SubResource("status").

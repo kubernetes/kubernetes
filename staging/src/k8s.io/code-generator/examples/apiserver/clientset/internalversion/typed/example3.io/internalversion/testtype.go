@@ -69,6 +69,7 @@ func (c *testTypes) Get(ctx context.Context, name string, options v1.GetOptions)
 	result = &example3io.TestType{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -86,6 +87,7 @@ func (c *testTypes) List(ctx context.Context, opts v1.ListOptions) (result *exam
 	result = &example3io.TestTypeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,6 +105,7 @@ func (c *testTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -114,6 +117,7 @@ func (c *testTypes) Create(ctx context.Context, testType *example3io.TestType, o
 	result = &example3io.TestType{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
@@ -127,6 +131,7 @@ func (c *testTypes) Update(ctx context.Context, testType *example3io.TestType, o
 	result = &example3io.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(testType.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -142,6 +147,7 @@ func (c *testTypes) UpdateStatus(ctx context.Context, testType *example3io.TestT
 	result = &example3io.TestType{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(testType.Name).
 		SubResource("status").
@@ -156,6 +162,7 @@ func (c *testTypes) UpdateStatus(ctx context.Context, testType *example3io.TestT
 func (c *testTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(name).
 		Body(&opts).
@@ -171,6 +178,7 @@ func (c *testTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -184,6 +192,7 @@ func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, 
 	result = &example3io.TestType{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(example3io.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(name).
 		SubResource(subresources...).

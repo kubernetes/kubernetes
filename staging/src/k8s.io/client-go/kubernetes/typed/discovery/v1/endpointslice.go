@@ -72,6 +72,7 @@ func (c *endpointSlices) Get(ctx context.Context, name string, options metav1.Ge
 	result = &v1.EndpointSlice{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *endpointSlices) List(ctx context.Context, opts metav1.ListOptions) (res
 	result = &v1.EndpointSliceList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *endpointSlices) Watch(ctx context.Context, opts metav1.ListOptions) (wa
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *endpointSlices) Create(ctx context.Context, endpointSlice *v1.EndpointS
 	result = &v1.EndpointSlice{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(endpointSlice).
@@ -130,6 +134,7 @@ func (c *endpointSlices) Update(ctx context.Context, endpointSlice *v1.EndpointS
 	result = &v1.EndpointSlice{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		Name(endpointSlice.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *endpointSlices) Update(ctx context.Context, endpointSlice *v1.EndpointS
 func (c *endpointSlices) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *endpointSlices) DeleteCollection(ctx context.Context, opts metav1.Delet
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *endpointSlices) Patch(ctx context.Context, name string, pt types.PatchT
 	result = &v1.EndpointSlice{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *endpointSlices) Apply(ctx context.Context, endpointSlice *discoveryv1.E
 	result = &v1.EndpointSlice{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("endpointslices").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

@@ -72,6 +72,7 @@ func (c *configMaps) Get(ctx context.Context, name string, options metav1.GetOpt
 	result = &v1.ConfigMap{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *configMaps) List(ctx context.Context, opts metav1.ListOptions) (result 
 	result = &v1.ConfigMapList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *configMaps) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *configMaps) Create(ctx context.Context, configMap *v1.ConfigMap, opts m
 	result = &v1.ConfigMap{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(configMap).
@@ -130,6 +134,7 @@ func (c *configMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts m
 	result = &v1.ConfigMap{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		Name(configMap.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *configMaps) Update(ctx context.Context, configMap *v1.ConfigMap, opts m
 func (c *configMaps) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *configMaps) DeleteCollection(ctx context.Context, opts metav1.DeleteOpt
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *configMaps) Patch(ctx context.Context, name string, pt types.PatchType,
 	result = &v1.ConfigMap{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *configMaps) Apply(ctx context.Context, configMap *corev1.ConfigMapApply
 	result = &v1.ConfigMap{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("configmaps").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

@@ -55,6 +55,7 @@ func newTokenReviews(c *AuthenticationV1Client) *tokenReviews {
 func (c *tokenReviews) Create(ctx context.Context, tokenReview *v1.TokenReview, opts metav1.CreateOptions) (result *v1.TokenReview, err error) {
 	result = &v1.TokenReview{}
 	err = c.client.Post().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("tokenreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(tokenReview).

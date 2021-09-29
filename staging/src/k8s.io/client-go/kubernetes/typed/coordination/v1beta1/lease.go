@@ -72,6 +72,7 @@ func (c *leases) Get(ctx context.Context, name string, options v1.GetOptions) (r
 	result = &v1beta1.Lease{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *leases) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1
 	result = &v1beta1.LeaseList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *leases) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interfac
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *leases) Create(ctx context.Context, lease *v1beta1.Lease, opts v1.Creat
 	result = &v1beta1.Lease{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(lease).
@@ -130,6 +134,7 @@ func (c *leases) Update(ctx context.Context, lease *v1beta1.Lease, opts v1.Updat
 	result = &v1beta1.Lease{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		Name(lease.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *leases) Update(ctx context.Context, lease *v1beta1.Lease, opts v1.Updat
 func (c *leases) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *leases) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, li
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *leases) Patch(ctx context.Context, name string, pt types.PatchType, dat
 	result = &v1beta1.Lease{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *leases) Apply(ctx context.Context, lease *coordinationv1beta1.LeaseAppl
 	result = &v1beta1.Lease{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("leases").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

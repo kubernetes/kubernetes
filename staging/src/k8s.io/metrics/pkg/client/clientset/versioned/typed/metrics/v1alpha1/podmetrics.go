@@ -62,6 +62,7 @@ func (c *podMetricses) Get(ctx context.Context, name string, options v1.GetOptio
 	result = &v1alpha1.PodMetrics{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("pods").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -79,6 +80,7 @@ func (c *podMetricses) List(ctx context.Context, opts v1.ListOptions) (result *v
 	result = &v1alpha1.PodMetricsList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -96,6 +98,7 @@ func (c *podMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("pods").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

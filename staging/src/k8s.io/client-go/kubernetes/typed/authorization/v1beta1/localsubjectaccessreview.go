@@ -58,6 +58,7 @@ func (c *localSubjectAccessReviews) Create(ctx context.Context, localSubjectAcce
 	result = &v1beta1.LocalSubjectAccessReview{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("localsubjectaccessreviews").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(localSubjectAccessReview).

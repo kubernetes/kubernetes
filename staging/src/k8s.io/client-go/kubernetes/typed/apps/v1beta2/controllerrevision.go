@@ -72,6 +72,7 @@ func (c *controllerRevisions) Get(ctx context.Context, name string, options v1.G
 	result = &v1beta2.ControllerRevision{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *controllerRevisions) List(ctx context.Context, opts v1.ListOptions) (re
 	result = &v1beta2.ControllerRevisionList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *controllerRevisions) Watch(ctx context.Context, opts v1.ListOptions) (w
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *controllerRevisions) Create(ctx context.Context, controllerRevision *v1
 	result = &v1beta2.ControllerRevision{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(controllerRevision).
@@ -130,6 +134,7 @@ func (c *controllerRevisions) Update(ctx context.Context, controllerRevision *v1
 	result = &v1beta2.ControllerRevision{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		Name(controllerRevision.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *controllerRevisions) Update(ctx context.Context, controllerRevision *v1
 func (c *controllerRevisions) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *controllerRevisions) DeleteCollection(ctx context.Context, opts v1.Dele
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *controllerRevisions) Patch(ctx context.Context, name string, pt types.P
 	result = &v1beta2.ControllerRevision{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *controllerRevisions) Apply(ctx context.Context, controllerRevision *app
 	result = &v1beta2.ControllerRevision{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("controllerrevisions").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

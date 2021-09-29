@@ -59,6 +59,7 @@ func newNodeMetricses(c *MetricsV1alpha1Client) *nodeMetricses {
 func (c *nodeMetricses) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NodeMetrics, err error) {
 	result = &v1alpha1.NodeMetrics{}
 	err = c.client.Get().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -75,6 +76,7 @@ func (c *nodeMetricses) List(ctx context.Context, opts v1.ListOptions) (result *
 	}
 	result = &v1alpha1.NodeMetricsList{}
 	err = c.client.Get().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -91,6 +93,7 @@ func (c *nodeMetricses) Watch(ctx context.Context, opts v1.ListOptions) (watch.I
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).

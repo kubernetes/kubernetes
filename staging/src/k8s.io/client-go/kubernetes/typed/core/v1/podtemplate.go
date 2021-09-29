@@ -72,6 +72,7 @@ func (c *podTemplates) Get(ctx context.Context, name string, options metav1.GetO
 	result = &v1.PodTemplate{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *podTemplates) List(ctx context.Context, opts metav1.ListOptions) (resul
 	result = &v1.PodTemplateList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *podTemplates) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *podTemplates) Create(ctx context.Context, podTemplate *v1.PodTemplate, 
 	result = &v1.PodTemplate{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(podTemplate).
@@ -130,6 +134,7 @@ func (c *podTemplates) Update(ctx context.Context, podTemplate *v1.PodTemplate, 
 	result = &v1.PodTemplate{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		Name(podTemplate.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *podTemplates) Update(ctx context.Context, podTemplate *v1.PodTemplate, 
 func (c *podTemplates) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *podTemplates) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *podTemplates) Patch(ctx context.Context, name string, pt types.PatchTyp
 	result = &v1.PodTemplate{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *podTemplates) Apply(ctx context.Context, podTemplate *corev1.PodTemplat
 	result = &v1.PodTemplate{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("podtemplates").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

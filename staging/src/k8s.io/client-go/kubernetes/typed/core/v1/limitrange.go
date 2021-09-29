@@ -72,6 +72,7 @@ func (c *limitRanges) Get(ctx context.Context, name string, options metav1.GetOp
 	result = &v1.LimitRange{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *limitRanges) List(ctx context.Context, opts metav1.ListOptions) (result
 	result = &v1.LimitRangeList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *limitRanges) Watch(ctx context.Context, opts metav1.ListOptions) (watch
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *limitRanges) Create(ctx context.Context, limitRange *v1.LimitRange, opt
 	result = &v1.LimitRange{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(limitRange).
@@ -130,6 +134,7 @@ func (c *limitRanges) Update(ctx context.Context, limitRange *v1.LimitRange, opt
 	result = &v1.LimitRange{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		Name(limitRange.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *limitRanges) Update(ctx context.Context, limitRange *v1.LimitRange, opt
 func (c *limitRanges) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *limitRanges) DeleteCollection(ctx context.Context, opts metav1.DeleteOp
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *limitRanges) Patch(ctx context.Context, name string, pt types.PatchType
 	result = &v1.LimitRange{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *limitRanges) Apply(ctx context.Context, limitRange *corev1.LimitRangeAp
 	result = &v1.LimitRange{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("limitranges").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

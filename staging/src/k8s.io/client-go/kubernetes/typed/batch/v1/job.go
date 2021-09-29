@@ -74,6 +74,7 @@ func (c *jobs) Get(ctx context.Context, name string, options metav1.GetOptions) 
 	result = &v1.Job{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *jobs) List(ctx context.Context, opts metav1.ListOptions) (result *v1.Jo
 	result = &v1.JobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *jobs) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interf
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *jobs) Create(ctx context.Context, job *v1.Job, opts metav1.CreateOption
 	result = &v1.Job{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(job).
@@ -132,6 +136,7 @@ func (c *jobs) Update(ctx context.Context, job *v1.Job, opts metav1.UpdateOption
 	result = &v1.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		Name(job.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *jobs) UpdateStatus(ctx context.Context, job *v1.Job, opts metav1.Update
 	result = &v1.Job{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		Name(job.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *jobs) UpdateStatus(ctx context.Context, job *v1.Job, opts metav1.Update
 func (c *jobs) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *jobs) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, 
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *jobs) Patch(ctx context.Context, name string, pt types.PatchType, data 
 	result = &v1.Job{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *jobs) Apply(ctx context.Context, job *batchv1.JobApplyConfiguration, op
 	result = &v1.Job{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *jobs) ApplyStatus(ctx context.Context, job *batchv1.JobApplyConfigurati
 	result = &v1.Job{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("jobs").
 		Name(*name).
 		SubResource("status").

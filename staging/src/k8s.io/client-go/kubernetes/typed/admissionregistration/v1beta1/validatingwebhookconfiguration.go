@@ -69,6 +69,7 @@ func newValidatingWebhookConfigurations(c *AdmissionregistrationV1beta1Client) *
 func (c *validatingWebhookConfigurations) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	result = &v1beta1.ValidatingWebhookConfiguration{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +86,7 @@ func (c *validatingWebhookConfigurations) List(ctx context.Context, opts v1.List
 	}
 	result = &v1beta1.ValidatingWebhookConfigurationList{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +103,7 @@ func (c *validatingWebhookConfigurations) Watch(ctx context.Context, opts v1.Lis
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +114,7 @@ func (c *validatingWebhookConfigurations) Watch(ctx context.Context, opts v1.Lis
 func (c *validatingWebhookConfigurations) Create(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.CreateOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	result = &v1beta1.ValidatingWebhookConfiguration{}
 	err = c.client.Post().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(validatingWebhookConfiguration).
@@ -123,6 +127,7 @@ func (c *validatingWebhookConfigurations) Create(ctx context.Context, validating
 func (c *validatingWebhookConfigurations) Update(ctx context.Context, validatingWebhookConfiguration *v1beta1.ValidatingWebhookConfiguration, opts v1.UpdateOptions) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	result = &v1beta1.ValidatingWebhookConfiguration{}
 	err = c.client.Put().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		Name(validatingWebhookConfiguration.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +140,7 @@ func (c *validatingWebhookConfigurations) Update(ctx context.Context, validating
 // Delete takes name of the validatingWebhookConfiguration and deletes it. Returns an error if one occurs.
 func (c *validatingWebhookConfigurations) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		Name(name).
 		Body(&opts).
@@ -149,6 +155,7 @@ func (c *validatingWebhookConfigurations) DeleteCollection(ctx context.Context, 
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +168,7 @@ func (c *validatingWebhookConfigurations) DeleteCollection(ctx context.Context, 
 func (c *validatingWebhookConfigurations) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.ValidatingWebhookConfiguration, err error) {
 	result = &v1beta1.ValidatingWebhookConfiguration{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +195,7 @@ func (c *validatingWebhookConfigurations) Apply(ctx context.Context, validatingW
 	}
 	result = &v1beta1.ValidatingWebhookConfiguration{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("validatingwebhookconfigurations").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

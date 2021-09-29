@@ -72,6 +72,7 @@ func (c *networkPolicies) Get(ctx context.Context, name string, options v1.GetOp
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *networkPolicies) List(ctx context.Context, opts v1.ListOptions) (result
 	result = &v1beta1.NetworkPolicyList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *networkPolicies) Watch(ctx context.Context, opts v1.ListOptions) (watch
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *networkPolicies) Create(ctx context.Context, networkPolicy *v1beta1.Net
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(networkPolicy).
@@ -130,6 +134,7 @@ func (c *networkPolicies) Update(ctx context.Context, networkPolicy *v1beta1.Net
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		Name(networkPolicy.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *networkPolicies) Update(ctx context.Context, networkPolicy *v1beta1.Net
 func (c *networkPolicies) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *networkPolicies) DeleteCollection(ctx context.Context, opts v1.DeleteOp
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *networkPolicies) Patch(ctx context.Context, name string, pt types.Patch
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *networkPolicies) Apply(ctx context.Context, networkPolicy *extensionsv1
 	result = &v1beta1.NetworkPolicy{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("networkpolicies").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

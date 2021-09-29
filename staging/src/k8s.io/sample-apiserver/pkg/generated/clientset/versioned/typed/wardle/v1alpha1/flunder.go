@@ -69,6 +69,7 @@ func (c *flunders) Get(ctx context.Context, name string, options v1.GetOptions) 
 	result = &v1alpha1.Flunder{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -86,6 +87,7 @@ func (c *flunders) List(ctx context.Context, opts v1.ListOptions) (result *v1alp
 	result = &v1alpha1.FlunderList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,6 +105,7 @@ func (c *flunders) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -114,6 +117,7 @@ func (c *flunders) Create(ctx context.Context, flunder *v1alpha1.Flunder, opts v
 	result = &v1alpha1.Flunder{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(flunder).
@@ -127,6 +131,7 @@ func (c *flunders) Update(ctx context.Context, flunder *v1alpha1.Flunder, opts v
 	result = &v1alpha1.Flunder{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		Name(flunder.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -142,6 +147,7 @@ func (c *flunders) UpdateStatus(ctx context.Context, flunder *v1alpha1.Flunder, 
 	result = &v1alpha1.Flunder{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		Name(flunder.Name).
 		SubResource("status").
@@ -156,6 +162,7 @@ func (c *flunders) UpdateStatus(ctx context.Context, flunder *v1alpha1.Flunder, 
 func (c *flunders) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		Name(name).
 		Body(&opts).
@@ -171,6 +178,7 @@ func (c *flunders) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, 
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -184,6 +192,7 @@ func (c *flunders) Patch(ctx context.Context, name string, pt types.PatchType, d
 	result = &v1alpha1.Flunder{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("flunders").
 		Name(name).
 		SubResource(subresources...).

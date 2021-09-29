@@ -69,6 +69,7 @@ func newCSINodes(c *StorageV1beta1Client) *cSINodes {
 func (c *cSINodes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.CSINode, err error) {
 	result = &v1beta1.CSINode{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +86,7 @@ func (c *cSINodes) List(ctx context.Context, opts v1.ListOptions) (result *v1bet
 	}
 	result = &v1beta1.CSINodeList{}
 	err = c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,6 +103,7 @@ func (c *cSINodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -111,6 +114,7 @@ func (c *cSINodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 func (c *cSINodes) Create(ctx context.Context, cSINode *v1beta1.CSINode, opts v1.CreateOptions) (result *v1beta1.CSINode, err error) {
 	result = &v1beta1.CSINode{}
 	err = c.client.Post().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cSINode).
@@ -123,6 +127,7 @@ func (c *cSINodes) Create(ctx context.Context, cSINode *v1beta1.CSINode, opts v1
 func (c *cSINodes) Update(ctx context.Context, cSINode *v1beta1.CSINode, opts v1.UpdateOptions) (result *v1beta1.CSINode, err error) {
 	result = &v1beta1.CSINode{}
 	err = c.client.Put().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		Name(cSINode.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -135,6 +140,7 @@ func (c *cSINodes) Update(ctx context.Context, cSINode *v1beta1.CSINode, opts v1
 // Delete takes name of the cSINode and deletes it. Returns an error if one occurs.
 func (c *cSINodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		Name(name).
 		Body(&opts).
@@ -149,6 +155,7 @@ func (c *cSINodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, 
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -161,6 +168,7 @@ func (c *cSINodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, 
 func (c *cSINodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.CSINode, err error) {
 	result = &v1beta1.CSINode{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		Name(name).
 		SubResource(subresources...).
@@ -187,6 +195,7 @@ func (c *cSINodes) Apply(ctx context.Context, cSINode *storagev1beta1.CSINodeApp
 	}
 	result = &v1beta1.CSINode{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("csinodes").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

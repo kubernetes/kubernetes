@@ -71,6 +71,7 @@ func newFlowSchemas(c *FlowcontrolV1beta2Client) *flowSchemas {
 func (c *flowSchemas) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta2.FlowSchema, err error) {
 	result = &v1beta2.FlowSchema{}
 	err = c.client.Get().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -87,6 +88,7 @@ func (c *flowSchemas) List(ctx context.Context, opts v1.ListOptions) (result *v1
 	}
 	result = &v1beta2.FlowSchemaList{}
 	err = c.client.Get().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,6 +105,7 @@ func (c *flowSchemas) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,6 +116,7 @@ func (c *flowSchemas) Watch(ctx context.Context, opts v1.ListOptions) (watch.Int
 func (c *flowSchemas) Create(ctx context.Context, flowSchema *v1beta2.FlowSchema, opts v1.CreateOptions) (result *v1beta2.FlowSchema, err error) {
 	result = &v1beta2.FlowSchema{}
 	err = c.client.Post().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(flowSchema).
@@ -125,6 +129,7 @@ func (c *flowSchemas) Create(ctx context.Context, flowSchema *v1beta2.FlowSchema
 func (c *flowSchemas) Update(ctx context.Context, flowSchema *v1beta2.FlowSchema, opts v1.UpdateOptions) (result *v1beta2.FlowSchema, err error) {
 	result = &v1beta2.FlowSchema{}
 	err = c.client.Put().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		Name(flowSchema.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -139,6 +144,7 @@ func (c *flowSchemas) Update(ctx context.Context, flowSchema *v1beta2.FlowSchema
 func (c *flowSchemas) UpdateStatus(ctx context.Context, flowSchema *v1beta2.FlowSchema, opts v1.UpdateOptions) (result *v1beta2.FlowSchema, err error) {
 	result = &v1beta2.FlowSchema{}
 	err = c.client.Put().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		Name(flowSchema.Name).
 		SubResource("status").
@@ -152,6 +158,7 @@ func (c *flowSchemas) UpdateStatus(ctx context.Context, flowSchema *v1beta2.Flow
 // Delete takes name of the flowSchema and deletes it. Returns an error if one occurs.
 func (c *flowSchemas) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		Name(name).
 		Body(&opts).
@@ -166,6 +173,7 @@ func (c *flowSchemas) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -178,6 +186,7 @@ func (c *flowSchemas) DeleteCollection(ctx context.Context, opts v1.DeleteOption
 func (c *flowSchemas) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.FlowSchema, err error) {
 	result = &v1beta2.FlowSchema{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		Name(name).
 		SubResource(subresources...).
@@ -204,6 +213,7 @@ func (c *flowSchemas) Apply(ctx context.Context, flowSchema *flowcontrolv1beta2.
 	}
 	result = &v1beta2.FlowSchema{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -232,6 +242,7 @@ func (c *flowSchemas) ApplyStatus(ctx context.Context, flowSchema *flowcontrolv1
 
 	result = &v1beta2.FlowSchema{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1beta2.SchemeGroupVersion).
 		Resource("flowschemas").
 		Name(*name).
 		SubResource("status").

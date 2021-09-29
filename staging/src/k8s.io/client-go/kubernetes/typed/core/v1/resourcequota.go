@@ -74,6 +74,7 @@ func (c *resourceQuotas) Get(ctx context.Context, name string, options metav1.Ge
 	result = &v1.ResourceQuota{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *resourceQuotas) List(ctx context.Context, opts metav1.ListOptions) (res
 	result = &v1.ResourceQuotaList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *resourceQuotas) Watch(ctx context.Context, opts metav1.ListOptions) (wa
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *resourceQuotas) Create(ctx context.Context, resourceQuota *v1.ResourceQ
 	result = &v1.ResourceQuota{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(resourceQuota).
@@ -132,6 +136,7 @@ func (c *resourceQuotas) Update(ctx context.Context, resourceQuota *v1.ResourceQ
 	result = &v1.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		Name(resourceQuota.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *resourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *v1.Res
 	result = &v1.ResourceQuota{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		Name(resourceQuota.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *resourceQuotas) UpdateStatus(ctx context.Context, resourceQuota *v1.Res
 func (c *resourceQuotas) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *resourceQuotas) DeleteCollection(ctx context.Context, opts metav1.Delet
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *resourceQuotas) Patch(ctx context.Context, name string, pt types.PatchT
 	result = &v1.ResourceQuota{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *resourceQuotas) Apply(ctx context.Context, resourceQuota *corev1.Resour
 	result = &v1.ResourceQuota{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *resourceQuotas) ApplyStatus(ctx context.Context, resourceQuota *corev1.
 	result = &v1.ResourceQuota{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("resourcequotas").
 		Name(*name).
 		SubResource("status").

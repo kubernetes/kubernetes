@@ -70,6 +70,7 @@ func newNamespaces(c *CoreV1Client) *namespaces {
 func (c *namespaces) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -86,6 +87,7 @@ func (c *namespaces) List(ctx context.Context, opts metav1.ListOptions) (result 
 	}
 	result = &v1.NamespaceList{}
 	err = c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -102,6 +104,7 @@ func (c *namespaces) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -112,6 +115,7 @@ func (c *namespaces) Watch(ctx context.Context, opts metav1.ListOptions) (watch.
 func (c *namespaces) Create(ctx context.Context, namespace *v1.Namespace, opts metav1.CreateOptions) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Post().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(namespace).
@@ -124,6 +128,7 @@ func (c *namespaces) Create(ctx context.Context, namespace *v1.Namespace, opts m
 func (c *namespaces) Update(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Put().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		Name(namespace.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -138,6 +143,7 @@ func (c *namespaces) Update(ctx context.Context, namespace *v1.Namespace, opts m
 func (c *namespaces) UpdateStatus(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Put().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		Name(namespace.Name).
 		SubResource("status").
@@ -151,6 +157,7 @@ func (c *namespaces) UpdateStatus(ctx context.Context, namespace *v1.Namespace, 
 // Delete takes name of the namespace and deletes it. Returns an error if one occurs.
 func (c *namespaces) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		Name(name).
 		Body(&opts).
@@ -162,6 +169,7 @@ func (c *namespaces) Delete(ctx context.Context, name string, opts metav1.Delete
 func (c *namespaces) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Namespace, err error) {
 	result = &v1.Namespace{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		Name(name).
 		SubResource(subresources...).
@@ -188,6 +196,7 @@ func (c *namespaces) Apply(ctx context.Context, namespace *corev1.NamespaceApply
 	}
 	result = &v1.Namespace{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -216,6 +225,7 @@ func (c *namespaces) ApplyStatus(ctx context.Context, namespace *corev1.Namespac
 
 	result = &v1.Namespace{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("namespaces").
 		Name(*name).
 		SubResource("status").

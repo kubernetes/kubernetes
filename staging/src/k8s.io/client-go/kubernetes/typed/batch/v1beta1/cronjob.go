@@ -74,6 +74,7 @@ func (c *cronJobs) Get(ctx context.Context, name string, options v1.GetOptions) 
 	result = &v1beta1.CronJob{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *cronJobs) List(ctx context.Context, opts v1.ListOptions) (result *v1bet
 	result = &v1beta1.CronJobList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *cronJobs) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interf
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *cronJobs) Create(ctx context.Context, cronJob *v1beta1.CronJob, opts v1
 	result = &v1beta1.CronJob{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(cronJob).
@@ -132,6 +136,7 @@ func (c *cronJobs) Update(ctx context.Context, cronJob *v1beta1.CronJob, opts v1
 	result = &v1beta1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		Name(cronJob.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v1beta1.CronJob, o
 	result = &v1beta1.CronJob{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		Name(cronJob.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *cronJobs) UpdateStatus(ctx context.Context, cronJob *v1beta1.CronJob, o
 func (c *cronJobs) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *cronJobs) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, 
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *cronJobs) Patch(ctx context.Context, name string, pt types.PatchType, d
 	result = &v1beta1.CronJob{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *cronJobs) Apply(ctx context.Context, cronJob *batchv1beta1.CronJobApply
 	result = &v1beta1.CronJob{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *cronJobs) ApplyStatus(ctx context.Context, cronJob *batchv1beta1.CronJo
 	result = &v1beta1.CronJob{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1beta1.SchemeGroupVersion).
 		Resource("cronjobs").
 		Name(*name).
 		SubResource("status").

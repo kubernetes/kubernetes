@@ -71,6 +71,7 @@ func newNodes(c *CoreV1Client) *nodes {
 func (c *nodes) Get(ctx context.Context, name string, options metav1.GetOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -87,6 +88,7 @@ func (c *nodes) List(ctx context.Context, opts metav1.ListOptions) (result *v1.N
 	}
 	result = &v1.NodeList{}
 	err = c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -103,6 +105,7 @@ func (c *nodes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Inter
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,6 +116,7 @@ func (c *nodes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Inter
 func (c *nodes) Create(ctx context.Context, node *v1.Node, opts metav1.CreateOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Post().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(node).
@@ -125,6 +129,7 @@ func (c *nodes) Create(ctx context.Context, node *v1.Node, opts metav1.CreateOpt
 func (c *nodes) Update(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Put().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(node.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -139,6 +144,7 @@ func (c *nodes) Update(ctx context.Context, node *v1.Node, opts metav1.UpdateOpt
 func (c *nodes) UpdateStatus(ctx context.Context, node *v1.Node, opts metav1.UpdateOptions) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Put().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(node.Name).
 		SubResource("status").
@@ -152,6 +158,7 @@ func (c *nodes) UpdateStatus(ctx context.Context, node *v1.Node, opts metav1.Upd
 // Delete takes name of the node and deletes it. Returns an error if one occurs.
 func (c *nodes) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(name).
 		Body(&opts).
@@ -166,6 +173,7 @@ func (c *nodes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions,
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -178,6 +186,7 @@ func (c *nodes) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions,
 func (c *nodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Node, err error) {
 	result = &v1.Node{}
 	err = c.client.Patch(pt).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(name).
 		SubResource(subresources...).
@@ -204,6 +213,7 @@ func (c *nodes) Apply(ctx context.Context, node *corev1.NodeApplyConfiguration, 
 	}
 	result = &v1.Node{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -232,6 +242,7 @@ func (c *nodes) ApplyStatus(ctx context.Context, node *corev1.NodeApplyConfigura
 
 	result = &v1.Node{}
 	err = c.client.Patch(types.ApplyPatchType).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("nodes").
 		Name(*name).
 		SubResource("status").

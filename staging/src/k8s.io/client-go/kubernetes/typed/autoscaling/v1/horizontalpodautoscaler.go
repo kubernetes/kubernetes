@@ -74,6 +74,7 @@ func (c *horizontalPodAutoscalers) Get(ctx context.Context, name string, options
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -91,6 +92,7 @@ func (c *horizontalPodAutoscalers) List(ctx context.Context, opts metav1.ListOpt
 	result = &v1.HorizontalPodAutoscalerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +110,7 @@ func (c *horizontalPodAutoscalers) Watch(ctx context.Context, opts metav1.ListOp
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -119,6 +122,7 @@ func (c *horizontalPodAutoscalers) Create(ctx context.Context, horizontalPodAuto
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(horizontalPodAutoscaler).
@@ -132,6 +136,7 @@ func (c *horizontalPodAutoscalers) Update(ctx context.Context, horizontalPodAuto
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		Name(horizontalPodAutoscaler.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -147,6 +152,7 @@ func (c *horizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalP
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		Name(horizontalPodAutoscaler.Name).
 		SubResource("status").
@@ -161,6 +167,7 @@ func (c *horizontalPodAutoscalers) UpdateStatus(ctx context.Context, horizontalP
 func (c *horizontalPodAutoscalers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		Name(name).
 		Body(&opts).
@@ -176,6 +183,7 @@ func (c *horizontalPodAutoscalers) DeleteCollection(ctx context.Context, opts me
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -189,6 +197,7 @@ func (c *horizontalPodAutoscalers) Patch(ctx context.Context, name string, pt ty
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		Name(name).
 		SubResource(subresources...).
@@ -216,6 +225,7 @@ func (c *horizontalPodAutoscalers) Apply(ctx context.Context, horizontalPodAutos
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -245,6 +255,7 @@ func (c *horizontalPodAutoscalers) ApplyStatus(ctx context.Context, horizontalPo
 	result = &v1.HorizontalPodAutoscaler{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("horizontalpodautoscalers").
 		Name(*name).
 		SubResource("status").

@@ -78,6 +78,7 @@ func (c *replicationControllers) Get(ctx context.Context, name string, options m
 	result = &v1.ReplicationController{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -95,6 +96,7 @@ func (c *replicationControllers) List(ctx context.Context, opts metav1.ListOptio
 	result = &v1.ReplicationControllerList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -112,6 +114,7 @@ func (c *replicationControllers) Watch(ctx context.Context, opts metav1.ListOpti
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -123,6 +126,7 @@ func (c *replicationControllers) Create(ctx context.Context, replicationControll
 	result = &v1.ReplicationController{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(replicationController).
@@ -136,6 +140,7 @@ func (c *replicationControllers) Update(ctx context.Context, replicationControll
 	result = &v1.ReplicationController{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(replicationController.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -151,6 +156,7 @@ func (c *replicationControllers) UpdateStatus(ctx context.Context, replicationCo
 	result = &v1.ReplicationController{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(replicationController.Name).
 		SubResource("status").
@@ -165,6 +171,7 @@ func (c *replicationControllers) UpdateStatus(ctx context.Context, replicationCo
 func (c *replicationControllers) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(name).
 		Body(&opts).
@@ -180,6 +187,7 @@ func (c *replicationControllers) DeleteCollection(ctx context.Context, opts meta
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -193,6 +201,7 @@ func (c *replicationControllers) Patch(ctx context.Context, name string, pt type
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(name).
 		SubResource(subresources...).
@@ -220,6 +229,7 @@ func (c *replicationControllers) Apply(ctx context.Context, replicationControlle
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -249,6 +259,7 @@ func (c *replicationControllers) ApplyStatus(ctx context.Context, replicationCon
 	result = &v1.ReplicationController{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(*name).
 		SubResource("status").
@@ -264,6 +275,7 @@ func (c *replicationControllers) GetScale(ctx context.Context, replicationContro
 	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(replicationControllerName).
 		SubResource("scale").
@@ -278,6 +290,7 @@ func (c *replicationControllers) UpdateScale(ctx context.Context, replicationCon
 	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("replicationcontrollers").
 		Name(replicationControllerName).
 		SubResource("scale").

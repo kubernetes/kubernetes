@@ -72,6 +72,7 @@ func (c *roles) Get(ctx context.Context, name string, options v1.GetOptions) (re
 	result = &v1alpha1.Role{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *roles) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1
 	result = &v1alpha1.RoleList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *roles) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *roles) Create(ctx context.Context, role *v1alpha1.Role, opts v1.CreateO
 	result = &v1alpha1.Role{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(role).
@@ -130,6 +134,7 @@ func (c *roles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.UpdateO
 	result = &v1alpha1.Role{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		Name(role.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *roles) Update(ctx context.Context, role *v1alpha1.Role, opts v1.UpdateO
 func (c *roles) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *roles) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, lis
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *roles) Patch(ctx context.Context, name string, pt types.PatchType, data
 	result = &v1alpha1.Role{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *roles) Apply(ctx context.Context, role *rbacv1alpha1.RoleApplyConfigura
 	result = &v1alpha1.Role{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1alpha1.SchemeGroupVersion).
 		Resource("roles").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

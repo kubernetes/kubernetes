@@ -80,6 +80,7 @@ func (c *statefulSets) Get(ctx context.Context, name string, options metav1.GetO
 	result = &v1.StatefulSet{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -97,6 +98,7 @@ func (c *statefulSets) List(ctx context.Context, opts metav1.ListOptions) (resul
 	result = &v1.StatefulSetList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -114,6 +116,7 @@ func (c *statefulSets) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -125,6 +128,7 @@ func (c *statefulSets) Create(ctx context.Context, statefulSet *v1.StatefulSet, 
 	result = &v1.StatefulSet{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(statefulSet).
@@ -138,6 +142,7 @@ func (c *statefulSets) Update(ctx context.Context, statefulSet *v1.StatefulSet, 
 	result = &v1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -153,6 +158,7 @@ func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1.Statefu
 	result = &v1.StatefulSet{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(statefulSet.Name).
 		SubResource("status").
@@ -167,6 +173,7 @@ func (c *statefulSets) UpdateStatus(ctx context.Context, statefulSet *v1.Statefu
 func (c *statefulSets) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(name).
 		Body(&opts).
@@ -182,6 +189,7 @@ func (c *statefulSets) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -195,6 +203,7 @@ func (c *statefulSets) Patch(ctx context.Context, name string, pt types.PatchTyp
 	result = &v1.StatefulSet{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(name).
 		SubResource(subresources...).
@@ -222,6 +231,7 @@ func (c *statefulSets) Apply(ctx context.Context, statefulSet *appsv1.StatefulSe
 	result = &v1.StatefulSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -251,6 +261,7 @@ func (c *statefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1.Stat
 	result = &v1.StatefulSet{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(*name).
 		SubResource("status").
@@ -266,6 +277,7 @@ func (c *statefulSets) GetScale(ctx context.Context, statefulSetName string, opt
 	result = &autoscalingv1.Scale{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(statefulSetName).
 		SubResource("scale").
@@ -280,6 +292,7 @@ func (c *statefulSets) UpdateScale(ctx context.Context, statefulSetName string, 
 	result = &autoscalingv1.Scale{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(statefulSetName).
 		SubResource("scale").
@@ -305,6 +318,7 @@ func (c *statefulSets) ApplyScale(ctx context.Context, statefulSetName string, s
 	result = &autoscalingv1.Scale{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("statefulsets").
 		Name(statefulSetName).
 		SubResource("scale").

@@ -68,6 +68,7 @@ func (c *examples) Get(ctx context.Context, name string, options metav1.GetOptio
 	result = &v1.Example{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,6 +86,7 @@ func (c *examples) List(ctx context.Context, opts metav1.ListOptions) (result *v
 	result = &v1.ExampleList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -102,6 +104,7 @@ func (c *examples) Watch(ctx context.Context, opts metav1.ListOptions) (watch.In
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,6 +116,7 @@ func (c *examples) Create(ctx context.Context, example *v1.Example, opts metav1.
 	result = &v1.Example{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(example).
@@ -126,6 +130,7 @@ func (c *examples) Update(ctx context.Context, example *v1.Example, opts metav1.
 	result = &v1.Example{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		Name(example.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -139,6 +144,7 @@ func (c *examples) Update(ctx context.Context, example *v1.Example, opts metav1.
 func (c *examples) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		Name(name).
 		Body(&opts).
@@ -154,6 +160,7 @@ func (c *examples) DeleteCollection(ctx context.Context, opts metav1.DeleteOptio
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -167,6 +174,7 @@ func (c *examples) Patch(ctx context.Context, name string, pt types.PatchType, d
 	result = &v1.Example{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("examples").
 		Name(name).
 		SubResource(subresources...).

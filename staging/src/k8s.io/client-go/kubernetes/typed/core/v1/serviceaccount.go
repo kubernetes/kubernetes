@@ -75,6 +75,7 @@ func (c *serviceAccounts) Get(ctx context.Context, name string, options metav1.G
 	result = &v1.ServiceAccount{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -92,6 +93,7 @@ func (c *serviceAccounts) List(ctx context.Context, opts metav1.ListOptions) (re
 	result = &v1.ServiceAccountList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -109,6 +111,7 @@ func (c *serviceAccounts) Watch(ctx context.Context, opts metav1.ListOptions) (w
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -120,6 +123,7 @@ func (c *serviceAccounts) Create(ctx context.Context, serviceAccount *v1.Service
 	result = &v1.ServiceAccount{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(serviceAccount).
@@ -133,6 +137,7 @@ func (c *serviceAccounts) Update(ctx context.Context, serviceAccount *v1.Service
 	result = &v1.ServiceAccount{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		Name(serviceAccount.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -146,6 +151,7 @@ func (c *serviceAccounts) Update(ctx context.Context, serviceAccount *v1.Service
 func (c *serviceAccounts) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		Name(name).
 		Body(&opts).
@@ -161,6 +167,7 @@ func (c *serviceAccounts) DeleteCollection(ctx context.Context, opts metav1.Dele
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -174,6 +181,7 @@ func (c *serviceAccounts) Patch(ctx context.Context, name string, pt types.Patch
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		Name(name).
 		SubResource(subresources...).
@@ -201,6 +209,7 @@ func (c *serviceAccounts) Apply(ctx context.Context, serviceAccount *corev1.Serv
 	result = &v1.ServiceAccount{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).
@@ -215,6 +224,7 @@ func (c *serviceAccounts) CreateToken(ctx context.Context, serviceAccountName st
 	result = &authenticationv1.TokenRequest{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("serviceaccounts").
 		Name(serviceAccountName).
 		SubResource("token").

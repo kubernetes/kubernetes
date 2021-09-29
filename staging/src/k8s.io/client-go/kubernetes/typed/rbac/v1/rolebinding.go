@@ -72,6 +72,7 @@ func (c *roleBindings) Get(ctx context.Context, name string, options metav1.GetO
 	result = &v1.RoleBinding{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -89,6 +90,7 @@ func (c *roleBindings) List(ctx context.Context, opts metav1.ListOptions) (resul
 	result = &v1.RoleBindingList{}
 	err = c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -106,6 +108,7 @@ func (c *roleBindings) Watch(ctx context.Context, opts metav1.ListOptions) (watc
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -117,6 +120,7 @@ func (c *roleBindings) Create(ctx context.Context, roleBinding *v1.RoleBinding, 
 	result = &v1.RoleBinding{}
 	err = c.client.Post().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(roleBinding).
@@ -130,6 +134,7 @@ func (c *roleBindings) Update(ctx context.Context, roleBinding *v1.RoleBinding, 
 	result = &v1.RoleBinding{}
 	err = c.client.Put().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		Name(roleBinding.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -143,6 +148,7 @@ func (c *roleBindings) Update(ctx context.Context, roleBinding *v1.RoleBinding, 
 func (c *roleBindings) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		Name(name).
 		Body(&opts).
@@ -158,6 +164,7 @@ func (c *roleBindings) DeleteCollection(ctx context.Context, opts metav1.DeleteO
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -171,6 +178,7 @@ func (c *roleBindings) Patch(ctx context.Context, name string, pt types.PatchTyp
 	result = &v1.RoleBinding{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		Name(name).
 		SubResource(subresources...).
@@ -198,6 +206,7 @@ func (c *roleBindings) Apply(ctx context.Context, roleBinding *rbacv1.RoleBindin
 	result = &v1.RoleBinding{}
 	err = c.client.Patch(types.ApplyPatchType).
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("rolebindings").
 		Name(*name).
 		VersionedParams(&patchOpts, scheme.ParameterCodec).

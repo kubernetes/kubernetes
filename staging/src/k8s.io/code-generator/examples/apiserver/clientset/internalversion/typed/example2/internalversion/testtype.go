@@ -66,6 +66,7 @@ func newTestTypes(c *SecondExampleClient) *testTypes {
 func (c *testTypes) Get(ctx context.Context, name string, options v1.GetOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Get().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -82,6 +83,7 @@ func (c *testTypes) List(ctx context.Context, opts v1.ListOptions) (result *exam
 	}
 	result = &example2.TestTypeList{}
 	err = c.client.Get().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -98,6 +100,7 @@ func (c *testTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 	}
 	opts.Watch = true
 	return c.client.Get().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -108,6 +111,7 @@ func (c *testTypes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Inter
 func (c *testTypes) Create(ctx context.Context, testType *example2.TestType, opts v1.CreateOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Post().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(testType).
@@ -120,6 +124,7 @@ func (c *testTypes) Create(ctx context.Context, testType *example2.TestType, opt
 func (c *testTypes) Update(ctx context.Context, testType *example2.TestType, opts v1.UpdateOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(testType.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -134,6 +139,7 @@ func (c *testTypes) Update(ctx context.Context, testType *example2.TestType, opt
 func (c *testTypes) UpdateStatus(ctx context.Context, testType *example2.TestType, opts v1.UpdateOptions) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Put().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(testType.Name).
 		SubResource("status").
@@ -147,6 +153,7 @@ func (c *testTypes) UpdateStatus(ctx context.Context, testType *example2.TestTyp
 // Delete takes name of the testType and deletes it. Returns an error if one occurs.
 func (c *testTypes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(name).
 		Body(&opts).
@@ -161,6 +168,7 @@ func (c *testTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -173,6 +181,7 @@ func (c *testTypes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions,
 func (c *testTypes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *example2.TestType, err error) {
 	result = &example2.TestType{}
 	err = c.client.Patch(pt).
+		GroupVersion(example2.SchemeGroupVersion).
 		Resource("testtypes").
 		Name(name).
 		SubResource(subresources...).
