@@ -18,7 +18,9 @@ limitations under the License.
 package types
 
 import (
+	"context"
 	"errors"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -62,22 +64,39 @@ type CompleteFuncParam struct {
 
 // Run executes the operations and its supporting functions
 func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
-	var context OperationContext
-	if o.CompleteFunc != nil {
-		c := CompleteFuncParam{
-			Err:      &context.DetailedErr,
-			Migrated: &context.Migrated,
-		}
-		defer o.CompleteFunc(c)
-	}
-	if o.EventRecorderFunc != nil {
-		defer o.EventRecorderFunc(&eventErr)
-	}
-	// Handle panic, if any, from operationFunc()
-	defer runtime.RecoverFromPanic(&detailedErr)
 
-	context = o.OperationFunc()
-	return context.EventErr, context.DetailedErr
+	timeoutContext, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+
+	var opCtx OperationContext
+	var opCtxChan = make(chan OperationContext)
+
+	go func(timeoutContext context.Context) {
+		if o.CompleteFunc != nil {
+			c := CompleteFuncParam{
+				Err:      &opCtx.DetailedErr,
+				Migrated: &opCtx.Migrated,
+			}
+			defer o.CompleteFunc(c)
+		}
+		if o.EventRecorderFunc != nil {
+			defer o.EventRecorderFunc(&eventErr)
+		}
+		// Handle panic, if any, from operationFunc()
+		defer runtime.RecoverFromPanic(&detailedErr)
+
+		opFuncCtx := o.OperationFunc()
+		opCtxChan <- opFuncCtx
+	}(timeoutContext)
+
+	select {
+	case <-timeoutContext.Done():
+		opCtx = NewOperationContext(context.DeadlineExceeded, context.DeadlineExceeded, false)
+	case opFuncCtx := <-opCtxChan:
+		opCtx = opFuncCtx
+	}
+
+	return opCtx.EventErr, opCtx.DetailedErr
 }
 
 // FailedPrecondition error indicates CSI operation returned failed precondition
