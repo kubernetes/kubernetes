@@ -23,7 +23,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -547,30 +546,18 @@ const (
 
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")
-	b, err := strconv.ParseBool(dryRunFlag)
-	// The flag is not a boolean
-	if err != nil {
-		switch dryRunFlag {
-		case cmd.Flag("dry-run").NoOptDefVal:
-			klog.Warning(`--dry-run is deprecated and can be replaced with --dry-run=client.`)
-			return DryRunClient, nil
-		case "client":
-			return DryRunClient, nil
-		case "server":
-			return DryRunServer, nil
-		case "none":
-			return DryRunNone, nil
-		default:
-			return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
-		}
-	}
-	// The flag was a boolean
-	if b {
-		klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "client")
+	switch dryRunFlag {
+	case cmd.Flag("dry-run").NoOptDefVal:
+		return DryRunNone, errors.New(`--dry-run flag without a value was specified. A value must be set: "none", "server", or "client".`)
+	case "client":
 		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
 	}
-	klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "none")
-	return DryRunNone, nil
 }
 
 // PrintFlagsWithDryRunStrategy sets a success message at print time for the dry run strategy
