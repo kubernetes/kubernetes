@@ -854,17 +854,17 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	genericfeatures.StreamingProxyRedirects: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.24
-	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Deprecated},
-	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.APIPriorityAndFairness:  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
-	genericfeatures.OpenAPIEnums:            {Default: false, PreRelease: featuregate.Alpha},
-
+	genericfeatures.StreamingProxyRedirects:             {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.24
+	genericfeatures.ValidateProxyRedirects:              {Default: true, PreRelease: featuregate.Deprecated},
+	genericfeatures.AdvancedAuditing:                    {Default: true, PreRelease: featuregate.GA},
+	genericfeatures.APIResponseCompression:              {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.APIListChunking:                     {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.DryRun:                              {Default: true, PreRelease: featuregate.GA},
+	genericfeatures.ServerSideApply:                     {Default: true, PreRelease: featuregate.GA},
+	genericfeatures.APIPriorityAndFairness:              {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.WarningHeaders:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
+	genericfeatures.OpenAPIEnums:                        {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
 	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
