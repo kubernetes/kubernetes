@@ -145,9 +145,6 @@ func TestDefaultKubernetesUserAgent(t *testing.T) {
 }
 
 func TestRESTClientRequires(t *testing.T) {
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: scheme.Codecs}}); err == nil {
-		t.Errorf("unexpected non-error")
-	}
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
