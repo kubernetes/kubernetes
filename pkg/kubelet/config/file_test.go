@@ -73,6 +73,38 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	}
 }
 
+func TestExtractInvalidStaticPod(t *testing.T) {
+	dirName, err := mkTempDir("file-test")
+	if err != nil {
+		t.Fatalf("unable to create temp dir: %v", err)
+	}
+	defer removeAll(dirName, t)
+
+	fileName := filepath.Join(dirName, "invalid-static-pod")
+
+	err = ioutil.WriteFile(fileName, []byte(`apiVersion: v1
+kind: Pod
+metadata:
+  name: static
+spec:
+  containers:
+  - name: bb
+    image: busybox
+  serviceAccountName: default
+`), 0555)
+	if err != nil {
+		t.Fatalf("unable to write test file %#v", err)
+	}
+
+	ch := make(chan interface{}, 1)
+	sf := newSourceFile(fileName, "node01", time.Millisecond, ch)
+	_, err = sf.extractFromFile(fileName)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	expectEmptyChannel(t, ch)
+}
+
 func mkTempDir(prefix string) (string, error) {
 	return ioutil.TempDir(os.TempDir(), prefix)
 }

@@ -104,6 +104,16 @@ func TestExtractInvalidPods(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "Static pod referencing service account",
+			pod: &v1.Pod{
+				TypeMeta: metav1.TypeMeta{APIVersion: "v1"},
+				Spec: v1.PodSpec{
+					Containers:         []v1.Container{{Name: "test"}},
+					ServiceAccountName: "default",
+				},
+			},
+		},
 	}
 	for _, testCase := range testCases {
 		data, err := json.Marshal(testCase.pod)

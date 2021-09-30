@@ -118,6 +118,9 @@ func (s *sourceURL) extractFromURL() error {
 			// It parsed but could not be used.
 			return singlePodErr
 		}
+		if singlePodErr = validateStaticPod(pod); singlePodErr != nil {
+			return singlePodErr
+		}
 		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.HTTPSource}
 		return nil
 	}
@@ -128,6 +131,11 @@ func (s *sourceURL) extractFromURL() error {
 		if multiPodErr != nil {
 			// It parsed but could not be used.
 			return multiPodErr
+		}
+		for i := range podList.Items {
+			if singlePodErr = validateStaticPod(&podList.Items[i]); singlePodErr != nil {
+				return singlePodErr
+			}
 		}
 		pods := make([]*v1.Pod, 0, len(podList.Items))
 		for i := range podList.Items {

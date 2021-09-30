@@ -230,7 +230,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 		if podErr != nil {
 			return pod, podErr
 		}
-		return pod, nil
+		return pod, validateStaticPod(pod)
 	}
 
 	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file", filename, podErr)

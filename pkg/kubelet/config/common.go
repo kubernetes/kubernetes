@@ -165,3 +165,10 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods v1.
 	}
 	return true, *v1Pods, err
 }
+
+func validateStaticPod(pod *v1.Pod) error {
+	if pod.Spec.ServiceAccountName != "" {
+		return fmt.Errorf("static pod %s cannot reference service account", pod.Name)
+	}
+	return nil
+}
