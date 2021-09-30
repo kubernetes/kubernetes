@@ -1447,8 +1447,29 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(&pod.Spec, allStatus)
 	klog.V(4).InfoS("Got phase for pod", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "phase", s.Phase)
+
+	// pods are not allowed to transition out of terminal phases
+	// we must check both the cached oldPodStatus and new one
+	if oldPodStatus.Phase == v1.PodFailed || oldPodStatus.Phase == v1.PodSucceeded {
+		// Status manager shows terminal phase; transitions are not allowed
+		if s.Phase != oldPodStatus.Phase {
+			klog.ErrorS(nil, "Pod attempted illegal phase transition", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "apiStatusPhase", s.Phase, "apiStatus", s)
+			// Force back to phase from the API server
+			s.Phase = oldPodStatus.Phase
+		}
+	}
+	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
+		// API server shows terminal phase; transitions are not allowed
+		if s.Phase != pod.Status.Phase {
+			klog.ErrorS(nil, "Pod attempted illegal phase transition", "pod", klog.KObj(pod), "oldPhase", pod.Status.Phase, "apiStatusPhase", s.Phase, "apiStatus", s)
+			// Force back to phase from the API server
+			s.Phase = pod.Status.Phase
+		}
+	}
+
 	if s.Phase == oldPodStatus.Phase {
 		// preserve the reason and message which is associated with the phase
+		klog.V(4).InfoS("Overriding reason/message for pod", "pod", klog.KObj(pod), "reason", oldPodStatus.Reason, "msg", oldPodStatus.Message)
 		s.Reason = oldPodStatus.Reason
 		s.Message = oldPodStatus.Message
 		if len(s.Reason) == 0 {
@@ -1466,16 +1487,6 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 			s.Reason = result.Reason
 			s.Message = result.Message
 			break
-		}
-	}
-
-	// pods are not allowed to transition out of terminal phases
-	if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
-		// API server shows terminal phase; transitions are not allowed
-		if s.Phase != pod.Status.Phase {
-			klog.ErrorS(nil, "Pod attempted illegal phase transition", "pod", klog.KObj(pod), "originalStatusPhase", pod.Status.Phase, "apiStatusPhase", s.Phase, "apiStatus", s)
-			// Force back to phase from the API server
-			s.Phase = pod.Status.Phase
 		}
 	}
 
