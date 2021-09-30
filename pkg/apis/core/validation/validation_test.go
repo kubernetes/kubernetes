@@ -23,8 +23,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	asserttestify "github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10371,253 +10373,10 @@ func makeValidService() core.Service {
 }
 
 func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
-	tests := []struct {
-		new  []core.EphemeralContainer
-		old  []core.EphemeralContainer
-		err  string
-		test string
-	}{
-		{[]core.EphemeralContainer{}, []core.EphemeralContainer{}, "", "nothing"},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"",
-			"No change in Ephemeral Containers",
-		},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"",
-			"Ephemeral Container list order changes",
-		},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{},
-			"",
-			"Add an Ephemeral Container",
-		},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger1",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{},
-			"",
-			"Add two Ephemeral Containers",
-		},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"",
-			"Add to an existing Ephemeral Containers",
-		},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger3",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"",
-			"Add to an existing Ephemeral Containers, list order changes",
-		},
-		{
-			[]core.EphemeralContainer{},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"may not be removed",
-			"Remove an Ephemeral Container",
-		},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "firstone",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "thentheother",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"may not be removed",
-			"Replace an Ephemeral Container",
-		},
-		{
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger1",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			[]core.EphemeralContainer{{
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger1",
-					Image:                    "debian",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}, {
-				EphemeralContainerCommon: core.EphemeralContainerCommon{
-					Name:                     "debugger2",
-					Image:                    "busybox",
-					ImagePullPolicy:          "IfNotPresent",
-					TerminationMessagePolicy: "File",
-				},
-			}},
-			"may not be changed",
-			"Change an Ephemeral Containers",
-		},
-	}
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
-	makePod := func(ephemeralContainers []core.EphemeralContainer) core.Pod {
-		return core.Pod{
+	makePod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
+		return &core.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations:     map[string]string{},
 				Labels:          map[string]string{},
@@ -10639,18 +10398,342 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 		}
 	}
 
-	for _, test := range tests {
-		new, old := makePod(test.new), makePod(test.old)
-		errs := ValidatePodEphemeralContainersUpdate(&new, &old, PodValidationOptions{})
-		if test.err == "" {
+	// Some tests use Windows host pods as an example of fields that might
+	// conflict between an ephemeral container and the rest of the pod.
+	opts := PodValidationOptions{AllowWindowsHostProcessField: true}
+	capabilities.SetForTests(capabilities.Capabilities{
+		AllowPrivileged: true,
+	})
+	makeWindowsHostPod := func(ephemeralContainers []core.EphemeralContainer) *core.Pod {
+		return &core.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations:     map[string]string{},
+				Labels:          map[string]string{},
+				Name:            "pod",
+				Namespace:       "ns",
+				ResourceVersion: "1",
+			},
+			Spec: core.PodSpec{
+				Containers: []core.Container{{
+					Name:            "cnt",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: proto.Bool(true),
+						},
+					},
+					TerminationMessagePolicy: "File",
+				}},
+				DNSPolicy:           core.DNSClusterFirst,
+				EphemeralContainers: ephemeralContainers,
+				RestartPolicy:       core.RestartPolicyOnFailure,
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: proto.Bool(true),
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		new, old *core.Pod
+		err      string
+	}{
+		{
+			"no ephemeral containers",
+			makePod([]core.EphemeralContainer{}),
+			makePod([]core.EphemeralContainer{}),
+			"",
+		},
+		{
+			"No change in Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"",
+		},
+		{
+			"Ephemeral Container list order changes",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"",
+		},
+		{
+			"Add an Ephemeral Container",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{}),
+			"",
+		},
+		{
+			"Add two Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger1",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{}),
+			"",
+		},
+		{
+			"Add to an existing Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"",
+		},
+		{
+			"Add to an existing Ephemeral Containers, list order changes",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger3",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"",
+		},
+		{
+			"Remove an Ephemeral Container",
+			makePod([]core.EphemeralContainer{}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"may not be removed",
+		},
+		{
+			"Replace an Ephemeral Container",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "firstone",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "thentheother",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"may not be removed",
+		},
+		{
+			"Change an Ephemeral Containers",
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger1",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makePod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger1",
+					Image:                    "debian",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}, {
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:                     "debugger2",
+					Image:                    "busybox",
+					ImagePullPolicy:          "IfNotPresent",
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			"may not be changed",
+		},
+		{
+			"Ephemeral container with potential conflict with regular containers, but conflict not present",
+			makeWindowsHostPod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:            "debugger1",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: proto.Bool(true),
+						},
+					},
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makeWindowsHostPod(nil),
+			"",
+		},
+		{
+			"Ephemeral container with potential conflict with regular containers, and conflict is present",
+			makeWindowsHostPod([]core.EphemeralContainer{{
+				EphemeralContainerCommon: core.EphemeralContainerCommon{
+					Name:            "debugger1",
+					Image:           "image",
+					ImagePullPolicy: "IfNotPresent",
+					SecurityContext: &core.SecurityContext{
+						WindowsOptions: &core.WindowsSecurityContextOptions{
+							HostProcess: proto.Bool(false),
+						},
+					},
+					TerminationMessagePolicy: "File",
+				},
+			}}),
+			makeWindowsHostPod(nil),
+			"spec.ephemeralContainers[0].securityContext.windowsOptions.hostProcess: Invalid value: false: pod hostProcess value must be identical",
+		},
+	}
+
+	for _, tc := range tests {
+		errs := ValidatePodEphemeralContainersUpdate(tc.new, tc.old, opts)
+		if tc.err == "" {
 			if len(errs) != 0 {
-				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
+				t.Errorf("unexpected invalid for test: %s\nErrors returned: %+v\nLocal diff of test objects (-old +new):\n%s", tc.name, errs, cmp.Diff(tc.old, tc.new))
 			}
 		} else {
 			if len(errs) == 0 {
-				t.Errorf("unexpected valid: %s\nA: %+v\nB: %+v", test.test, test.new, test.old)
-			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, test.err) {
-				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", test.test, test.err, actualErr)
+				t.Errorf("unexpected valid for test: %s\nLocal diff of test objects (-old +new):\n%s", tc.name, cmp.Diff(tc.old, tc.new))
+			} else if actualErr := errs.ToAggregate().Error(); !strings.Contains(actualErr, tc.err) {
+				t.Errorf("unexpected error message: %s\nExpected error: %s\nActual error: %s", tc.name, tc.err, actualErr)
 			}
 		}
 	}
