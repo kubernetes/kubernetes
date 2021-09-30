@@ -24,11 +24,9 @@ import (
 	"context"
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/kubernetes/pkg/controller/cronjob"
 	"k8s.io/kubernetes/pkg/controller/job"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 func startJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
@@ -41,23 +39,13 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 }
 
 func startCronJobController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CronJobControllerV2) {
-		cj2c, err := cronjob.NewControllerV2(controllerContext.InformerFactory.Batch().V1().Jobs(),
-			controllerContext.InformerFactory.Batch().V1().CronJobs(),
-			controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
-		)
-		if err != nil {
-			return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
-		}
-		go cj2c.Run(int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs), ctx.Done())
-		return nil, true, nil
-	}
-	cjc, err := cronjob.NewController(
+	cj2c, err := cronjob.NewControllerV2(controllerContext.InformerFactory.Batch().V1().Jobs(),
+		controllerContext.InformerFactory.Batch().V1().CronJobs(),
 		controllerContext.ClientBuilder.ClientOrDie("cronjob-controller"),
 	)
 	if err != nil {
-		return nil, true, fmt.Errorf("error creating CronJob controller: %v", err)
+		return nil, true, fmt.Errorf("error creating CronJob controller V2: %v", err)
 	}
-	go cjc.Run(ctx.Done())
+	go cj2c.Run(int(controllerContext.ComponentConfig.CronJobController.ConcurrentCronJobSyncs), ctx.Done())
 	return nil, true, nil
 }

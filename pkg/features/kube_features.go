@@ -406,15 +406,6 @@ const (
 	// Enable all logic related to the PodDisruptionBudget API object in policy
 	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
 
-	// owner: @alaypatel07, @soltysh
-	// alpha: v1.20
-	// beta: v1.21
-	// GA: v1.22
-	//
-	// CronJobControllerV2 controls whether the controller manager starts old cronjob
-	// controller or new one which is implemented with informers and delaying queue
-	CronJobControllerV2 featuregate.Feature = "CronJobControllerV2"
-
 	// owner: @smarterclayton
 	// alpha: v1.21
 	// beta: v1.22
@@ -804,7 +795,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSliceNodeName:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.25
 	WindowsEndpointSliceProxying:                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
-	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta},                    // on by default in 1.22
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
