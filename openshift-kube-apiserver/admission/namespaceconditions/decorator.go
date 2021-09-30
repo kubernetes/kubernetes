@@ -1,6 +1,7 @@
 package namespaceconditions
 
 import (
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -56,5 +57,35 @@ func (d *NamespaceLabelConditions) WithNamespaceLabelConditions(admissionPlugin 
 	default:
 		return admissionPlugin
 	}
+}
 
+// NamespaceLabelSelector provides a decorator that delegates
+type NamespaceLabelSelector struct {
+	namespaceClient corev1client.NamespacesGetter
+	namespaceLister corev1lister.NamespaceLister
+
+	admissionPluginNamesToDecorate sets.String
+	namespaceLabelSelector         labels.Selector
+}
+
+func NewConditionalAdmissionPlugins(nsClient corev1client.NamespacesGetter, nsLister corev1lister.NamespaceLister, nsSelector labels.Selector, admissionPluginNames ...string) *NamespaceLabelSelector {
+	return &NamespaceLabelSelector{
+		namespaceClient:                nsClient,
+		namespaceLister:                nsLister,
+		admissionPluginNamesToDecorate: sets.NewString(admissionPluginNames...),
+		namespaceLabelSelector:         nsSelector,
+	}
+}
+
+func (d *NamespaceLabelSelector) WithNamespaceLabelSelector(admissionPlugin admission.Interface, name string) admission.Interface {
+	if !d.admissionPluginNamesToDecorate.Has(name) {
+		return admissionPlugin
+	}
+
+	return &pluginHandlerWithNamespaceLabelConditions{
+		admissionPlugin:   admissionPlugin,
+		namespaceClient:   d.namespaceClient,
+		namespaceLister:   d.namespaceLister,
+		namespaceSelector: d.namespaceLabelSelector,
+	}
 }
