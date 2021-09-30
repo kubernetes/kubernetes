@@ -53,6 +53,16 @@ type WithTicker interface {
 	NewTicker(time.Duration) Ticker
 }
 
+// WithDelayedExecution allows for injecting fake or real clocks into
+// code that needs to make use of AfterFunc functionality.
+type WithDelayedExecution interface {
+	Clock
+	// AfterFunc executes f in its own goroutine after waiting
+	// for d duration and returns a Timer whose channel can be
+	// closed by calling Stop() on the Timer.
+	AfterFunc(d time.Duration, f func()) Timer
+}
+
 // Ticker defines the Ticker interface.
 type Ticker interface {
 	C() <-chan time.Time
@@ -85,6 +95,13 @@ func (RealClock) After(d time.Duration) <-chan time.Time {
 func (RealClock) NewTimer(d time.Duration) Timer {
 	return &realTimer{
 		timer: time.NewTimer(d),
+	}
+}
+
+// AfterFunc is the same as time.AfterFunc(d, f).
+func (RealClock) AfterFunc(d time.Duration, f func()) Timer {
+	return &realTimer{
+		timer: time.AfterFunc(d, f),
 	}
 }
 
