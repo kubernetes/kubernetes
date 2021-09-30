@@ -54,26 +54,27 @@ func (c *pods) Bind(ctx context.Context, binding *v1.Binding, opts metav1.Create
 // Equivalent to calling EvictV1beta1.
 // Deprecated: Use EvictV1() (supported in 1.22+) or EvictV1beta1().
 func (c *pods) Evict(ctx context.Context, eviction *policyv1beta1.Eviction) error {
-	return c.client.Post().Namespace(c.ns).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
+	return c.client.Post().Namespace(c.ns).GroupVersion(policyv1beta1.SchemeGroupVersion).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
 }
 
 func (c *pods) EvictV1beta1(ctx context.Context, eviction *policyv1beta1.Eviction) error {
-	return c.client.Post().Namespace(c.ns).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
+	return c.client.Post().Namespace(c.ns).GroupVersion(policyv1beta1.SchemeGroupVersion).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
 }
 
 func (c *pods) EvictV1(ctx context.Context, eviction *policyv1.Eviction) error {
-	return c.client.Post().Namespace(c.ns).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
+	return c.client.Post().Namespace(c.ns).GroupVersion(policyv1.SchemeGroupVersion).Resource("pods").Name(eviction.Name).SubResource("eviction").Body(eviction).Do(ctx).Error()
 }
 
 // Get constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Request {
-	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, scheme.ParameterCodec)
+	return c.client.Get().Namespace(c.ns).Name(name).GroupVersion(v1.SchemeGroupVersion).Resource("pods").SubResource("log").VersionedParams(opts, scheme.ParameterCodec)
 }
 
 // ProxyGet returns a response of the pod by calling it through the proxy.
 func (c *pods) ProxyGet(scheme, name, port, path string, params map[string]string) restclient.ResponseWrapper {
 	request := c.client.Get().
 		Namespace(c.ns).
+		GroupVersion(v1.SchemeGroupVersion).
 		Resource("pods").
 		SubResource("proxy").
 		Name(net.JoinSchemeNamePort(scheme, name, port)).
