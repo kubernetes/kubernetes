@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestExecute(t *testing.T) {
@@ -64,7 +64,7 @@ func TestExecuteDelayed(t *testing.T) {
 	})
 	now := time.Now()
 	then := now.Add(10 * time.Second)
-	fakeClock := clock.NewFakeClock(now)
+	fakeClock := testingclock.NewFakeClock(now)
 	queue.clock = fakeClock
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)
@@ -95,7 +95,7 @@ func TestCancel(t *testing.T) {
 	})
 	now := time.Now()
 	then := now.Add(10 * time.Second)
-	fakeClock := clock.NewFakeClock(now)
+	fakeClock := testingclock.NewFakeClock(now)
 	queue.clock = fakeClock
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)
@@ -128,7 +128,7 @@ func TestCancelAndReadd(t *testing.T) {
 	})
 	now := time.Now()
 	then := now.Add(10 * time.Second)
-	fakeClock := clock.NewFakeClock(now)
+	fakeClock := testingclock.NewFakeClock(now)
 	queue.clock = fakeClock
 	queue.AddWork(NewWorkArgs("1", "1"), now, then)
 	queue.AddWork(NewWorkArgs("2", "2"), now, then)

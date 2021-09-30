@@ -22,8 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	// TODO: Switch to k8s.io/utils/clock once it supports AfterFunc()
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/utils/clock"
 )
 
 // WorkArgs keeps arguments that will be passed to the function executed by the worker.
@@ -50,7 +49,7 @@ type TimedWorker struct {
 }
 
 // createWorker creates a TimedWorker that will execute `f` not earlier than `fireAt`.
-func createWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(args *WorkArgs) error, clock clock.Clock) *TimedWorker {
+func createWorker(args *WorkArgs, createdAt time.Time, fireAt time.Time, f func(args *WorkArgs) error, clock clock.WithDelayedExecution) *TimedWorker {
 	delay := fireAt.Sub(createdAt)
 	if delay <= 0 {
 		go f(args)
@@ -78,7 +77,7 @@ type TimedWorkerQueue struct {
 	// map of workers keyed by string returned by 'KeyFromWorkArgs' from the given worker.
 	workers  map[string]*TimedWorker
 	workFunc func(args *WorkArgs) error
-	clock    clock.Clock
+	clock    clock.WithDelayedExecution
 }
 
 // CreateWorkerQueue creates a new TimedWorkerQueue for workers that will execute
