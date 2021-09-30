@@ -185,6 +185,57 @@ func TestRequestOrdersSubResource(t *testing.T) {
 	}
 }
 
+func TestRequestOrdersGroupVersion(t *testing.T) {
+
+	tests := []struct {
+		name             string
+		gv               schema.GroupVersion
+		versionedAPIPath string
+		expected         string
+	}{
+		{
+			name:     "v1 Groupversion and empty versionedAPIPath",
+			gv:       v1.SchemeGroupVersion,
+			expected: "/api/v1/namespaces/foo/baz/bar/a/b/test",
+		},
+		{
+			name:     "v1beta1 Groupversion and empty versionedAPIPath",
+			gv:       schema.GroupVersion{Group: "group", Version: "v1beta1"},
+			expected: "/apis/group/v1beta1/namespaces/foo/baz/bar/a/b/test",
+		},
+		{
+			name:     "v1alpha1 Groupversion and empty versionedAPIPath",
+			gv:       schema.GroupVersion{Group: "group", Version: "v1alpha1"},
+			expected: "/apis/group/v1alpha1/namespaces/foo/baz/bar/a/b/test",
+		},
+		{
+			name:             "v1 Groupversion overrides configured versionedAPIPath",
+			gv:               v1.SchemeGroupVersion,
+			versionedAPIPath: "apis",
+			expected:         "/api/v1/namespaces/foo/baz/bar/a/b/test",
+		},
+		{
+			name:             "v1beta1 Groupversion overrides configured versionedAPIPath",
+			gv:               schema.GroupVersion{Group: "group", Version: "v1beta1"},
+			versionedAPIPath: "api",
+			expected:         "/apis/group/v1beta1/namespaces/foo/baz/bar/a/b/test",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			r := (&Request{
+				c:          &RESTClient{base: &url.URL{}, versionedAPIPath: tt.versionedAPIPath},
+				pathPrefix: "/test/",
+			}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b").GroupVersion(tt.gv)
+			if s := r.URL().String(); s != tt.expected {
+				t.Errorf("got: %s expected %s", s, tt.expected)
+			}
+
+		})
+	}
+}
+
 func TestRequestSetTwiceError(t *testing.T) {
 	if (&Request{}).Name("bar").Name("baz").err == nil {
 		t.Errorf("setting name twice should result in error")
