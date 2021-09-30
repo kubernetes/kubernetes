@@ -856,8 +856,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Operation("delete"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(deleteReturnType).
-				Returns(http.StatusOK, "OK", deleteReturnType).
-				Returns(http.StatusAccepted, "Accepted", deleteReturnType)
+				Returns(http.StatusOK, "OK", producedObject).
+				Returns(http.StatusAccepted, "Accepted", producedObject)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 				route.ParameterNamed("body").Required(false)
@@ -880,7 +880,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Operation("deletecollection"+namespaced+kind+strings.Title(subresource)+operationSuffix).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), mediaTypes...)...).
 				Writes(versionedStatus).
-				Returns(http.StatusOK, "OK", versionedStatus)
+				Returns(http.StatusOK, "OK", producedObject)
 			if isCollectionDeleter {
 				route.Reads(versionedDeleterObject)
 				route.ParameterNamed("body").Required(false)
