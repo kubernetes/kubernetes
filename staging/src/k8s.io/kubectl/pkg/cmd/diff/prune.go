@@ -43,6 +43,13 @@ type pruner struct {
 	resources         []prune.Resource
 }
 
+func newPruner() *pruner {
+	return &pruner{
+		visitedUids:       sets.NewString(),
+		visitedNamespaces: sets.NewString(),
+	}
+}
+
 func (p *pruner) pruneAll() ([]runtime.Object, error) {
 	var allPruned []runtime.Object
 	namespacedRESTMappings, nonNamespacedRESTMappings, err := prune.GetRESTMappings(p.mapper, &(p.resources))

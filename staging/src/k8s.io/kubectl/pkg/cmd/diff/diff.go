@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/discovery"
@@ -120,7 +119,6 @@ type DiffOptions struct {
 	Builder          *resource.Builder
 	Diff             *DiffProgram
 	Prune            bool
-	PruneWhitelist   []string
 	pruner           *pruner
 }
 
@@ -137,10 +135,7 @@ func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
 			Exec:      exec.New(),
 			IOStreams: ioStreams,
 		},
-		pruner: &pruner{
-			visitedUids:       sets.NewString(),
-			visitedNamespaces: sets.NewString(),
-		},
+		pruner: newPruner(),
 	}
 }
 
@@ -180,8 +175,8 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
-	cmd.Flags().StringArrayVar(&options.PruneWhitelist, "prune-whitelist", options.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Automatically diff for possibly will be deleted resource objects, Should be used with either -l or --prune-all.")
+	cmd.Flags().StringArray("prunewhitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
+	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Include resources that would be deleted by pruning. Can be used with -l and default shows all would be pruned resources")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
@@ -661,7 +656,7 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 			return err
 		}
 
-		o.pruner.resources, err = prune.ParseResources(o.pruner.mapper, o.PruneWhitelist)
+		o.pruner.resources, err = prune.ParseResources(o.pruner.mapper, cmdutil.GetFlagStringArray(cmd, "prunewhitelist"))
 		if err != nil {
 			return err
 		}
