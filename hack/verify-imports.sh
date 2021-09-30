@@ -43,4 +43,4 @@ if [[ ! -x "$importverifier" ]]; then
   exit 1
 fi
 
-"${importverifier}" "k8s.io/" "${KUBE_ROOT}/staging/publishing/import-restrictions.yaml"
+"${importverifier}" "k8s.io/" "${KUBE_ROOT}/staging/publishing/import-restrictions.yaml" --disallowed-import "github.com/pkg/errors" --ignored-path "cmd/kubeadm/app"

@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	flag "github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
 )
 
@@ -59,15 +60,6 @@ type ImportRestriction struct {
 	AllowedImports []string `yaml:"allowedImports"`
 	// ExcludeTests will skip checking test dependencies.
 	ExcludeTests bool `yaml:"excludeTests"`
-}
-
-// DisallowedImport describes an Import that should no longer be imported
-// TODO: Map to YAML if the list of DisallowedImport grow
-type DisallowedImport struct {
-	// Pkg The package that's disallowed
-	Pkg string
-	// IgnoredTrees ignore the check against those sub-trees
-	IgnoredTrees []string
 }
 
 // ForbiddenImportsFor determines all of the forbidden
@@ -177,11 +169,16 @@ func (i *ImportRestriction) isForbidden(imp string) bool {
 	return importsBelowRoot && !importsBelowBase && !importsAllowed
 }
 
-var rootPackage string
+var (
+	rootPackage       string
+	disallowedImports = flag.StringSlice("disallowed-import", []string{}, "The package that's disallowed")
+	ignoredPaths      = flag.StringSlice("ignored-path", []string{}, "Ignore the check against those sub-paths")
+)
 
 func main() {
-	if len(os.Args) != 3 {
-		log.Fatalf("Usage: %s ROOT RESTRICTIONS.yaml", os.Args[0])
+	flag.Parse()
+	if len(os.Args) < 3 {
+		log.Fatalf("Usage: %s ROOT RESTRICTIONS.yaml --disallowed-import \"..\" --ignored-path \"..\"", os.Args[0])
 	}
 
 	rootPackage = os.Args[1]
@@ -310,25 +307,21 @@ func logForbiddenPackages(base string, forbidden []string) {
 }
 
 // Check if any imports are disallowed
-// Exec e.g find . -name "*.go" |  grep -v vendor/ | grep -v cmd/kubeadm/app | { xargs grep 'github.com/pkg/errors' -sl || true; }
+// Supply the disallowed imports using the flag --disallowed-import
+// To ignore specific sub-path using  --ignored-path
+// this will execute:
+// find . -name "*.go" |  grep -v vendor/ | grep -v cmd/kubeadm/app | { xargs grep 'whatever/package' -sl || true; }
 func verifyDisallowedImports() error {
-
-	// Manually create a single entry for github/pkg/errors
-	disallowedImports := []DisallowedImport{{
-		Pkg:          "github.com/pkg/errors",
-		IgnoredTrees: []string{"cmd/kubeadm/app", "cmd/importverifier"},
-	},
-	}
 
 	cmd := "find "
 	args := []string{".", "-name", "\"*.go\"", "|", "grep", "-v", "vendor/"}
 	fArgs := []string{"|", "{", "xargs", "grep"}
 
-	for _, di := range disallowedImports {
+	for _, di := range *disallowedImports {
 		// Add the Pkg to look for using grep
-		fArgs = append(fArgs, "'"+di.Pkg+"'", "-sl", "||", "true;", "}")
+		fArgs = append(fArgs, "'"+di+"'", "-sl", "||", "true;", "}")
 
-		for _, tree := range di.IgnoredTrees {
+		for _, tree := range *ignoredPaths {
 			args = append(args, "|", "grep", "-v", tree)
 		}
 		args = append(args, fArgs...)
@@ -346,7 +339,7 @@ func verifyDisallowedImports() error {
 		}
 
 		if len(stdout) != 0 {
-			return fmt.Errorf("Disallowed Import '%s' is used: \n%s", di.Pkg, stdout)
+			return fmt.Errorf("Disallowed Import '%s' is being used: \n%s", di, stdout)
 		}
 	}
 
