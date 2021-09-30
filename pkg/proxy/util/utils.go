@@ -24,14 +24,15 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/events"
+	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	netutils "k8s.io/utils/net"
 
 	"k8s.io/klog/v2"
@@ -50,7 +51,7 @@ var (
 	ErrAddressNotAllowed = errors.New("address not allowed")
 
 	// ErrNoAddresses indicates there are no addresses for the hostname
-	ErrNoAddresses = errors.New("No addresses for hostname")
+	ErrNoAddresses = errors.New("no addresses for hostname")
 )
 
 // isValidEndpoint checks that the given host / port pair are valid endpoint
@@ -176,12 +177,12 @@ func GetLocalAddrSet() netutils.IPSet {
 func ShouldSkipService(service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).Infof("Skipping service %s in namespace %s due to clusterIP = %q", service.Name, service.Namespace, service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service due to cluster IP", "service", klog.KObj(service), "clusterIP", service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).Infof("Skipping service %s in namespace %s due to Type=ExternalName", service.Name, service.Namespace)
+		klog.V(3).InfoS("Skipping service due to Type=ExternalName", "service", klog.KObj(service))
 		return true
 	}
 	return false
@@ -254,7 +255,7 @@ func GetNodeAddresses(cidrs []string, nw NetworkInterfacer) (sets.String, error)
 // LogAndEmitIncorrectIPVersionEvent logs and emits incorrect IP version event.
 func LogAndEmitIncorrectIPVersionEvent(recorder events.EventRecorder, fieldName, fieldValue, svcNamespace, svcName string, svcUID types.UID) {
 	errMsg := fmt.Sprintf("%s in %s has incorrect IP version", fieldValue, fieldName)
-	klog.Errorf("%s (service %s/%s).", errMsg, svcNamespace, svcName)
+	klog.ErrorS(nil, "Incorrect IP version", "service", klog.KRef(svcNamespace, svcName), "field", fieldName, "value", fieldValue)
 	if recorder != nil {
 		recorder.Eventf(
 			&v1.ObjectReference{
@@ -274,7 +275,15 @@ func MapIPsByIPFamily(ipStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromIP(ip); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], ip)
 		} else {
-			klog.Errorf("Skipping invalid IP: %s", ip)
+			// this function is called in multiple places. All of which
+			// have sanitized data. Except the case of ExternalIPs which is
+			// not validated by api-server. Specifically empty strings
+			// validation. Which yields into a lot of bad error logs.
+			// check for empty string
+			if len(strings.TrimSpace(ip)) != 0 {
+				klog.ErrorS(nil, "Skipping invalid IP", "ip", ip)
+
+			}
 		}
 	}
 	return ipFamilyMap
@@ -288,7 +297,7 @@ func MapCIDRsByIPFamily(cidrStrings []string) map[v1.IPFamily][]string {
 		if ipFamily, err := getIPFamilyFromCIDR(cidr); err == nil {
 			ipFamilyMap[ipFamily] = append(ipFamilyMap[ipFamily], cidr)
 		} else {
-			klog.Errorf("Skipping invalid cidr: %s", cidr)
+			klog.ErrorS(nil, "Skipping invalid CIDR", "cidr", cidr)
 		}
 	}
 	return ipFamilyMap
@@ -367,7 +376,7 @@ func EnsureSysctl(sysctl utilsysctl.Interface, name string, newVal int) error {
 		if err := sysctl.SetSysctl(name, newVal); err != nil {
 			return fmt.Errorf("can't set sysctl %s to %d: %v", name, newVal, err)
 		}
-		klog.V(1).Infof("Changed sysctl %q: %d -> %d", name, oldVal, newVal)
+		klog.V(1).InfoS("Changed sysctl", "name", name, "before", oldVal, "after", newVal)
 	}
 	return nil
 }
@@ -496,7 +505,7 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[netutils.LocalPort]ne
 	for k, v := range replacementPortsMap {
 		// Only close newly opened local ports - leave ones that were open before this update
 		if originalPortsMap[k] == nil {
-			klog.V(2).Infof("Closing local port %s", k.String())
+			klog.V(2).InfoS("Closing local port", "port", k.String())
 			v.Close()
 		}
 	}

@@ -30,7 +30,6 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/metrics"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	netutils "k8s.io/utils/net"
 )
@@ -75,22 +74,19 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	}
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
-	dualStackEnabled := effectiveFeatures.Enabled(kubefeatures.IPv6DualStack)
-
 	if config.ClusterCIDR != "" {
 		cidrs := strings.Split(config.ClusterCIDR, ",")
 		switch {
-		// if DualStack only valid one cidr or two cidrs with one of each IP family
-		case dualStackEnabled && len(cidrs) > 2:
+		case len(cidrs) > 2:
 			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed or a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
 		// if DualStack and two cidrs validate if there is at least one of each IP family
-		case dualStackEnabled && len(cidrs) == 2:
+		case len(cidrs) == 2:
 			isDual, err := netutils.IsDualStackCIDRStrings(cidrs)
 			if err != nil || !isDual {
 				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid DualStack CIDR (e.g. 10.100.0.0/16,fde4:8dba:82e1::/48)"))
 			}
 		// if not DualStack only one CIDR allowed
-		case !dualStackEnabled && len(cidrs) > 1:
+		case len(cidrs) > 1:
 			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "only one CIDR allowed (e.g. 10.100.0.0/16 or fde4:8dba:82e1::/48)"))
 		// if we are here means that len(cidrs) == 1, we need to validate it
 		default:

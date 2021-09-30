@@ -147,9 +147,7 @@ aliases:
   # emeritus:
   # - rootfs
   sig-storage-reviewers:
-    - saad-ali
     - jsafrane
-    - rootfs
     - jingxu97
     - msau42
     - gnufied
@@ -162,6 +160,7 @@ aliases:
     - saikat-royc
   # emeritus:
   # - davidz627
+  # - rootfs
 
   sig-scheduling-maintainers:
     - alculquicondor
@@ -310,6 +309,7 @@ aliases:
     - smarterclayton
     - soltysh
     - krmayankk
+    - alculquicondor
   # sig-apps-emeritus:
   # - tnozicka
 
@@ -486,6 +486,7 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
+    - ehashman
 
   sig-scalability-approvers:
     - mm4tt

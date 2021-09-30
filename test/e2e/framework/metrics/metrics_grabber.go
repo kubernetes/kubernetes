@@ -318,7 +318,7 @@ func (g *Grabber) GrabFromSnapshotController(podName string, port int) (Snapshot
 func (g *Grabber) GrabFromAPIServer() (APIServerMetrics, error) {
 	output, err := g.getMetricsFromAPIServer()
 	if err != nil {
-		return APIServerMetrics{}, nil
+		return APIServerMetrics{}, err
 	}
 	return parseAPIServerMetrics(output)
 }

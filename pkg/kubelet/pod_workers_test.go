@@ -27,13 +27,13 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
+	"k8s.io/utils/clock"
 )
 
 // fakePodWorkers runs sync pod function in serial, so we can have
@@ -49,6 +49,7 @@ type fakePodWorkers struct {
 	statusLock            sync.Mutex
 	running               map[types.UID]bool
 	terminating           map[types.UID]bool
+	terminated            map[types.UID]bool
 	terminationRequested  map[types.UID]bool
 	removeRuntime         map[types.UID]bool
 	removeContent         map[types.UID]bool
@@ -81,10 +82,15 @@ func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
 	}
 }
 
-func (f *fakePodWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkType {
+func (f *fakePodWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkerState {
 	return nil
 }
 
+func (f *fakePodWorkers) IsPodKnownTerminated(uid types.UID) bool {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.terminated[uid]
+}
 func (f *fakePodWorkers) CouldHaveRunningContainers(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
@@ -104,6 +110,11 @@ func (f *fakePodWorkers) ShouldPodRuntimeBeRemoved(uid types.UID) bool {
 	f.statusLock.Lock()
 	defer f.statusLock.Unlock()
 	return f.removeRuntime[uid]
+}
+func (f *fakePodWorkers) setPodRuntimeBeRemoved(uid types.UID) {
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	f.removeRuntime = map[types.UID]bool{uid: true}
 }
 func (f *fakePodWorkers) ShouldPodContentBeRemoved(uid types.UID) bool {
 	f.statusLock.Lock()

@@ -38,10 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	netutils "k8s.io/utils/net"
 
 	// TODO: remove this import if
@@ -49,71 +47,13 @@ import (
 	// to "v1"?
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
-
-func TestDisabledSubpath(t *testing.T) {
-	fhu := hostutil.NewFakeHostUtil(nil)
-	fsp := &subpath.FakeSubpath{}
-	pod := v1.Pod{
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-		},
-	}
-	podVolumes := kubecontainer.VolumeMap{
-		"disk": kubecontainer.VolumeInfo{Mounter: &stubVolume{path: "/mnt/disk"}},
-	}
-
-	cases := map[string]struct {
-		container   v1.Container
-		expectError bool
-	}{
-		"subpath not specified": {
-			v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			false,
-		},
-		"subpath specified": {
-			v1.Container{
-				VolumeMounts: []v1.VolumeMount{
-					{
-						MountPath: "/mnt/path3",
-						SubPath:   "/must/not/be/absolute",
-						Name:      "disk",
-						ReadOnly:  true,
-					},
-				},
-			},
-			true,
-		},
-	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
-	for name, test := range cases {
-		_, _, err := makeMounts(&pod, "/pod", &test.container, "fakepodname", "", []string{}, podVolumes, fhu, fsp, nil, false)
-		if err != nil && !test.expectError {
-			t.Errorf("test %v failed: %v", name, err)
-		}
-		if err == nil && test.expectError {
-			t.Errorf("test %v failed: expected error", name)
-		}
-	}
-}
 
 func TestNodeHostsFileContent(t *testing.T) {
 	testCases := []struct {
@@ -3170,7 +3110,6 @@ func TestTruncatePodHostname(t *testing.T) {
 func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 	testcases := []struct {
 		name          string
-		dualStack     bool
 		nodeAddresses []v1.NodeAddress
 		criPodIPs     []string
 		podIPs        []v1.PodIP
@@ -3195,21 +3134,10 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			},
 		},
 		{
-			name: "Dual-stack addresses are ignored in single-stack cluster",
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
-			},
-			podIPs: []v1.PodIP{
-				{IP: "10.0.0.1"},
-			},
-		},
-		{
 			name: "Single-stack addresses in dual-stack cluster",
 			nodeAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 			},
-			dualStack: true,
 			podIPs: []v1.PodIP{
 				{IP: "10.0.0.1"},
 			},
@@ -3221,7 +3149,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
 				{Type: v1.NodeExternalIP, Address: "192.168.0.1"},
 			},
-			dualStack: true,
 			podIPs: []v1.PodIP{
 				{IP: "10.0.0.1"},
 			},
@@ -3232,7 +3159,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			podIPs: []v1.PodIP{
 				{IP: "10.0.0.1"},
 				{IP: "fd01::1234"},
@@ -3244,7 +3170,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			criPodIPs: []string{"192.168.0.1"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
@@ -3256,7 +3181,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			criPodIPs: []string{"192.168.0.1", "2001:db8::2"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
@@ -3270,7 +3194,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			criPodIPs: []string{"2001:db8::2", "192.168.0.1"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
@@ -3284,8 +3207,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.dualStack)()
 
 			kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 				{

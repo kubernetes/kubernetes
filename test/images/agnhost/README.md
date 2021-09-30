@@ -417,6 +417,8 @@ It will also start a UDP server on the indicated UDP port that responds to the f
 - `echo <msg>`: Returns the given `<msg>`
 - `clientip`: Returns the request's IP address
 
+The UDP server can be disabled by setting `--udp-port -1`.
+
 Additionally, if (and only if) `--sctp-port` is passed, it will start an SCTP server on that port,
 responding to the same commands as the UDP server.
 
@@ -643,6 +645,7 @@ The Windows `agnhost` image includes a `nc` binary that is 100% compliant with i
 
 ## Image
 
-The image can be found at `k8s.gcr.io/e2e-test-images/agnhost:2.32` for both Linux and
+The image can be found at `k8s.gcr.io/e2e-test-images/agnhost:2.33` for both Linux and
 Windows containers (based on `mcr.microsoft.com/windows/nanoserver:1809`,
-`mcr.microsoft.com/windows/nanoserver:2004`, and `mcr.microsoft.com/windows/nanoserver:20H2`).
+`mcr.microsoft.com/windows/nanoserver:2004`, `mcr.microsoft.com/windows/nanoserver:20H2`, and
+`mcr.microsoft.com/windows/nanoserver:ltsc2022`).

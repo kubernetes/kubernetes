@@ -137,8 +137,13 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 	}
 	dialOptions := []grpc.DialOption{
 		grpc.WithBlock(), // block until the underlying connection is up
-		grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
-		grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
+		// use chained interceptors so that the default (retry and backoff) interceptors are added.
+		// otherwise they will be overwritten by the metric interceptor.
+		//
+		// these optional interceptors will be placed after the default ones.
+		// which seems to be what we want as the metrics will be collected on each attempt (retry)
+		grpc.WithChainUnaryInterceptor(grpcprom.UnaryClientInterceptor),
+		grpc.WithChainStreamInterceptor(grpcprom.StreamClientInterceptor),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
 		tracingOpts := []otelgrpc.Option{
@@ -244,7 +249,7 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 	}, nil
 }
 
-func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
+func newETCD3Storage(c storagebackend.ConfigForResource, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {
 		return nil, nil, err
@@ -276,7 +281,7 @@ func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (st
 	if transformer == nil {
 		transformer = value.IdentityTransformer
 	}
-	return etcd3.New(client, c.Codec, newFunc, c.Prefix, transformer, c.Paging, c.LeaseManagerConfig), destroyFunc, nil
+	return etcd3.New(client, c.Codec, newFunc, c.Prefix, c.GroupResource, transformer, c.Paging, c.LeaseManagerConfig), destroyFunc, nil
 }
 
 // startDBSizeMonitorPerEndpoint starts a loop to monitor etcd database size and update the

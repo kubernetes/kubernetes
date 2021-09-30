@@ -22,7 +22,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -41,7 +41,7 @@ var _ = SIGDescribe("Security Context", func() {
 		podClient = f.PodClient()
 	})
 
-	ginkgo.Context("when pod PID namespace is configurable [Feature:ShareProcessNamespace][NodeAlphaFeature:ShareProcessNamespace]", func() {
+	ginkgo.Context("Container PID namespace sharing", func() {
 		ginkgo.It("containers in pods using isolated PID namespaces should all receive PID 1", func() {
 			ginkgo.By("Create a pod with isolated PID namespaces.")
 			f.PodClient().CreateSync(&v1.Pod{
@@ -71,7 +71,7 @@ var _ = SIGDescribe("Security Context", func() {
 			}
 		})
 
-		ginkgo.It("processes in containers sharing a pod namespace should be able to see each other [Alpha]", func() {
+		ginkgo.It("processes in containers sharing a pod namespace should be able to see each other", func() {
 			ginkgo.By("Check whether shared PID namespace is supported.")
 			isEnabled, err := isSharedPIDNamespaceSupported()
 			framework.ExpectNoError(err)

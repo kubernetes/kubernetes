@@ -33,4 +33,7 @@ import (
 
 	// dependencies
 	_ "sigs.k8s.io/zeitgeist"
+
+	// mockgen
+	_ "github.com/golang/mock/mockgen"
 )

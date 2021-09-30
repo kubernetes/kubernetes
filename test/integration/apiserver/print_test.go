@@ -141,6 +141,7 @@ func TestServerSidePrint(t *testing.T) {
 			{Group: "node.k8s.io", Version: "v1beta1"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1alpha1"},
 			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta1"},
+			{Group: "flowcontrol.apiserver.k8s.io", Version: "v1beta2"},
 			{Group: "internal.apiserver.k8s.io", Version: "v1alpha1"},
 		},
 		[]schema.GroupVersionResource{},

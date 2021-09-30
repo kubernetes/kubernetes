@@ -27,14 +27,11 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
@@ -79,7 +76,7 @@ func TestVolumeBinding(t *testing.T) {
 		nodes                   []*v1.Node
 		pvcs                    []*v1.PersistentVolumeClaim
 		pvs                     []*v1.PersistentVolume
-		feature                 featuregate.Feature
+		fts                     feature.Features
 		args                    *config.VolumeBindingArgs
 		wantPreFilterStatus     *framework.Status
 		wantStateAfterPreFilter *stateData
@@ -263,7 +260,7 @@ func TestVolumeBinding(t *testing.T) {
 				podVolumesByNode: map[string]*PodVolumes{},
 			},
 			wantFilterStatus: []*framework.Status{
-				framework.NewStatus(framework.UnschedulableAndUnresolvable, `pvc(s) bound to non-existent pv(s)`),
+				framework.NewStatus(framework.UnschedulableAndUnresolvable, `node(s) unavailable due to one or more pvc(s) bound to non-existent pv(s)`),
 			},
 			wantScores: []int64{
 				0,
@@ -298,7 +295,9 @@ func TestVolumeBinding(t *testing.T) {
 					withCapacity(resource.MustParse("100Gi")).
 					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
 			},
-			feature:             features.VolumeCapacityPriority,
+			fts: feature.Features{
+				EnableVolumeCapacityPriority: true,
+			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
 				boundClaims: []*v1.PersistentVolumeClaim{},
@@ -364,7 +363,9 @@ func TestVolumeBinding(t *testing.T) {
 					withCapacity(resource.MustParse("100Gi")).
 					withNodeAffinity(map[string][]string{v1.LabelHostname: {"node-b"}}).PersistentVolume,
 			},
-			feature:             features.VolumeCapacityPriority,
+			fts: feature.Features{
+				EnableVolumeCapacityPriority: true,
+			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
 				boundClaims: []*v1.PersistentVolumeClaim{},
@@ -441,7 +442,9 @@ func TestVolumeBinding(t *testing.T) {
 						"topology.kubernetes.io/zone":   {"zone-b"},
 					}).PersistentVolume,
 			},
-			feature:             features.VolumeCapacityPriority,
+			fts: feature.Features{
+				EnableVolumeCapacityPriority: true,
+			},
 			wantPreFilterStatus: nil,
 			wantStateAfterPreFilter: &stateData{
 				boundClaims: []*v1.PersistentVolumeClaim{},
@@ -523,7 +526,9 @@ func TestVolumeBinding(t *testing.T) {
 						"topology.kubernetes.io/zone":   {"zone-b"},
 					}).PersistentVolume,
 			},
-			feature: features.VolumeCapacityPriority,
+			fts: feature.Features{
+				EnableVolumeCapacityPriority: true,
+			},
 			args: &config.VolumeBindingArgs{
 				BindTimeoutSeconds: 300,
 				Shape: []config.UtilizationShapePoint{
@@ -570,9 +575,6 @@ func TestVolumeBinding(t *testing.T) {
 
 	for _, item := range table {
 		t.Run(item.name, func(t *testing.T) {
-			if item.feature != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, item.feature, true)()
-			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			client := fake.NewSimpleClientset()
@@ -592,12 +594,12 @@ func TestVolumeBinding(t *testing.T) {
 				args = &config.VolumeBindingArgs{
 					BindTimeoutSeconds: 300,
 				}
-				if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+				if item.fts.EnableVolumeCapacityPriority {
 					args.Shape = defaultShapePoint
 				}
 			}
 
-			pl, err := New(args, fh)
+			pl, err := New(args, fh, item.fts)
 			if err != nil {
 				t.Fatal(err)
 			}

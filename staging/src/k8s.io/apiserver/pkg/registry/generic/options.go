@@ -26,9 +26,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// RESTOptions is set of configuration options to generic registries.
+// RESTOptions is set of resource-specific configuration options to generic registries.
 type RESTOptions struct {
-	StorageConfig *storagebackend.Config
+	StorageConfig *storagebackend.ConfigForResource
 	Decorator     StorageDecorator
 
 	EnableGarbageCollection   bool

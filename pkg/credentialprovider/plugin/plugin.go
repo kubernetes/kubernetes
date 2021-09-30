@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	credentialproviderapi "k8s.io/kubelet/pkg/apis/credentialprovider"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubeletconfigv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/config/v1alpha1"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -85,6 +85,9 @@ func RegisterCredentialProviderPlugins(pluginConfigFile, pluginBinDir string) er
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to validate credential provider config: %v", errs.ToAggregate())
 	}
+
+	// Register metrics for credential providers
+	registerMetrics()
 
 	for _, provider := range credentialProviderConfig.Providers {
 		pluginBin := filepath.Join(pluginBinDir, provider.Name)
@@ -398,14 +401,8 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 	// also, this behaviour is inline with Credential Provider Config spec
 	cmd.Env = mergeEnvVars(e.environ(), configEnvVars)
 
-	err = cmd.Run()
-	if ctx.Err() != nil {
-		return nil, fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, ctx.Err())
-	}
-
-	if err != nil {
-		klog.V(2).Infof("Error execing credential provider plugin, stderr: %v", stderr.String())
-		return nil, fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, err)
+	if err = e.runPlugin(ctx, cmd, image); err != nil {
+		return nil, err
 	}
 
 	data = stdout.Bytes()
@@ -426,6 +423,22 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 	}
 
 	return response, nil
+}
+
+func (e *execPlugin) runPlugin(ctx context.Context, cmd *exec.Cmd, image string) error {
+	startTime := time.Now()
+	defer kubeletCredentialProviderPluginDuration.WithLabelValues(e.name).Observe(time.Since(startTime).Seconds())
+
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		kubeletCredentialProviderPluginErrors.WithLabelValues(e.name).Inc()
+		return fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, ctx.Err())
+	}
+	if err != nil {
+		kubeletCredentialProviderPluginErrors.WithLabelValues(e.name).Inc()
+		return fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, err)
+	}
+	return nil
 }
 
 // encodeRequest encodes the internal CredentialProviderRequest type into the v1alpha1 version in json

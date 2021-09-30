@@ -32,9 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var nevererrc chan error
@@ -376,7 +377,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 			func(t *testing.T) {
 				stopCh := make(chan struct{})
 				connFails := test.numConnFails
-				fakeClock := clock.NewFakeClock(time.Unix(0, 0))
+				fakeClock := testingclock.NewFakeClock(time.Unix(0, 0))
 				bm := wait.NewExponentialBackoffManager(time.Millisecond, maxBackoff, 100*time.Millisecond, 2.0, 1.0, fakeClock)
 				done := make(chan struct{})
 				defer close(done)

@@ -285,7 +285,7 @@ var _ = common.SIGDescribe("Conntrack", func() {
 	// IP could result in the connection being closed with the error "Connection reset by
 	// peer"
 	// xref: https://kubernetes.io/blog/2019/03/29/kube-proxy-subtleties-debugging-an-intermittent-connection-reset/
-	ginkgo.It("should drop INVALID conntrack entries", func() {
+	ginkgo.It("should drop INVALID conntrack entries [Privileged]", func() {
 		serverLabel := map[string]string{
 			"app": "boom-server",
 		}
@@ -323,6 +323,11 @@ var _ = common.SIGDescribe("Conntrack", func() {
 										FieldPath:  "status.podIPs",
 									},
 								},
+							},
+						},
+						SecurityContext: &v1.SecurityContext{
+							Capabilities: &v1.Capabilities{
+								Add: []v1.Capability{"NET_RAW"},
 							},
 						},
 					},
@@ -381,19 +386,19 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		// if conntrack does not drop the invalid packets it will go through without NAT
 		// so the client will receive an unexpected TCP connection and RST the connection
 		// the server will log ERROR if that happens
-		ginkgo.By("checking client pod does not RST the TCP connection because it receives and INVALID packet")
+		ginkgo.By("checking client pod does not RST the TCP connection because it receives an INVALID packet")
 		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn("ERROR", "boom-server")); err == nil {
 			logs, err := e2epod.GetPodLogs(cs, ns, "boom-server", "boom-server")
 			framework.ExpectNoError(err)
 			framework.Logf("boom-server pod logs: %s", logs)
-			framework.Failf("Boom server pod received a RST from the client")
+			framework.Failf("boom-server pod received a RST from the client")
 		}
 
 		logs, err := e2epod.GetPodLogs(cs, ns, "boom-server", "boom-server")
 		framework.ExpectNoError(err)
 		if !strings.Contains(string(logs), "connection established") {
 			framework.Logf("boom-server pod logs: %s", logs)
-			framework.Failf("Boom server pod did not sent any bad packet to the client")
+			framework.Failf("boom-server pod did not send any bad packet to the client")
 		}
 		framework.Logf("boom-server pod logs: %s", logs)
 		framework.Logf("boom-server OK: did not receive any RST packet")

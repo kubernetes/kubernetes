@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -copyright_file=$BUILD_TAG_FILE -source=interface.go  -destination=mockvmclient/interface.go -package=mockvmclient Interface
 package vmclient
 
 import (
@@ -32,8 +33,6 @@ const (
 )
 
 // Interface is the client interface for VirtualMachines.
-// Don't forget to run the following command to generate the mock client:
-// mockgen -source=$GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmclient/interface.go -package=mockvmclient Interface > $GOPATH/src/k8s.io/kubernetes/staging/src/k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient/interface.go
 type Interface interface {
 	// Get gets a VirtualMachine.
 	Get(ctx context.Context, resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (compute.VirtualMachine, *retry.Error)

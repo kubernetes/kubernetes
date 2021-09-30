@@ -45,7 +45,7 @@ func (e *listWorkEstimator) estimate(r *http.Request) WorkEstimate {
 	if !ok {
 		// no RequestInfo should never happen, but to be on the safe side
 		// let's return maximumSeats
-		return WorkEstimate{Seats: maximumSeats}
+		return WorkEstimate{InitialSeats: maximumSeats}
 	}
 
 	query := r.URL.Query()
@@ -55,18 +55,18 @@ func (e *listWorkEstimator) estimate(r *http.Request) WorkEstimate {
 
 		// This request is destined to fail in the validation layer,
 		// return maximumSeats for this request to be consistent.
-		return WorkEstimate{Seats: maximumSeats}
+		return WorkEstimate{InitialSeats: maximumSeats}
 	}
 	isListFromCache := !shouldListFromStorage(query, &listOptions)
 
-	count, err := e.countGetterFn(key(requestInfo))
+	numStored, err := e.countGetterFn(key(requestInfo))
 	switch {
 	case err == ObjectCountStaleErr:
 		// object count going stale is indicative of degradation, so we should
 		// be conservative here and allocate maximum seats to this list request.
 		// NOTE: if a CRD is removed, its count will go stale first and then the
 		// pruner will eventually remove the CRD from the cache.
-		return WorkEstimate{Seats: maximumSeats}
+		return WorkEstimate{InitialSeats: maximumSeats}
 	case err == ObjectCountNotFoundErr:
 		// there are two scenarios in which we can see this error:
 		//  a. the type is truly unknown, a typo on the caller's part.
@@ -75,30 +75,30 @@ func (e *listWorkEstimator) estimate(r *http.Request) WorkEstimate {
 		// we don't have a way to distinguish between a and b. b seems to indicate
 		// to a more severe case of degradation, although b can naturally trigger
 		// when a CRD is removed. let's be conservative and allocate maximum seats.
-		return WorkEstimate{Seats: maximumSeats}
+		return WorkEstimate{InitialSeats: maximumSeats}
 	case err != nil:
 		// we should never be here since Get returns either ObjectCountStaleErr or
 		// ObjectCountNotFoundErr, return maximumSeats to be on the safe side.
-		return WorkEstimate{Seats: maximumSeats}
+		return WorkEstimate{InitialSeats: maximumSeats}
 	}
 
-	// TODO: For resources that implement indexes at the watchcache level,
-	//  we need to adjust the cost accordingly
+	limit := numStored
+	if utilfeature.DefaultFeatureGate.Enabled(features.APIListChunking) && listOptions.Limit > 0 &&
+		listOptions.Limit < numStored {
+		limit = listOptions.Limit
+	}
+
 	var estimatedObjectsToBeProcessed int64
+
 	switch {
 	case isListFromCache:
-		// if we are here, count is known
-		estimatedObjectsToBeProcessed = count
+		// TODO: For resources that implement indexes at the watchcache level,
+		//  we need to adjust the cost accordingly
+		estimatedObjectsToBeProcessed = numStored
+	case listOptions.FieldSelector != "" || listOptions.LabelSelector != "":
+		estimatedObjectsToBeProcessed = numStored + limit
 	default:
-		// Even if a selector is specified and we may need to list and go over more objects from etcd
-		// to produce the result of size <limit>, each individual chunk will be of size at most <limit>.
-		// As a result. the work estimate of the request should be computed based on <limit> and the actual
-		// cost of processing more elements will be hidden in the request processing latency.
-		estimatedObjectsToBeProcessed = listOptions.Limit
-		if estimatedObjectsToBeProcessed == 0 {
-			// limit has not been specified, fall back to count
-			estimatedObjectsToBeProcessed = count
-		}
+		estimatedObjectsToBeProcessed = 2 * limit
 	}
 
 	// for now, our rough estimate is to allocate one seat to each 100 obejcts that
@@ -114,7 +114,7 @@ func (e *listWorkEstimator) estimate(r *http.Request) WorkEstimate {
 	if seats > maximumSeats {
 		seats = maximumSeats
 	}
-	return WorkEstimate{Seats: seats}
+	return WorkEstimate{InitialSeats: seats}
 }
 
 func key(requestInfo *apirequest.RequestInfo) string {

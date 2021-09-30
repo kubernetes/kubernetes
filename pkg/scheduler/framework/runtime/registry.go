@@ -22,11 +22,23 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"sigs.k8s.io/yaml"
 )
 
 // PluginFactory is a function that builds a plugin.
 type PluginFactory = func(configuration runtime.Object, f framework.Handle) (framework.Plugin, error)
+
+// PluginFactoryWithFts is a function that builds a plugin with certain feature gates.
+type PluginFactoryWithFts func(runtime.Object, framework.Handle, plfeature.Features) (framework.Plugin, error)
+
+// FactoryAdapter can be used to inject feature gates for a plugin that needs
+// them when the caller expects the older PluginFactory method.
+func FactoryAdapter(fts plfeature.Features, withFts PluginFactoryWithFts) PluginFactory {
+	return func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+		return withFts(plArgs, fh, fts)
+	}
+}
 
 // DecodeInto decodes configuration whose type is *runtime.Unknown to the interface into.
 func DecodeInto(obj runtime.Object, into interface{}) error {

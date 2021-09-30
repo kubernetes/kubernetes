@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Microsoft/hcsshim/hcn"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -930,55 +929,4 @@ func makeTestEndpointSlice(namespace, name string, sliceNum int, epsFunc func(*d
 	}
 	epsFunc(eps)
 	return eps
-}
-
-func Test_kernelSupportsDualstack(t *testing.T) {
-	tests := []struct {
-		currentVersion hcn.Version
-		name           string
-		want           bool
-	}{
-		{
-			hcn.Version{Major: 10, Minor: 10},
-			"Less than minimal should not be supported",
-			false,
-		},
-		{
-			hcn.Version{Major: 9, Minor: 11},
-			"Less than minimal should not be supported",
-			false,
-		},
-		{
-			hcn.Version{Major: 11, Minor: 1},
-			"Less than minimal should not be supported",
-			false,
-		},
-		{
-			hcn.Version{Major: 11, Minor: 10},
-			"Current version should be supported",
-			true,
-		},
-		{
-			hcn.Version{Major: 11, Minor: 11},
-			"Greater than minimal version should be supported",
-			true,
-		},
-		{
-			hcn.Version{Major: 12, Minor: 1},
-			"Greater than minimal version should be supported",
-			true,
-		},
-		{
-			hcn.Version{Major: 12, Minor: 12},
-			"Greater than minimal should be supported",
-			true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := kernelSupportsDualstack(tt.currentVersion); got != tt.want {
-				t.Errorf("kernelSupportsDualstack on version %v: got %v, want %v", tt.currentVersion, got, tt.want)
-			}
-		})
-	}
 }

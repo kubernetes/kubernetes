@@ -209,3 +209,30 @@ func (r *MaxOfRateLimiter) Forget(item interface{}) {
 		limiter.Forget(item)
 	}
 }
+
+// WithMaxWaitRateLimiter have maxDelay which avoids waiting too long
+type WithMaxWaitRateLimiter struct {
+	limiter  RateLimiter
+	maxDelay time.Duration
+}
+
+func NewWithMaxWaitRateLimiter(limiter RateLimiter, maxDelay time.Duration) RateLimiter {
+	return &WithMaxWaitRateLimiter{limiter: limiter, maxDelay: maxDelay}
+}
+
+func (w WithMaxWaitRateLimiter) When(item interface{}) time.Duration {
+	delay := w.limiter.When(item)
+	if delay > w.maxDelay {
+		return w.maxDelay
+	}
+
+	return delay
+}
+
+func (w WithMaxWaitRateLimiter) Forget(item interface{}) {
+	w.limiter.Forget(item)
+}
+
+func (w WithMaxWaitRateLimiter) NumRequeues(item interface{}) int {
+	return w.limiter.NumRequeues(item)
+}

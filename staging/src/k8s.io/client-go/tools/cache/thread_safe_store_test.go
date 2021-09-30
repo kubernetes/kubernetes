@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -88,5 +89,34 @@ func TestThreadSafeStoreAddKeepsNonEmptySetPostDeleteFromIndex(t *testing.T) {
 
 	if len(set) != 1 {
 		t.Errorf("Index backing string set has incorrect length, expect 1. Set length: %d", len(set))
+	}
+}
+
+func BenchmarkIndexer(b *testing.B) {
+	testIndexer := "testIndexer"
+
+	indexers := Indexers{
+		testIndexer: func(obj interface{}) (strings []string, e error) {
+			indexes := []string{obj.(string)}
+			return indexes, nil
+		},
+	}
+
+	indices := Indices{}
+	store := NewThreadSafeStore(indexers, indices).(*threadSafeMap)
+
+	// The following benchmark imitates what is happening in indexes
+	// used in storage layer, where indexing is mostly static (e.g.
+	// indexing objects by their (namespace, name)).
+	// The 5000 number imitates indexing nodes in 5000-node cluster.
+	objectCount := 5000
+	objects := make([]string, 0, 5000)
+	for i := 0; i < objectCount; i++ {
+		objects = append(objects, fmt.Sprintf("object-number-%d", i))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		store.Update(objects[i%objectCount], objects[i%objectCount])
 	}
 }

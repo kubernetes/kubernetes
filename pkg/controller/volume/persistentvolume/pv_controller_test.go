@@ -558,6 +558,14 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
 		},
 		{
+			name:                 "migration on for GCE with Beta storage provisioner annontation",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			claimAnnotations:     map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin},
+			expClaimAnnotations:  map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			migratedDriverGates:  []featuregate.Feature{features.CSIMigrationGCE},
+		},
+		{
 			name:                 "migration off for GCE",
 			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
 			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
@@ -571,6 +579,14 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
 			claimAnnotations:     map[string]string{pvutil.AnnStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
 			expClaimAnnotations:  map[string]string{pvutil.AnnStorageProvisioner: gcePlugin},
+			migratedDriverGates:  []featuregate.Feature{},
+		},
+		{
+			name:                 "migration off for GCE removes migrated to (rollback) with Beta storage provisioner annontation",
+			volumeAnnotations:    map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			expVolumeAnnotations: map[string]string{pvutil.AnnDynamicallyProvisioned: gcePlugin},
+			claimAnnotations:     map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin, pvutil.AnnMigratedTo: gceDriver},
+			expClaimAnnotations:  map[string]string{pvutil.AnnBetaStorageProvisioner: gcePlugin},
 			migratedDriverGates:  []featuregate.Feature{},
 		},
 		{
@@ -625,14 +641,14 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 			}
 			if tc.volumeAnnotations != nil {
 				ann := tc.volumeAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, pvutil.AnnDynamicallyProvisioned)
+				updateMigrationAnnotations(cmpm, translator, ann, false)
 				if !reflect.DeepEqual(tc.expVolumeAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}
 			}
 			if tc.claimAnnotations != nil {
 				ann := tc.claimAnnotations
-				updateMigrationAnnotations(cmpm, translator, ann, pvutil.AnnStorageProvisioner)
+				updateMigrationAnnotations(cmpm, translator, ann, true)
 				if !reflect.DeepEqual(tc.expClaimAnnotations, ann) {
 					t.Errorf("got volume annoations: %v, but expected: %v", ann, tc.expVolumeAnnotations)
 				}

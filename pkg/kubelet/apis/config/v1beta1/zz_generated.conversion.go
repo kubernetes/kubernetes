@@ -308,7 +308,9 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	if err := v1.Convert_Pointer_int64_To_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
 		return err
 	}
-	out.ResolverConfig = in.ResolverConfig
+	if err := v1.Convert_Pointer_string_To_string(&in.ResolverConfig, &out.ResolverConfig, s); err != nil {
+		return err
+	}
 	out.RunOnce = in.RunOnce
 	if err := v1.Convert_Pointer_bool_To_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
 		return err
@@ -479,7 +481,9 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	if err := v1.Convert_int64_To_Pointer_int64(&in.PodPidsLimit, &out.PodPidsLimit, s); err != nil {
 		return err
 	}
-	out.ResolverConfig = in.ResolverConfig
+	if err := v1.Convert_string_To_Pointer_string(&in.ResolverConfig, &out.ResolverConfig, s); err != nil {
+		return err
+	}
 	out.RunOnce = in.RunOnce
 	if err := v1.Convert_bool_To_Pointer_bool(&in.CPUCFSQuota, &out.CPUCFSQuota, s); err != nil {
 		return err

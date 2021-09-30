@@ -134,9 +134,7 @@ func TestSchedulerDefaults(t *testing.T) {
 			name:   "empty config",
 			config: &v1beta1.KubeSchedulerConfiguration{},
 			expected: &v1beta1.KubeSchedulerConfiguration{
-				Parallelism:        pointer.Int32Ptr(16),
-				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
-				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				Parallelism: pointer.Int32Ptr(16),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
@@ -173,9 +171,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				Profiles: []v1beta1.KubeSchedulerProfile{{}},
 			},
 			expected: &v1beta1.KubeSchedulerConfiguration{
-				Parallelism:        pointer.Int32Ptr(16),
-				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
-				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				Parallelism: pointer.Int32Ptr(16),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
@@ -229,9 +225,7 @@ func TestSchedulerDefaults(t *testing.T) {
 				},
 			},
 			expected: &v1beta1.KubeSchedulerConfiguration{
-				Parallelism:        pointer.Int32Ptr(16),
-				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
-				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				Parallelism: pointer.Int32Ptr(16),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,
@@ -431,95 +425,12 @@ func TestSchedulerDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "metrics and healthz address with no port",
-			config: &v1beta1.KubeSchedulerConfiguration{
-				Parallelism:        pointer.Int32Ptr(16),
-				MetricsBindAddress: pointer.StringPtr("1.2.3.4"),
-				HealthzBindAddress: pointer.StringPtr("1.2.3.4"),
-			},
-			expected: &v1beta1.KubeSchedulerConfiguration{
-				Parallelism:        pointer.Int32Ptr(16),
-				HealthzBindAddress: pointer.StringPtr("1.2.3.4:10251"),
-				MetricsBindAddress: pointer.StringPtr("1.2.3.4:10251"),
-				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
-					EnableProfiling:           &enable,
-					EnableContentionProfiling: &enable,
-				},
-				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       pointer.BoolPtr(true),
-					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "leases",
-					ResourceNamespace: "kube-system",
-					ResourceName:      "kube-scheduler",
-				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					QPS:         50,
-					Burst:       100,
-					ContentType: "application/vnd.kubernetes.protobuf",
-				},
-				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
-				Profiles: []v1beta1.KubeSchedulerProfile{
-					{
-						SchedulerName: pointer.StringPtr("default-scheduler"),
-						Plugins:       getDefaultPlugins(),
-						PluginConfig:  pluginConfigs,
-					},
-				},
-			},
-		},
-		{
-			name: "metrics and healthz port with no address",
-			config: &v1beta1.KubeSchedulerConfiguration{
-				MetricsBindAddress: pointer.StringPtr(":12345"),
-				HealthzBindAddress: pointer.StringPtr(":12345"),
-			},
-			expected: &v1beta1.KubeSchedulerConfiguration{
-				Parallelism:        pointer.Int32Ptr(16),
-				HealthzBindAddress: pointer.StringPtr("0.0.0.0:12345"),
-				MetricsBindAddress: pointer.StringPtr("0.0.0.0:12345"),
-				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
-					EnableProfiling:           &enable,
-					EnableContentionProfiling: &enable,
-				},
-				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       pointer.BoolPtr(true),
-					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "leases",
-					ResourceNamespace: "kube-system",
-					ResourceName:      "kube-scheduler",
-				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					QPS:         50,
-					Burst:       100,
-					ContentType: "application/vnd.kubernetes.protobuf",
-				},
-				PercentageOfNodesToScore: pointer.Int32Ptr(0),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
-				Profiles: []v1beta1.KubeSchedulerProfile{
-					{
-						SchedulerName: pointer.StringPtr("default-scheduler"),
-						Plugins:       getDefaultPlugins(),
-						PluginConfig:  pluginConfigs,
-					},
-				},
-			},
-		},
-		{
 			name: "set non default parallelism",
 			config: &v1beta1.KubeSchedulerConfiguration{
 				Parallelism: pointer.Int32Ptr(8),
 			},
 			expected: &v1beta1.KubeSchedulerConfiguration{
-				Parallelism:        pointer.Int32Ptr(8),
-				HealthzBindAddress: pointer.StringPtr("0.0.0.0:10251"),
-				MetricsBindAddress: pointer.StringPtr("0.0.0.0:10251"),
+				Parallelism: pointer.Int32Ptr(8),
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           &enable,
 					EnableContentionProfiling: &enable,

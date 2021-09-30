@@ -45,7 +45,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -54,6 +53,7 @@ import (
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/util/flowcontrol"
 	utiltesting "k8s.io/client-go/util/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
@@ -1563,7 +1563,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	// which are used in the server implementation returning StatusOK above.
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
-	clock := clock.FakeClock{}
+	clock := testingclock.FakeClock{}
 	request.backoff = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
 		Backoff: flowcontrol.NewFakeBackOff(
@@ -2484,7 +2484,7 @@ func TestThrottledLogger(t *testing.T) {
 	defer func() {
 		globalThrottledLogger.clock = oldClock
 	}()
-	clock := clock.NewFakeClock(now)
+	clock := testingclock.NewFakeClock(now)
 	globalThrottledLogger.clock = clock
 
 	logMessages := 0

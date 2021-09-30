@@ -245,6 +245,7 @@ func TestPolicyCompatibility(t *testing.T) {
 			sched, err := scheduler.New(
 				client,
 				informerFactory,
+				nil,
 				recorderFactory,
 				make(chan struct{}),
 				scheduler.WithProfiles([]config.KubeSchedulerProfile(nil)...),

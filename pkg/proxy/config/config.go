@@ -47,7 +47,9 @@ type ServiceHandler interface {
 }
 
 // EndpointsHandler is an abstract interface of objects which receive
-// notifications about endpoints object changes.
+// notifications about endpoints object changes. This is not a required
+// sub-interface of proxy.Provider, and proxy implementations should
+// not implement it unless they can't handle EndpointSlices.
 type EndpointsHandler interface {
 	// OnEndpointsAdd is called whenever creation of new endpoints object
 	// is observed.
@@ -130,14 +132,14 @@ func (c *EndpointsConfig) RegisterEventHandler(handler EndpointsHandler) {
 
 // Run waits for cache synced and invokes handlers after syncing.
 func (c *EndpointsConfig) Run(stopCh <-chan struct{}) {
-	klog.Info("Starting endpoints config controller")
+	klog.InfoS("Starting endpoints config controller")
 
 	if !cache.WaitForNamedCacheSync("endpoints config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		klog.V(3).Infof("Calling handler.OnEndpointsSynced()")
+		klog.V(3).InfoS("Calling handler.OnEndpointsSynced()")
 		c.eventHandlers[i].OnEndpointsSynced()
 	}
 }
@@ -149,7 +151,7 @@ func (c *EndpointsConfig) handleAddEndpoints(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnEndpointsAdd")
+		klog.V(4).InfoS("Calling handler.OnEndpointsAdd")
 		c.eventHandlers[i].OnEndpointsAdd(endpoints)
 	}
 }
@@ -166,7 +168,7 @@ func (c *EndpointsConfig) handleUpdateEndpoints(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnEndpointsUpdate")
+		klog.V(4).InfoS("Calling handler.OnEndpointsUpdate")
 		c.eventHandlers[i].OnEndpointsUpdate(oldEndpoints, endpoints)
 	}
 }
@@ -185,7 +187,7 @@ func (c *EndpointsConfig) handleDeleteEndpoints(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnEndpointsDelete")
+		klog.V(4).InfoS("Calling handler.OnEndpointsDelete")
 		c.eventHandlers[i].OnEndpointsDelete(endpoints)
 	}
 }
@@ -221,14 +223,14 @@ func (c *EndpointSliceConfig) RegisterEventHandler(handler EndpointSliceHandler)
 
 // Run waits for cache synced and invokes handlers after syncing.
 func (c *EndpointSliceConfig) Run(stopCh <-chan struct{}) {
-	klog.Info("Starting endpoint slice config controller")
+	klog.InfoS("Starting endpoint slice config controller")
 
 	if !cache.WaitForNamedCacheSync("endpoint slice config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for _, h := range c.eventHandlers {
-		klog.V(3).Infof("Calling handler.OnEndpointSlicesSynced()")
+		klog.V(3).InfoS("Calling handler.OnEndpointSlicesSynced()")
 		h.OnEndpointSlicesSynced()
 	}
 }
@@ -240,7 +242,7 @@ func (c *EndpointSliceConfig) handleAddEndpointSlice(obj interface{}) {
 		return
 	}
 	for _, h := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnEndpointSliceAdd %+v", endpointSlice)
+		klog.V(4).InfoS("Calling handler.OnEndpointSliceAdd", "endpoints", klog.KObj(endpointSlice))
 		h.OnEndpointSliceAdd(endpointSlice)
 	}
 }
@@ -257,7 +259,7 @@ func (c *EndpointSliceConfig) handleUpdateEndpointSlice(oldObj, newObj interface
 		return
 	}
 	for _, h := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnEndpointSliceUpdate")
+		klog.V(4).InfoS("Calling handler.OnEndpointSliceUpdate")
 		h.OnEndpointSliceUpdate(oldEndpointSlice, newEndpointSlice)
 	}
 }
@@ -276,7 +278,7 @@ func (c *EndpointSliceConfig) handleDeleteEndpointSlice(obj interface{}) {
 		}
 	}
 	for _, h := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnEndpointsDelete")
+		klog.V(4).InfoS("Calling handler.OnEndpointsDelete")
 		h.OnEndpointSliceDelete(endpointSlice)
 	}
 }
@@ -312,14 +314,14 @@ func (c *ServiceConfig) RegisterEventHandler(handler ServiceHandler) {
 
 // Run waits for cache synced and invokes handlers after syncing.
 func (c *ServiceConfig) Run(stopCh <-chan struct{}) {
-	klog.Info("Starting service config controller")
+	klog.InfoS("Starting service config controller")
 
 	if !cache.WaitForNamedCacheSync("service config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		klog.V(3).Info("Calling handler.OnServiceSynced()")
+		klog.V(3).InfoS("Calling handler.OnServiceSynced()")
 		c.eventHandlers[i].OnServiceSynced()
 	}
 }
@@ -331,7 +333,7 @@ func (c *ServiceConfig) handleAddService(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Info("Calling handler.OnServiceAdd")
+		klog.V(4).InfoS("Calling handler.OnServiceAdd")
 		c.eventHandlers[i].OnServiceAdd(service)
 	}
 }
@@ -348,7 +350,7 @@ func (c *ServiceConfig) handleUpdateService(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Info("Calling handler.OnServiceUpdate")
+		klog.V(4).InfoS("Calling handler.OnServiceUpdate")
 		c.eventHandlers[i].OnServiceUpdate(oldService, service)
 	}
 }
@@ -367,7 +369,7 @@ func (c *ServiceConfig) handleDeleteService(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Info("Calling handler.OnServiceDelete")
+		klog.V(4).InfoS("Calling handler.OnServiceDelete")
 		c.eventHandlers[i].OnServiceDelete(service)
 	}
 }
@@ -439,14 +441,14 @@ func (c *NodeConfig) RegisterEventHandler(handler NodeHandler) {
 
 // Run starts the goroutine responsible for calling registered handlers.
 func (c *NodeConfig) Run(stopCh <-chan struct{}) {
-	klog.Info("Starting node config controller")
+	klog.InfoS("Starting node config controller")
 
 	if !cache.WaitForNamedCacheSync("node config", stopCh, c.listerSynced) {
 		return
 	}
 
 	for i := range c.eventHandlers {
-		klog.V(3).Infof("Calling handler.OnNodeSynced()")
+		klog.V(3).InfoS("Calling handler.OnNodeSynced()")
 		c.eventHandlers[i].OnNodeSynced()
 	}
 }
@@ -458,7 +460,7 @@ func (c *NodeConfig) handleAddNode(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnNodeAdd")
+		klog.V(4).InfoS("Calling handler.OnNodeAdd")
 		c.eventHandlers[i].OnNodeAdd(node)
 	}
 }
@@ -475,7 +477,7 @@ func (c *NodeConfig) handleUpdateNode(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(5).Infof("Calling handler.OnNodeUpdate")
+		klog.V(5).InfoS("Calling handler.OnNodeUpdate")
 		c.eventHandlers[i].OnNodeUpdate(oldNode, node)
 	}
 }
@@ -494,7 +496,7 @@ func (c *NodeConfig) handleDeleteNode(obj interface{}) {
 		}
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnNodeDelete")
+		klog.V(4).InfoS("Calling handler.OnNodeDelete")
 		c.eventHandlers[i].OnNodeDelete(node)
 	}
 }

@@ -85,7 +85,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.17
+    version: 1.17.1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
@@ -108,19 +108,19 @@ dependencies:
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "golang: etcd release version"
-    version: 1.16.7
+    version: 1.16.8
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.23.0-go1.17-buster.0
+    version: v1.23.0-go1.17.1-bullseye.1
     refPaths:
     - path: build/build-image/cross/VERSION
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
-    version: buster-v1.9.0
+    version: bullseye-v1.0.0
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
@@ -132,9 +132,11 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-ppc64le:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
+    - path: test/conformance/image/Makefile
+      match: BASE_IMAGE_VERSION\?=
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: buster-v1.6.6
+    version: bullseye-v1.0.0
     refPaths:
     - path: build/common.sh
       match: __default_debian_iptables_version=
@@ -142,7 +144,7 @@ dependencies:
       match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: v2.3.1-go1.17-buster.0
+    version: v2.3.1-go1.17.1-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
@@ -154,7 +156,7 @@ dependencies:
       match: TAG\s*\?=
 
   - name: "k8s.gcr.io/pause: dependents"
-    version: 3.5
+    version: 3.6
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: PauseVersion\s+=
@@ -206,7 +208,7 @@ dependencies:
       match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+(.\d+)?"}
 
   - name: "k8s.gcr.io/setcap: dependents"
-    version: buster-v2.0.4
+    version: bullseye-v1.0.0
     refPaths:
     - path: build/common.sh
       match: __default_setcap_version=

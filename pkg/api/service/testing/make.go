@@ -48,7 +48,8 @@ func MakeService(name string, tweaks ...Tweak) *api.Service {
 	SetTypeClusterIP(svc)
 	// Default to 1 port
 	SetPorts(MakeServicePort("", 93, intstr.FromInt(76), api.ProtocolTCP))(svc)
-	// Default internalTrafficPolicy to "Cluster"
+	// Default internalTrafficPolicy to "Cluster".  This probably should not
+	// apply to ExternalName, but it went into beta and is not worth breaking.
 	SetInternalTrafficPolicy(api.ServiceInternalTrafficPolicyCluster)(svc)
 
 	for _, tweak := range tweaks {
@@ -113,6 +114,29 @@ func MakeServicePort(name string, port int, tgtPort intstr.IntOrString, proto ap
 	}
 }
 
+// SetHeadless sets the service as headless and clears other fields.
+func SetHeadless(svc *api.Service) {
+	SetTypeClusterIP(svc)
+	SetClusterIPs(api.ClusterIPNone)(svc)
+}
+
+// SetSelector sets the service selector.
+func SetSelector(sel map[string]string) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.Selector = map[string]string{}
+		for k, v := range sel {
+			svc.Spec.Selector[k] = v
+		}
+	}
+}
+
+// SetClusterIP sets the service ClusterIP fields.
+func SetClusterIP(ip string) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.ClusterIP = ip
+	}
+}
+
 // SetClusterIPs sets the service ClusterIP and ClusterIPs fields.
 func SetClusterIPs(ips ...string) Tweak {
 	return func(svc *api.Service) {
@@ -166,5 +190,44 @@ func SetExternalTrafficPolicy(policy api.ServiceExternalTrafficPolicyType) Tweak
 func SetAllocateLoadBalancerNodePorts(val bool) Tweak {
 	return func(svc *api.Service) {
 		svc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(val)
+	}
+}
+
+// SetUniqueNodePorts sets all nodeports to unique values.
+func SetUniqueNodePorts(svc *api.Service) {
+	for i := range svc.Spec.Ports {
+		svc.Spec.Ports[i].NodePort = int32(30000 + i)
+	}
+}
+
+// SetHealthCheckNodePort sets the healthCheckNodePort field for a Service.
+func SetHealthCheckNodePort(value int32) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.HealthCheckNodePort = value
+	}
+}
+
+// SetSessionAffinity sets the SessionAffinity field.
+func SetSessionAffinity(affinity api.ServiceAffinity) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.SessionAffinity = affinity
+		switch affinity {
+		case api.ServiceAffinityNone:
+			svc.Spec.SessionAffinityConfig = nil
+		case api.ServiceAffinityClientIP:
+			timeout := int32(10)
+			svc.Spec.SessionAffinityConfig = &api.SessionAffinityConfig{
+				ClientIP: &api.ClientIPConfig{
+					TimeoutSeconds: &timeout,
+				},
+			}
+		}
+	}
+}
+
+// SetExternalName sets the ExternalName field.
+func SetExternalName(val string) Tweak {
+	return func(svc *api.Service) {
+		svc.Spec.ExternalName = val
 	}
 }

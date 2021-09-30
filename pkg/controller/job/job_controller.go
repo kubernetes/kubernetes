@@ -56,12 +56,11 @@ import (
 )
 
 const (
-	statusUpdateRetries = 3
-
 	// maxUncountedPods is the maximum size the slices in
 	// .status.uncountedTerminatedPods should have to keep their representation
 	// roughly below 20 KB.
-	maxUncountedPods = 500
+	maxUncountedPods          = 500
+	maxPodCreateDeletePerSync = 500
 )
 
 // controllerKind contains the schema.GroupVersionKind for this controller type.
@@ -71,8 +70,7 @@ var (
 	// DefaultJobBackOff is the default backoff period, exported for the e2e test
 	DefaultJobBackOff = 10 * time.Second
 	// MaxJobBackOff is the max backoff period, exported for the e2e test
-	MaxJobBackOff             = 360 * time.Second
-	maxPodCreateDeletePerSync = 500
+	MaxJobBackOff = 360 * time.Second
 )
 
 // Controller ensures that all Job objects have corresponding pods to
@@ -82,7 +80,7 @@ type Controller struct {
 	podControl controller.PodControlInterface
 
 	// To allow injection of the following for testing.
-	updateStatusHandler func(job *batch.Job) error
+	updateStatusHandler func(job *batch.Job) (*batch.Job, error)
 	patchJobHandler     func(job *batch.Job, patch []byte) error
 	syncHandler         func(jobKey string) (bool, error)
 
@@ -438,8 +436,13 @@ func (jm *Controller) processNextWorkItem() bool {
 		return true
 	}
 
-	utilruntime.HandleError(fmt.Errorf("Error syncing job: %v", err))
-	jm.queue.AddRateLimited(key)
+	utilruntime.HandleError(fmt.Errorf("syncing job: %w", err))
+	if !apierrors.IsConflict(err) {
+		// If this was a conflict error, we expect a Job or Pod update event, which
+		// will add the job back to the queue. Avoiding the rate limited requeue
+		// saves an unnecessary sync.
+		jm.queue.AddRateLimited(key)
+	}
 
 	return true
 }
@@ -754,7 +757,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		job.Status.Active = active
 		err = jm.trackJobStatusAndRemoveFinalizers(&job, pods, prevSucceededIndexes, *uncounted, finishedCondition, needsStatusUpdate)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("tracking status: %w", err)
 		}
 		jobFinished := IsJobFinished(&job)
 		if jobHasNewFailure && !jobFinished {
@@ -782,7 +785,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		job.Status.UncountedTerminatedPods = nil
 		jm.enactJobFinished(&job, finishedCondition)
 
-		if err := jm.updateStatusHandler(&job); err != nil {
+		if _, err := jm.updateStatusHandler(&job); err != nil {
 			return forget, err
 		}
 
@@ -888,8 +891,17 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 	uncountedStatus := job.Status.UncountedTerminatedPods
 	var newSucceededIndexes []int
 	if isIndexed {
-		// Sort to introduce completed Indexes First.
+		// Sort to introduce completed Indexes in order.
 		sort.Sort(byCompletionIndex(pods))
+	}
+	uidsWithFinalizer := make(sets.String, len(pods))
+	for _, p := range pods {
+		if hasJobTrackingFinalizer(p) {
+			uidsWithFinalizer.Insert(string(p.UID))
+		}
+	}
+	if cleanUncountedPodsWithoutFinalizers(&job.Status, uidsWithFinalizer) {
+		needsFlush = true
 	}
 	for _, pod := range pods {
 		if !hasJobTrackingFinalizer(pod) {
@@ -924,14 +936,14 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 				uncountedStatus.Failed = append(uncountedStatus.Failed, pod.UID)
 			}
 		}
-		if len(uncountedStatus.Succeeded)+len(uncountedStatus.Failed) >= maxUncountedPods {
+		if len(newSucceededIndexes)+len(uncountedStatus.Succeeded)+len(uncountedStatus.Failed) >= maxUncountedPods {
 			if len(newSucceededIndexes) > 0 {
 				succeededIndexes = succeededIndexes.withOrderedIndexes(newSucceededIndexes)
 				job.Status.Succeeded = int32(succeededIndexes.total())
 				job.Status.CompletedIndexes = succeededIndexes.String()
 			}
 			var err error
-			if needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, needsFlush); err != nil {
+			if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, uidsWithFinalizer, needsFlush); err != nil {
 				return err
 			}
 			podsToRemoveFinalizer = nil
@@ -944,14 +956,14 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 		job.Status.CompletedIndexes = succeededIndexes.String()
 	}
 	var err error
-	if needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, needsFlush); err != nil {
+	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, uidsWithFinalizer, needsFlush); err != nil {
 		return err
 	}
 	if jm.enactJobFinished(job, finishedCond) {
 		needsFlush = true
 	}
 	if needsFlush {
-		if err := jm.updateStatusHandler(job); err != nil {
+		if _, err := jm.updateStatusHandler(job); err != nil {
 			return fmt.Errorf("removing uncounted pods from status: %w", err)
 		}
 	}
@@ -967,59 +979,66 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 // 4. (if not all removals succeeded) flush Job status again.
 // Returns whether there are pending changes in the Job status that need to be
 // flushed in subsequent calls.
-func (jm *Controller) flushUncountedAndRemoveFinalizers(job *batch.Job, podsToRemoveFinalizer []*v1.Pod, needsFlush bool) (bool, error) {
+func (jm *Controller) flushUncountedAndRemoveFinalizers(job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, needsFlush bool) (*batch.Job, bool, error) {
+	var err error
 	if needsFlush {
-		if err := jm.updateStatusHandler(job); err != nil {
-			return needsFlush, fmt.Errorf("adding uncounted pods to status: %w", err)
+		if job, err = jm.updateStatusHandler(job); err != nil {
+			return job, needsFlush, fmt.Errorf("adding uncounted pods to status: %w", err)
 		}
 		needsFlush = false
 	}
-	var failedToRm []*v1.Pod
 	var rmErr error
 	if len(podsToRemoveFinalizer) > 0 {
-		failedToRm, rmErr = jm.removeTrackingFinalizerFromPods(podsToRemoveFinalizer)
-	}
-	uncountedStatus := job.Status.UncountedTerminatedPods
-	if rmErr == nil {
-		needsFlush = len(uncountedStatus.Succeeded) > 0 || len(uncountedStatus.Failed) > 0
-		job.Status.Succeeded += int32(len(uncountedStatus.Succeeded))
-		uncountedStatus.Succeeded = nil
-		job.Status.Failed += int32(len(uncountedStatus.Failed))
-		uncountedStatus.Failed = nil
-		return needsFlush, nil
-	}
-	uidsWithFinalizer := make(sets.String, len(failedToRm))
-	for _, p := range failedToRm {
-		uidsWithFinalizer.Insert(string(p.UID))
-	}
-	newUncounted := uncountedWithFailedFinalizerRemovals(uncountedStatus.Succeeded, uidsWithFinalizer)
-	if len(newUncounted) != len(uncountedStatus.Succeeded) {
-		needsFlush = true
-		job.Status.Succeeded += int32(len(uncountedStatus.Succeeded) - len(newUncounted))
-		uncountedStatus.Succeeded = newUncounted
-	}
-	newUncounted = uncountedWithFailedFinalizerRemovals(uncountedStatus.Failed, uidsWithFinalizer)
-	if len(newUncounted) != len(uncountedStatus.Failed) {
-		needsFlush = true
-		job.Status.Failed += int32(len(uncountedStatus.Failed) - len(newUncounted))
-		uncountedStatus.Failed = newUncounted
-	}
-	if needsFlush {
-		if err := jm.updateStatusHandler(job); err != nil {
-			return needsFlush, fmt.Errorf("removing uncounted pods from status: %w", err)
+		var rmSucceded []bool
+		rmSucceded, rmErr = jm.removeTrackingFinalizerFromPods(podsToRemoveFinalizer)
+		for i, p := range podsToRemoveFinalizer {
+			if rmSucceded[i] {
+				uidsWithFinalizer.Delete(string(p.UID))
+			}
 		}
 	}
-	return needsFlush, rmErr
+	// Failed to remove some finalizers. Attempt to update the status with the
+	// partial progress.
+	if cleanUncountedPodsWithoutFinalizers(&job.Status, uidsWithFinalizer) {
+		needsFlush = true
+	}
+	if rmErr != nil && needsFlush {
+		if job, err := jm.updateStatusHandler(job); err != nil {
+			return job, needsFlush, fmt.Errorf("removing uncounted pods from status: %w", err)
+		}
+	}
+	return job, needsFlush, rmErr
+}
+
+// cleanUncountedPodsWithoutFinalizers removes the Pod UIDs from
+// .status.uncountedTerminatedPods for which the finalizer was successfully
+// removed and increments the corresponding status counters.
+// Returns whether there was any status change.
+func cleanUncountedPodsWithoutFinalizers(status *batch.JobStatus, uidsWithFinalizer sets.String) bool {
+	updated := false
+	uncountedStatus := status.UncountedTerminatedPods
+	newUncounted := filterInUncountedUIDs(uncountedStatus.Succeeded, uidsWithFinalizer)
+	if len(newUncounted) != len(uncountedStatus.Succeeded) {
+		updated = true
+		status.Succeeded += int32(len(uncountedStatus.Succeeded) - len(newUncounted))
+		uncountedStatus.Succeeded = newUncounted
+	}
+	newUncounted = filterInUncountedUIDs(uncountedStatus.Failed, uidsWithFinalizer)
+	if len(newUncounted) != len(uncountedStatus.Failed) {
+		updated = true
+		status.Failed += int32(len(uncountedStatus.Failed) - len(newUncounted))
+		uncountedStatus.Failed = newUncounted
+	}
+	return updated
 }
 
 // removeTrackingFinalizerFromPods removes tracking finalizers from Pods and
-// returns the pod for which the operation failed (if the pod was deleted when
-// this function was called, it's considered as the finalizer was removed
-// successfully).
-func (jm *Controller) removeTrackingFinalizerFromPods(pods []*v1.Pod) ([]*v1.Pod, error) {
+// returns an array of booleans where the i-th value is true if the finalizer
+// of the i-th Pod was successfully removed (if the pod was deleted when this
+// function was called, it's considered as the finalizer was removed successfully).
+func (jm *Controller) removeTrackingFinalizerFromPods(pods []*v1.Pod) ([]bool, error) {
 	errCh := make(chan error, len(pods))
-	var failed []*v1.Pod
-	var lock sync.Mutex
+	succeeded := make([]bool, len(pods))
 	wg := sync.WaitGroup{}
 	wg.Add(len(pods))
 	for i := range pods {
@@ -1030,16 +1049,15 @@ func (jm *Controller) removeTrackingFinalizerFromPods(pods []*v1.Pod) ([]*v1.Pod
 				if err := jm.podControl.PatchPod(pod.Namespace, pod.Name, patch); err != nil && !apierrors.IsNotFound(err) {
 					errCh <- err
 					utilruntime.HandleError(err)
-					lock.Lock()
-					failed = append(failed, pod)
-					lock.Unlock()
 					return
 				}
+				succeeded[i] = true
 			}
 		}(i)
 	}
 	wg.Wait()
-	return failed, errorFromChannel(errCh)
+
+	return succeeded, errorFromChannel(errCh)
 }
 
 // enactJobFinished adds the Complete or Failed condition and records events.
@@ -1072,10 +1090,10 @@ func (jm *Controller) enactJobFinished(job *batch.Job, finishedCond *batch.JobCo
 	return true
 }
 
-func uncountedWithFailedFinalizerRemovals(uncounted []types.UID, uidsWithFinalizer sets.String) []types.UID {
+func filterInUncountedUIDs(uncounted []types.UID, include sets.String) []types.UID {
 	var newUncounted []types.UID
 	for _, uid := range uncounted {
-		if uidsWithFinalizer.Has(string(uid)) {
+		if include.Has(string(uid)) {
 			newUncounted = append(newUncounted, uid)
 		}
 	}
@@ -1340,22 +1358,9 @@ func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.P
 	return rm
 }
 
-func (jm *Controller) updateJobStatus(job *batch.Job) error {
-	jobClient := jm.kubeClient.BatchV1().Jobs(job.Namespace)
-	var err error
-	for i := 0; i <= statusUpdateRetries; i = i + 1 {
-		var newJob *batch.Job
-		newJob, err = jobClient.Get(context.TODO(), job.Name, metav1.GetOptions{})
-		if err != nil {
-			break
-		}
-		newJob.Status = job.Status
-		if _, err = jobClient.UpdateStatus(context.TODO(), newJob, metav1.UpdateOptions{}); err == nil {
-			break
-		}
-	}
-
-	return err
+// updateJobStatus calls the API to update the job status.
+func (jm *Controller) updateJobStatus(job *batch.Job) (*batch.Job, error) {
+	return jm.kubeClient.BatchV1().Jobs(job.Namespace).UpdateStatus(context.TODO(), job, metav1.UpdateOptions{})
 }
 
 func (jm *Controller) patchJob(job *batch.Job, data []byte) error {

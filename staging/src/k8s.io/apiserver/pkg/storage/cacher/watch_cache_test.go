@@ -24,20 +24,20 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/tools/cache"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
@@ -81,7 +81,7 @@ func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
 	}
 	versioner := etcd3.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, clock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
+	wc := newWatchCache(keyFunc, mockHandler, getAttrsFunc, versioner, indexers, testingclock.NewFakeClock(time.Now()), reflect.TypeOf(&example.Pod{}))
 	// To preserve behavior of tests that assume a given capacity,
 	// resize it to th expected size.
 	wc.capacity = capacity
@@ -357,7 +357,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}()
 
 	// list by empty MatchValues.
-	list, resourceVersion, err := store.WaitUntilFreshAndList(5, nil, nil)
+	list, resourceVersion, indexUsed, err := store.WaitUntilFreshAndList(5, nil, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -367,13 +367,16 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	if len(list) != 3 {
 		t.Errorf("unexpected list returned: %#v", list)
 	}
+	if indexUsed != "" {
+		t.Errorf("Used index %q but expected none to be used", indexUsed)
+	}
 
 	// list by label index.
 	matchValues := []storage.MatchValue{
 		{IndexName: "l:label", Value: "value1"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -383,13 +386,16 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	if len(list) != 2 {
 		t.Errorf("unexpected list returned: %#v", list)
 	}
+	if indexUsed != "l:label" {
+		t.Errorf("Used index %q but expected %q", indexUsed, "l:label")
+	}
 
 	// list with spec.nodeName index.
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 		{IndexName: "f:spec.nodeName", Value: "node2"},
 	}
-	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -399,12 +405,15 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	if len(list) != 1 {
 		t.Errorf("unexpected list returned: %#v", list)
 	}
+	if indexUsed != "f:spec.nodeName" {
+		t.Errorf("Used index %q but expected %q", indexUsed, "f:spec.nodeName")
+	}
 
 	// list with index not exists.
 	matchValues = []storage.MatchValue{
 		{IndexName: "l:not-exist-label", Value: "whatever"},
 	}
-	list, resourceVersion, err = store.WaitUntilFreshAndList(5, matchValues, nil)
+	list, resourceVersion, indexUsed, err = store.WaitUntilFreshAndList(5, matchValues, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -413,6 +422,9 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 	}
 	if len(list) != 3 {
 		t.Errorf("unexpected list returned: %#v", list)
+	}
+	if indexUsed != "" {
+		t.Errorf("Used index %q but expected none to be used", indexUsed)
 	}
 }
 
@@ -443,7 +455,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	store := newTestWatchCache(3, &cache.Indexers{})
-	fc := store.clock.(*clock.FakeClock)
+	fc := store.clock.(*testingclock.FakeClock)
 
 	// In background, step clock after the below call starts the timer.
 	go func() {
@@ -459,7 +471,7 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 		store.Add(makeTestPod("bar", 5))
 	}()
 
-	_, _, err := store.WaitUntilFreshAndList(5, nil, nil)
+	_, _, _, err := store.WaitUntilFreshAndList(5, nil, nil)
 	if !errors.IsTimeout(err) {
 		t.Errorf("expected timeout error but got: %v", err)
 	}
@@ -484,7 +496,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	store := newTestWatchCache(5, &cache.Indexers{})
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(0, nil, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(0, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -507,7 +519,7 @@ func TestReflectorForWatchCache(t *testing.T) {
 	r.ListAndWatch(wait.NeverStop)
 
 	{
-		_, version, err := store.WaitUntilFreshAndList(10, nil, nil)
+		_, version, _, err := store.WaitUntilFreshAndList(10, nil, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

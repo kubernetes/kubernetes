@@ -20,7 +20,7 @@ import (
 	"math"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
@@ -88,7 +88,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	allocations := t.getAllocations(totalEndpoints)
 
 	if allocations == nil {
-		klog.V(2).Infof("Insufficient endpoints, removing hints from %s Service", si.ServiceKey)
+		klog.V(2).InfoS("Insufficient endpoints, removing hints from service", "serviceKey", si.ServiceKey)
 		t.RemoveHints(si.ServiceKey, si.AddressType)
 		return RemoveHintsFromSlices(si)
 	}
@@ -104,7 +104,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	for _, slice := range allocatableSlices {
 		for i, endpoint := range slice.Endpoints {
 			if endpoint.Zone == nil || *endpoint.Zone == "" {
-				klog.Warningf("Endpoint found without zone specified, removing hints from %s Service", si.ServiceKey)
+				klog.InfoS("Endpoint found without zone specified, removing hints from service", "serviceKey", si.ServiceKey)
 				t.RemoveHints(si.ServiceKey, si.AddressType)
 				return RemoveHintsFromSlices(si)
 			}
@@ -132,6 +132,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 // cache.
 func (t *TopologyCache) SetHints(serviceKey string, addrType discovery.AddressType, allocatedHintsByZone EndpointZoneInfo) {
 	if len(allocatedHintsByZone) == 0 {
+		klog.V(2).Infof("No hints allocated for zones, removing them from %s EndpointSlices for %s Service", addrType, serviceKey)
 		t.RemoveHints(serviceKey, addrType)
 		return
 	}
@@ -184,6 +185,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 		if !ok || zone == "" || nodeCPU.IsZero() {
 			cpuByZone = map[string]*resource.Quantity{}
 			sufficientNodeInfo = false
+			klog.Warningf("Can't get CPU or zone information for %s node", node.Name)
 			break
 		}
 
@@ -199,6 +201,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 	defer t.lock.Unlock()
 
 	if totalCPU.IsZero() || !sufficientNodeInfo || len(cpuByZone) < 2 {
+		klog.V(2).Infof("Insufficient node info for topology hints (%d zones, %s CPU, %t)", len(cpuByZone), totalCPU.MilliValue(), sufficientNodeInfo)
 		t.sufficientNodeInfo = false
 		t.cpuByZone = nil
 		t.cpuRatiosByZone = nil
@@ -219,6 +222,7 @@ func (t *TopologyCache) SetNodes(nodes []*v1.Node) {
 // threshold, a nil value will be returned.
 func (t *TopologyCache) getAllocations(numEndpoints int) map[string]Allocation {
 	if t.cpuRatiosByZone == nil || len(t.cpuRatiosByZone) < 2 || len(t.cpuRatiosByZone) > numEndpoints {
+		klog.V(2).Infof("Insufficient info to allocate endpoints (%d endpoints, %d zones)", numEndpoints, len(t.cpuRatiosByZone))
 		return nil
 	}
 

@@ -176,4 +176,8 @@ func (f *FakeIPTables) HasRandomFully() bool {
 	return f.hasRandomFully
 }
 
+func (f *FakeIPTables) Present() bool {
+	return true
+}
+
 var _ = iptables.Interface(&FakeIPTables{})

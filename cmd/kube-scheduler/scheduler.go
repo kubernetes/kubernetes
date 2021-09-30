@@ -49,6 +49,12 @@ func runSchedulerCmd() error {
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
+	err := command.ParseFlags(os.Args[1:])
+	if err != nil {
+		// when fail to parse flags, return error with the usage message.
+		return fmt.Errorf("%v\n%s", err, command.UsageString())
+	}
+
 	if err := command.Execute(); err != nil {
 		return err
 	}

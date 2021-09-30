@@ -23,7 +23,7 @@ import (
 	"runtime"
 	"sync/atomic"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	apitypes "k8s.io/apimachinery/pkg/types"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -109,7 +109,7 @@ func WithPriorityAndFairness(
 
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
-			httplog.AddKeyValue(ctx, "apf_d", truncateLogField(flowDistinguisher))
+			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
 		}
 
 		var served bool

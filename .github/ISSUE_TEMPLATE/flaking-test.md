@@ -19,4 +19,8 @@ labels: kind/flake
 - links to go.k8s.io/triage appreciated
 - links to specific failures in spyglass appreciated
 
+#### Relevant SIG
+<!-- You can identify the SIG from the "prowjob_config_url" on the testgrid dashboard for a test -->
+/sig 
+
 <!-- Please see the deflaking doc (https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/flaky-tests.md) for more guidance! -->

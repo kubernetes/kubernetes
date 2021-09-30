@@ -29,6 +29,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -745,9 +746,9 @@ func TestControllerSyncJob(t *testing.T) {
 				setPodsStatusesWithIndexes(podIndexer, job, tc.podsWithIndexes)
 
 				actual := job
-				manager.updateStatusHandler = func(job *batch.Job) error {
+				manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 					actual = job
-					return nil
+					return job, nil
 				}
 
 				// run
@@ -976,9 +977,9 @@ func TestSyncJobLegacyTracking(t *testing.T) {
 			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(&tc.job)
 
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) error {
+			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 				actual = job
-				return nil
+				return job, nil
 			}
 
 			// Run.
@@ -1181,7 +1182,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
-				buildPod().phase(v1.PodSucceeded).Pod,
+				buildPod().uid("e").phase(v1.PodSucceeded).Pod,
 				buildPod().phase(v1.PodFailed).Pod,
 				buildPod().phase(v1.PodPending).Pod,
 				buildPod().uid("a").phase(v1.PodSucceeded).trackingFinalizer().Pod,
@@ -1193,12 +1194,12 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			wantStatusUpdates: []batch.JobStatus{
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Succeeded: []types.UID{"a", "e", "c"},
-						Failed:    []types.UID{"b", "f", "d"},
+						Succeeded: []types.UID{"a", "c"},
+						Failed:    []types.UID{"b", "d"},
 					},
 					Active:    1,
-					Succeeded: 2,
-					Failed:    3,
+					Succeeded: 3,
+					Failed:    4,
 				},
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
@@ -1330,6 +1331,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{
+				buildPod().uid("a").phase(v1.PodSucceeded).Pod,
 				buildPod().uid("c").phase(v1.PodSucceeded).trackingFinalizer().Pod,
 				buildPod().uid("d").phase(v1.PodFailed).trackingFinalizer().Pod,
 			},
@@ -1337,12 +1339,6 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			wantErr:          mockErr,
 			wantRmFinalizers: 2,
 			wantStatusUpdates: []batch.JobStatus{
-				{
-					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Succeeded: []types.UID{"a", "c"},
-						Failed:    []types.UID{"b", "d"},
-					},
-				},
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
 						Succeeded: []types.UID{"c"},
@@ -1454,15 +1450,16 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			job: batch.Job{
 				Status: batch.JobStatus{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Failed: []types.UID{"a"},
+						Failed: []types.UID{"a", "b"},
 					},
 				},
 			},
 			pods: func() []*v1.Pod {
-				pods := make([]*v1.Pod, 501)
+				pods := make([]*v1.Pod, 500)
 				for i := range pods {
 					pods[i] = buildPod().uid(strconv.Itoa(i)).phase(v1.PodSucceeded).trackingFinalizer().Pod
 				}
+				pods = append(pods, buildPod().uid("b").phase(v1.PodFailed).trackingFinalizer().Pod)
 				return pods
 			}(),
 			wantRmFinalizers: 501,
@@ -1476,20 +1473,50 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 							}
 							return uids
 						}(),
-						Failed: []types.UID{"a"},
+						Failed: []types.UID{"b"},
 					},
+					Failed: 1,
 				},
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
-						Succeeded: []types.UID{"499", "500"},
+						Succeeded: []types.UID{"499"},
+						Failed:    []types.UID{"b"},
 					},
 					Succeeded: 499,
 					Failed:    1,
 				},
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					Succeeded:               500,
+					Failed:                  2,
+				},
+			},
+		},
+		"too many indexed finished": {
+			job: batch.Job{
+				Spec: batch.JobSpec{
+					CompletionMode: &indexedCompletion,
+					Completions:    pointer.Int32Ptr(501),
+				},
+			},
+			pods: func() []*v1.Pod {
+				pods := make([]*v1.Pod, 501)
+				for i := range pods {
+					pods[i] = buildPod().uid(strconv.Itoa(i)).index(strconv.Itoa(i)).phase(v1.PodSucceeded).trackingFinalizer().Pod
+				}
+				return pods
+			}(),
+			wantRmFinalizers: 501,
+			wantStatusUpdates: []batch.JobStatus{
+				{
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
+					CompletedIndexes:        "0-499",
+					Succeeded:               500,
+				},
+				{
+					CompletedIndexes:        "0-500",
+					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 					Succeeded:               501,
-					Failed:                  1,
 				},
 			},
 		},
@@ -1501,9 +1528,9 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			fakePodControl := controller.FakePodControl{Err: tc.podControlErr}
 			manager.podControl = &fakePodControl
 			var statusUpdates []batch.JobStatus
-			manager.updateStatusHandler = func(job *batch.Job) error {
+			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 				statusUpdates = append(statusUpdates, *job.Status.DeepCopy())
-				return tc.statusUpdateErr
+				return job, tc.statusUpdateErr
 			}
 
 			if tc.job.Status.UncountedTerminatedPods == nil {
@@ -1513,7 +1540,7 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			succeededIndexes := succeededIndexesFromJob(&tc.job)
 			err := manager.trackJobStatusAndRemoveFinalizers(&tc.job, tc.pods, succeededIndexes, *uncounted, tc.finishedCond, tc.needsFlush)
 			if !errors.Is(err, tc.wantErr) {
-				t.Errorf("Got error %v, want %w", err, tc.wantErr)
+				t.Errorf("Got error %v, want %v", err, tc.wantErr)
 			}
 			if diff := cmp.Diff(tc.wantStatusUpdates, statusUpdates); diff != "" {
 				t.Errorf("Unexpected status updates (-want,+got):\n%s", diff)
@@ -1628,9 +1655,9 @@ func TestSyncJobPastDeadline(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) error {
+			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 				actual = job
-				return nil
+				return job, nil
 			}
 
 			// job & pods setup
@@ -1705,9 +1732,9 @@ func TestSyncPastDeadlineJobFinished(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 	var actual *batch.Job
-	manager.updateStatusHandler = func(job *batch.Job) error {
+	manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 		actual = job
-		return nil
+		return job, nil
 	}
 
 	job := newJob(1, 1, 6, batch.NonIndexedCompletion)
@@ -1770,7 +1797,9 @@ func TestSyncJobDeleted(t *testing.T) {
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
-	manager.updateStatusHandler = func(job *batch.Job) error { return nil }
+	manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+		return job, nil
+	}
 	job := newJob(2, 2, 6, batch.NonIndexedCompletion)
 	forget, err := manager.syncJob(testutil.GetKey(job, t))
 	if err != nil {
@@ -1790,30 +1819,52 @@ func TestSyncJobDeleted(t *testing.T) {
 func TestSyncJobUpdateRequeue(t *testing.T) {
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
 	DefaultJobBackOff = time.Duration(0) // overwrite the default value for testing
-	manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
-	fakePodControl := controller.FakePodControl{}
-	manager.podControl = &fakePodControl
-	manager.podStoreSynced = alwaysReady
-	manager.jobStoreSynced = alwaysReady
-	updateError := fmt.Errorf("update error")
-	manager.updateStatusHandler = func(job *batch.Job) error {
-		manager.queue.AddRateLimited(testutil.GetKey(job, t))
-		return updateError
+	cases := map[string]struct {
+		updateErr      error
+		wantRequeue    bool
+		withFinalizers bool
+	}{
+		"no error": {},
+		"generic error": {
+			updateErr:   fmt.Errorf("update error"),
+			wantRequeue: true,
+		},
+		"conflict error": {
+			updateErr: apierrors.NewConflict(schema.GroupResource{}, "", nil),
+		},
+		"conflict error, with finalizers": {
+			withFinalizers: true,
+			updateErr:      apierrors.NewConflict(schema.GroupResource{}, "", nil),
+		},
 	}
-	job := newJob(2, 2, 6, batch.NonIndexedCompletion)
-	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
-	forget, err := manager.syncJob(testutil.GetKey(job, t))
-	if err == nil || err != updateError {
-		t.Errorf("Expected error %v when syncing jobs, got %v", updateError, err)
-	}
-	if forget != false {
-		t.Errorf("Unexpected forget value. Expected %v, saw %v\n", false, forget)
-	}
-	t.Log("Waiting for a job in the queue")
-	key, _ := manager.queue.Get()
-	expectedKey := testutil.GetKey(job, t)
-	if key != expectedKey {
-		t.Errorf("Expected requeue of job with key %s got %s", expectedKey, key)
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.withFinalizers)()
+			manager, sharedInformerFactory := newControllerFromClient(clientset, controller.NoResyncPeriodFunc)
+			fakePodControl := controller.FakePodControl{}
+			manager.podControl = &fakePodControl
+			manager.podStoreSynced = alwaysReady
+			manager.jobStoreSynced = alwaysReady
+			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+				return job, tc.updateErr
+			}
+			job := newJob(2, 2, 6, batch.NonIndexedCompletion)
+			sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
+			manager.queue.Add(testutil.GetKey(job, t))
+			manager.processNextWorkItem()
+			// With DefaultJobBackOff=0, the queueing is synchronous.
+			requeued := manager.queue.Len() > 0
+			if requeued != tc.wantRequeue {
+				t.Errorf("Unexpected requeue, got %t, want %t", requeued, tc.wantRequeue)
+			}
+			if requeued {
+				key, _ := manager.queue.Get()
+				expectedKey := testutil.GetKey(job, t)
+				if key != expectedKey {
+					t.Errorf("Expected requeue of job with key %s got %s", expectedKey, key)
+				}
+			}
+		})
 	}
 }
 
@@ -2297,7 +2348,9 @@ func TestSyncJobExpectations(t *testing.T) {
 	manager.podControl = &fakePodControl
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
-	manager.updateStatusHandler = func(job *batch.Job) error { return nil }
+	manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
+		return job, nil
+	}
 
 	job := newJob(2, 2, 6, batch.NonIndexedCompletion)
 	sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
@@ -2501,9 +2554,9 @@ func TestJobBackoffReset(t *testing.T) {
 		manager.podStoreSynced = alwaysReady
 		manager.jobStoreSynced = alwaysReady
 		var actual *batch.Job
-		manager.updateStatusHandler = func(job *batch.Job) error {
+		manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 			actual = job
-			return nil
+			return job, nil
 		}
 
 		// job & pods setup
@@ -2681,9 +2734,9 @@ func TestJobBackoffForOnFailure(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) error {
+			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 				actual = job
-				return nil
+				return job, nil
 			}
 
 			// job & pods setup
@@ -2783,9 +2836,9 @@ func TestJobBackoffOnRestartPolicyNever(t *testing.T) {
 			manager.podStoreSynced = alwaysReady
 			manager.jobStoreSynced = alwaysReady
 			var actual *batch.Job
-			manager.updateStatusHandler = func(job *batch.Job) error {
+			manager.updateStatusHandler = func(job *batch.Job) (*batch.Job, error) {
 				actual = job
-				return nil
+				return job, nil
 			}
 
 			// job & pods setup

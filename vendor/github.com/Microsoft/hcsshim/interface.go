@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/Microsoft/hcsshim/internal/schema1"
+	"github.com/Microsoft/hcsshim/internal/hcs/schema1"
 )
 
 // ProcessConfig is used as both the input of Container.CreateProcess

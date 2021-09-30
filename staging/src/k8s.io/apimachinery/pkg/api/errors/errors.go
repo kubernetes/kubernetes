@@ -170,6 +170,25 @@ func NewAlreadyExists(qualifiedResource schema.GroupResource, name string) *Stat
 	}}
 }
 
+// NewGenerateNameConflict returns an error indicating the server
+// was not able to generate a valid name for a resource.
+func NewGenerateNameConflict(qualifiedResource schema.GroupResource, name string, retryAfterSeconds int) *StatusError {
+	return &StatusError{metav1.Status{
+		Status: metav1.StatusFailure,
+		Code:   http.StatusConflict,
+		Reason: metav1.StatusReasonAlreadyExists,
+		Details: &metav1.StatusDetails{
+			Group:             qualifiedResource.Group,
+			Kind:              qualifiedResource.Resource,
+			Name:              name,
+			RetryAfterSeconds: int32(retryAfterSeconds),
+		},
+		Message: fmt.Sprintf(
+			"%s %q already exists, the server was not able to generate a unique name for the object",
+			qualifiedResource.String(), name),
+	}}
+}
+
 // NewUnauthorized returns an error indicating the client is not authorized to perform the requested
 // action.
 func NewUnauthorized(reason string) *StatusError {

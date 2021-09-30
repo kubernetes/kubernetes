@@ -190,6 +190,10 @@ func (fc *fakeClock) Sleep(d time.Duration) {
 	fc.now = fc.now.Add(d)
 }
 
+func (fc *fakeClock) Since(ts time.Time) time.Duration {
+	return time.Since(ts)
+}
+
 func TestRatePrecisionBug(t *testing.T) {
 	// golang.org/x/time/rate used to have bugs around precision and this
 	// proves that they don't recur (at least in the form we know about).  This

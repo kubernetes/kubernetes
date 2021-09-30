@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	goruntime "runtime"
 	"time"
 
@@ -177,7 +178,7 @@ func NewKubeGenericRuntimeManager(
 	livenessManager proberesults.Manager,
 	readinessManager proberesults.Manager,
 	startupManager proberesults.Manager,
-	seccompProfileRoot string,
+	rootDirectory string,
 	machineInfo *cadvisorapi.MachineInfo,
 	podStateProvider podStateProvider,
 	osInterface kubecontainer.OSInterface,
@@ -206,7 +207,7 @@ func NewKubeGenericRuntimeManager(
 		recorder:               recorder,
 		cpuCFSQuota:            cpuCFSQuota,
 		cpuCFSQuotaPeriod:      cpuCFSQuotaPeriod,
-		seccompProfileRoot:     seccompProfileRoot,
+		seccompProfileRoot:     filepath.Join(rootDirectory, "seccomp"),
 		livenessManager:        livenessManager,
 		readinessManager:       readinessManager,
 		startupManager:         startupManager,
@@ -813,7 +814,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 				klog.V(4).InfoS("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
 				return
 			}
-			metrics.StartedPodsErrorsTotal.WithLabelValues(err.Error()).Inc()
+			metrics.StartedPodsErrorsTotal.Inc()
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			klog.ErrorS(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
 			ref, referr := ref.GetReference(legacyscheme.Scheme, pod)

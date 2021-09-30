@@ -199,7 +199,7 @@ func startAPIServerOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) {
 		controlPlaneConfig.GenericConfig.FlowControl = utilflowcontrol.New(
 			controlPlaneConfig.ExtraConfig.VersionedInformers,
-			clientset.FlowcontrolV1beta1(),
+			clientset.FlowcontrolV1beta2(),
 			controlPlaneConfig.GenericConfig.MaxRequestsInFlight+controlPlaneConfig.GenericConfig.MaxMutatingRequestsInFlight,
 			controlPlaneConfig.GenericConfig.RequestTimeout/4,
 		)

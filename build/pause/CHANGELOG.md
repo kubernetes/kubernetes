@@ -1,3 +1,7 @@
+# 3.6
+
+* Support for Windows container images (OS Versions: 2022) was added. ([#104438](https://github.com/kubernetes/kubernetes/pull/104438), [@nick5616](https://github.com/nick5616))
+
 # 3.5
 
 * Run the container image as non root user per default ([#97963](https://github.com/kubernetes/kubernetes/pull/97963))

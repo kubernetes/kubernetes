@@ -18,6 +18,7 @@ package cacher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	goruntime "runtime"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -43,6 +43,8 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var (
@@ -208,7 +210,7 @@ TestCase:
 			break TestCase
 		default:
 		}
-		w.Stop()
+		w.stopThreadUnsafe()
 	}
 }
 
@@ -549,7 +551,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("expected received a event on ResultChan")
 		}
-		w.Stop()
+		w.stopThreadUnsafe()
 	}
 }
 
@@ -602,7 +604,7 @@ func TestTimeBucketWatchersBasic(t *testing.T) {
 		return newCacheWatcher(0, filter, forget, testVersioner{}, deadline, true, objectType, "")
 	}
 
-	clock := clock.NewFakeClock(time.Now())
+	clock := testingclock.NewFakeClock(time.Now())
 	watchers := newTimeBucketWatchers(clock, defaultBookmarkFrequency)
 	now := clock.Now()
 	watchers.addWatcher(newWatcher(now.Add(10 * time.Second)))
@@ -649,6 +651,7 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 
 	// run the collision test for 3 seconds to let ~2 buckets expire
 	stopCh := make(chan struct{})
+	var watchErr error
 	time.AfterFunc(3*time.Second, func() { close(stopCh) })
 
 	wg := &sync.WaitGroup{}
@@ -664,7 +667,8 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 				ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 				w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
 				if err != nil {
-					t.Fatalf("Failed to create watch: %v", err)
+					watchErr = fmt.Errorf("Failed to create watch: %v", err)
+					return
 				}
 				w.Stop()
 			}
@@ -686,6 +690,10 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 
 	// wait for adding/removing watchers to end
 	wg.Wait()
+
+	if watchErr != nil {
+		t.Fatal(watchErr)
+	}
 
 	// wait out the expiration period and pop expired watchers
 	time.Sleep(2 * time.Second)
@@ -742,6 +750,7 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	}
 
 	resourceVersion := uint64(1000)
+	errc := make(chan error, 1)
 	go func() {
 		deadline := time.Now().Add(time.Second)
 		for i := 0; time.Now().Before(deadline); i++ {
@@ -752,7 +761,8 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 					ResourceVersion: fmt.Sprintf("%v", resourceVersion+uint64(i)),
 				}})
 			if err != nil {
-				t.Fatalf("failed to add a pod: %v", err)
+				errc <- fmt.Errorf("failed to add a pod: %v", err)
+				return
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -762,6 +772,9 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	lastObservedRV := uint64(0)
 	for {
 		select {
+		case err := <-errc:
+			t.Fatal(err)
+			return
 		case event, ok := <-w.ResultChan():
 			if !ok {
 				t.Fatal("Unexpected closed")
@@ -945,7 +958,6 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 
 		select {
 		case <-done:
-			break
 		case <-time.After(time.Second):
 			t.Fatal("receive result timeout")
 		}
@@ -994,6 +1006,8 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 
 	expectedRV := 2000
 
+	var rcErr error
+
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -1001,7 +1015,8 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 		for {
 			event, ok := <-w.ResultChan()
 			if !ok {
-				t.Fatalf("Unexpected closed channel")
+				rcErr = errors.New("Unexpected closed channel")
+				return
 			}
 			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
 			if err != nil {
@@ -1017,6 +1032,9 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	cacher.watchCache.UpdateResourceVersion(strconv.Itoa(expectedRV))
 
 	wg.Wait()
+	if rcErr != nil {
+		t.Fatal(rcErr)
+	}
 }
 
 type fakeTimeBudget struct{}

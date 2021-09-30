@@ -93,9 +93,7 @@ func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
 	return dpa
 }
 
-var nodeResourcesFitFunc = func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-	return noderesources.NewFit(plArgs, fh, feature.Features{})
-}
+var nodeResourcesFitFunc = frameworkruntime.FactoryAdapter(feature.Features{}, noderesources.NewFit)
 
 func TestPostFilter(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
@@ -526,9 +524,7 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "pod with anti-affinity is preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterPluginAsExtensions(noderesources.FitName, nodeResourcesFitFunc, "Filter", "PreFilter"),
-				st.RegisterPluginAsExtensions(interpodaffinity.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
-					return interpodaffinity.New(plArgs, fh, feature.Features{})
-				}, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(interpodaffinity.Name, frameworkruntime.FactoryAdapter(feature.Features{}, interpodaffinity.New), "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
