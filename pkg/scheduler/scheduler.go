@@ -38,7 +38,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -231,7 +231,7 @@ func New(client clientset.Interface,
 	}
 
 	if options.applyDefaultProfile {
-		var versionedCfg v1beta2.KubeSchedulerConfiguration
+		var versionedCfg v1beta3.KubeSchedulerConfiguration
 		scheme.Scheme.Default(&versionedCfg)
 		cfg := config.KubeSchedulerConfiguration{}
 		if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
