@@ -466,6 +466,21 @@ func (n *NodeWrapper) Label(k, v string) *NodeWrapper {
 	return n
 }
 
+// Taint applies a given {k, v} tuple as a taint to the inner node.
+// The prefer flag specifies if the taint is a preference(soft) or requirement(hard)
+// TODO: If needed expand the prefer option to include Execute later
+func (n *NodeWrapper) Taint(k, v string, prefer bool) *NodeWrapper {
+	var taintEffect v1.TaintEffect
+	if prefer {
+		taintEffect = v1.TaintEffectPreferNoSchedule
+	} else {
+		taintEffect = v1.TaintEffectNoSchedule
+	}
+	newTaint := v1.Taint{Key: k, Value: v, Effect: taintEffect}
+	n.Spec.Taints = append(n.Spec.Taints, newTaint)
+	return n
+}
+
 // Capacity sets the capacity and the allocatable resources of the inner node.
 // Each entry in `resources` corresponds to a resource name and its quantity.
 // By default, the capacity and allocatable number of pods are set to 32.

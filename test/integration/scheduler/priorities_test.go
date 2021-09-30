@@ -496,3 +496,75 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 		})
 	}
 }
+
+// TestDefaultSchedulerTolerationInfluence tests if the increased weight of Toleration priority(which is default) has
+// an influence on the pod placement
+// The algorithm is pretty simple.
+// 1.) Start the scheduler with default config.
+// 2.) Create 3 nodes with one of them having taint.
+// 3.) Create 80 pods with with no tolerations. (80 is chosen randomly with the qps limit of 100(?) in mind)
+// 4.) < 20% of the pods should land on the tainted node.
+func TestDefaultSchedulerTolerationInfluence(t *testing.T) {
+	testCtx := initTest(t, "")
+	defer testutils.CleanupTest(t, testCtx)
+	cs := testCtx.ClientSet
+	var taintedNodes []*v1.Node
+
+	// Add a few nodes with no taints
+	_, err := createAndWaitForNodesInCache(testCtx, "zonenode1", st.MakeNode().Label(v1.LabelTopologyZone, "z1"), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = createAndWaitForNodesInCache(testCtx, "zonenode2", st.MakeNode().Label(v1.LabelTopologyZone, "z2"), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add tainted node
+	taintedNodes, err = createAndWaitForNodesInCache(testCtx, "zonenode3", st.MakeNode().Label(v1.LabelTopologyZone, "z3").Taint("newtaint", "newvalue", true), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ns := testCtx.NS.Name
+	var pods []v1.Pod
+	pause := imageutils.GetPauseImageName()
+	totalPodCount := 80
+	for i := 0; i < totalPodCount; i++ {
+		p := st.MakePod().Name(fmt.Sprintf("p-%d", i)).Container(pause).Obj()
+		_, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Cannot create Pod: %v", err)
+		}
+	}
+	// Wait for all Pods to be scheduled.
+	err = wait.Poll(pollInterval, wait.ForeverTestTimeout, func() (bool, error) {
+		podList, err := cs.CoreV1().Pods(ns).List(testCtx.Ctx, metav1.ListOptions{})
+		if err != nil {
+			t.Fatalf("Cannot list pods to verify scheduling: %v", err)
+		}
+		for _, p := range podList.Items {
+			if p.Spec.NodeName == "" {
+				return false, nil
+			}
+		}
+		pods = podList.Items
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("All the pods did not get scheduled: %v", err)
+	}
+	podsOnTaintedNode := 0
+	for _, pod := range pods {
+		if pod.Spec.NodeName == taintedNodes[0].Name {
+			podsOnTaintedNode++
+		}
+	}
+	podsOnTaintedNodePercentange := float64(podsOnTaintedNode) / float64(totalPodCount)
+	if podsOnTaintedNodePercentange > 0.20 {
+		// Why 20%? Scheduler when impartial should allow 1/3rd of the pods to land on the taintedNode but with taint
+		// priority's increased weight(3 now), we should see that value to come down.
+		t.Fatalf("Expected less than 20 percent of the pods to be scheduled onto tainted node but %v percent "+
+			"got scheduled", podsOnTaintedNodePercentange*100)
+	}
+}
