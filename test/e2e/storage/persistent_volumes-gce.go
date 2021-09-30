@@ -57,7 +57,7 @@ func initializeGCETestSpec(c clientset.Interface, t *framework.TimeoutContext, n
 }
 
 // Testing configurations of single a PV/PVC pair attached to a GCE PD
-var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
+var _ = utils.SIGDescribe("PersistentVolumes GCEPD [Feature:StorageProvider]", func() {
 	var (
 		c         clientset.Interface
 		diskName  string
