@@ -1910,7 +1910,7 @@ func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 func startProxyServer(ns string) (int, *exec.Cmd, error) {
 	// Specifying port 0 indicates we want the os to pick a random port.
 	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, ns)
-	cmd := tk.KubectlCmd("proxy", "-p", "0", "--disable-filter")
+	cmd := tk.KubectlCmd("proxy", "-p", "0", "--disable-filter", "--append-server-path")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		return -1, nil, err
