@@ -90,9 +90,9 @@ readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 readonly KUBE_CONTAINER_RSYNC_PORT=8730
 
 # These are the default versions (image tags) for their respective base images.
-readonly __default_debian_iptables_version=bullseye-v1.0.0
-readonly __default_go_runner_version=v2.3.1-go1.17.1-bullseye.0
-readonly __default_setcap_version=bullseye-v1.0.0
+readonly __default_debian_iptables_version=buster-v1.6.7
+readonly __default_go_runner_version=v2.3.1-go1.17-buster.0
+readonly __default_setcap_version=buster-v2.0.4
 
 # These are the base images for the Docker-wrapped binaries.
 readonly KUBE_GORUNNER_IMAGE="${KUBE_GORUNNER_IMAGE:-$KUBE_BASE_IMAGE_REGISTRY/go-runner:$__default_go_runner_version}"
@@ -395,8 +395,6 @@ function kube::build::build_image() {
 # $3 is the value to set the --pull flag for docker build; true by default
 # $4 is the set of --build-args for docker.
 function kube::build::docker_build() {
-  kube::util::ensure-docker-buildx
-
   local -r image=$1
   local -r context_dir=$2
   local -r pull="${3:-true}"

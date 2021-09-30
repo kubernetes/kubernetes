@@ -195,7 +195,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		code := http.StatusCreated
 		status, ok := result.(*metav1.Status)
-		if ok && err == nil && status.Code == 0 {
+		if ok && status.Code == 0 {
 			status.Code = int32(code)
 		}
 

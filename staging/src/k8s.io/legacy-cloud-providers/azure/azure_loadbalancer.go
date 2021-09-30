@@ -21,6 +21,7 @@ package azure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -305,7 +306,7 @@ func (az *Cloud) cleanBackendpoolForPrimarySLB(primarySLB *network.LoadBalancer,
 					ipConf := (*bp.BackendIPConfigurations)[i]
 					ipConfigID := to.String(ipConf.ID)
 					_, vmSetName, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfigID)
-					if err != nil {
+					if err != nil && !errors.Is(err, cloudprovider.InstanceNotFound) {
 						return nil, err
 					}
 					primaryVMSetName := az.VMSet.GetPrimaryVMSetName()
@@ -1130,13 +1131,10 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 					for _, ipConf := range *bp.BackendIPConfigurations {
 						ipConfID := to.String(ipConf.ID)
 						nodeName, _, err := az.VMSet.GetNodeNameByIPConfigurationID(ipConfID)
-						if err != nil {
+						if err != nil && !errors.Is(err, cloudprovider.InstanceNotFound) {
 							return nil, err
 						}
-						if nodeName == "" {
-							// VM may under deletion
-							continue
-						}
+
 						// If a node is not supposed to be included in the LB, it
 						// would not be in the `nodes` slice. We need to check the nodes that
 						// have been added to the LB's backendpool, find the unwanted ones and
@@ -2132,7 +2130,6 @@ func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lb
 
 //  ensurePIPTagged ensures the public IP of the service is tagged as configured
 func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddress) bool {
-	changed := false
 	configTags := parseTags(az.Tags)
 	annotationTags := make(map[string]*string)
 	if _, ok := service.Annotations[ServiceAnnotationAzurePIPTags]; ok {
@@ -2154,12 +2151,10 @@ func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddre
 	if serviceNames != nil {
 		configTags[serviceTagKey] = serviceNames
 	}
-	for k, v := range configTags {
-		if vv, ok := pip.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			pip.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(pip.Tags, configTags)
+	pip.Tags = tags
+
 	return changed
 }
 
@@ -2720,7 +2715,6 @@ func unbindServiceFromPIP(pip *network.PublicIPAddress, serviceName string) erro
 
 // ensureLoadBalancerTagged ensures every load balancer in the resource group is tagged as configured
 func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
-	changed := false
 	if az.Tags == "" {
 		return false
 	}
@@ -2728,18 +2722,15 @@ func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
 	if lb.Tags == nil {
 		lb.Tags = make(map[string]*string)
 	}
-	for k, v := range tags {
-		if vv, ok := lb.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			lb.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(lb.Tags, tags)
+	lb.Tags = tags
+
 	return changed
 }
 
 // ensureSecurityGroupTagged ensures the security group is tagged as configured
 func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
-	changed := false
 	if az.Tags == "" {
 		return false
 	}
@@ -2747,11 +2738,9 @@ func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
 	if sg.Tags == nil {
 		sg.Tags = make(map[string]*string)
 	}
-	for k, v := range tags {
-		if vv, ok := sg.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			sg.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(sg.Tags, tags)
+	sg.Tags = tags
+
 	return changed
 }
