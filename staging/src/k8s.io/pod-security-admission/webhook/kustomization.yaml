@@ -1,0 +1,9 @@
+resources:
+- manifests/10-namespace.yaml
+- manifests/20-configmap.yaml
+- manifests/20-serviceaccount.yaml
+- manifests/30-clusterrole.yaml
+- manifests/40-clusterrolebinding.yaml
+- manifests/50-deployment.yaml
+- manifests/60-service.yaml
+- manifests/70-validatingwebhookconfiguration.yaml
