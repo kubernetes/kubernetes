@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -69,6 +70,13 @@ const (
 	Write-Output "SUCCESS"`
 )
 
+var (
+	trueVar = true
+
+	User_NTAuthorityLocalService = "NT AUTHORITY\\Local Service"
+	User_NTAuthoritySystem       = "NT AUTHORITY\\SYSTEM"
+)
+
 var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDocker] [MinimumKubeletVersion:1.22] HostProcess containers", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
@@ -86,10 +94,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 
 		ginkgo.By("scheduling a pod with a container that verifies %COMPUTERNAME% matches selected node name")
 		image := imageutils.GetConfig(imageutils.BusyBox)
-
-		trueVar := true
 		podName := "host-process-test-pod"
-		user := "NT AUTHORITY\\Local service"
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: podName,
@@ -98,7 +103,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 				SecurityContext: &v1.PodSecurityContext{
 					WindowsOptions: &v1.WindowsSecurityContextOptions{
 						HostProcess:   &trueVar,
-						RunAsUserName: &user,
+						RunAsUserName: &User_NTAuthoritySystem,
 					},
 				},
 				HostNetwork: true,
@@ -131,9 +136,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 
 	ginkgo.It("should support init containers", func() {
 		ginkgo.By("scheduling a pod with a container that verifies init container can configure the node")
-		trueVar := true
 		podName := "host-process-init-pods"
-		user := "NT AUTHORITY\\SYSTEM"
 		filename := fmt.Sprintf("/testfile%s.txt", string(uuid.NewUUID()))
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -143,7 +146,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 				SecurityContext: &v1.PodSecurityContext{
 					WindowsOptions: &v1.WindowsSecurityContextOptions{
 						HostProcess:   &trueVar,
-						RunAsUserName: &user,
+						RunAsUserName: &User_NTAuthoritySystem,
 					},
 				},
 				HostNetwork: true,
@@ -364,8 +367,6 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 				containers = append(containers, container)
 			}
 
-			trueVar := true
-			user := "NT AUTHORITY\\Local Service"
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podName,
@@ -374,7 +375,7 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 					SecurityContext: &v1.PodSecurityContext{
 						WindowsOptions: &v1.WindowsSecurityContextOptions{
 							HostProcess:   &trueVar,
-							RunAsUserName: &user,
+							RunAsUserName: &User_NTAuthorityLocalService,
 						},
 					},
 					HostNetwork:   true,
@@ -479,11 +480,103 @@ var _ = SIGDescribe("[Feature:WindowsHostProcessContainers] [Excluded:WindowsDoc
 		framework.ExpectEqual(p.Status.Phase, v1.PodSucceeded)
 	})
 
+	ginkgo.It("metrics should report count of started and failed to start HostProcess containers", func() {
+		ginkgo.By("Selecting a Windows node")
+		targetNode, err := findWindowsNode(f)
+		framework.ExpectNoError(err, "Error finding Windows node")
+		framework.Logf("Using node: %v", targetNode.Name)
+
+		ginkgo.By("Getting initial kubelet metrics values")
+		beforeMetrics, err := getCurrentHostProcessMetrics(f, targetNode.Name)
+		framework.ExpectNoError(err, "Error getting initial kubelet metrics for node")
+		framework.Logf("Initial HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
+			beforeMetrics.StartedContainersCount, beforeMetrics.StartedContainersErrorCount, beforeMetrics.StartedInitContainersCount, beforeMetrics.StartedInitContainersErrorCount)
+
+		ginkgo.By("Scheduling a pod with a HostProcess init container that will fail")
+
+		podName := "host-process-metrics-pod-failing-init-container"
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &User_NTAuthoritySystem,
+					},
+				},
+				HostNetwork: true,
+				InitContainers: []v1.Container{
+					{
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Name:    "failing-init-container",
+						Command: []string{"foobar.exe"},
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Name:    "container",
+						Command: []string{"cmd.exe", "/c", "exit", "/b", "0"},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeName:      targetNode.Name,
+			},
+		}
+
+		f.PodClient().Create(pod)
+		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+
+		ginkgo.By("Scheduling a pod with a HostProcess container that will fail")
+		podName = "host-process-metrics-pod-failing-container"
+		pod = &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: podName,
+			},
+			Spec: v1.PodSpec{
+				SecurityContext: &v1.PodSecurityContext{
+					WindowsOptions: &v1.WindowsSecurityContextOptions{
+						HostProcess:   &trueVar,
+						RunAsUserName: &User_NTAuthoritySystem,
+					},
+				},
+				HostNetwork: true,
+				Containers: []v1.Container{
+					{
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Name:    "failing-container",
+						Command: []string{"foobar.exe"},
+					},
+				},
+				RestartPolicy: v1.RestartPolicyNever,
+				NodeName:      targetNode.Name,
+			},
+		}
+
+		f.PodClient().Create(pod)
+		f.PodClient().WaitForFinish(podName, 3*time.Minute)
+
+		ginkgo.By("Getting subsequent kubelet metrics values")
+
+		afterMetrics, err := getCurrentHostProcessMetrics(f, targetNode.Name)
+		framework.ExpectNoError(err, "Error getting subsequent kubelet metrics for node")
+		framework.Logf("Subsequent HostProcess container metrics -- StartedContainers: %v, StartedContainersErrors: %v, StartedInitContainers: %v, StartedInitContainersErrors: %v",
+			afterMetrics.StartedContainersCount, afterMetrics.StartedContainersErrorCount, afterMetrics.StartedInitContainersCount, afterMetrics.StartedInitContainersErrorCount)
+
+		// Note: This test performs relative comparisons to ensure metrics values were logged and does not validate specific values.
+		// This done so the test can be run in parallel with other tests which may start HostProcess containers on the same node.
+		ginkgo.By("Ensuring metrics were updated")
+		framework.ExpectEqual(beforeMetrics.StartedContainersCount < afterMetrics.StartedContainersCount, true, "Count of started HostProcess containers should increase")
+		framework.ExpectEqual(beforeMetrics.StartedContainersErrorCount < afterMetrics.StartedContainersErrorCount, true, "Count of started HostProcess errors containers should increase")
+		framework.ExpectEqual(beforeMetrics.StartedInitContainersCount < afterMetrics.StartedInitContainersCount, true, "Count of started HostProcess init containers should increase")
+		framework.ExpectEqual(beforeMetrics.StartedInitContainersErrorCount < afterMetrics.StartedInitContainersErrorCount, true, "Count of started HostProcess errors init containers should increase")
+	})
+
 })
 
 func makeTestPodWithVolumeMounts(name string) *v1.Pod {
-	trueVar := true
-	username := "NT AUTHORITY\\SYSTEM"
 	hostPathDirectoryOrCreate := v1.HostPathDirectoryOrCreate
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -493,7 +586,7 @@ func makeTestPodWithVolumeMounts(name string) *v1.Pod {
 			SecurityContext: &v1.PodSecurityContext{
 				WindowsOptions: &v1.WindowsSecurityContextOptions{
 					HostProcess:   &trueVar,
-					RunAsUserName: &username,
+					RunAsUserName: &User_NTAuthoritySystem,
 				},
 			},
 			HostNetwork: true,
@@ -610,6 +703,46 @@ func makeTestPodWithVolumeMounts(name string) *v1.Pod {
 			},
 		},
 	}
+}
+
+type HostProcessContainersMetrics struct {
+	StartedContainersCount          int64
+	StartedContainersErrorCount     int64
+	StartedInitContainersCount      int64
+	StartedInitContainersErrorCount int64
+}
+
+// getCurrentHostProcessMetrics returns a HostPRocessContainersMetrics object. Any metrics that do not have any
+// values reported will be set to 0.
+func getCurrentHostProcessMetrics(f *framework.Framework, nodeName string) (HostProcessContainersMetrics, error) {
+	var result HostProcessContainersMetrics
+
+	metrics, err := e2emetrics.GetKubeletMetrics(f.ClientSet, nodeName)
+	if err != nil {
+		return result, err
+	}
+
+	for _, sample := range metrics["started_host_process_containers_total"] {
+		switch sample.Metric["container_type"] {
+		case "container":
+			result.StartedContainersCount = int64(sample.Value)
+		case "init_container":
+			result.StartedInitContainersCount = int64(sample.Value)
+		}
+	}
+
+	// note: accumulate failures of all types (ErrImagePull, RunContainerError, etc)
+	// for each container type here.
+	for _, sample := range metrics["started_host_process_containers_errors_total"] {
+		switch sample.Metric["container_type"] {
+		case "container":
+			result.StartedContainersErrorCount += int64(sample.Value)
+		case "init_container":
+			result.StartedInitContainersErrorCount += int64(sample.Value)
+		}
+	}
+
+	return result, nil
 }
 
 func SkipUnlessWindowsHostProcessContainersEnabled() {

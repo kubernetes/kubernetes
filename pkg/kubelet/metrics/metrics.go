@@ -90,6 +90,10 @@ const (
 	StartedContainersTotalKey       = "started_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
 
+	// Metrics to track HostProcess container usage by this kubelet
+	StartedHostProcessContainersTotalKey       = "started_host_process_containers_total"
+	StartedHostProcessContainersErrorsTotalKey = "started_host_process_containers_errors_total"
+
 	// Metrics to track ephemeral container usage by this kubelet
 	ManagedEphemeralContainersKey = "managed_ephemeral_containers"
 
@@ -488,6 +492,26 @@ var (
 		},
 		[]string{"container_type", "code"},
 	)
+	// StartedHostProcessContainersTotal is a counter that tracks the number of hostprocess container creation operations
+	StartedHostProcessContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedHostProcessContainersTotalKey,
+			Help:           "Cumulative number of hostprocess containers started. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type"},
+	)
+	// StartedHostProcessContainersErrorsTotal is a counter that tracks the number of errors creating hostprocess containers
+	StartedHostProcessContainersErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           StartedHostProcessContainersErrorsTotalKey,
+			Help:           "Cumulative number of errors when starting hostprocess containers. This metric will only be collected on Windows and requires WindowsHostProcessContainers feature gate to be enabled.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "code"},
+	)
 	// ManagedEphemeralContainers is a gauge that indicates how many ephemeral containers are managed by this kubelet.
 	ManagedEphemeralContainers = metrics.NewGauge(
 		&metrics.GaugeOpts{
@@ -530,6 +554,10 @@ func Register(collectors ...metrics.StableCollector) {
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers) {
+			legacyregistry.MustRegister(StartedHostProcessContainersTotal)
+			legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
+		}
 		legacyregistry.MustRegister(RunPodSandboxDuration)
 		legacyregistry.MustRegister(RunPodSandboxErrors)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
