@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-security-webhook
+  namespace: pod-security-webhook
+  labels:
+    app: pod-security-webhook
+spec:
+  selector:
+    matchLabels:
+      app: pod-security-webhook
+  template:
+    metadata:
+      labels:
+        app: pod-security-webhook
+    spec:
+      serviceAccountName: pod-security-webhook
+      priorityClassName: system-cluster-critical
+      volumes:
+        - name: config
+          configMap:
+            name: pod-security-webhook
+        - name: pki
+          secret:
+            secretName: pod-security-webhook
+      containers:
+        - name: pod-security-webhook
+          image: samuelroth/pod-security-webhook:latest
+          # image: k8s.gcr.io/sig-auth/pod-security-webhook:v1.22-alpha.0
+          ports:
+            - containerPort: 8443
+          command: ["/pod-security-webhook"]
+          args:
+            [
+              "--config",
+              "/etc/config/podsecurityconfiguration.yaml",
+              "--tls-cert-file",
+              "/etc/pki/tls.crt",
+              "--tls-private-key-file",
+              "/etc/pki/tls.key",
+            ]
+          resources:
+            requests:
+              cpu: "0.25"
+            limits:
+              cpu: "0.5"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: config
+              mountPath: "/etc/config"
+              readOnly: true
+            - name: pki
+              mountPath: "/etc/pki"
+              readOnly: true
