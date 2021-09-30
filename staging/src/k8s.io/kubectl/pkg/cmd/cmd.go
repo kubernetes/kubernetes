@@ -425,8 +425,12 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 	// Wraps CommandHeaderRoundTripper around standard RoundTripper.
 	kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
 		c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			crt.Delegate = rt
-			return crt
+			// Must be separate RoundTripper; not "crt" closure.
+			// Fixes: https://github.com/kubernetes/kubectl/issues/1098
+			return &genericclioptions.CommandHeaderRoundTripper{
+				Delegate: rt,
+				Headers:  crt.Headers,
+			}
 		})
 		return c
 	}
