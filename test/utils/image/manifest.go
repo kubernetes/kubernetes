@@ -208,7 +208,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
-	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "bullseye-v1.0.0"}
+	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "buster-v1.6.7"}
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.4"}
 	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
@@ -228,7 +228,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.2"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{list.GcRegistry, "pause", "3.6"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.5"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{list.GcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{list.GcRegistry, "prometheus-to-sd", "v0.5.0"}
