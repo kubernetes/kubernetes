@@ -235,7 +235,7 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 	for _, sliceInfo := range sliceInfoByName {
 		for _, port := range sliceInfo.Ports {
 			if port.Name == nil {
-				klog.ErrorS(nil, "Ignoring port with nil name", "port", port)
+				klog.ErrorS(nil, "Ignoring port with nil name", "portName", port.Name)
 				continue
 			}
 			// TODO: handle nil ports to mean "all"
@@ -355,7 +355,7 @@ func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[strin
 			// Ensure endpoints are always returned in the same order to simplify diffing.
 			sort.Sort(byEndpoint(endpointsMap[svcPortName]))
 
-			klog.V(3).InfoS("Setting endpoints for service port name", "servicePortName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
+			klog.V(3).InfoS("Setting endpoints for service port name", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 

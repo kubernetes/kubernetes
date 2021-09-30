@@ -301,7 +301,7 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	if reflect.DeepEqual(change.previous, change.current) {
 		delete(sct.items, namespacedName)
 	} else {
-		klog.V(2).InfoS("Service updated ports", "service", namespacedName, "ports", len(change.current))
+		klog.V(2).InfoS("Service updated ports", "service", klog.KObj(svc), "portCount", len(change.current))
 	}
 	metrics.ServiceChangesPending.Set(float64(len(sct.items)))
 	return len(sct.items) > 0
@@ -416,9 +416,9 @@ func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 		existingPorts.Insert(svcPortName.String())
 		_, exists := (*sm)[svcPortName]
 		if !exists {
-			klog.V(1).InfoS("Adding new service port", "servicePortName", svcPortName, "ServicePort", info.String())
+			klog.V(1).InfoS("Adding new service port", "portName", svcPortName, "servicePort", info.String())
 		} else {
-			klog.V(1).InfoS("Updating existing service port", "servicePortName", svcPortName, "ServicePort", info.String())
+			klog.V(1).InfoS("Updating existing service port", "portName", svcPortName, "servicePort", info.String())
 		}
 		(*sm)[svcPortName] = info
 	}
@@ -441,13 +441,13 @@ func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {
-			klog.V(1).InfoS("Removing service port", "port", svcPortName)
+			klog.V(1).InfoS("Removing service port", "portName", svcPortName)
 			if info.Protocol() == v1.ProtocolUDP {
 				UDPStaleClusterIP.Insert(info.ClusterIP().String())
 			}
 			delete(*sm, svcPortName)
 		} else {
-			klog.ErrorS(nil, "Service port does not exists", "port", svcPortName)
+			klog.ErrorS(nil, "Service port does not exists", "portName", svcPortName)
 		}
 	}
 }

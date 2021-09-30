@@ -466,7 +466,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 				}
 			}
 
-			klog.V(3).InfoS("Setting endpoints for service port", "servicePortName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
+			klog.V(3).InfoS("Setting endpoints for service port", "portName", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 	return endpointsMap
@@ -550,7 +550,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 				}
 			}
 			if stale {
-				klog.V(4).InfoS("Stale endpoint", "servicePortName", svcPortName, "endpoint", ep.String())
+				klog.V(4).InfoS("Stale endpoint", "portName", svcPortName, "endpoint", ep.String())
 				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}
