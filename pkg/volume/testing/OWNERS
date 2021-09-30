@@ -1,14 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
+- sig-storage-approvers
 - pmorie
-- saad-ali
-- rootfs
-- jsafrane
 reviewers:
+- sig-storage-reviewers
 - jeffvance
-- saad-ali
-- jsafrane
-- rootfs
-- jingxu97
-- msau42
+labels:
+- sig/storage
