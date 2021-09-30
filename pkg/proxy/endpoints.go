@@ -271,7 +271,7 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 
 	namespacedName, _, err := endpointSliceCacheKeys(endpointSlice)
 	if err != nil {
-		klog.InfoS("Error getting endpoint slice cache keys", "error", err)
+		klog.InfoS("Error getting endpoint slice cache keys", "err", err)
 		return false
 	}
 
@@ -550,7 +550,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 				}
 			}
 			if stale {
-				klog.V(4).InfoS("Stale endpoint", "portName", svcPortName, "endpoint", ep.String())
+				klog.V(4).InfoS("Stale endpoint", "portName", svcPortName, "endpoint", ep)
 				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}

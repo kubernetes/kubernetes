@@ -416,9 +416,9 @@ func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 		existingPorts.Insert(svcPortName.String())
 		_, exists := (*sm)[svcPortName]
 		if !exists {
-			klog.V(1).InfoS("Adding new service port", "portName", svcPortName, "servicePort", info.String())
+			klog.V(1).InfoS("Adding new service port", "portName", svcPortName, "servicePort", info)
 		} else {
-			klog.V(1).InfoS("Updating existing service port", "portName", svcPortName, "servicePort", info.String())
+			klog.V(1).InfoS("Updating existing service port", "portName", svcPortName, "servicePort", info)
 		}
 		(*sm)[svcPortName] = info
 	}
