@@ -2746,7 +2746,7 @@ type PodSpec struct {
 	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
 	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
 	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
-	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
+	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	EphemeralContainers []EphemeralContainer
 	// +optional
@@ -3185,7 +3185,7 @@ var _ = Container(EphemeralContainerCommon{})
 // Ephemeral containers may not be added by directly updating the pod spec. They must be added
 // via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
 // once added.
-// This is an alpha feature enabled by the EphemeralContainers feature flag.
+// This is a beta feature available on clusters that haven't disabled the EphemeralContainers feature gate.
 type EphemeralContainer struct {
 	// Ephemeral containers have all of the fields of Container, plus additional fields
 	// specific to ephemeral containers. Fields in common with Container are in the
@@ -3250,7 +3250,7 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus
 
 	// Status for any ephemeral containers that have run in this pod.
-	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
+	// This field is beta-level and available on clusters that haven't disabled the EphemeralContainers feature gate.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus
 }
