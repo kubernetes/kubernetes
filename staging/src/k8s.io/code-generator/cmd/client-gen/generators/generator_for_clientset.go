@@ -152,7 +152,7 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 		configShallowCopy.UserAgent = $.DefaultKubernetesUserAgent|raw$()
 	}
 
-	restClient, err := rest.RESTClientFor(&configShallowCopy)
+	restClient, err := rest.UnversionedRESTClientFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
