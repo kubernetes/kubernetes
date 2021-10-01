@@ -62,7 +62,7 @@ type request struct {
 	arrivalTime time.Time
 
 	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
-	arrivalR float64
+	arrivalR SeatSeconds
 
 	// descr1 and descr2 are not used in any logic but they appear in
 	// log messages
@@ -84,9 +84,9 @@ type queue struct {
 	// The requests not yet executing in the real world are stored in a FIFO list.
 	requests fifo
 
-	// virtualStart is the "virtual time" (R progress meter reading) at
+	// nextDispatchR is the R progress meter reading at
 	// which the next request will be dispatched in the virtual world.
-	virtualStart float64
+	nextDispatchR SeatSeconds
 
 	// requestsExecuting is the count in the real world
 	requestsExecuting int
@@ -130,7 +130,7 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 		return true
 	})
 	return debug.QueueDump{
-		VirtualStart:      q.virtualStart,
+		VirtualStart:      q.nextDispatchR.ToFloat(), // TODO: change QueueDump to use SeatSeconds
 		Requests:          digest,
 		ExecutingRequests: q.requestsExecuting,
 		SeatsInUse:        q.seatsInUse,
