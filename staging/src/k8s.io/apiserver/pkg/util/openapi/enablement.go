@@ -56,8 +56,53 @@ func pruneEnums(schema *spec.Schema) {
 		schema.Description = schema.Description[:headerIndex]
 	}
 	schema.Enum = nil
-	for name, prop := range schema.Properties {
-		pruneEnums(&prop)
-		schema.Properties[name] = prop
+	for k, v := range schema.Definitions {
+		pruneEnums(&v)
+		schema.Definitions[k] = v
+	}
+	for k, v := range schema.Properties {
+		pruneEnums(&v)
+		schema.Properties[k] = v
+	}
+	for k, v := range schema.PatternProperties {
+		pruneEnums(&v)
+		schema.Properties[k] = v
+	}
+	for k, v := range schema.Dependencies {
+		if v.Schema != nil {
+			pruneEnums(v.Schema)
+			schema.Dependencies[k] = v
+		}
+	}
+	for i, v := range schema.AllOf {
+		pruneEnums(&v)
+		schema.AllOf[i] = v
+	}
+	for i, v := range schema.AnyOf {
+		pruneEnums(&v)
+		schema.AnyOf[i] = v
+	}
+	for i, v := range schema.OneOf {
+		pruneEnums(&v)
+		schema.OneOf[i] = v
+	}
+	if schema.Not != nil {
+		pruneEnums(schema.Not)
+	}
+	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
+		pruneEnums(schema.AdditionalProperties.Schema)
+	}
+	if schema.AdditionalItems != nil && schema.AdditionalItems.Schema != nil {
+		pruneEnums(schema.AdditionalItems.Schema)
+	}
+	if schema.Items != nil {
+		if schema.Items.Schema != nil {
+			pruneEnums(schema.Items.Schema)
+		} else {
+			for i, v := range schema.Items.Schemas {
+				pruneEnums(&v)
+				schema.Items.Schemas[i] = v
+			}
+		}
 	}
 }
