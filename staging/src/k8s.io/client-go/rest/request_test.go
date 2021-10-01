@@ -284,7 +284,7 @@ func TestRequestParam(t *testing.T) {
 }
 
 func TestRequestVersionedParams(t *testing.T) {
-	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}).Param("foo", "a")
+	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}, groupVersion: v1.SchemeGroupVersion}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -300,7 +300,7 @@ func TestRequestVersionedParams(t *testing.T) {
 }
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
-	r := &Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}
+	r := &Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}, groupVersion: v1.SchemeGroupVersion}
 	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, scheme.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},

@@ -125,13 +125,17 @@ func NewRequest(c *RESTClient) *Request {
 		backoff = noBackoff
 	}
 
-	var pathPrefix string
-	if c.base != nil {
-		pathPrefix = path.Join("/", c.base.Path, c.versionedAPIPath)
-	} else if len(c.versionedAPIPath) > 0 {
-		pathPrefix = path.Join("/", c.versionedAPIPath)
+	var pathPrefix, versionedAPIPath string
+	if len(c.versionedAPIPath) > 0 {
+		versionedAPIPath = c.versionedAPIPath
 	} else {
-		pathPrefix = "/"
+		versionedAPIPath = versionedAPIPathFromGV(c.content.GroupVersion)
+	}
+
+	if c.base != nil {
+		pathPrefix = path.Join("/", c.base.Path, versionedAPIPath)
+	} else {
+		pathPrefix = path.Join("/", versionedAPIPath)
 	}
 
 	var timeout time.Duration
@@ -351,18 +355,14 @@ func (r *Request) Param(paramName, s string) *Request {
 	return r.setParam(paramName, s)
 }
 
-// GroupVersion sets the API group and version associated with this request, and resets the prefix to
-// /api/<group> (for v1) or /apis/<group>/<version> (for all other group/versions)
+// GroupVersion sets the API group and version associated with s request, and resets the prefix to
+// /api/<group> (for v1) or /apis/<group>/<version> (for all oter group/versions)
 func (r *Request) GroupVersion(groupVersion schema.GroupVersion) *Request {
-	versionedAPIPath := "/apis"
-	if groupVersion.Group == "" && groupVersion.Version == "v1" {
-		versionedAPIPath = "/api"
-	}
-
+	versionedAPIPath := versionedAPIPathFromGV(groupVersion)
 	if r.c.base != nil {
-		r.pathPrefix = path.Join("/", r.c.base.Path, versionedAPIPath, groupVersion.Group, groupVersion.Version)
+		r.pathPrefix = path.Join("/", r.c.base.Path, versionedAPIPath)
 	} else {
-		r.pathPrefix = path.Join("/", versionedAPIPath, groupVersion.Group, groupVersion.Version)
+		r.pathPrefix = path.Join("/", versionedAPIPath)
 	}
 
 	r.groupVersion = groupVersion
@@ -1452,4 +1452,20 @@ func ValidatePathSegmentName(name string, prefix bool) []string {
 		return IsValidPathSegmentPrefix(name)
 	}
 	return IsValidPathSegmentName(name)
+}
+
+// pathFromGroupVersion returns the relative API path based on the groupVersion
+// "core" v1: /api/v1
+// others: /apis/<group>/<version>
+// "meta.k8s.io" or empty version: /
+func versionedAPIPathFromGV(groupVersion schema.GroupVersion) string {
+	if groupVersion == metav1.SchemeGroupVersion ||
+		groupVersion.Version == "" {
+		return ""
+	}
+	prefix := "/apis"
+	if groupVersion.Group == "" && groupVersion.Version == "v1" {
+		prefix = "/api"
+	}
+	return path.Join(prefix, groupVersion.Group, groupVersion.Version)
 }
