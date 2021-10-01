@@ -1189,5 +1189,5 @@ func (tc *nodeConfigTestCase) checkConfigMetrics(f *framework.Framework) {
 			return fmt.Errorf("checkConfigMetrics: case: %s: expect metrics %s but got %s", tc.desc, spew.Sprintf("%#v", expect), spew.Sprintf("%#v", actual))
 		}
 		return nil
-	}, timeout, interval).Should(gomega.BeNil())
+	}, 3*timeout, interval).Should(gomega.BeNil())
 }

@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -81,6 +81,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:Container
 
 	f := framework.NewDefaultFramework("restart-test")
 	ginkgo.Context("Container Runtime", func() {
+		ginkgo.Skip("this test is too heavyweight.")
 		ginkgo.Context("Network", func() {
 			ginkgo.It("should recover from ip leak", func() {
 				if framework.TestContext.ContainerRuntime == "docker" {
