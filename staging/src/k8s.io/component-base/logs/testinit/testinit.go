@@ -14,18 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+// Package testinit adds logging flags to a Ginkgo or Go test program during
+// initialization, something that the logs package itself no longer does.
+//
+// Normal commands should not use this and instead manage logging flags with
+// logs.Options and/or cli.Run.
+package testinit
 
 import (
-	"os"
+	"flag"
 
-	"k8s.io/component-base/cli"
-	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
-	"k8s.io/pod-security-admission/cmd/webhook/server"
+	"k8s.io/component-base/logs"
 )
 
-func main() {
-	command := server.NewServerCommand()
-	code := cli.Run(command)
-	os.Exit(code)
+func init() {
+	logs.AddGoFlags(flag.CommandLine)
 }

@@ -259,6 +259,9 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				}
 			}
 
+			// Config and flags parsed, now we can initialize logging.
+			logs.InitLogs()
+
 			// construct a KubeletServer from kubeletFlags and kubeletConfig
 			kubeletServer := &options.KubeletServer{
 				KubeletFlags:         *kubeletFlags,

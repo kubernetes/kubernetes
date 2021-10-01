@@ -40,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	etcd3watcher "k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/client-go/dynamic"
+	_ "k8s.io/component-base/logs/testinit" // enable logging flags
 
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"

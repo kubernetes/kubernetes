@@ -14,18 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package framework
 
 import (
-	"os"
-
-	"k8s.io/component-base/cli"
-	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
-	"k8s.io/pod-security-admission/cmd/webhook/server"
+	// All integration tests are expected to have logging flags.
+	_ "k8s.io/component-base/logs/testinit"
 )
-
-func main() {
-	command := server.NewServerCommand()
-	code := cli.Run(command)
-	os.Exit(code)
-}
