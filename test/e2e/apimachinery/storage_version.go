@@ -34,6 +34,7 @@ const (
 	idNonExist = "id-non-exist"
 )
 
+// This test requires that --feature-gates=APIServerIdentity=true,StorageVersionAPI=true be set on the apiserver and the controller manager
 var _ = SIGDescribe("StorageVersion resources [Feature:StorageVersionAPI]", func() {
 	f := framework.NewDefaultFramework("storage-version")
 
