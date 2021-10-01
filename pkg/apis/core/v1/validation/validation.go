@@ -144,10 +144,12 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	return allErrs
 }
 
-// AccumulateUniqueHostPorts checks all the containers for duplicates ports. Any
-// duplicate port will be returned in the ErrorList.
-func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
+// checkPortConflicts looks for duplicate hostPorts and duplicate namedPorts.
+// It returns an error list of conflicting port definitions.
+func checkPortConflicts(containers []v1.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	portAccumulator := sets.String{}
+	nameAccumulator := sets.String{}
 
 	for ci, ctr := range containers {
 		idxPath := fldPath.Index(ci)
@@ -155,14 +157,25 @@ func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.Stri
 		for pi := range ctr.Ports {
 			idxPath := portsPath.Index(pi)
 			port := ctr.Ports[pi].HostPort
+			name := ctr.Ports[pi].Name
 			if port == 0 {
 				continue
 			}
-			str := fmt.Sprintf("%d/%s", port, ctr.Ports[pi].Protocol)
-			if accumulator.Has(str) {
+
+			str := fmt.Sprintf("%s/%s/%d", ctr.Ports[pi].Protocol, ctr.Ports[pi].HostIP, port)
+			if portAccumulator.Has(str) {
 				allErrs = append(allErrs, field.Duplicate(idxPath.Child("hostPort"), str))
 			} else {
-				accumulator.Insert(str)
+				portAccumulator.Insert(str)
+			}
+
+			// Don't error on no name.
+			if name != "" {
+				if nameAccumulator.Has(name) {
+					allErrs = append(allErrs, field.Duplicate(idxPath.Child("namedPort"), name))
+				} else {
+					nameAccumulator.Insert(name)
+				}
 			}
 		}
 	}

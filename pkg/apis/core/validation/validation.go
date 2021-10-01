@@ -2687,10 +2687,12 @@ func validateAffinityTimeout(timeout *int32, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
-// AccumulateUniqueHostPorts extracts each HostPort of each Container,
-// accumulating the results and returning an error if any ports conflict.
-func AccumulateUniqueHostPorts(containers []core.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
+// checkPortConflicts looks for duplicate hostPorts and duplicate namedPorts.
+// It returns an error list of conflicting port definitions.
+func checkPortConflicts(containers []core.Container, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
+	portAccumulator := sets.String{}
+	nameAccumulator := sets.String{}
 
 	for ci, ctr := range containers {
 		idxPath := fldPath.Index(ci)
@@ -2698,25 +2700,29 @@ func AccumulateUniqueHostPorts(containers []core.Container, accumulator *sets.St
 		for pi := range ctr.Ports {
 			idxPath := portsPath.Index(pi)
 			port := ctr.Ports[pi].HostPort
+			name := ctr.Ports[pi].Name
 			if port == 0 {
 				continue
 			}
+
 			str := fmt.Sprintf("%s/%s/%d", ctr.Ports[pi].Protocol, ctr.Ports[pi].HostIP, port)
-			if accumulator.Has(str) {
+			if portAccumulator.Has(str) {
 				allErrs = append(allErrs, field.Duplicate(idxPath.Child("hostPort"), str))
 			} else {
-				accumulator.Insert(str)
+				portAccumulator.Insert(str)
+			}
+
+			// Don't error on no name.
+			if name != "" {
+				if nameAccumulator.Has(name) {
+					allErrs = append(allErrs, field.Duplicate(idxPath.Child("namedPort"), name))
+				} else {
+					nameAccumulator.Insert(name)
+				}
 			}
 		}
 	}
 	return allErrs
-}
-
-// checkHostPortConflicts checks for colliding Port.HostPort values across
-// a slice of containers.
-func checkHostPortConflicts(containers []core.Container, fldPath *field.Path) field.ErrorList {
-	allPorts := sets.String{}
-	return AccumulateUniqueHostPorts(containers, &allPorts, fldPath)
 }
 
 func validateExecAction(exec *core.ExecAction, fldPath *field.Path) field.ErrorList {
@@ -3006,11 +3012,11 @@ func validateContainers(containers []core.Container, isInitContainers bool, volu
 	if isInitContainers {
 		// check initContainers one by one since they are running in sequential order.
 		for _, initContainer := range containers {
-			allErrs = append(allErrs, checkHostPortConflicts([]core.Container{initContainer}, fldPath)...)
+			allErrs = append(allErrs, checkPortConflicts([]core.Container{initContainer}, fldPath)...)
 		}
 	} else {
 		// Check for colliding ports across all containers.
-		allErrs = append(allErrs, checkHostPortConflicts(containers, fldPath)...)
+		allErrs = append(allErrs, checkPortConflicts(containers, fldPath)...)
 	}
 
 	return allErrs
