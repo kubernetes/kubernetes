@@ -6,7 +6,6 @@ approvers:
 - feiskyer
 - ksubrmnn
 - kumarvin123
-- elweb9858
 - sbangari
 reviewers:
 - dineshgovindasamy
@@ -14,7 +13,6 @@ reviewers:
 - feiskyer
 - ksubrmnn
 - kumarvin123
-- elweb9858
 - sbangari
 labels:
 - sig/network
