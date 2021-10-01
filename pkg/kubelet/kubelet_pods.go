@@ -1504,8 +1504,19 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 		if err != nil {
 			klog.V(4).InfoS("Cannot get host IPs", "err", err)
 		} else {
+			// notes: (khenidak):
+			// There are situations where node IPs change. Specifically
+			// 1. cloud provider change node ips (by adding or changing orders)
+			// 2. runtime node ip change.
+			// this guarantees that host net pods gets updated IPs. But does not
+			// guarantees that containers running inside the pod will sense the change
+			// nor does not modify downward apis. Host net pods that want to operate
+			// correctly with changing node IP  must listen to ::0
+			// we set the podIPs anyway and depend on status manager to check
+			// if status has indeed changed and in need for an api-server call
+			// for more info check: status manager's isPodStatusByKubeletEqual()
 			s.HostIP = hostIPs[0].String()
-			if kubecontainer.IsHostNetworkPod(pod) && s.PodIP == "" {
+			if kubecontainer.IsHostNetworkPod(pod) {
 				s.PodIP = hostIPs[0].String()
 				s.PodIPs = []v1.PodIP{{IP: s.PodIP}}
 				if len(hostIPs) == 2 {

@@ -3165,39 +3165,37 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			},
 		},
 		{
-			name: "CRI PodIPs override NodeAddresses",
+			name: "single-stack CRI PodIPs DOES NOT override NodeAddresses",
 			nodeAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
 			criPodIPs: []string{"192.168.0.1"},
 			podIPs: []v1.PodIP{
-				{IP: "192.168.0.1"},
+				{IP: "10.0.0.1"},
 			},
 		},
 		{
-			name: "CRI dual-stack PodIPs override NodeAddresses",
+			name: "CRI dual-stack PodIPs DOES NOT override NodeAddresses",
 			nodeAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
 			criPodIPs: []string{"192.168.0.1", "2001:db8::2"},
 			podIPs: []v1.PodIP{
-				{IP: "192.168.0.1"},
-				{IP: "2001:db8::2"},
+				{IP: "10.0.0.1"},
+				{IP: "fd01::1234"},
 			},
 		},
 		{
-			// by default the cluster prefers IPv4
-			name: "CRI dual-stack PodIPs override NodeAddresses prefer IPv4",
+			name: "set according to ip family order of host and CRI DOES NOT override host IPs",
 			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
+				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 			},
 			criPodIPs: []string{"2001:db8::2", "192.168.0.1"},
 			podIPs: []v1.PodIP{
-				{IP: "192.168.0.1"},
-				{IP: "2001:db8::2"},
+				{IP: "fd01::1234"},
+				{IP: "10.0.0.1"},
 			},
 		},
 	}
