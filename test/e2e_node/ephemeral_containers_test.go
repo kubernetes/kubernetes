@@ -27,7 +27,7 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Ephemeral Containers [Feature:EphemeralContainers][NodeAlphaFeature:EphemeralContainers]", func() {
+var _ = SIGDescribe("Ephemeral Containers", func() {
 	f := framework.NewDefaultFramework("ephemeral-containers-test")
 	var podClient *framework.PodClient
 	ginkgo.BeforeEach(func() {
