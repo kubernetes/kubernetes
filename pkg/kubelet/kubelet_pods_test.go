@@ -2400,6 +2400,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 		containers        []v1.Container
 		hasInitContainers bool
 		isInitContainer   bool
+		isTerminated      bool
 		expected          []v1.ContainerStatus
 	}{
 		{
@@ -2464,6 +2465,7 @@ func TestConvertToAPIContainerStatuses(t *testing.T) {
 				test.containers,
 				test.hasInitContainers,
 				test.isInitContainer,
+				test.isTerminated,
 			)
 			for i, status := range containerStatuses {
 				assert.Equal(t, test.expected[i], status, "[test %s]", test.name)
@@ -2742,7 +2744,7 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			for _, name := range test.unreadyContainer {
 				kl.readinessManager.Set(kubecontainer.BuildContainerID("", findContainerStatusByName(test.expected, name).ContainerID), results.Failure, test.pod)
 			}
-			actual := kl.generateAPIPodStatus(test.pod, test.currentStatus)
+			actual := kl.generateAPIPodStatus(test.pod, test.currentStatus, false)
 			if !apiequality.Semantic.DeepEqual(test.expected, actual) {
 				t.Fatalf("Unexpected status: %s", diff.ObjectReflectDiff(actual, test.expected))
 			}
@@ -3261,7 +3263,7 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(pod, criStatus)
+			status := kl.generateAPIPodStatus(pod, criStatus, false)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -3394,7 +3396,7 @@ func TestGenerateAPIPodStatusPodIPs(t *testing.T) {
 				IPs:       tc.criPodIPs,
 			}
 
-			status := kl.generateAPIPodStatus(pod, criStatus)
+			status := kl.generateAPIPodStatus(pod, criStatus, false)
 			if !reflect.DeepEqual(status.PodIPs, tc.podIPs) {
 				t.Fatalf("Expected PodIPs %#v, got %#v", tc.podIPs, status.PodIPs)
 			}
@@ -3522,7 +3524,7 @@ func TestConvertToAPIContainerStatusesDataRace(t *testing.T) {
 	// detection, so would catch a race condition consistently, despite only spawning 2 goroutines
 	for i := 0; i < 2; i++ {
 		go func() {
-			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, false, false)
+			kl.convertToAPIContainerStatuses(pod, criStatus, []v1.ContainerStatus{}, []v1.Container{}, false, false, false)
 		}()
 	}
 }
