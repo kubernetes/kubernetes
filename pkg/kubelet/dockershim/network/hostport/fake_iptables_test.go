@@ -24,7 +24,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "k8s.io/component-helpers/network/utils/iptables"
 )
 
 func TestRestoreFlushRules(t *testing.T) {

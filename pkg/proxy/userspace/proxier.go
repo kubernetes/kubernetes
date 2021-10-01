@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
+	"k8s.io/component-helpers/network/utils/iptables"
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
@@ -42,7 +43,6 @@ import (
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
-	"k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 )

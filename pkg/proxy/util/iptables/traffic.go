@@ -19,8 +19,8 @@ package iptables
 import (
 	"fmt"
 
+	utiliptables "k8s.io/component-helpers/network/utils/iptables"
 	"k8s.io/klog/v2"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	netutils "k8s.io/utils/net"
 )
 

@@ -26,7 +26,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "k8s.io/component-helpers/network/utils/iptables"
 	"k8s.io/utils/exec"
 	netutils "k8s.io/utils/net"
 )

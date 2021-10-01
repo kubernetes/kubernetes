@@ -31,11 +31,11 @@ import (
 
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
+	utiliptables "k8s.io/component-helpers/network/utils/iptables"
+	utiliptablestest "k8s.io/component-helpers/network/utils/iptables/testing"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utiliptablestest "k8s.io/kubernetes/pkg/util/iptables/testing"
 )
 
 type fakeIPSetVersioner struct {

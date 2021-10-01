@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
+	utiliptables "k8s.io/component-helpers/network/utils/iptables"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
 const (

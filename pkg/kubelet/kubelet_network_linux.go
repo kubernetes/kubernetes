@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utiliptables "k8s.io/component-helpers/network/utils/iptables"
 	"k8s.io/klog/v2"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
 )

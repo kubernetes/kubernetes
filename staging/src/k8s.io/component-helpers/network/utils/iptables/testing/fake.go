@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/component-helpers/network/utils/iptables"
 )
 
 const (

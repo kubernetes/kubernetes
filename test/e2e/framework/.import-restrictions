@@ -215,7 +215,7 @@ rules:
       - k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff
       - k8s.io/kubernetes/pkg/util/hash
       - k8s.io/kubernetes/pkg/util/ipset
-      - k8s.io/kubernetes/pkg/util/iptables
+      - k8s.io/component-helpers/network/utils/iptables
       - k8s.io/kubernetes/pkg/util/ipvs
       - k8s.io/kubernetes/pkg/util/labels
       - k8s.io/kubernetes/pkg/util/node

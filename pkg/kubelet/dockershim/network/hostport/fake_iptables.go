@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "k8s.io/component-helpers/network/utils/iptables"
 	netutils "k8s.io/utils/net"
 )
 
