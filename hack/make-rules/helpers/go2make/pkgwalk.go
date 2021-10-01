@@ -72,7 +72,24 @@ func WalkPkg(pkgName string, visit VisitFunc) error {
 // findPackage finds a Go package.
 func findPackage(pkgName string) (*build.Package, error) {
 	debug("find", pkgName)
-	pkg, err := build.Import(pkgName, getwd(), build.FindOnly)
+
+	var (
+		pkg *build.Package
+		err error
+	)
+
+	canonicalPkgName := canonicalizeImportPath(pkgName)
+	if pkgDir, knownDir := getResolvedPackageDir(canonicalPkgName); knownDir {
+		pkg, err = build.ImportDir(pkgDir, build.FindOnly)
+		if pkg != nil {
+			// ensure the ImportPath is the canonical one
+			pkg.ImportPath = canonicalPkgName
+		}
+	} else {
+		debug("unknown", pkgName)
+		pkg, err = build.Import(pkgName, getwd(), build.FindOnly)
+	}
+
 	if err != nil {
 		return nil, err
 	}
