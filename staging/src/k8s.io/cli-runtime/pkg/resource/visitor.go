@@ -430,6 +430,10 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			if len(info.ResourceVersion) != 0 {
 				item.ResourceVersion = info.ResourceVersion
 			}
+			// propagate list source to items source
+			if len(info.Source) != 0 {
+				item.Source = info.Source
+			}
 			if err := fn(item, nil); err != nil {
 				errs = append(errs, err)
 			}
