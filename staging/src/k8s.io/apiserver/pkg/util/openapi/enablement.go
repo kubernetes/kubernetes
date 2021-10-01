@@ -42,67 +42,97 @@ func amendDefinitions(defs map[string]common.OpenAPIDefinition) {
 	// revert changes from OpenAPIEnums
 	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.OpenAPIEnums) {
 		for gvk, def := range defs {
-			pruneEnums(&def.Schema)
-			defs[gvk] = def
+			if pruneEnums(&def.Schema) {
+				defs[gvk] = def
+			}
 		}
 	}
 }
 
-func pruneEnums(schema *spec.Schema) {
+func pruneEnums(schema *spec.Schema) (changed bool) {
+	if len(schema.Enum) != 0 {
+		schema.Enum = nil
+		changed = true
+	}
 	if headerIndex := strings.Index(schema.Description, enumTypeDescriptionHeader); headerIndex != -1 {
 		// remove the enum section from description.
 		// note that the new lines before the header should be removed too,
 		// thus the slice range.
 		schema.Description = schema.Description[:headerIndex]
+		changed = true
 	}
-	schema.Enum = nil
 	for k, v := range schema.Definitions {
-		pruneEnums(&v)
-		schema.Definitions[k] = v
+		if pruneEnums(&v) {
+			changed = true
+			schema.Definitions[k] = v
+		}
 	}
 	for k, v := range schema.Properties {
-		pruneEnums(&v)
-		schema.Properties[k] = v
+		if pruneEnums(&v) {
+			changed = true
+			schema.Properties[k] = v
+		}
 	}
 	for k, v := range schema.PatternProperties {
-		pruneEnums(&v)
-		schema.Properties[k] = v
+		if pruneEnums(&v) {
+			changed = true
+			schema.Properties[k] = v
+		}
 	}
 	for k, v := range schema.Dependencies {
 		if v.Schema != nil {
-			pruneEnums(v.Schema)
-			schema.Dependencies[k] = v
-		}
-	}
-	for i, v := range schema.AllOf {
-		pruneEnums(&v)
-		schema.AllOf[i] = v
-	}
-	for i, v := range schema.AnyOf {
-		pruneEnums(&v)
-		schema.AnyOf[i] = v
-	}
-	for i, v := range schema.OneOf {
-		pruneEnums(&v)
-		schema.OneOf[i] = v
-	}
-	if schema.Not != nil {
-		pruneEnums(schema.Not)
-	}
-	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
-		pruneEnums(schema.AdditionalProperties.Schema)
-	}
-	if schema.AdditionalItems != nil && schema.AdditionalItems.Schema != nil {
-		pruneEnums(schema.AdditionalItems.Schema)
-	}
-	if schema.Items != nil {
-		if schema.Items.Schema != nil {
-			pruneEnums(schema.Items.Schema)
-		} else {
-			for i, v := range schema.Items.Schemas {
-				pruneEnums(&v)
-				schema.Items.Schemas[i] = v
+			if pruneEnums(v.Schema) {
+				changed = true
+				schema.Dependencies[k] = v
 			}
 		}
 	}
+	for i, v := range schema.AllOf {
+		if pruneEnums(&v) {
+			changed = true
+			schema.AllOf[i] = v
+		}
+	}
+	for i, v := range schema.AnyOf {
+		if pruneEnums(&v) {
+			changed = true
+			schema.AnyOf[i] = v
+		}
+	}
+	for i, v := range schema.OneOf {
+		if pruneEnums(&v) {
+			changed = true
+			schema.OneOf[i] = v
+		}
+	}
+	if schema.Not != nil {
+		if pruneEnums(schema.Not) {
+			changed = true
+		}
+	}
+	if schema.AdditionalProperties != nil && schema.AdditionalProperties.Schema != nil {
+		if pruneEnums(schema.AdditionalProperties.Schema) {
+			changed = true
+		}
+	}
+	if schema.AdditionalItems != nil && schema.AdditionalItems.Schema != nil {
+		if pruneEnums(schema.AdditionalItems.Schema) {
+			changed = true
+		}
+	}
+	if schema.Items != nil {
+		if schema.Items.Schema != nil {
+			if pruneEnums(schema.Items.Schema) {
+				changed = true
+			}
+		} else {
+			for i, v := range schema.Items.Schemas {
+				if pruneEnums(&v) {
+					changed = true
+					schema.Items.Schemas[i] = v
+				}
+			}
+		}
+	}
+	return
 }
