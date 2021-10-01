@@ -19,6 +19,7 @@ package stats
 import (
 	"testing"
 
+	gomock "github.com/golang/mock/gomock"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 
@@ -208,15 +209,16 @@ func TestCadvisorListPodStats(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCadvisor := new(cadvisortest.Mock)
-	mockCadvisor.
-		On("ContainerInfoV2", "/", options).Return(infos, nil).
-		On("RootFsInfo").Return(rootfs, nil).
-		On("ImagesFsInfo").Return(imagefs, nil)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
 
-	mockRuntime := new(containertest.Mock)
-	mockRuntime.
-		On("ImageStats").Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil)
+	mockCadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
+	mockCadvisor.EXPECT().RootFsInfo().Return(rootfs, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo().Return(imagefs, nil)
+
+	mockRuntime := containertest.NewMockRuntime(mockCtrl)
+	mockRuntime.EXPECT().ImageStats().Return(&kubecontainer.ImageStats{TotalStorageBytes: 123}, nil).AnyTimes()
 
 	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
 		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
@@ -230,11 +232,11 @@ func TestCadvisorListPodStats(t *testing.T) {
 	p1Time := metav1.Now()
 	p2Time := metav1.Now()
 	p3Time := metav1.Now()
-	mockStatus := new(statustest.MockStatusProvider)
-	mockStatus.On("GetPodStatus", types.UID("UID"+pName0)).Return(v1.PodStatus{StartTime: &p0Time}, true)
-	mockStatus.On("GetPodStatus", types.UID("UID"+pName1)).Return(v1.PodStatus{StartTime: &p1Time}, true)
-	mockStatus.On("GetPodStatus", types.UID("UID"+pName2)).Return(v1.PodStatus{StartTime: &p2Time}, true)
-	mockStatus.On("GetPodStatus", types.UID("UID"+pName3)).Return(v1.PodStatus{StartTime: &p3Time}, true)
+	mockStatus := statustest.NewMockPodStatusProvider(mockCtrl)
+	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName0)).Return(v1.PodStatus{StartTime: &p0Time}, true)
+	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName1)).Return(v1.PodStatus{StartTime: &p1Time}, true)
+	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName2)).Return(v1.PodStatus{StartTime: &p2Time}, true)
+	mockStatus.EXPECT().GetPodStatus(types.UID("UID"+pName3)).Return(v1.PodStatus{StartTime: &p3Time}, true)
 
 	resourceAnalyzer := &fakeResourceAnalyzer{podVolumeStats: volumeStats}
 
@@ -391,9 +393,11 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 		Recursive: true,
 	}
 
-	mockCadvisor := new(cadvisortest.Mock)
-	mockCadvisor.
-		On("ContainerInfoV2", "/", options).Return(infos, nil)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	mockCadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	mockCadvisor.EXPECT().ContainerInfoV2("/", options).Return(infos, nil)
 
 	ephemeralVolumes := []statsapi.VolumeStats{getPodVolumeStats(seedEphemeralVolume1, "ephemeralVolume1"),
 		getPodVolumeStats(seedEphemeralVolume2, "ephemeralVolume2")}
@@ -479,18 +483,20 @@ func TestCadvisorListPodCPUAndMemoryStats(t *testing.T) {
 }
 
 func TestCadvisorImagesFsStats(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
 	var (
 		assert       = assert.New(t)
-		mockCadvisor = new(cadvisortest.Mock)
-		mockRuntime  = new(containertest.Mock)
+		mockCadvisor = cadvisortest.NewMockInterface(mockCtrl)
+		mockRuntime  = containertest.NewMockRuntime(mockCtrl)
 
 		seed        = 1000
 		imageFsInfo = getTestFsInfo(seed)
 		imageStats  = &kubecontainer.ImageStats{TotalStorageBytes: 100}
 	)
 
-	mockCadvisor.On("ImagesFsInfo").Return(imageFsInfo, nil)
-	mockRuntime.On("ImageStats").Return(imageStats, nil)
+	mockCadvisor.EXPECT().ImagesFsInfo().Return(imageFsInfo, nil)
+	mockRuntime.EXPECT().ImageStats().Return(imageStats, nil)
 
 	provider := newCadvisorStatsProvider(mockCadvisor, &fakeResourceAnalyzer{}, mockRuntime, nil, NewFakeHostStatsProvider())
 	stats, err := provider.ImageFsStats()
@@ -503,6 +509,4 @@ func TestCadvisorImagesFsStats(t *testing.T) {
 	assert.Equal(imageFsInfo.InodesFree, stats.InodesFree)
 	assert.Equal(imageFsInfo.Inodes, stats.Inodes)
 	assert.Equal(*imageFsInfo.Inodes-*imageFsInfo.InodesFree, *stats.InodesUsed)
-
-	mockCadvisor.AssertExpectations(t)
 }
