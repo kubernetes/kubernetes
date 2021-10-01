@@ -3878,7 +3878,10 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             namedType: io.k8s.api.core.v1.ContainerPort
-          elementRelationship: atomic
+          elementRelationship: associative
+          keys:
+          - containerPort
+          - protocol
     - name: readinessProbe
       type:
         namedType: io.k8s.api.core.v1.Probe
