@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -30,6 +31,7 @@ import (
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -54,6 +56,8 @@ type CSILimits struct {
 	randomVolumeIDPrefix string
 
 	translator InTreeToCSITranslator
+
+	enableGenericEphemeralVolume bool
 }
 
 var _ framework.FilterPlugin = &CSILimits{}
@@ -96,7 +100,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	}
 
 	newVolumes := make(map[string]string)
-	if err := pl.filterAttachableVolumes(csiNode, pod.Spec.Volumes, pod.Namespace, newVolumes); err != nil {
+	if err := pl.filterAttachableVolumes(pod, csiNode, true /* new pod */, newVolumes); err != nil {
 		return framework.AsStatus(err)
 	}
 
@@ -113,7 +117,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	attachedVolumes := make(map[string]string)
 	for _, existingPod := range nodeInfo.Pods {
-		if err := pl.filterAttachableVolumes(csiNode, existingPod.Pod.Spec.Volumes, existingPod.Pod.Namespace, attachedVolumes); err != nil {
+		if err := pl.filterAttachableVolumes(existingPod.Pod, csiNode, false /* existing pod */, attachedVolumes); err != nil {
 			return framework.AsStatus(err)
 		}
 	}
@@ -144,23 +148,53 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 }
 
 func (pl *CSILimits) filterAttachableVolumes(
-	csiNode *storagev1.CSINode, volumes []v1.Volume, namespace string, result map[string]string) error {
-	for _, vol := range volumes {
-		// CSI volumes can only be used as persistent volumes
-		if vol.PersistentVolumeClaim == nil {
+	pod *v1.Pod, csiNode *storagev1.CSINode, newPod bool, result map[string]string) error {
+	for _, vol := range pod.Spec.Volumes {
+		// CSI volumes can only be used through a PVC.
+		pvcName := ""
+		ephemeral := false
+		switch {
+		case vol.PersistentVolumeClaim != nil:
+			pvcName = vol.PersistentVolumeClaim.ClaimName
+		case vol.Ephemeral != nil:
+			if newPod && !pl.enableGenericEphemeralVolume {
+				return fmt.Errorf(
+					"volume %s is a generic ephemeral volume, but that feature is disabled in kube-scheduler",
+					vol.Name,
+				)
+			}
+			// Generic ephemeral inline volumes also use a PVC,
+			// just with a computed name and certain ownership.
+			// That is checked below once the pvc object is
+			// retrieved.
+			pvcName = pod.Name + "-" + vol.Name
+			ephemeral = true
+		default:
 			continue
 		}
-		pvcName := vol.PersistentVolumeClaim.ClaimName
 
 		if pvcName == "" {
 			return fmt.Errorf("PersistentVolumeClaim had no name")
 		}
 
-		pvc, err := pl.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
+		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 
 		if err != nil {
-			klog.V(5).InfoS("Unable to look up PVC info", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName))
+			if newPod {
+				// The PVC is required to proceed with
+				// scheduling of a new pod because it cannot
+				// run without it. Bail out immediately.
+				return fmt.Errorf("looking up PVC %s/%s: %v", pod.Namespace, pvcName, err)
+			}
+			// If the PVC is invalid, we don't count the volume because
+			// there's no guarantee that it belongs to the running predicate.
+			klog.V(5).InfoS("Unable to look up PVC info", "PVC", fmt.Sprintf("%s/%s", pod.Namespace, pvcName))
 			continue
+		}
+
+		// The PVC for an ephemeral volume must be owned by the pod.
+		if ephemeral && !metav1.IsControlledBy(pvc, pod) {
+			return fmt.Errorf("PVC %s/%s is not owned by pod", pod.Namespace, pvcName)
 		}
 
 		driverName, volumeHandle := pl.getCSIDriverInfo(csiNode, pvc)
@@ -276,7 +310,7 @@ func (pl *CSILimits) getCSIDriverInfoFromSC(csiNode *storagev1.CSINode, pvc *v1.
 }
 
 // NewCSI initializes a new plugin and returns it.
-func NewCSI(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
+func NewCSI(_ runtime.Object, handle framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
@@ -284,12 +318,13 @@ func NewCSI(_ runtime.Object, handle framework.Handle) (framework.Plugin, error)
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &CSILimits{
-		csiNodeLister:        csiNodesLister,
-		pvLister:             pvLister,
-		pvcLister:            pvcLister,
-		scLister:             scLister,
-		randomVolumeIDPrefix: rand.String(32),
-		translator:           csitrans.New(),
+		csiNodeLister:                csiNodesLister,
+		pvLister:                     pvLister,
+		pvcLister:                    pvcLister,
+		scLister:                     scLister,
+		randomVolumeIDPrefix:         rand.String(32),
+		translator:                   csitrans.New(),
+		enableGenericEphemeralVolume: fts.EnableGenericEphemeralVolume,
 	}, nil
 }
 

@@ -38,8 +38,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	netutils "k8s.io/utils/net"
 
 	// TODO: remove this import if
@@ -47,6 +49,7 @@ import (
 	// to "v1"?
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -2886,13 +2889,16 @@ func TestGetPortForward(t *testing.T) {
 }
 
 func TestHasHostMountPVC(t *testing.T) {
-	tests := map[string]struct {
-		pvError       error
-		pvcError      error
-		expected      bool
-		podHasPVC     bool
-		pvcIsHostPath bool
-	}{
+	type testcase struct {
+		pvError          error
+		pvcError         error
+		expected         bool
+		podHasPVC        bool
+		pvcIsHostPath    bool
+		podHasEphemeral  bool
+		ephemeralEnabled bool
+	}
+	tests := map[string]testcase{
 		"no pvc": {podHasPVC: false, expected: false},
 		"error fetching pvc": {
 			podHasPVC: true,
@@ -2909,6 +2915,18 @@ func TestHasHostMountPVC(t *testing.T) {
 			pvcIsHostPath: true,
 			expected:      true,
 		},
+		"enabled ephemeral host path": {
+			podHasEphemeral:  true,
+			pvcIsHostPath:    true,
+			ephemeralEnabled: true,
+			expected:         true,
+		},
+		"disabled ephemeral host path": {
+			podHasEphemeral:  true,
+			pvcIsHostPath:    true,
+			ephemeralEnabled: false,
+			expected:         false,
+		},
 		"non host path pvc": {
 			podHasPVC:     true,
 			pvcIsHostPath: false,
@@ -2916,7 +2934,8 @@ func TestHasHostMountPVC(t *testing.T) {
 		},
 	}
 
-	for k, v := range tests {
+	run := func(t *testing.T, v testcase) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, v.ephemeralEnabled)()
 		testKubelet := newTestKubelet(t, false)
 		defer testKubelet.Cleanup()
 		pod := &v1.Pod{
@@ -2935,13 +2954,23 @@ func TestHasHostMountPVC(t *testing.T) {
 					},
 				},
 			}
+		}
 
-			if v.pvcIsHostPath {
-				volumeToReturn.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
-					HostPath: &v1.HostPathVolumeSource{},
-				}
+		if v.podHasEphemeral {
+			pod.Spec.Volumes = []v1.Volume{
+				{
+					Name: "xyz",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{},
+					},
+				},
 			}
+		}
 
+		if (v.podHasPVC || v.podHasEphemeral) && v.pvcIsHostPath {
+			volumeToReturn.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{},
+			}
 		}
 
 		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
@@ -2957,9 +2986,14 @@ func TestHasHostMountPVC(t *testing.T) {
 
 		actual := testKubelet.kubelet.hasHostMountPVC(pod)
 		if actual != v.expected {
-			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
+			t.Errorf("expected %t but got %t", v.expected, actual)
 		}
+	}
 
+	for k, v := range tests {
+		t.Run(k, func(t *testing.T) {
+			run(t, v)
+		})
 	}
 }
 

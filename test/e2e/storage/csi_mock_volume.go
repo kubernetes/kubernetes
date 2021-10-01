@@ -197,7 +197,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		framework.ExpectNoError(err, "Failed to register CSIDriver %v", m.config.GetUniqueDriverName())
 	}
 
-	createPod := func(ephemeral bool) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
+	type volumeType string
+	csiEphemeral := volumeType("CSI")
+	genericEphemeral := volumeType("Ephemeral")
+	pvcReference := volumeType("PVC")
+	createPod := func(withVolume volumeType) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
 		ginkgo.By("Creating pod")
 		sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
 		scTest := testsuites.StorageClassTest{
@@ -213,12 +217,21 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 		// The mock driver only works when everything runs on a single node.
 		nodeSelection := m.config.ClientNodeSelection
-		if ephemeral {
+		switch withVolume {
+		case csiEphemeral:
 			pod = startPausePodInline(f.ClientSet, scTest, nodeSelection, f.Namespace.Name)
-			if pod != nil {
-				m.pods = append(m.pods, pod)
+		case genericEphemeral:
+			class, pod = startPausePodGenericEphemeral(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name)
+			if class != nil {
+				m.sc[class.Name] = class
 			}
-		} else {
+			claim = &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      pod.Name + "-" + pod.Spec.Volumes[0].Name,
+					Namespace: f.Namespace.Name,
+				},
+			}
+		case pvcReference:
 			class, claim, pod = startPausePod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name)
 			if class != nil {
 				m.sc[class.Name] = class
@@ -226,9 +239,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			if claim != nil {
 				m.pvcs = append(m.pvcs, claim)
 			}
-			if pod != nil {
-				m.pods = append(m.pods, pod)
-			}
+		}
+		if pod != nil {
+			m.pods = append(m.pods, pod)
 		}
 		return // result variables set above
 	}
@@ -318,6 +331,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			name                   string
 			disableAttach          bool
 			deployClusterRegistrar bool
+			volumeType             volumeType
 		}{
 			{
 				name:                   "should not require VolumeAttach for drivers without attachment",
@@ -327,6 +341,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			{
 				name:                   "should require VolumeAttach for drivers with attachment",
 				deployClusterRegistrar: true,
+			},
+			{
+				name:                   "should require VolumeAttach for ephemermal volume and drivers with attachment",
+				deployClusterRegistrar: true,
+				volumeType:             genericEphemeral,
 			},
 			{
 				name:                   "should preserve attachment policy when no CSIDriver present",
@@ -340,7 +359,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(testParameters{registerDriver: test.deployClusterRegistrar, disableAttach: test.disableAttach})
 				defer cleanup()
 
-				_, claim, pod := createPod(false)
+				volumeType := t.volumeType
+				if volumeType == "" {
+					volumeType = pvcReference
+				}
+				_, claim, pod := createPod(volumeType)
 				if pod == nil {
 					return
 				}
@@ -375,7 +398,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			init(testParameters{registerDriver: false, disableAttach: true})
 			defer cleanup()
 
-			_, claim, pod := createPod(false /* persistent volume, late binding as specified above */)
+			_, claim, pod := createPod(pvcReference) // late binding as specified above
 			if pod == nil {
 				return
 			}
@@ -497,7 +520,11 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				defer cleanup()
 
-				_, _, pod := createPod(test.expectEphemeral)
+				withVolume := pvcReference
+				if test.expectEphemeral {
+					withVolume = csiEphemeral
+				}
+				_, _, pod := createPod(withVolume)
 				if pod == nil {
 					return
 				}
@@ -539,22 +566,72 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 2))
 
-			_, _, pod1 := createPod(false)
+			_, _, pod1 := createPod(pvcReference)
 			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating first pod")
 
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
 
-			_, _, pod2 := createPod(false)
+			_, _, pod2 := createPod(pvcReference)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating second pod")
 
 			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod2.Name, pod2.Namespace)
 			framework.ExpectNoError(err, "Failed to start pod2: %v", err)
 
-			_, _, pod3 := createPod(false)
+			_, _, pod3 := createPod(pvcReference)
 			gomega.Expect(pod3).NotTo(gomega.BeNil(), "while creating third pod")
 			err = waitForMaxVolumeCondition(pod3, m.cs)
 			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod3)
+		})
+
+		ginkgo.It("should report attach limit for generic ephemeral volume when persistent volume is attached [Slow]", func() {
+			// define volume limit to be 2 for this test
+			var err error
+			init(testParameters{attachLimit: 1})
+			defer cleanup()
+			nodeName := m.config.ClientNodeSelection.Name
+			driverName := m.config.GetUniqueDriverName()
+
+			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
+			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
+
+			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
+
+			_, _, pod1 := createPod(pvcReference)
+			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating pod with persistent volume")
+
+			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
+			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+
+			_, _, pod2 := createPod(genericEphemeral)
+			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
+			err = waitForMaxVolumeCondition(pod2, m.cs)
+			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
+		})
+
+		ginkgo.It("should report attach limit for persistent volume when generic ephemeral volume is attached [Slow]", func() {
+			// define volume limit to be 2 for this test
+			var err error
+			init(testParameters{attachLimit: 1})
+			defer cleanup()
+			nodeName := m.config.ClientNodeSelection.Name
+			driverName := m.config.GetUniqueDriverName()
+
+			csiNodeAttachLimit, err := checkCSINodeForLimits(nodeName, driverName, m.cs)
+			framework.ExpectNoError(err, "while checking limits in CSINode: %v", err)
+
+			gomega.Expect(csiNodeAttachLimit).To(gomega.BeNumerically("==", 1))
+
+			_, _, pod1 := createPod(genericEphemeral)
+			gomega.Expect(pod1).NotTo(gomega.BeNil(), "while creating pod with persistent volume")
+
+			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod1.Name, pod1.Namespace)
+			framework.ExpectNoError(err, "Failed to start pod1: %v", err)
+
+			_, _, pod2 := createPod(pvcReference)
+			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod with ephemeral volume")
+			err = waitForMaxVolumeCondition(pod2, m.cs)
+			framework.ExpectNoError(err, "while waiting for max volume condition on pod : %+v", pod2)
 		})
 	})
 
@@ -603,7 +680,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				init(tp)
 				defer cleanup()
 
-				sc, pvc, pod := createPod(false)
+				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
 				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
@@ -696,7 +773,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				defer cleanup()
 
-				sc, pvc, pod := createPod(false)
+				sc, pvc, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
 
 				framework.ExpectEqual(*sc.AllowVolumeExpansion, true, "failed creating sc with allowed expansion")
@@ -837,7 +914,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				})
 				defer cleanup()
 
-				_, claim, pod := createPod(false)
+				_, claim, pod := createPod(pvcReference)
 				if pod == nil {
 					return
 				}
@@ -975,7 +1052,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				})
 				defer cleanup()
 
-				_, claim, pod := createPod(false)
+				_, claim, pod := createPod(pvcReference)
 				if pod == nil {
 					return
 				}
@@ -1121,7 +1198,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "create PVC watch")
 				defer pvcWatch.Stop()
 
-				sc, claim, pod := createPod(false)
+				sc, claim, pod := createPod(pvcReference)
 				gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod")
 				bindingMode := storagev1.VolumeBindingImmediate
 				if test.lateBinding {
@@ -1331,7 +1408,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				syncDelay := 5 * time.Second
 				time.Sleep(syncDelay)
 
-				sc, _, pod := createPod(false /* persistent volume, late binding as specified above */)
+				sc, _, pod := createPod(pvcReference) // late binding as specified above
 				framework.ExpectEqual(sc.Name, scName, "pre-selected storage class name not used")
 
 				waitCtx, cancel := context.WithTimeout(context.Background(), f.Timeouts.PodStart)
@@ -1530,7 +1607,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				defer cleanup()
 
-				_, _, pod := createPod(false)
+				_, _, pod := createPod(pvcReference)
 				if pod == nil {
 					return
 				}
@@ -1993,7 +2070,7 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 	return attachLimit, nil
 }
 
-func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
+func createSC(cs clientset.Interface, t testsuites.StorageClassTest, scName, ns string) *storagev1.StorageClass {
 	class := newStorageClass(t, ns, "")
 	if scName != "" {
 		class.Name = scName
@@ -2005,12 +2082,17 @@ func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2e
 		framework.ExpectNoError(err, "Failed to create class: %v", err)
 	}
 
+	return class
+}
+
+func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
+	class := createSC(cs, t, scName, ns)
 	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        t.ClaimSize,
 		StorageClassName: &(class.Name),
 		VolumeMode:       &t.VolumeMode,
 	}, ns)
-	claim, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), claim, metav1.CreateOptions{})
+	claim, err := cs.CoreV1().PersistentVolumeClaims(ns).Create(context.TODO(), claim, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 	if !t.DelayBinding {
@@ -2044,6 +2126,21 @@ func startPausePodInline(cs clientset.Interface, t testsuites.StorageClassTest, 
 		node, ns)
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	return pod
+}
+
+func startPausePodGenericEphemeral(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.Pod) {
+	class := createSC(cs, t, scName, ns)
+	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+		ClaimSize:        t.ClaimSize,
+		StorageClassName: &(class.Name),
+		VolumeMode:       &t.VolumeMode,
+	}, ns)
+	pod, err := startPausePodWithVolumeSource(cs, v1.VolumeSource{
+		Ephemeral: &v1.EphemeralVolumeSource{
+			VolumeClaimTemplate: &v1.PersistentVolumeClaimTemplate{Spec: claim.Spec}},
+	}, node, ns)
+	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	return class, pod
 }
 
 func startPausePodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string) (*v1.Pod, error) {
