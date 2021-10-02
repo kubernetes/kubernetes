@@ -42,6 +42,3 @@ type PodSecurityExemptions struct {
 	Namespaces     []string
 	RuntimeClasses []string
 }
-
-
-
