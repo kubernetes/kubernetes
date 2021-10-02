@@ -22,7 +22,7 @@ import (
 	"strconv"
 	"strings"
 
-	cobra "github.com/spf13/cobra"
+	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
@@ -345,6 +345,10 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			if err != nil {
 				return err
 			}
+		}
+		err = o.checkService(service, cmd)
+		if err != nil {
+			return err
 		}
 		return nil
 	})
