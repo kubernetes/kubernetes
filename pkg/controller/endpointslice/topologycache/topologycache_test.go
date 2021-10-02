@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -290,9 +290,10 @@ func TestAddHints(t *testing.T) {
 
 func TestSetNodes(t *testing.T) {
 	type nodeInfo struct {
-		zone  string
-		cpu   resource.Quantity
-		ready v1.ConditionStatus
+		zone   string
+		cpu    resource.Quantity
+		ready  v1.ConditionStatus
+		labels map[string]string
 	}
 
 	testCases := []struct {
@@ -349,11 +350,38 @@ func TestSetNodes(t *testing.T) {
 		expectedCPUByZone:        nil,
 		expectedRatios:           nil,
 	}, {
+		name: "2 zones, control plane node in 1, ready node in 1",
+		nodes: []nodeInfo{
+			{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
+			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue,
+				labels: map[string]string{"node-role.kubernetes.io/control-plane": ""}},
+		},
+		expectSufficientNodeInfo: false,
+		expectedCPUByZone:        nil,
+		expectedRatios:           nil,
+	}, {
 		name: "2 zones, unready node in 1, ready node in 2",
 		nodes: []nodeInfo{
 			{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
 			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
 			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionFalse},
+		},
+		expectSufficientNodeInfo: true,
+		expectedCPUByZone: map[string]*resource.Quantity{
+			"zone-a": resource.NewQuantity(1, resource.BinarySI),
+			"zone-b": resource.NewQuantity(1, resource.BinarySI),
+		},
+		expectedRatios: map[string]float64{
+			"zone-a": 0.5,
+			"zone-b": 0.5,
+		},
+	}, {
+		name: "2 zones, control plane node in 1, ready node in 2",
+		nodes: []nodeInfo{
+			{zone: "zone-a", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
+			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue},
+			{zone: "zone-b", cpu: resource.MustParse("1000m"), ready: v1.ConditionTrue,
+				labels: map[string]string{"node-role.kubernetes.io/control-plane": ""}},
 		},
 		expectSufficientNodeInfo: true,
 		expectedCPUByZone: map[string]*resource.Quantity{
@@ -393,7 +421,10 @@ func TestSetNodes(t *testing.T) {
 			cache := NewTopologyCache()
 			nodes := make([]*v1.Node, 0, len(tc.nodes))
 			for _, node := range tc.nodes {
-				labels := map[string]string{}
+				labels := node.labels
+				if labels == nil {
+					labels = map[string]string{}
+				}
 				if node.zone != "" {
 					labels[v1.LabelTopologyZone] = node.zone
 				}
