@@ -289,7 +289,7 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPI
 
 	ginkgo.Context("Downward API tests for hugepages", func() {
 		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessDownwardAPIHugePagesEnabled()
+			e2eskipper.SkipUnlessFeatureGate("DownwardAPIHugePages")
 		})
 
 		ginkgo.It("should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars", func() {

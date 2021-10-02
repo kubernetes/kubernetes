@@ -26,7 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -626,9 +625,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		})
 
 		ginkgo.It("should return the expected error with the feature gate disabled", func() {
-			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesGetAllocatable) {
-				e2eskipper.Skipf("this test is meant to run with the POD Resources Extensions feature gate disabled")
-			}
+			e2eskipper.SkipIfFeatureGate(kubefeatures.KubeletPodResourcesGetAllocatable)
 
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err)

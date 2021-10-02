@@ -35,7 +35,7 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("aws", "gce", "gke")
 		// If CSIMigration is enabled, then the limits should be on CSINodes, not Nodes, and another test checks this
-		e2eskipper.SkipIfCSIMigrationEnabled()
+		e2eskipper.SkipIfFeatureGate("CSIMigration")
 		c = f.ClientSet
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
