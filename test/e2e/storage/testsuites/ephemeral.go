@@ -53,9 +53,9 @@ func InitCustomEphemeralTestSuite(patterns []storageframework.TestPattern) stora
 	}
 }
 
-// InitEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
-// using test suite default patterns
-func InitEphemeralTestSuite() storageframework.TestSuite {
+// GenericEphemeralTestPatterns returns the test patterns for
+// generic ephemeral inline volumes.
+func GenericEphemeralTestPatterns() []storageframework.TestPattern {
 	genericLateBinding := storageframework.DefaultFsGenericEphemeralVolume
 	genericLateBinding.Name += " (late-binding)"
 	genericLateBinding.BindingMode = storagev1.VolumeBindingWaitForFirstConsumer
@@ -64,13 +64,30 @@ func InitEphemeralTestSuite() storageframework.TestSuite {
 	genericImmediateBinding.Name += " (immediate-binding)"
 	genericImmediateBinding.BindingMode = storagev1.VolumeBindingImmediate
 
-	patterns := []storageframework.TestPattern{
-		storageframework.DefaultFsCSIEphemeralVolume,
+	return []storageframework.TestPattern{
 		genericLateBinding,
 		genericImmediateBinding,
 	}
+}
 
-	return InitCustomEphemeralTestSuite(patterns)
+// CSIEphemeralTestPatterns returns the test patterns for
+// CSI ephemeral inline volumes.
+func CSIEphemeralTestPatterns() []storageframework.TestPattern {
+	return []storageframework.TestPattern{
+		storageframework.DefaultFsCSIEphemeralVolume,
+	}
+}
+
+// AllEphemeralTestPatterns returns all pre-defined test patterns for
+// generic and CSI ephemeral inline volumes.
+func AllEphemeralTestPatterns() []storageframework.TestPattern {
+	return append(GenericEphemeralTestPatterns(), CSIEphemeralTestPatterns()...)
+}
+
+// InitEphemeralTestSuite returns ephemeralTestSuite that implements TestSuite interface
+// using test suite default patterns
+func InitEphemeralTestSuite() storageframework.TestSuite {
+	return InitCustomEphemeralTestSuite(AllEphemeralTestPatterns())
 }
 
 func (p *ephemeralTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
@@ -152,7 +169,12 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 
 		l.testCase.ReadOnly = true
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
-			e2evolume.VerifyExecInPodSucceed(f, pod, "mount | grep /mnt/test | grep ro,")
+			command := "mount | grep /mnt/test | grep ro,"
+			if framework.NodeOSDistroIs("windows") {
+				// attempt to create a dummy file and expect for it not to be created
+				command = "ls /mnt/test* && (touch /mnt/test-0/hello-world || true) && [ ! -f /mnt/test-0/hello-world ]"
+			}
+			e2evolume.VerifyExecInPodSucceed(f, pod, command)
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -164,7 +186,12 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 
 		l.testCase.ReadOnly = false
 		l.testCase.RunningPodCheck = func(pod *v1.Pod) interface{} {
-			e2evolume.VerifyExecInPodSucceed(f, pod, "mount | grep /mnt/test | grep rw,")
+			command := "mount | grep /mnt/test | grep rw,"
+			if framework.NodeOSDistroIs("windows") {
+				// attempt to create a dummy file and expect for it to be created
+				command = "ls /mnt/test* && touch /mnt/test-0/hello-world && [ -f /mnt/test-0/hello-world ]"
+			}
+			e2evolume.VerifyExecInPodSucceed(f, pod, command)
 			return nil
 		}
 		l.testCase.TestEphemeral()
@@ -273,6 +300,10 @@ func (t EphemeralTest) TestEphemeral() {
 
 	ginkgo.By(fmt.Sprintf("checking the requested inline volume exists in the pod running on node %+v", t.Node))
 	command := "mount | grep /mnt/test && sleep 10000"
+	if framework.NodeOSDistroIs("windows") {
+		command = "ls /mnt/test* && sleep 10000"
+	}
+
 	var volumes []v1.VolumeSource
 	numVolumes := t.NumInlineVolumes
 	if numVolumes == 0 {
@@ -346,9 +377,10 @@ func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command stri
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:    "csi-volume-tester",
-					Image:   e2evolume.GetDefaultTestImage(),
-					Command: e2evolume.GenerateScriptCmd(command),
+					Name:  "csi-volume-tester",
+					Image: e2epod.GetDefaultTestImage(),
+					// NOTE: /bin/sh works on both agnhost and busybox
+					Command: []string{"/bin/sh", "-c", command},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyNever,

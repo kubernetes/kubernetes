@@ -1679,64 +1679,6 @@ func TestScaleDownIncludeUnreadyPods(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestScaleDownOneMetricInvalid(t *testing.T) {
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            5,
-		statusReplicas:          5,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               50,
-		metricsTarget: []autoscalingv2.MetricSpec{
-			{
-				Type: "CheddarCheese",
-			},
-		},
-		reportedLevels:      []uint64{100, 300, 500, 250, 250},
-		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:       true,
-		recommendations:     []timestampedRecommendation{},
-	}
-
-	tc.runTest(t)
-}
-
-func TestScaleDownOneMetricEmpty(t *testing.T) {
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            5,
-		statusReplicas:          5,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               50,
-		metricsTarget: []autoscalingv2.MetricSpec{
-			{
-				Type: autoscalingv2.ExternalMetricSourceType,
-				External: &autoscalingv2.ExternalMetricSource{
-					Metric: autoscalingv2.MetricIdentifier{
-						Name:     "qps",
-						Selector: &metav1.LabelSelector{},
-					},
-					Target: autoscalingv2.MetricTarget{
-						Type:         autoscalingv2.AverageValueMetricType,
-						AverageValue: resource.NewMilliQuantity(1000, resource.DecimalSI),
-					},
-				},
-			},
-		},
-		reportedLevels:      []uint64{100, 300, 500, 250, 250},
-		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:       true,
-		recommendations:     []timestampedRecommendation{},
-	}
-	_, _, _, testEMClient, _ := tc.prepareTestClient(t)
-	testEMClient.PrependReactor("list", "*", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-		return true, &emapi.ExternalMetricValueList{}, fmt.Errorf("something went wrong")
-	})
-	tc.testEMClient = testEMClient
-	tc.runTest(t)
-}
-
 func TestScaleDownIgnoreHotCpuPods(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -4113,10 +4055,10 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 		reportedLevels:      []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:       true,
+		recommendations:     []timestampedRecommendation{},
 		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "ScaleDownStabilized"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-			{Type: autoscalingv1.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 	}
 
@@ -4148,10 +4090,10 @@ func TestNoScaleDownOneMetricEmpty(t *testing.T) {
 		reportedLevels:      []uint64{100, 300, 500, 250, 250},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:       true,
+		recommendations:     []timestampedRecommendation{},
 		expectedConditions: []autoscalingv1.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "ScaleDownStabilized"},
-			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-			{Type: autoscalingv1.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
+			{Type: autoscalingv1.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv1.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetExternalMetric"},
 		},
 	}
 	_, _, _, testEMClient, _ := tc.prepareTestClient(t)

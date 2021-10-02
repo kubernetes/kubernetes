@@ -17,9 +17,12 @@ limitations under the License.
 package operationexecutor
 
 import (
-	"github.com/prometheus/client_model/go"
+	"os"
+	"testing"
+
+	io_prometheus_client "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -32,8 +35,7 @@ import (
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
 	"k8s.io/kubernetes/pkg/volume/gcepd"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
-	"os"
-	"testing"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // this method just tests the volume plugin name that's used in CompleteFunc, the same plugin is also used inside the
@@ -92,7 +94,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 		storageOperationStatusCountMetricBefore := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
 
 		var ee error
-		unmapVolumeFunc.CompleteFunc(&ee)
+		unmapVolumeFunc.CompleteFunc(volumetypes.CompleteFuncParam{Err: &ee})
 
 		storageOperationStatusCountMetricAfter := findMetricWithNameAndLabels(metricFamilyName, labelFilter)
 		if storageOperationStatusCountMetricAfter == nil {

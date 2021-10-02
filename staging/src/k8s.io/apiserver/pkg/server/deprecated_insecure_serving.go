@@ -45,6 +45,9 @@ func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTime
 		Addr:           s.Listener.Addr().String(),
 		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
+
+		IdleTimeout:       90 * time.Second, // matches http.DefaultTransport keep-alive timeout
+		ReadHeaderTimeout: 32 * time.Second, // just shy of requestTimeoutUpperBound
 	}
 
 	if len(s.Name) > 0 {
@@ -52,7 +55,7 @@ func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTime
 	} else {
 		klog.Infof("Serving insecurely on %s", s.Listener.Addr())
 	}
-	_, err := RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
+	_, _, err := RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
 	// NOTE: we do not handle stoppedCh returned by RunServer for graceful termination here
 	return err
 }

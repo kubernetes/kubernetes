@@ -93,6 +93,11 @@ func (a customResourceValidator) ValidateUpdate(ctx context.Context, obj, old ru
 	return allErrs
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (customResourceValidator) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 func (a customResourceValidator) ValidateStatusUpdate(ctx context.Context, obj, old runtime.Object, scale *apiextensions.CustomResourceSubresourceScale) field.ErrorList {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {

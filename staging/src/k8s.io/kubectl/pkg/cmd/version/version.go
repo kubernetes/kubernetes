@@ -71,7 +71,7 @@ func NewCmdVersion(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *co
 	cmd := &cobra.Command{
 		Use:     "version",
 		Short:   i18n.T("Print the client and server version information"),
-		Long:    i18n.T("Print the client and server version information for the current context"),
+		Long:    i18n.T("Print the client and server version information for the current context."),
 		Example: versionExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
@@ -156,6 +156,12 @@ func (o *Options) Run() error {
 		// There is a bug in the program if we hit this case.
 		// However, we follow a policy of never panicking.
 		return fmt.Errorf("VersionOptions were not validated: --output=%q should have been rejected", o.Output)
+	}
+
+	if serverVersion != nil {
+		if err := printVersionSkewWarning(o.ErrOut, clientVersion, *serverVersion); err != nil {
+			return err
+		}
 	}
 
 	return serverErr

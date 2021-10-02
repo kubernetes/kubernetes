@@ -1,25 +1,18 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- saad-ali
-- rootfs
-- gnufied
+- sig-storage-approvers
 - jingxu97
-- jsafrane
-- msau42
-- davidz627
-- xing-yang
+- pohly
 reviewers:
-- saad-ali
-- rootfs
-- gnufied
-- jingxu97
-- jsafrane
-- msau42
-- jeffvance
-- copejon
-- verult
-- davidz627
-- xing-yang
+- sig-storage-reviewers
+- pohly
 labels:
 - sig/storage
+
+emeritus_reviewers:
+- rootfs
+- davidz627
+- copejon
+- jeffvance
+- saad-ali

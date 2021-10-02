@@ -33,10 +33,12 @@ import (
 
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -486,6 +488,8 @@ func TestSharedCertificateExists(t *testing.T) {
 func TestCreatePKIAssetsWithSparseCerts(t *testing.T) {
 	for _, test := range certstestutil.GetSparseCertTestCases(t) {
 		t.Run(test.Name, func(t *testing.T) {
+			pkiutiltesting.Reset()
+
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 
@@ -587,6 +591,8 @@ func TestUsingExternalCA(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			pkiutiltesting.Reset()
+
 			dir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(dir)
 
@@ -776,6 +782,8 @@ func TestCreateCertificateFilesMethods(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		pkiutiltesting.Reset()
+
 		// Create temp folder for the test case
 		tmpdir := testutil.SetupTempDir(t)
 		defer os.RemoveAll(tmpdir)

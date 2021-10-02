@@ -112,7 +112,7 @@ func (f *RemoteRuntime) StopPodSandbox(ctx context.Context, req *kubeapi.StopPod
 // This call is idempotent, and must not return an error if the sandbox has
 // already been removed.
 func (f *RemoteRuntime) RemovePodSandbox(ctx context.Context, req *kubeapi.RemovePodSandboxRequest) (*kubeapi.RemovePodSandboxResponse, error) {
-	err := f.RuntimeService.RemovePodSandbox(req.PodSandboxId)
+	err := f.RuntimeService.StopPodSandbox(req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}
@@ -260,6 +260,27 @@ func (f *RemoteRuntime) ListContainerStats(ctx context.Context, req *kubeapi.Lis
 	}
 
 	return &kubeapi.ListContainerStatsResponse{Stats: stats}, nil
+}
+
+// PodSandboxStats returns stats of the pod. If the pod does not
+// exist, the call returns an error.
+func (f *RemoteRuntime) PodSandboxStats(ctx context.Context, req *kubeapi.PodSandboxStatsRequest) (*kubeapi.PodSandboxStatsResponse, error) {
+	stats, err := f.RuntimeService.PodSandboxStats(req.PodSandboxId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.PodSandboxStatsResponse{Stats: stats}, nil
+}
+
+// ListPodSandboxStats returns stats of all running pods.
+func (f *RemoteRuntime) ListPodSandboxStats(ctx context.Context, req *kubeapi.ListPodSandboxStatsRequest) (*kubeapi.ListPodSandboxStatsResponse, error) {
+	stats, err := f.RuntimeService.ListPodSandboxStats(req.Filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return &kubeapi.ListPodSandboxStatsResponse{Stats: stats}, nil
 }
 
 // UpdateRuntimeConfig updates the runtime configuration based on the given request.

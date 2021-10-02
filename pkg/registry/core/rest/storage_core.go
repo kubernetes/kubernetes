@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -35,7 +36,7 @@ import (
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -110,13 +111,9 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		NegotiatedSerializer:         legacyscheme.Codecs,
 	}
 
-	var podDisruptionClient policyclient.PodDisruptionBudgetsGetter
-	if policyGroupVersion := (schema.GroupVersion{Group: "policy", Version: "v1beta1"}); legacyscheme.Scheme.IsVersionRegistered(policyGroupVersion) {
-		var err error
-		podDisruptionClient, err = policyclient.NewForConfig(c.LoopbackClientConfig)
-		if err != nil {
-			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-		}
+	podDisruptionClient, err := policyclient.NewForConfig(c.LoopbackClientConfig)
+	if err != nil {
+		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 	restStorage := LegacyRESTStorage{}
 
@@ -201,10 +198,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	serviceClusterIPAllocator, err := ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+	serviceClusterIPAllocator, err := ipallocator.New(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
 		if err != nil {
 			return nil, err
 		}
@@ -218,12 +215,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	// allocator for secondary service ip range
 	var secondaryServiceClusterIPAllocator ipallocator.Interface
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
+	if c.SecondaryServiceIPRange.IP != nil {
 		var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
-		secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+		secondaryServiceClusterIPAllocator, err = ipallocator.New(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 			mem := allocator.NewAllocationMap(max, rangeSpec)
 			// TODO etcdallocator package to return a storage interface via the storageFactory
-			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
+			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", serviceStorageConfig.ForResource(api.Resource("serviceipallocations")))
 			if err != nil {
 				return nil, err
 			}
@@ -237,10 +234,10 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 
 	var serviceNodePortRegistry rangeallocation.RangeRegistry
-	serviceNodePortAllocator, err := portallocator.NewPortAllocatorCustom(c.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+	serviceNodePortAllocator, err := portallocator.New(c.ServiceNodePortRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorageConfig)
+		etcd, err := serviceallocator.NewEtcd(mem, "/ranges/servicenodeports", serviceStorageConfig.ForResource(api.Resource("servicenodeportallocations")))
 		if err != nil {
 			return nil, err
 		}
@@ -257,18 +254,24 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
 
-	serviceRESTStorage, serviceStatusStorage, err := servicestore.NewGenericREST(restOptionsGetter, serviceClusterIPRange, secondaryServiceClusterIPAllocator != nil)
+	serviceIPAllocators := map[api.IPFamily]ipallocator.Interface{
+		serviceClusterIPAllocator.IPFamily(): serviceClusterIPAllocator,
+	}
+	if secondaryServiceClusterIPAllocator != nil {
+		serviceIPAllocators[secondaryServiceClusterIPAllocator.IPFamily()] = secondaryServiceClusterIPAllocator
+	}
+
+	serviceRESTStorage, serviceStatusStorage, serviceRESTProxy, err := servicestore.NewREST(
+		restOptionsGetter,
+		serviceClusterIPAllocator.IPFamily(),
+		serviceIPAllocators,
+		serviceNodePortAllocator,
+		endpointsStorage,
+		podStorage.Pod,
+		c.ProxyTransport)
 	if err != nil {
 		return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 	}
-
-	serviceRest, serviceRestProxy := servicestore.NewREST(serviceRESTStorage,
-		endpointsStorage,
-		podStorage.Pod,
-		serviceClusterIPAllocator,
-		secondaryServiceClusterIPAllocator,
-		serviceNodePortAllocator,
-		c.ProxyTransport)
 
 	restStorageMap := map[string]rest.Storage{
 		"pods":             podStorage.Pod,
@@ -286,8 +289,8 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"replicationControllers":        controllerStorage.Controller,
 		"replicationControllers/status": controllerStorage.Status,
 
-		"services":        serviceRest,
-		"services/proxy":  serviceRestProxy,
+		"services":        serviceRESTStorage,
+		"services/proxy":  serviceRESTProxy,
 		"services/status": serviceStatusStorage,
 
 		"endpoints": endpointsStorage,
@@ -317,7 +320,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
 	}
-	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "policy", Version: "v1beta1"}) {
+	if podStorage.Eviction != nil {
 		restStorageMap["pods/eviction"] = podStorage.Eviction
 	}
 	if serviceAccountStorage.Token != nil {
@@ -343,8 +346,8 @@ func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.
 	// this is fragile, which assumes that the default port is being used
 	// TODO: switch to secure port until these components remove the ability to serve insecurely.
 	serversToValidate := map[string]*componentstatus.Server{
-		"controller-manager": {Addr: "127.0.0.1", Port: ports.InsecureKubeControllerManagerPort, Path: "/healthz"},
-		"scheduler":          {Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultInsecureSchedulerPort, Path: "/healthz"},
+		"controller-manager": {EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: ports.KubeControllerManagerPort, Path: "/healthz"},
+		"scheduler":          {EnableHTTPS: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}, Addr: "127.0.0.1", Port: kubeschedulerconfig.DefaultKubeSchedulerPort, Path: "/healthz"},
 	}
 
 	for ix, machine := range s.storageFactory.Backends() {

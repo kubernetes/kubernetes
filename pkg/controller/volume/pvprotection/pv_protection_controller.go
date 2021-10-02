@@ -144,6 +144,7 @@ func (c *Controller) processPV(pvName string) error {
 		if !isUsed {
 			return c.removeFinalizer(pv)
 		}
+		klog.V(4).Infof("Keeping PV %s because it is being used", pvName)
 	}
 
 	if protectionutil.NeedToAddFinalizer(pv, volumeutil.PVProtectionFinalizer) {

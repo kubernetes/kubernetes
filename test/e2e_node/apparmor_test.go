@@ -27,7 +27,8 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	"github.com/opencontainers/runc/libcontainer/apparmor"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,7 +38,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -46,7 +46,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
+var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() {
 	if isAppArmorEnabled() {
 		ginkgo.BeforeEach(func() {
 			ginkgo.By("Loading AppArmor profiles for testing")
@@ -246,5 +246,5 @@ func isAppArmorEnabled() bool {
 	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
-	return apparmor.IsAppArmorEnabled()
+	return apparmor.IsEnabled()
 }

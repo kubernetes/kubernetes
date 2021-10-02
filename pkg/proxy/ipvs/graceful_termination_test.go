@@ -17,12 +17,12 @@ limitations under the License.
 package ipvs
 
 import (
-	"net"
 	"reflect"
 	"testing"
 
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilipvstest "k8s.io/kubernetes/pkg/util/ipvs/testing"
+	netutils "k8s.io/utils/net"
 )
 
 func Test_GracefulDeleteRS(t *testing.T) {
@@ -37,12 +37,12 @@ func Test_GracefulDeleteRS(t *testing.T) {
 		{
 			name: "graceful delete, no connections results in deleting the real server immediatetly",
 			vs: &utilipvs.VirtualServer{
-				Address:  net.ParseIP("1.1.1.1"),
+				Address:  netutils.ParseIPSloppy("1.1.1.1"),
 				Protocol: "tcp",
 				Port:     uint16(80),
 			},
 			rs: &utilipvs.RealServer{
-				Address:      net.ParseIP("10.0.0.1"),
+				Address:      netutils.ParseIPSloppy("10.0.0.1"),
 				Port:         uint16(80),
 				Weight:       100,
 				ActiveConn:   0,
@@ -55,7 +55,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -67,7 +67,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "tcp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       100,
 							ActiveConn:   0,
@@ -83,7 +83,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -101,12 +101,12 @@ func Test_GracefulDeleteRS(t *testing.T) {
 		{
 			name: "graceful delete, real server has active connections, weight should be 0 but don't delete",
 			vs: &utilipvs.VirtualServer{
-				Address:  net.ParseIP("1.1.1.1"),
+				Address:  netutils.ParseIPSloppy("1.1.1.1"),
 				Protocol: "tcp",
 				Port:     uint16(80),
 			},
 			rs: &utilipvs.RealServer{
-				Address:      net.ParseIP("10.0.0.1"),
+				Address:      netutils.ParseIPSloppy("10.0.0.1"),
 				Port:         uint16(80),
 				Weight:       100,
 				ActiveConn:   10,
@@ -119,7 +119,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -131,7 +131,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "tcp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       100,
 							ActiveConn:   10,
@@ -147,7 +147,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -159,7 +159,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "tcp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       0,
 							ActiveConn:   10,
@@ -173,12 +173,12 @@ func Test_GracefulDeleteRS(t *testing.T) {
 		{
 			name: "graceful delete, real server has in-active connections, weight should be 0 but don't delete",
 			vs: &utilipvs.VirtualServer{
-				Address:  net.ParseIP("1.1.1.1"),
+				Address:  netutils.ParseIPSloppy("1.1.1.1"),
 				Protocol: "tcp",
 				Port:     uint16(80),
 			},
 			rs: &utilipvs.RealServer{
-				Address:      net.ParseIP("10.0.0.1"),
+				Address:      netutils.ParseIPSloppy("10.0.0.1"),
 				Port:         uint16(80),
 				Weight:       100,
 				ActiveConn:   0,
@@ -191,7 +191,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -203,7 +203,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "tcp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       100,
 							ActiveConn:   0,
@@ -219,7 +219,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -231,7 +231,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "tcp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       0,
 							ActiveConn:   0,
@@ -245,12 +245,12 @@ func Test_GracefulDeleteRS(t *testing.T) {
 		{
 			name: "graceful delete, real server has connections, but udp connections are deleted immediately",
 			vs: &utilipvs.VirtualServer{
-				Address:  net.ParseIP("1.1.1.1"),
+				Address:  netutils.ParseIPSloppy("1.1.1.1"),
 				Protocol: "udp",
 				Port:     uint16(80),
 			},
 			rs: &utilipvs.RealServer{
-				Address:      net.ParseIP("10.0.0.1"),
+				Address:      netutils.ParseIPSloppy("10.0.0.1"),
 				Port:         uint16(80),
 				Weight:       100,
 				ActiveConn:   10,
@@ -263,7 +263,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "udp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "udp",
 						Port:     uint16(80),
 					},
@@ -275,7 +275,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "udp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       100,
 							ActiveConn:   10,
@@ -291,7 +291,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "udp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "udp",
 						Port:     uint16(80),
 					},
@@ -309,12 +309,12 @@ func Test_GracefulDeleteRS(t *testing.T) {
 		{
 			name: "graceful delete, real server mismatch should be no-op",
 			vs: &utilipvs.VirtualServer{
-				Address:  net.ParseIP("1.1.1.1"),
+				Address:  netutils.ParseIPSloppy("1.1.1.1"),
 				Protocol: "tcp",
 				Port:     uint16(80),
 			},
 			rs: &utilipvs.RealServer{
-				Address:      net.ParseIP("10.0.0.1"),
+				Address:      netutils.ParseIPSloppy("10.0.0.1"),
 				Port:         uint16(81), // port mismatched
 				Weight:       100,
 				ActiveConn:   0,
@@ -327,7 +327,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -339,7 +339,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "tcp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       100,
 							ActiveConn:   0,
@@ -355,7 +355,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Port:     80,
 						Protocol: "tcp",
 					}: {
-						Address:  net.ParseIP("1.1.1.1"),
+						Address:  netutils.ParseIPSloppy("1.1.1.1"),
 						Protocol: "tcp",
 						Port:     uint16(80),
 					},
@@ -367,7 +367,7 @@ func Test_GracefulDeleteRS(t *testing.T) {
 						Protocol: "tcp",
 					}: {
 						{
-							Address:      net.ParseIP("10.0.0.1"),
+							Address:      netutils.ParseIPSloppy("10.0.0.1"),
 							Port:         uint16(80),
 							Weight:       100,
 							ActiveConn:   0,

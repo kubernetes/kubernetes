@@ -16,6 +16,11 @@ limitations under the License.
 
 package e2enode
 
+import (
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+)
+
 const (
 	// SRIOVDevicePluginCMYAML is the path of the config map to configure the sriov device plugin.
 	SRIOVDevicePluginCMYAML = "test/e2e_node/testing-manifests/sriovdp-cm.yaml"
@@ -26,3 +31,19 @@ const (
 	// SRIOVDevicePluginName is the name of the device plugin pod
 	SRIOVDevicePluginName = "sriov-device-plugin"
 )
+
+func requireSRIOVDevices() {
+	sriovdevCount, err := countSRIOVDevices()
+	framework.ExpectNoError(err)
+
+	if sriovdevCount > 0 {
+		return // all good
+	}
+
+	msg := "this test is meant to run on a system with at least one configured VF from SRIOV device"
+	if framework.TestContext.RequireDevices {
+		framework.Failf(msg)
+	} else {
+		e2eskipper.Skipf(msg)
+	}
+}

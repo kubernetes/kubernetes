@@ -1,0 +1,22 @@
+language: go
+sudo: false
+go:
+  - 1.7.x
+  - 1.8.x
+  - 1.9.x
+  - 1.10.x
+  - 1.11.x
+  - 1.12.x
+  - tip
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+before_install:
+  - go get golang.org/x/tools/cmd/cover
+script:
+  - go test ./... -race -coverprofile=coverage.txt -covermode=atomic
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
+notifications:
+  email: false

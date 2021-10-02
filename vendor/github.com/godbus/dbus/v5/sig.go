@@ -137,7 +137,7 @@ func ParseSignatureMust(s string) Signature {
 	return sig
 }
 
-// Empty retruns whether the signature is the empty signature.
+// Empty returns whether the signature is the empty signature.
 func (s Signature) Empty() bool {
 	return s.str == ""
 }

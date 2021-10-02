@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -53,8 +52,8 @@ import (
 var zero = int64(0)
 
 func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonSetsController, informers.SharedInformerFactory, clientset.Interface) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-	_, server, closeFn := framework.RunAMaster(masterConfig)
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
 
 	config := restclient.Config{Host: server.URL}
 	clientSet, err := clientset.NewForConfig(&config)
@@ -91,6 +90,7 @@ func setupScheduler(
 	sched, err := scheduler.New(
 		cs,
 		informerFactory,
+		nil,
 		profile.NewRecorderFactory(eventBroadcaster),
 		ctx.Done(),
 	)
@@ -534,7 +534,7 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 						{
 							MatchFields: []v1.NodeSelectorRequirement{
 								{
-									Key:      api.ObjectNameField,
+									Key:      metav1.ObjectNameField,
 									Operator: v1.NodeSelectorOpIn,
 									Values:   []string{"node-1"},
 								},

@@ -120,7 +120,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	)
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testCtx := testutils.InitTestMaster(t, "taint-based-evictions", admission)
+			testCtx := testutils.InitTestAPIServer(t, "taint-based-evictions", admission)
 
 			// Build clientset and informers for controllers.
 			externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{

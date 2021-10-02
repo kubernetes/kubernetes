@@ -216,7 +216,7 @@ func main(cmd *cobra.Command, args []string) {
 	}
 
 	if delayShutdown > 0 {
-		termCh := make(chan os.Signal)
+		termCh := make(chan os.Signal, 1)
 		signal.Notify(termCh, syscall.SIGTERM)
 		go func() {
 			<-termCh

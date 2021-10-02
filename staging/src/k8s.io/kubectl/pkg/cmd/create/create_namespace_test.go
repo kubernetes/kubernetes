@@ -17,45 +17,39 @@ limitations under the License.
 package create
 
 import (
-	"net/http"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 )
 
 func TestCreateNamespace(t *testing.T) {
-	namespaceObject := &v1.Namespace{}
-	namespaceObject.Name = "my-namespace"
-	tf := cmdtesting.NewTestFactory()
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := scheme.Codecs.WithoutConversion()
-
-	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces" && m == "POST":
-				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, namespaceObject)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
+	tests := map[string]struct {
+		options  *NamespaceOptions
+		expected *corev1.Namespace
+	}{
+		"success_create": {
+			options: &NamespaceOptions{
+				Name: "my-namespace",
+			},
+			expected: &corev1.Namespace{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Namespace",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-namespace",
+				},
+			},
+		},
 	}
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdCreateNamespace(tf, ioStreams)
-	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{namespaceObject.Name})
-	expectedOutput := "namespace/" + namespaceObject.Name + "\n"
-	if buf.String() != expectedOutput {
-		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			namespace := tc.options.createNamespace()
+			if !apiequality.Semantic.DeepEqual(namespace, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, namespace)
+			}
+		})
 	}
 }

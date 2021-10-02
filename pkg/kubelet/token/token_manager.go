@@ -30,10 +30,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -118,7 +118,7 @@ func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticat
 		case m.expired(ctr):
 			return nil, fmt.Errorf("token %s expired and refresh failed: %v", key, err)
 		default:
-			klog.Errorf("couldn't update token %s: %v", key, err)
+			klog.ErrorS(err, "Couldn't update token", "cacheKey", key)
 			return ctr, nil
 		}
 	}
@@ -172,7 +172,7 @@ func (m *Manager) requiresRefresh(tr *authenticationv1.TokenRequest) bool {
 	if tr.Spec.ExpirationSeconds == nil {
 		cpy := tr.DeepCopy()
 		cpy.Status.Token = ""
-		klog.Errorf("expiration seconds was nil for tr: %#v", cpy)
+		klog.ErrorS(nil, "Expiration seconds was nil for token request", "tokenRequest", cpy)
 		return false
 	}
 	now := m.clock.Now()

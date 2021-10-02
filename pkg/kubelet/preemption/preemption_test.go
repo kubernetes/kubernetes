@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
@@ -57,7 +57,7 @@ func (f *fakePodKiller) getKilledPods() []*v1.Pod {
 	return f.killedPods
 }
 
-func (f *fakePodKiller) killPodNow(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+func (f *fakePodKiller) killPodNow(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(status *v1.PodStatus)) error {
 	if f.errDuringPodKilling {
 		f.killedPods = []*v1.Pod{}
 		return fmt.Errorf("problem killing pod %v", pod)

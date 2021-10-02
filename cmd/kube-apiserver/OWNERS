@@ -5,8 +5,6 @@ approvers:
 - deads2k
 - lavalamp
 - liggitt
-- mml
-- nikhiljindal
 - smarterclayton
 - sttts
 reviewers:
@@ -19,7 +17,6 @@ reviewers:
 - caesarxuchao
 - mikedanese
 - liggitt
-- nikhiljindal
 - ncdc
 - sttts
 - hzxuzhonghu
@@ -28,3 +25,6 @@ reviewers:
 labels:
 - sig/api-machinery
 - area/apiserver
+
+emeritus_approvers:
+- nikhiljindal

@@ -53,7 +53,7 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, nam
 	case api.Kind("Service"):
 		return c.CoreV1().Services(namespace).Delete(context.TODO(), name, options)
 	default:
-		return fmt.Errorf("Unsupported kind when deleting: %v", kind)
+		return fmt.Errorf("unsupported kind when deleting: %v", kind)
 	}
 }
 
@@ -63,7 +63,7 @@ func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, nam
 		if err == nil || apierrors.IsNotFound(err) {
 			return true, nil
 		}
-		return false, fmt.Errorf("Failed to delete object with non-retriable error: %v", err)
+		return false, fmt.Errorf("failed to delete object with non-retriable error: %v", err)
 	}
 	return RetryWithExponentialBackOff(deleteFunc)
 }

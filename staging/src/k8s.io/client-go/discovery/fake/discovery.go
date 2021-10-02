@@ -18,9 +18,11 @@ package fake
 
 import (
 	"fmt"
+	"net/http"
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -49,7 +51,13 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 			return resourceList, nil
 		}
 	}
-	return nil, fmt.Errorf("GroupVersion %q not found", groupVersion)
+	return nil, &errors.StatusError{
+		ErrStatus: metav1.Status{
+			Status:  metav1.StatusFailure,
+			Code:    http.StatusNotFound,
+			Reason:  metav1.StatusReasonNotFound,
+			Message: fmt.Sprintf("the server could not find the requested resource, GroupVersion %q not found", groupVersion),
+		}}
 }
 
 // ServerResources returns the supported resources for all groups and versions.

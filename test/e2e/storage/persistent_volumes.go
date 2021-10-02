@@ -316,7 +316,12 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		})
 	})
 
-	ginkgo.Describe("Default StorageClass", func() {
+	// testsuites/multivolume tests can now run with windows nodes
+	// This test is not compatible with windows because the default StorageClass
+	// doesn't have the ntfs parameter, we can't change the status of the cluster
+	// to add a StorageClass that's compatible with windows which is also the
+	// default StorageClass
+	ginkgo.Describe("Default StorageClass [LinuxOnly]", func() {
 		ginkgo.Context("pods that use multiple volumes", func() {
 
 			ginkgo.AfterEach(func() {
@@ -420,9 +425,8 @@ func makeStatefulSetWithPVCs(ns, cmd string, mounts []v1.VolumeMount, claims []v
 					Containers: []v1.Container{
 						{
 							Name:           "nginx",
-							Image:          imageutils.GetE2EImage(imageutils.Nginx),
-							Command:        []string{"/bin/sh"},
-							Args:           []string{"-c", cmd},
+							Image:          e2epod.GetTestImage(imageutils.Nginx),
+							Command:        e2epod.GenerateScriptCmd(cmd),
 							VolumeMounts:   mounts,
 							ReadinessProbe: readyProbe,
 						},

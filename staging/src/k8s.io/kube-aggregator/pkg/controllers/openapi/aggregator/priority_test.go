@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-openapi/spec"
-
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func newAPIServiceForTest(name, group string, minGroupPriority, versionPriority int32, svc *apiregistrationv1.ServiceReference) apiregistrationv1.APIService {

@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,6 +38,11 @@ type Model struct {
 	Ports          []int32
 	Protocols      []v1.Protocol
 	DNSDomain      string
+}
+
+// NewWindowsModel returns a model specific to windows testing.
+func NewWindowsModel(namespaces []string, podNames []string, ports []int32, dnsDomain string) *Model {
+	return NewModel(namespaces, podNames, ports, []v1.Protocol{v1.ProtocolTCP}, dnsDomain)
 }
 
 // NewModel instantiates a model based on:
@@ -84,6 +88,24 @@ func NewModel(namespaces []string, podNames []string, ports []int32, protocols [
 	return model
 }
 
+// GetProbeTimeoutSeconds returns a timeout for how long the probe should work before failing a check, and takes windows heuristics into account, where requests can take longer sometimes.
+func (m *Model) GetProbeTimeoutSeconds() int {
+	timeoutSeconds := 1
+	if framework.NodeOSDistroIs("windows") {
+		timeoutSeconds = 3
+	}
+	return timeoutSeconds
+}
+
+// GetWorkers returns the number of workers suggested to run when testing, taking windows heuristics into account, where parallel probing is flakier.
+func (m *Model) GetWorkers() int {
+	numberOfWorkers := 3
+	if framework.NodeOSDistroIs("windows") {
+		numberOfWorkers = 1 // See https://github.com/kubernetes/kubernetes/pull/97690
+	}
+	return numberOfWorkers
+}
+
 // NewReachability instantiates a default-true reachability from the model's pods
 func (m *Model) NewReachability() *Reachability {
 	return NewReachability(m.AllPods(), true)
@@ -126,7 +148,7 @@ func (m *Model) FindPod(ns string, name string) (*Pod, error) {
 			}
 		}
 	}
-	return nil, errors.Errorf("unable to find pod %s/%s", ns, name)
+	return nil, fmt.Errorf("unable to find pod %s/%s", ns, name)
 }
 
 // Namespace is the abstract representation of what matters to network policy
@@ -158,16 +180,7 @@ type Pod struct {
 	Namespace  string
 	Name       string
 	Containers []*Container
-}
-
-// FindContainer returns the container matching port and protocol; otherwise, an error
-func (p *Pod) FindContainer(port int32, protocol v1.Protocol) (*Container, error) {
-	for _, cont := range p.Containers {
-		if cont.Port == port && cont.Protocol == protocol {
-			return cont, nil
-		}
-	}
-	return nil, errors.Errorf("unable to find container in pod %s/%s, port %d, protocol %s", p.Namespace, p.Name, port, protocol)
+	ServiceIP  string
 }
 
 // PodString returns a corresponding pod string
@@ -200,10 +213,11 @@ func (p *Pod) LabelSelector() map[string]string {
 	}
 }
 
-// KubePod returns the kube pod
+// KubePod returns the kube pod (will add label selectors for windows if needed).
 func (p *Pod) KubePod() *v1.Pod {
 	zero := int64(0)
-	return &v1.Pod{
+
+	thePod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      p.Name,
 			Labels:    p.LabelSelector(),
@@ -214,6 +228,13 @@ func (p *Pod) KubePod() *v1.Pod {
 			Containers:                    p.ContainerSpecs(),
 		},
 	}
+
+	if framework.NodeOSDistroIs("windows") {
+		thePod.Spec.NodeSelector = map[string]string{
+			"kubernetes.io/os": "windows",
+		}
+	}
+	return thePod
 }
 
 // QualifiedServiceAddress returns the address that can be used to hit a service from
@@ -270,6 +291,7 @@ func (c *Container) Spec() v1.Container {
 	var (
 		// agnHostImage is the image URI of AgnHost
 		agnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
+		env          = []v1.EnvVar{}
 		cmd          []string
 	)
 
@@ -279,15 +301,21 @@ func (c *Container) Spec() v1.Container {
 	case v1.ProtocolUDP:
 		cmd = []string{"/agnhost", "serve-hostname", "--udp", "--http=false", "--port", fmt.Sprintf("%d", c.Port)}
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "netexec", "--sctp-port", fmt.Sprintf("%d", c.Port)}
+		env = append(env, v1.EnvVar{
+			Name:  fmt.Sprintf("SERVE_SCTP_PORT_%d", c.Port),
+			Value: "foo",
+		})
+		cmd = []string{"/agnhost", "porter"}
 	default:
 		framework.Failf("invalid protocol %v", c.Protocol)
 	}
+
 	return v1.Container{
 		Name:            c.Name(),
 		ImagePullPolicy: v1.PullIfNotPresent,
 		Image:           agnHostImage,
 		Command:         cmd,
+		Env:             env,
 		SecurityContext: &v1.SecurityContext{},
 		Ports: []v1.ContainerPort{
 			{

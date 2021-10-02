@@ -46,7 +46,7 @@ type Backend struct {
 type StorageFactory interface {
 	// New finds the storage destination for the given group and resource. It will
 	// return an error if the group has no storage destination configured.
-	NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error)
+	NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error)
 
 	// ResourcePrefix returns the overridden resource prefix for the GroupResource
 	// This allows for cohabitation of resources with different native types and provides
@@ -250,7 +250,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource schema.Gro
 
 // New finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
-func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.Config, error) {
+func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*storagebackend.ConfigForResource, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	// operate on copy
@@ -284,7 +284,7 @@ func (s *DefaultStorageFactory) NewConfig(groupResource schema.GroupResource) (*
 	}
 	klog.V(3).Infof("storing %v in %v, reading as %v from %#v", groupResource, codecConfig.StorageVersion, codecConfig.MemoryVersion, codecConfig.Config)
 
-	return &storageConfig, nil
+	return storageConfig.ForResource(groupResource), nil
 }
 
 // Backends returns all backends for all registered storage destinations.

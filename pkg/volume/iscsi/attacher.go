@@ -98,7 +98,7 @@ func (attacher *iscsiAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.iscsiDisk), nil
 }
 
-func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string, _ volume.DeviceMounterArgs) error {
 	mounter := attacher.host.GetMounter(iscsiPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {

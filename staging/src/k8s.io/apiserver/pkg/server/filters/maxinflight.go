@@ -47,7 +47,10 @@ const (
 	observationMaintenancePeriod = 10 * time.Second
 )
 
-var nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
+var (
+	nonMutatingRequestVerbs = sets.NewString("get", "list", "watch")
+	watchVerbs              = sets.NewString("watch")
+)
 
 func handleError(w http.ResponseWriter, r *http.Request, err error) {
 	errorMsg := fmt.Sprintf("Internal Server Error: %#v", r.RequestURI)
@@ -196,9 +199,9 @@ func WithMaxInFlightLimit(
 				}
 				// We need to split this data between buckets used for throttling.
 				if isMutatingRequest {
-					metrics.DroppedRequests.WithLabelValues(metrics.MutatingKind).Inc()
+					metrics.DroppedRequests.WithContext(ctx).WithLabelValues(metrics.MutatingKind).Inc()
 				} else {
-					metrics.DroppedRequests.WithLabelValues(metrics.ReadOnlyKind).Inc()
+					metrics.DroppedRequests.WithContext(ctx).WithLabelValues(metrics.ReadOnlyKind).Inc()
 				}
 				metrics.RecordRequestTermination(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
 				tooManyRequests(r, w)

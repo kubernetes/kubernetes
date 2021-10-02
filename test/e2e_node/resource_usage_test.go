@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -169,7 +170,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	// entries if we plan to monitor longer (e.g., 8 hours).
 	deadline := time.Now().Add(monitoringTime)
 	for time.Now().Before(deadline) {
-		timeLeft := deadline.Sub(time.Now())
+		timeLeft := time.Until(deadline)
 		framework.Logf("Still running...%v left", timeLeft)
 		if timeLeft < reportingPeriod {
 			time.Sleep(timeLeft)

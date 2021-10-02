@@ -39,7 +39,6 @@ const (
 	reconcilerLoopPeriod      time.Duration = 0 * time.Millisecond
 	syncLoopPeriod            time.Duration = 100 * time.Minute
 	maxWaitForUnmountDuration time.Duration = 50 * time.Millisecond
-	resyncPeriod              time.Duration = 5 * time.Minute
 )
 
 // Calls Run()

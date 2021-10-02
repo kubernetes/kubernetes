@@ -1,6 +1,6 @@
 // Copyright 2019, The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE.md file.
+// license that can be found in the LICENSE file.
 
 package cmp
 
@@ -79,7 +79,7 @@ func (opts formatOptions) verbosity() uint {
 	}
 }
 
-const maxVerbosityPreset = 3
+const maxVerbosityPreset = 6
 
 // verbosityPreset modifies the verbosity settings given an index
 // between 0 and maxVerbosityPreset, inclusive.
@@ -100,7 +100,7 @@ func verbosityPreset(opts formatOptions, i int) formatOptions {
 func (opts formatOptions) FormatDiff(v *valueNode, ptrs *pointerReferences) (out textNode) {
 	if opts.DiffMode == diffIdentical {
 		opts = opts.WithVerbosity(1)
-	} else {
+	} else if opts.verbosity() < 3 {
 		opts = opts.WithVerbosity(3)
 	}
 

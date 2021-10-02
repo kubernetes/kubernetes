@@ -19,6 +19,9 @@ package utils
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"path"
 	"regexp"
 	"strings"
 	"time"
@@ -46,6 +49,8 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 
 	ns := driverNamespace.Name
 
+	podEventLog := ginkgo.GinkgoWriter
+	var podEventLogCloser io.Closer
 	to := podlogs.LogOutput{
 		StatusWriter: ginkgo.GinkgoWriter,
 	}
@@ -69,17 +74,22 @@ func StartPodLogs(f *framework.Framework, driverNamespace *v1.Namespace) func() 
 		// keeps each directory name smaller (the full test
 		// name at one point exceeded 256 characters, which was
 		// too much for some filesystems).
-		to.LogPathPrefix = framework.TestContext.ReportDir + "/" +
-			strings.Join(components, "/") + "/"
+		logDir := framework.TestContext.ReportDir + "/" + strings.Join(components, "/")
+		to.LogPathPrefix = logDir + "/"
+
+		err := os.MkdirAll(logDir, 0755)
+		framework.ExpectNoError(err, "create pod log directory")
+		f, err := os.Create(path.Join(logDir, "pod-event.log"))
+		framework.ExpectNoError(err, "create pod events log file")
+		podEventLog = f
+		podEventLogCloser = f
 	}
 	podlogs.CopyAllLogs(ctx, cs, ns, to)
 
-	// pod events are something that the framework already collects itself
-	// after a failed test. Logging them live is only useful for interactive
-	// debugging, not when we collect reports.
-	if framework.TestContext.ReportDir == "" {
-		podlogs.WatchPods(ctx, cs, ns, ginkgo.GinkgoWriter)
-	}
+	// The framework doesn't know about the driver pods because of
+	// the separate namespace.  Therefore we always capture the
+	// events ourselves.
+	podlogs.WatchPods(ctx, cs, ns, podEventLog, podEventLogCloser)
 
 	return cancel
 }

@@ -121,7 +121,7 @@ func (p *exampleHandler) EventChan(pluginName string) chan examplePluginEvent {
 }
 
 func (p *exampleHandler) SendEvent(pluginName string, event examplePluginEvent) {
-	klog.V(2).Infof("Sending %v for plugin %s over chan %v", event, pluginName, p.eventChans[pluginName])
+	klog.V(2).InfoS("Sending event for plugin", "pluginName", pluginName, "event", event, "channel", p.eventChans[pluginName])
 	p.eventChans[pluginName] <- event
 }
 

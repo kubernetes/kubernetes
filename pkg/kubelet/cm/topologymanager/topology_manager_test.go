@@ -477,11 +477,17 @@ func TestAdmit(t *testing.T) {
 		if ctnActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, ctnActual.Admit)
 		}
+		if !ctnActual.Admit && ctnActual.Reason != ErrorTopologyAffinity {
+			t.Errorf("Error occurred, expected Reason in result to be %v got %v", ErrorTopologyAffinity, ctnActual.Reason)
+		}
 
 		// Pod scope Admit
 		podActual := podScopeManager.Admit(&podAttr)
 		if podActual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, podActual.Admit)
+		}
+		if !ctnActual.Admit && ctnActual.Reason != ErrorTopologyAffinity {
+			t.Errorf("Error occurred, expected Reason in result to be %v got %v", ErrorTopologyAffinity, ctnActual.Reason)
 		}
 	}
 }

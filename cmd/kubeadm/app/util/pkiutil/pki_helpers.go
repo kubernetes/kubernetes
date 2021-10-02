@@ -41,9 +41,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
+	netutils "k8s.io/utils/net"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
@@ -62,6 +63,7 @@ const (
 // CertConfig is a wrapper around certutil.Config extending it with PublicKeyAlgorithm.
 type CertConfig struct {
 	certutil.Config
+	NotAfter           *time.Time
 	PublicKeyAlgorithm x509.PublicKeyAlgorithm
 }
 
@@ -415,13 +417,13 @@ func pathForCSR(pkiPath, name string) string {
 // GetAPIServerAltNames builds an AltNames object for to be used when generating apiserver certificate
 func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames, error) {
 	// advertise address
-	advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
+	advertiseAddress := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
 		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
 			cfg.LocalAPIEndpoint.AdvertiseAddress)
 	}
 
-	internalAPIServerVirtualIP, err := kubeadmconstants.GetAPIServerVirtualIP(cfg.Networking.ServiceSubnet, features.Enabled(cfg.FeatureGates, features.IPv6DualStack))
+	internalAPIServerVirtualIP, err := kubeadmconstants.GetAPIServerVirtualIP(cfg.Networking.ServiceSubnet)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR: %v", cfg.Networking.ServiceSubnet)
 	}
@@ -444,7 +446,7 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 	// add cluster controlPlaneEndpoint if present (dns or ip)
 	if len(cfg.ControlPlaneEndpoint) > 0 {
 		if host, _, err := kubeadmutil.ParseHostPort(cfg.ControlPlaneEndpoint); err == nil {
-			if ip := net.ParseIP(host); ip != nil {
+			if ip := netutils.ParseIPSloppy(host); ip != nil {
 				altNames.IPs = append(altNames.IPs, ip)
 			} else {
 				altNames.DNSNames = append(altNames.DNSNames, host)
@@ -476,7 +478,7 @@ func GetEtcdPeerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames,
 // getAltNames builds an AltNames object with the cfg and certName.
 func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.AltNames, error) {
 	// advertise address
-	advertiseAddress := net.ParseIP(cfg.LocalAPIEndpoint.AdvertiseAddress)
+	advertiseAddress := netutils.ParseIPSloppy(cfg.LocalAPIEndpoint.AdvertiseAddress)
 	if advertiseAddress == nil {
 		return nil, errors.Errorf("error parsing LocalAPIEndpoint AdvertiseAddress %v: is not a valid textual representation of an IP address",
 			cfg.LocalAPIEndpoint.AdvertiseAddress)
@@ -506,7 +508,7 @@ func getAltNames(cfg *kubeadmapi.InitConfiguration, certName string) (*certutil.
 // certNames is used to print user facing warnings and should be the name of the cert the altNames will be used for
 func appendSANsToAltNames(altNames *certutil.AltNames, SANs []string, certName string) {
 	for _, altname := range SANs {
-		if ip := net.ParseIP(altname); ip != nil {
+		if ip := netutils.ParseIPSloppy(altname); ip != nil {
 			altNames.IPs = append(altNames.IPs, ip)
 		} else if len(validation.IsDNS1123Subdomain(altname)) == 0 {
 			altNames.DNSNames = append(altNames.DNSNames, altname)
@@ -619,8 +621,10 @@ func EncodePublicKeyPEM(key crypto.PublicKey) ([]byte, error) {
 	return pem.EncodeToMemory(&block), nil
 }
 
-// NewPrivateKey creates an RSA private key
-func NewPrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
+// NewPrivateKey returns a new private key.
+var NewPrivateKey = GeneratePrivateKey
+
+func GeneratePrivateKey(keyType x509.PublicKeyAlgorithm) (crypto.Signer, error) {
 	if keyType == x509.ECDSA {
 		return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 	}
@@ -645,6 +649,11 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 
 	RemoveDuplicateAltNames(&cfg.AltNames)
 
+	notAfter := time.Now().Add(kubeadmconstants.CertificateValidity).UTC()
+	if cfg.NotAfter != nil {
+		notAfter = *cfg.NotAfter
+	}
+
 	certTmpl := x509.Certificate{
 		Subject: pkix.Name{
 			CommonName:   cfg.CommonName,
@@ -654,7 +663,7 @@ func NewSignedCert(cfg *CertConfig, key crypto.Signer, caCert *x509.Certificate,
 		IPAddresses:           cfg.AltNames.IPs,
 		SerialNumber:          serial,
 		NotBefore:             caCert.NotBefore,
-		NotAfter:              time.Now().Add(kubeadmconstants.CertificateValidity).UTC(),
+		NotAfter:              notAfter,
 		KeyUsage:              keyUsage,
 		ExtKeyUsage:           cfg.Usages,
 		BasicConstraintsValid: true,

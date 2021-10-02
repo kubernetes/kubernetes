@@ -5,7 +5,6 @@
 package impl
 
 import (
-	"errors"
 	"reflect"
 	"sort"
 
@@ -118,7 +117,7 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 	}
 	b, n := protowire.ConsumeBytes(b)
 	if n < 0 {
-		return out, protowire.ParseError(n)
+		return out, errDecode
 	}
 	var (
 		key = mapi.keyZero
@@ -127,10 +126,10 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 	for len(b) > 0 {
 		num, wtyp, n := protowire.ConsumeTag(b)
 		if n < 0 {
-			return out, protowire.ParseError(n)
+			return out, errDecode
 		}
 		if num > protowire.MaxValidNumber {
-			return out, errors.New("invalid field number")
+			return out, errDecode
 		}
 		b = b[n:]
 		err := errUnknown
@@ -157,7 +156,7 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 		if err == errUnknown {
 			n = protowire.ConsumeFieldValue(num, wtyp, b)
 			if n < 0 {
-				return out, protowire.ParseError(n)
+				return out, errDecode
 			}
 		} else if err != nil {
 			return out, err
@@ -175,7 +174,7 @@ func consumeMapOfMessage(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi
 	}
 	b, n := protowire.ConsumeBytes(b)
 	if n < 0 {
-		return out, protowire.ParseError(n)
+		return out, errDecode
 	}
 	var (
 		key = mapi.keyZero
@@ -184,10 +183,10 @@ func consumeMapOfMessage(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi
 	for len(b) > 0 {
 		num, wtyp, n := protowire.ConsumeTag(b)
 		if n < 0 {
-			return out, protowire.ParseError(n)
+			return out, errDecode
 		}
 		if num > protowire.MaxValidNumber {
-			return out, errors.New("invalid field number")
+			return out, errDecode
 		}
 		b = b[n:]
 		err := errUnknown
@@ -208,7 +207,7 @@ func consumeMapOfMessage(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi
 			var v []byte
 			v, n = protowire.ConsumeBytes(b)
 			if n < 0 {
-				return out, protowire.ParseError(n)
+				return out, errDecode
 			}
 			var o unmarshalOutput
 			o, err = f.mi.unmarshalPointer(v, pointerOfValue(val), 0, opts)
@@ -221,7 +220,7 @@ func consumeMapOfMessage(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi
 		if err == errUnknown {
 			n = protowire.ConsumeFieldValue(num, wtyp, b)
 			if n < 0 {
-				return out, protowire.ParseError(n)
+				return out, errDecode
 			}
 		} else if err != nil {
 			return out, err

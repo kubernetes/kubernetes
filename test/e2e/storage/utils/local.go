@@ -70,6 +70,7 @@ type LocalTestResource struct {
 // LocalTestResourceManager represents interface to create/destroy local test resources on node
 type LocalTestResourceManager interface {
 	Create(node *v1.Node, volumeType LocalVolumeType, parameters map[string]string) *LocalTestResource
+	ExpandBlockDevice(ltr *LocalTestResource, mbToAdd int) error
 	Remove(ltr *LocalTestResource)
 }
 
@@ -287,6 +288,21 @@ func (l *ltrMgr) cleanupLocalVolumeGCELocalSSD(ltr *LocalTestResource) {
 	removeCmd := fmt.Sprintf("find '%s' -mindepth 1 -maxdepth 1 -print0 | xargs -r -0 rm -rf", ltr.Path)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
 	framework.ExpectNoError(err)
+}
+
+func (l *ltrMgr) expandLocalVolumeBlockFS(ltr *LocalTestResource, mbToAdd int) error {
+	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file conv=notrunc oflag=append bs=1M count=%d", ltr.loopDir, mbToAdd)
+	loopDev := l.findLoopDevice(ltr.loopDir, ltr.Node)
+	losetupCmd := fmt.Sprintf("losetup -c %s", loopDev)
+	return l.hostExec.IssueCommand(fmt.Sprintf("%s && %s", ddCmd, losetupCmd), ltr.Node)
+}
+
+func (l *ltrMgr) ExpandBlockDevice(ltr *LocalTestResource, mbtoAdd int) error {
+	switch ltr.VolumeType {
+	case LocalVolumeBlockFS:
+		return l.expandLocalVolumeBlockFS(ltr, mbtoAdd)
+	}
+	return fmt.Errorf("Failed to expand local test resource, unsupported volume type: %s", ltr.VolumeType)
 }
 
 func (l *ltrMgr) Create(node *v1.Node, volumeType LocalVolumeType, parameters map[string]string) *LocalTestResource {

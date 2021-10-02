@@ -101,15 +101,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 		t.Logf("kube-controller-manager will listen securely on port %d...", s.SecureServing.BindPort)
 	}
 
-	if s.InsecureServing.BindPort != 0 {
-		s.InsecureServing.Listener, s.InsecureServing.BindPort, err = createListenerOnFreePort()
-		if err != nil {
-			return result, fmt.Errorf("failed to create listener: %v", err)
-		}
-
-		t.Logf("kube-controller-manager will listen insecurely on port %d...", s.InsecureServing.BindPort)
-	}
-
 	config, err := s.Config(all, disabled)
 	if err != nil {
 		return result, fmt.Errorf("failed to create config from options: %v", err)

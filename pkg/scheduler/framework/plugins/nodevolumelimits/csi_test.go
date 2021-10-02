@@ -47,6 +47,10 @@ const (
 	hostpathInTreePluginName = "kubernetes.io/hostpath"
 )
 
+var (
+	scName = "csi-sc"
+)
+
 // getVolumeLimitKey returns a ResourceName by filter type
 func getVolumeLimitKey(filterType string) v1.ResourceName {
 	switch filterType {
@@ -236,14 +240,112 @@ func TestCSILimits(t *testing.T) {
 		},
 	}
 
+	ephemeralVolumePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "abc",
+			UID:       "12345",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "xyz",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	controller := true
+	ephemeralClaim := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ephemeralVolumePod.Namespace,
+			Name:      ephemeralVolumePod.Name + "-" + ephemeralVolumePod.Spec.Volumes[0].Name,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind:       "Pod",
+					Name:       ephemeralVolumePod.Name,
+					UID:        ephemeralVolumePod.UID,
+					Controller: &controller,
+				},
+			},
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName: &scName,
+		},
+	}
+	conflictingClaim := ephemeralClaim.DeepCopy()
+	conflictingClaim.OwnerReferences = nil
+
+	ephemeralTwoVolumePod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test",
+			Name:      "abc",
+			UID:       "12345II",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "x",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{},
+					},
+				},
+				{
+					Name: "y",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{},
+					},
+				},
+			},
+		},
+	}
+	ephemeralClaimX := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ephemeralTwoVolumePod.Namespace,
+			Name:      ephemeralTwoVolumePod.Name + "-" + ephemeralTwoVolumePod.Spec.Volumes[0].Name,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind:       "Pod",
+					Name:       ephemeralTwoVolumePod.Name,
+					UID:        ephemeralTwoVolumePod.UID,
+					Controller: &controller,
+				},
+			},
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName: &scName,
+		},
+	}
+	ephemeralClaimY := &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ephemeralTwoVolumePod.Namespace,
+			Name:      ephemeralTwoVolumePod.Name + "-" + ephemeralTwoVolumePod.Spec.Volumes[1].Name,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					Kind:       "Pod",
+					Name:       ephemeralTwoVolumePod.Name,
+					UID:        ephemeralTwoVolumePod.UID,
+					Controller: &controller,
+				},
+			},
+		},
+		Spec: v1.PersistentVolumeClaimSpec{
+			StorageClassName: &scName,
+		},
+	}
+
 	tests := []struct {
 		newPod           *v1.Pod
 		existingPods     []*v1.Pod
+		extraClaims      []v1.PersistentVolumeClaim
 		filterName       string
 		maxVols          int
 		driverNames      []string
 		test             string
 		migrationEnabled bool
+		ephemeralEnabled bool
 		limitSource      string
 		wantStatus       *framework.Status
 	}{
@@ -443,6 +545,97 @@ func TestCSILimits(t *testing.T) {
 			limitSource:      "csinode",
 			test:             "should not count in-tree and count csi volumes if migration is disabled (when scheduling in-tree volumes)",
 		},
+		// ephemeral volumes
+		{
+			newPod:      ephemeralVolumePod,
+			filterName:  "csi",
+			driverNames: []string{ebsCSIDriverName},
+			test:        "ephemeral volume feature disabled",
+			wantStatus:  framework.NewStatus(framework.Error, "volume xyz is a generic ephemeral volume, but that feature is disabled in kube-scheduler"),
+		},
+		{
+			newPod:           ephemeralVolumePod,
+			filterName:       "csi",
+			ephemeralEnabled: true,
+			driverNames:      []string{ebsCSIDriverName},
+			test:             "ephemeral volume missing",
+			wantStatus:       framework.NewStatus(framework.Error, `looking up PVC test/abc-xyz: persistentvolumeclaim "abc-xyz" not found`),
+		},
+		{
+			newPod:           ephemeralVolumePod,
+			filterName:       "csi",
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*conflictingClaim},
+			driverNames:      []string{ebsCSIDriverName},
+			test:             "ephemeral volume not owned",
+			wantStatus:       framework.NewStatus(framework.Error, "PVC test/abc-xyz is not owned by pod"),
+		},
+		{
+			newPod:           ephemeralVolumePod,
+			filterName:       "csi",
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
+			driverNames:      []string{ebsCSIDriverName},
+			test:             "ephemeral volume unbound",
+		},
+		{
+			newPod:           ephemeralVolumePod,
+			filterName:       "csi",
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
+			driverNames:      []string{ebsCSIDriverName},
+			existingPods:     []*v1.Pod{runningPod, csiEBSTwoVolPod},
+			maxVols:          2,
+			limitSource:      "node",
+			test:             "ephemeral doesn't when node volume limit <= pods CSI volume",
+			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:           csiEBSOneVolPod,
+			filterName:       "csi",
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaimX, *ephemeralClaimY},
+			driverNames:      []string{ebsCSIDriverName},
+			existingPods:     []*v1.Pod{runningPod, ephemeralTwoVolumePod},
+			maxVols:          2,
+			limitSource:      "node",
+			test:             "ephemeral doesn't when node volume limit <= pods ephemeral CSI volume",
+			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:           csiEBSOneVolPod,
+			filterName:       "csi",
+			ephemeralEnabled: false,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
+			driverNames:      []string{ebsCSIDriverName},
+			existingPods:     []*v1.Pod{runningPod, ephemeralVolumePod, csiEBSTwoVolPod},
+			maxVols:          3,
+			limitSource:      "node",
+			test:             "persistent doesn't when node volume limit <= pods ephemeral CSI volume + persistent volume, ephemeral disabled",
+			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:           csiEBSOneVolPod,
+			filterName:       "csi",
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
+			driverNames:      []string{ebsCSIDriverName},
+			existingPods:     []*v1.Pod{runningPod, ephemeralVolumePod, csiEBSTwoVolPod},
+			maxVols:          3,
+			limitSource:      "node",
+			test:             "persistent doesn't when node volume limit <= pods ephemeral CSI volume + persistent volume",
+			wantStatus:       framework.NewStatus(framework.Unschedulable, ErrReasonMaxVolumeCountExceeded),
+		},
+		{
+			newPod:           csiEBSOneVolPod,
+			filterName:       "csi",
+			ephemeralEnabled: true,
+			extraClaims:      []v1.PersistentVolumeClaim{*ephemeralClaim},
+			driverNames:      []string{ebsCSIDriverName},
+			existingPods:     []*v1.Pod{runningPod, ephemeralVolumePod, csiEBSTwoVolPod},
+			maxVols:          4,
+			test:             "persistent okay when node volume limit > pods ephemeral CSI volume + persistent volume",
+		},
 	}
 
 	// running attachable predicate tests with feature gate and limit present on nodes
@@ -457,14 +650,15 @@ func TestCSILimits(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, false)()
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 			}
-
 			p := &CSILimits{
 				csiNodeLister:        getFakeCSINodeLister(csiNode),
 				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
-				pvcLister:            getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
-				scLister:             getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]),
+				pvcLister:            append(getFakeCSIPVCLister(test.filterName, scName, test.driverNames...), test.extraClaims...),
+				scLister:             getFakeCSIStorageClassLister(scName, test.driverNames[0]),
 				randomVolumeIDPrefix: rand.String(32),
 				translator:           csitrans.New(),
+
+				enableGenericEphemeralVolume: test.ephemeralEnabled,
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

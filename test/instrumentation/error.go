@@ -23,17 +23,19 @@ import (
 )
 
 const (
-	errNotDirectCall        = "Opts for STABLE metric was not directly passed to new metric function"
-	errPositionalArguments  = "Positional arguments are not supported"
-	errStabilityLevel       = "StabilityLevel should be passed STABLE, ALPHA or removed"
-	errStableSummary        = "Stable summary metric is not supported"
-	errInvalidNewMetricCall = "Invalid new metric call, please ensure code compiles"
-	errNonStringAttribute   = "Non string attribute it not supported"
-	errBadVariableAttribute = "Metric attribute was not correctly set. Please use only global consts in same file"
-	errFieldNotSupported    = "Field %s is not supported"
-	errBuckets              = "Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"
-	errLabels               = "Labels were not set to list of strings"
-	errImport               = `Importing using "." is not supported`
+	errNotDirectCall                = "Opts for STABLE metric was not directly passed to new metric function"
+	errPositionalArguments          = "Positional arguments are not supported"
+	errStabilityLevel               = "StabilityLevel should be passed STABLE, ALPHA or removed"
+	errStableSummary                = "Stable summary metric is not supported"
+	errInvalidNewMetricCall         = "Invalid new metric call, please ensure code compiles"
+	errNonStringAttribute           = "Non string attribute is not supported"
+	errBadVariableAttribute         = "Metric attribute was not correctly set. Please use only global consts in same file"
+	errBadImportedVariableAttribute = "Metric attribute was not correctly set. Please use only global consts in correctly impoprted same file"
+	errFieldNotSupported            = "Field %s is not supported"
+	errBuckets                      = "Buckets should be set to list of floats, result from function call of prometheus.LinearBuckets or prometheus.ExponentialBuckets"
+	errLabels                       = "Labels were not set to list of strings"
+	errImport                       = `Importing using "." is not supported`
+	errExprNotIdent                 = "expr selector does not refer to type ast.Ident, is type %s"
 )
 
 type decodeError struct {

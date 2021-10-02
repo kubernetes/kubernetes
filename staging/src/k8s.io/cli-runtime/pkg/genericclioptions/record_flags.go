@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -74,6 +74,7 @@ func (f *RecordFlags) Complete(cmd *cobra.Command) error {
 	return nil
 }
 
+// CompleteWithChangeCause alters changeCause value with a new cause
 func (f *RecordFlags) CompleteWithChangeCause(cause string) error {
 	if f == nil {
 		return nil
@@ -92,6 +93,7 @@ func (f *RecordFlags) AddFlags(cmd *cobra.Command) {
 
 	if f.Record != nil {
 		cmd.Flags().BoolVar(f.Record, "record", *f.Record, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
+		cmd.Flags().MarkDeprecated("record", "--record will be removed in the future")
 	}
 }
 

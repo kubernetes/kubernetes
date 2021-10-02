@@ -57,11 +57,11 @@ func TestParseTags(t *testing.T) {
 		},
 		"genclient:onlyVerbs": {
 			lines:      []string{`+genclient`, `+genclient:onlyVerbs=create,delete`},
-			expectTags: Tags{GenerateClient: true, SkipVerbs: []string{"update", "updateStatus", "deleteCollection", "get", "list", "watch", "patch"}},
+			expectTags: Tags{GenerateClient: true, SkipVerbs: []string{"update", "updateStatus", "deleteCollection", "get", "list", "watch", "patch", "apply", "applyStatus"}},
 		},
 		"genclient:readonly": {
 			lines:      []string{`+genclient`, `+genclient:readonly`},
-			expectTags: Tags{GenerateClient: true, SkipVerbs: []string{"create", "update", "updateStatus", "delete", "deleteCollection", "patch"}},
+			expectTags: Tags{GenerateClient: true, SkipVerbs: []string{"create", "update", "updateStatus", "delete", "deleteCollection", "patch", "apply", "applyStatus"}},
 		},
 		"genclient:conflict": {
 			lines:       []string{`+genclient`, `+genclient:onlyVerbs=create`, `+genclient:skipVerbs=create`},

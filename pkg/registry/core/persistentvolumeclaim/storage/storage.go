@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +30,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST implements a RESTStorage for persistent volume claims.
@@ -48,6 +50,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		UpdateStrategy:      persistentvolumeclaim.Strategy,
 		DeleteStrategy:      persistentvolumeclaim.Strategy,
 		ReturnDeletedObject: true,
+		ResetFieldsStrategy: persistentvolumeclaim.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -58,8 +61,12 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = persistentvolumeclaim.StatusStrategy
+	statusStore.ResetFieldsStrategy = persistentvolumeclaim.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}, nil
+	rest := &REST{store}
+	store.Decorator = rest.defaultOnRead
+
+	return rest, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -68,6 +75,46 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"pvc"}
+}
+
+// defaultOnRead sets interlinked fields that were not previously set on read.
+// We can't do this in the normal defaulting path because that same logic
+// applies on Get, Create, and Update, but we need to distinguish between them.
+//
+// This will be called on both PersistentVolumeClaim and PersistentVolumeClaimList types.
+func (r *REST) defaultOnRead(obj runtime.Object) {
+	switch s := obj.(type) {
+	case *api.PersistentVolumeClaim:
+		r.defaultOnReadPvc(s)
+	case *api.PersistentVolumeClaimList:
+		r.defaultOnReadPvcList(s)
+	default:
+		// This was not an object we can default.  This is not an error, as the
+		// caching layer can pass through here, too.
+	}
+}
+
+// defaultOnReadPvcList defaults a PersistentVolumeClaimList.
+func (r *REST) defaultOnReadPvcList(pvcList *api.PersistentVolumeClaimList) {
+	if pvcList == nil {
+		return
+	}
+
+	for i := range pvcList.Items {
+		r.defaultOnReadPvc(&pvcList.Items[i])
+	}
+}
+
+// defaultOnReadPvc defaults a single PersistentVolumeClaim.
+func (r *REST) defaultOnReadPvc(pvc *api.PersistentVolumeClaim) {
+	if pvc == nil {
+		return
+	}
+
+	// We set dataSourceRef to the same value as dataSource at creation time now,
+	// but for pre-existing PVCs with data sources, the dataSourceRef field will
+	// be blank, so we fill it in here at read time.
+	pvcutil.NormalizeDataSources(&pvc.Spec)
 }
 
 // StatusREST implements the REST endpoint for changing the status of a persistentvolumeclaim.
@@ -90,4 +137,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

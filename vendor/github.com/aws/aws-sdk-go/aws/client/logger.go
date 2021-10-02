@@ -53,6 +53,10 @@ var LogHTTPRequestHandler = request.NamedHandler{
 }
 
 func logRequest(r *request.Request) {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) {
+		return
+	}
+
 	logBody := r.Config.LogLevel.Matches(aws.LogDebugWithHTTPBody)
 	bodySeekable := aws.IsReaderSeekable(r.Body)
 
@@ -120,6 +124,10 @@ var LogHTTPResponseHandler = request.NamedHandler{
 }
 
 func logResponse(r *request.Request) {
+	if !r.Config.LogLevel.AtLeast(aws.LogDebug) {
+		return
+	}
+
 	lw := &logWriter{r.Config.Logger, bytes.NewBuffer(nil)}
 
 	if r.HTTPResponse == nil {

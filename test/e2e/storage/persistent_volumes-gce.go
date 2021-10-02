@@ -86,13 +86,14 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		ginkgo.By("Initializing Test Spec")
 		diskName, err = e2epv.CreatePDWithRetry()
 		framework.ExpectNoError(err)
+
 		pvConfig = e2epv.PersistentVolumeConfig{
 			NamePrefix: "gce-",
 			Labels:     volLabel,
 			PVSource: v1.PersistentVolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
 					PDName:   diskName,
-					FSType:   "ext3",
+					FSType:   e2epv.GetDefaultFSType(),
 					ReadOnly: false,
 				},
 			},

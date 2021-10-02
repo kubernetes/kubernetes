@@ -52,7 +52,7 @@ func TestFlockerUtil_CreateVolume(t *testing.T) {
 	assert.Equal(3, size)
 
 	// test error during CreateVolume
-	fakeFlockerClient.Error = fmt.Errorf("Do not feel like provisioning")
+	fakeFlockerClient.Error = fmt.Errorf("do not feel like provisioning")
 	_, _, _, err = flockerUtil.CreateVolume(provisioner)
 	assert.Equal(fakeFlockerClient.Error.Error(), err.Error())
 }

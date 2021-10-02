@@ -304,10 +304,7 @@ func (h *Heap) GetByKey(key string) (interface{}, bool, error) {
 func (h *Heap) IsClosed() bool {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
-	if h.closed {
-		return true
-	}
-	return false
+	return h.closed
 }
 
 // NewHeap returns a Heap which can be used to queue up items to process.

@@ -16,6 +16,8 @@ limitations under the License.
 
 package types
 
+import "strings"
+
 type Version string
 
 func (v Version) String() string {
@@ -27,6 +29,10 @@ func (v Version) NonEmpty() string {
 		return "internalVersion"
 	}
 	return v.String()
+}
+
+func (v Version) PackageName() string {
+	return strings.ToLower(v.NonEmpty())
 }
 
 type Group string
@@ -42,6 +48,14 @@ func (g Group) NonEmpty() string {
 	return string(g)
 }
 
+func (g Group) PackageName() string {
+	parts := strings.Split(g.NonEmpty(), ".")
+	if parts[0] == "internal" && len(parts) > 1 {
+		return strings.ToLower(parts[1] + parts[0])
+	}
+	return strings.ToLower(parts[0])
+}
+
 type PackageVersion struct {
 	Version
 	// The fully qualified package, e.g. k8s.io/kubernetes/pkg/apis/apps, where the types.go is found.
@@ -51,6 +65,14 @@ type PackageVersion struct {
 type GroupVersion struct {
 	Group   Group
 	Version Version
+}
+
+func (gv GroupVersion) ToAPIVersion() string {
+	if len(gv.Group) > 0 && gv.Group.NonEmpty() != "core" {
+		return gv.Group.String() + "/" + gv.Version.String()
+	} else {
+		return gv.Version.String()
+	}
 }
 
 type GroupVersions struct {

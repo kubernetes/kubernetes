@@ -40,7 +40,7 @@ var (
 	image = imageutils.GetE2EImage(imageutils.Pause)
 )
 
-var _ = SIGDescribe("Windows volume mounts ", func() {
+var _ = SIGDescribe("[Feature:Windows] Windows volume mounts ", func() {
 	f := framework.NewDefaultFramework("windows-volumes")
 	var (
 		emptyDirSource = v1.VolumeSource{
@@ -90,23 +90,31 @@ func doReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath s
 		podName  = "pod-" + string(uuid.NewUUID())
 		pod      = testPodWithROVolume(podName, source, volumePath)
 	)
+	pod.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/os": "windows",
+	}
 
-	f.PodClient().CreateSync(pod)
+	pod = f.PodClient().CreateSync(pod)
+	ginkgo.By("verifying that pod has the correct nodeSelector")
+	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
+
 	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
 
+	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
 	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
-
 	framework.ExpectEqual(stderr, "Access is denied.")
-
 }
 
 func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, volumePath string) {
 	var (
-		filePath        = volumePath + "\\test-file"
+		filePath        = volumePath + "\\test-file" + string(uuid.NewUUID())
 		podName         = "pod-" + string(uuid.NewUUID())
 		pod             = testPodWithROVolume(podName, source, volumePath)
 		rwcontainerName = containerName + "-rw"
 	)
+	pod.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/os": "windows",
+	}
 
 	rwcontainer := v1.Container{
 		Name:  containerName + "-rw",
@@ -120,17 +128,22 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	}
 
 	pod.Spec.Containers = append(pod.Spec.Containers, rwcontainer)
-	f.PodClient().CreateSync(pod)
+	pod = f.PodClient().CreateSync(pod)
 
-	cmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
+	ginkgo.By("verifying that pod has the correct nodeSelector")
+	framework.ExpectEqual(pod.Spec.NodeSelector["kubernetes.io/os"], "windows")
 
-	stdoutRW, stderrRW, errRW := f.ExecCommandInContainerWithFullOutput(podName, rwcontainerName, cmd...)
-	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", cmd, stdoutRW, stderrRW)
+	ginkgo.By("verifying that pod can write to a volume with read/write access")
+	writecmd := []string{"cmd", "/c", "echo windows-volume-test", ">", filePath}
+	stdoutRW, stderrRW, errRW := f.ExecCommandInContainerWithFullOutput(podName, rwcontainerName, writecmd...)
+	msg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", writecmd, stdoutRW, stderrRW)
 	framework.ExpectNoError(errRW, msg)
 
-	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, cmd...)
+	ginkgo.By("verifying that pod will get an error when writing to a volume that is readonly")
+	_, stderr, _ := f.ExecCommandInContainerWithFullOutput(podName, containerName, writecmd...)
 	framework.ExpectEqual(stderr, "Access is denied.")
 
+	ginkgo.By("verifying that pod can read from the the volume that is readonly")
 	readcmd := []string{"cmd", "/c", "type", filePath}
 	readout, readerr, err := f.ExecCommandInContainerWithFullOutput(podName, containerName, readcmd...)
 	readmsg := fmt.Sprintf("cmd: %v, stdout: %q, stderr: %q", readcmd, readout, readerr)
@@ -138,6 +151,8 @@ func doReadWriteReadOnlyTest(f *framework.Framework, source v1.VolumeSource, vol
 	framework.ExpectNoError(err, readmsg)
 }
 
+// testPodWithROVolume makes a minimal pod defining a volume input source. Similarly to
+// other tests for sig-windows this should append a nodeSelector for windows.
 func testPodWithROVolume(podName string, source v1.VolumeSource, path string) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: metav1.TypeMeta{

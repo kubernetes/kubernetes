@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
@@ -28,6 +30,8 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationsappsv1 "k8s.io/client-go/applyconfigurations/apps/v1"
+	applyconfigurationsautoscalingv1 "k8s.io/client-go/applyconfigurations/autoscaling/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -142,6 +146,51 @@ func (c *FakeDeployments) Patch(ctx context.Context, name string, pt types.Patch
 	return obj.(*appsv1.Deployment), err
 }
 
+// Apply takes the given apply declarative configuration, applies it and returns the applied deployment.
+func (c *FakeDeployments) Apply(ctx context.Context, deployment *applyconfigurationsappsv1.DeploymentApplyConfiguration, opts v1.ApplyOptions) (result *appsv1.Deployment, err error) {
+	if deployment == nil {
+		return nil, fmt.Errorf("deployment provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(deployment)
+	if err != nil {
+		return nil, err
+	}
+	name := deployment.Name
+	if name == nil {
+		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data), &appsv1.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*appsv1.Deployment), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeDeployments) ApplyStatus(ctx context.Context, deployment *applyconfigurationsappsv1.DeploymentApplyConfiguration, opts v1.ApplyOptions) (result *appsv1.Deployment, err error) {
+	if deployment == nil {
+		return nil, fmt.Errorf("deployment provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(deployment)
+	if err != nil {
+		return nil, err
+	}
+	name := deployment.Name
+	if name == nil {
+		return nil, fmt.Errorf("deployment.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &appsv1.Deployment{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*appsv1.Deployment), err
+}
+
 // GetScale takes name of the deployment, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeDeployments) GetScale(ctx context.Context, deploymentName string, options v1.GetOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
@@ -157,6 +206,25 @@ func (c *FakeDeployments) GetScale(ctx context.Context, deploymentName string, o
 func (c *FakeDeployments) UpdateScale(ctx context.Context, deploymentName string, scale *autoscalingv1.Scale, opts v1.UpdateOptions) (result *autoscalingv1.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(deploymentsResource, "scale", c.ns, scale), &autoscalingv1.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscalingv1.Scale), err
+}
+
+// ApplyScale takes top resource name and the apply declarative configuration for scale,
+// applies it and returns the applied scale, and an error, if there is any.
+func (c *FakeDeployments) ApplyScale(ctx context.Context, deploymentName string, scale *applyconfigurationsautoscalingv1.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *autoscalingv1.Scale, err error) {
+	if scale == nil {
+		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
+	}
+	data, err := json.Marshal(scale)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(deploymentsResource, c.ns, deploymentName, types.ApplyPatchType, data, "status"), &autoscalingv1.Scale{})
 
 	if obj == nil {
 		return nil, err

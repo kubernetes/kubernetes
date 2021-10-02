@@ -33,7 +33,7 @@ import (
 
 // TestConfigMap tests apiserver-side behavior of creation of ConfigMaps and pods that consume them.
 func TestConfigMap(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})

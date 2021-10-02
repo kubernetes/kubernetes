@@ -23,11 +23,11 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"k8s.io/component-base/version"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 )
 
 // Version provides the version information of kubeadm.

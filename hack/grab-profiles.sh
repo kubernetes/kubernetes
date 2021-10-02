@@ -67,8 +67,7 @@ profile_components=""
 output_dir="."
 tunnel_port="${tunnel_port:-1234}"
 
-args=$(getopt -o s:mho:k:c -l server:,master,heapster,output:,kubelet:,scheduler,controller-manager,help,inuse-space,inuse-objects,alloc-space,alloc-objects,cpu,kubelet-binary:,master-binary:,scheduler-binary:,controller-manager-binary:,scheduler-port:,controller-manager-port: -- "$@")
-if [[ $? ]]; then
+if ! args=$(getopt -o s:mho:k:c -l server:,master,heapster,output:,kubelet:,scheduler,controller-manager,help,inuse-space,inuse-objects,alloc-space,alloc-objects,cpu,kubelet-binary:,master-binary:,scheduler-binary:,controller-manager-binary:,scheduler-port:,controller-manager-port: -- "$@"); then
   >&2 echo "Error in getopt"
   exit 1
 fi

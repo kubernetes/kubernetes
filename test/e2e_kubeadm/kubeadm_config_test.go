@@ -32,7 +32,6 @@ const (
 	kubeadmConfigRoleName                         = "kubeadm:nodes-kubeadm-config"
 	kubeadmConfigRoleBindingName                  = kubeadmConfigRoleName
 	kubeadmConfigClusterConfigurationConfigMapKey = "ClusterConfiguration"
-	kubeadmConfigClusterStatusConfigMapKey        = "ClusterStatus"
 )
 
 var (
@@ -60,23 +59,6 @@ var _ = Describe("kubeadm-config ConfigMap", func() {
 		cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeadmConfigName)
 
 		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeadmConfigClusterConfigurationConfigMapKey))
-		gomega.Expect(cm.Data).To(gomega.HaveKey(kubeadmConfigClusterStatusConfigMapKey))
-
-		m := unmarshalYaml(cm.Data[kubeadmConfigClusterStatusConfigMapKey])
-		if _, ok := m["apiEndpoints"]; ok {
-			d := m["apiEndpoints"].(map[interface{}]interface{})
-			// get all control-plane nodes
-			controlPlanes := getControlPlaneNodes(f.ClientSet)
-
-			// checks that all the control-plane nodes are in the apiEndpoints list
-			for _, cp := range controlPlanes.Items {
-				if _, ok := d[cp.Name]; !ok {
-					framework.Failf("failed to get apiEndpoints for control-plane %s in %s", cp.Name, kubeadmConfigClusterStatusConfigMapKey)
-				}
-			}
-		} else {
-			framework.Failf("failed to get apiEndpoints from %s", kubeadmConfigClusterStatusConfigMapKey)
-		}
 	})
 
 	ginkgo.It("should have related Role and RoleBinding", func() {

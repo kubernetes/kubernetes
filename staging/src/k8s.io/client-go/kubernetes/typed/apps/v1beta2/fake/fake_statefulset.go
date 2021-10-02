@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -141,6 +144,51 @@ func (c *FakeStatefulSets) Patch(ctx context.Context, name string, pt types.Patc
 	return obj.(*v1beta2.StatefulSet), err
 }
 
+// Apply takes the given apply declarative configuration, applies it and returns the applied statefulSet.
+func (c *FakeStatefulSets) Apply(ctx context.Context, statefulSet *appsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.StatefulSet, err error) {
+	if statefulSet == nil {
+		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(statefulSet)
+	if err != nil {
+		return nil, err
+	}
+	name := statefulSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.StatefulSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.StatefulSet), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeStatefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.StatefulSet, err error) {
+	if statefulSet == nil {
+		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(statefulSet)
+	if err != nil {
+		return nil, err
+	}
+	name := statefulSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.StatefulSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.StatefulSet), err
+}
+
 // GetScale takes name of the statefulSet, and returns the corresponding scale object, and an error if there is any.
 func (c *FakeStatefulSets) GetScale(ctx context.Context, statefulSetName string, options v1.GetOptions) (result *v1beta2.Scale, err error) {
 	obj, err := c.Fake.
@@ -156,6 +204,25 @@ func (c *FakeStatefulSets) GetScale(ctx context.Context, statefulSetName string,
 func (c *FakeStatefulSets) UpdateScale(ctx context.Context, statefulSetName string, scale *v1beta2.Scale, opts v1.UpdateOptions) (result *v1beta2.Scale, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(statefulsetsResource, "scale", c.ns, scale), &v1beta2.Scale{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.Scale), err
+}
+
+// ApplyScale takes top resource name and the apply declarative configuration for scale,
+// applies it and returns the applied scale, and an error, if there is any.
+func (c *FakeStatefulSets) ApplyScale(ctx context.Context, statefulSetName string, scale *appsv1beta2.ScaleApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.Scale, err error) {
+	if scale == nil {
+		return nil, fmt.Errorf("scale provided to ApplyScale must not be nil")
+	}
+	data, err := json.Marshal(scale)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, statefulSetName, types.ApplyPatchType, data, "status"), &v1beta2.Scale{})
 
 	if obj == nil {
 		return nil, err

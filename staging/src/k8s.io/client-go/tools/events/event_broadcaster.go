@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (

@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"sort"
 
-	//lint:ignore SA1019 Need to keep deprecated package for compatibility.
+	//nolint:staticcheck // Ignore SA1019. Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
@@ -32,7 +32,9 @@ import (
 // in a no-op Registerer.
 //
 // WrapRegistererWith provides a way to add fixed labels to a subset of
-// Collectors. It should not be used to add fixed labels to all metrics exposed.
+// Collectors. It should not be used to add fixed labels to all metrics
+// exposed. See also
+// https://prometheus.io/docs/instrumenting/writing_exporters/#target-labels-not-static-scraped-labels
 //
 // Conflicts between Collectors registered through the original Registerer with
 // Collectors registered through the wrapping Registerer will still be

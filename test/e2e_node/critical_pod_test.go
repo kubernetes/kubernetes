@@ -41,7 +41,7 @@ const (
 	bestEffortPodName = "best-effort"
 )
 
-var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]", func() {
+var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]", func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
 	ginkgo.Context("when we need to admit a critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
@@ -50,7 +50,7 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			}
 		})
 
-		ginkgo.It("should be able to create and delete a critical pod", func() {
+		ginkgo.It("[Flaky] should be able to create and delete a critical pod", func() {
 			configEnabled, err := isKubeletConfigEnabled(f)
 			framework.ExpectNoError(err)
 			if !configEnabled {

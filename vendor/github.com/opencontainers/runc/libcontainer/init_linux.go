@@ -3,6 +3,7 @@
 package libcontainer
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +13,8 @@ import (
 	"strings"
 	"unsafe"
 
-	"golang.org/x/sys/unix"
-
 	"github.com/containerd/console"
+	"github.com/opencontainers/runc/libcontainer/capabilities"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/system"
@@ -24,6 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 type initType string
@@ -34,8 +35,8 @@ const (
 )
 
 type pid struct {
-	Pid           int `json:"pid"`
-	PidFirstChild int `json:"pid_first"`
+	Pid           int `json:"stage2_pid"`
+	PidFirstChild int `json:"stage1_pid"`
 }
 
 // network is an internal struct used to setup container networks.
@@ -69,13 +70,14 @@ type initConfig struct {
 	RootlessEUID     bool                  `json:"rootless_euid,omitempty"`
 	RootlessCgroups  bool                  `json:"rootless_cgroups,omitempty"`
 	SpecState        *specs.State          `json:"spec_state,omitempty"`
+	Cgroup2Path      string                `json:"cgroup2_path,omitempty"`
 }
 
 type initer interface {
 	Init() error
 }
 
-func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd int) (initer, error) {
+func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd, logFd int) (initer, error) {
 	var config *initConfig
 	if err := json.NewDecoder(pipe).Decode(&config); err != nil {
 		return nil, err
@@ -89,6 +91,7 @@ func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd 
 			pipe:          pipe,
 			consoleSocket: consoleSocket,
 			config:        config,
+			logFd:         logFd,
 		}, nil
 	case initStandard:
 		return &linuxStandardInit{
@@ -97,6 +100,7 @@ func newContainerInit(t initType, pipe *os.File, consoleSocket *os.File, fifoFd 
 			parentPid:     unix.Getppid(),
 			config:        config,
 			fifoFd:        fifoFd,
+			logFd:         logFd,
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown init type %q", t)
@@ -108,9 +112,19 @@ func populateProcessEnvironment(env []string) error {
 	for _, pair := range env {
 		p := strings.SplitN(pair, "=", 2)
 		if len(p) < 2 {
-			return fmt.Errorf("invalid environment '%v'", pair)
+			return fmt.Errorf("invalid environment variable: %q", pair)
 		}
-		if err := os.Setenv(p[0], p[1]); err != nil {
+		name, val := p[0], p[1]
+		if name == "" {
+			return fmt.Errorf("environment variable name can't be empty: %q", pair)
+		}
+		if strings.IndexByte(name, 0) >= 0 {
+			return fmt.Errorf("environment variable name can't contain null(\\x00): %q", pair)
+		}
+		if strings.IndexByte(val, 0) >= 0 {
+			return fmt.Errorf("environment variable value can't contain null(\\x00): %q", pair)
+		}
+		if err := os.Setenv(name, val); err != nil {
 			return err
 		}
 	}
@@ -128,19 +142,33 @@ func finalizeNamespace(config *initConfig) error {
 		return errors.Wrap(err, "close exec fds")
 	}
 
-	if config.Cwd != "" {
-		if err := unix.Chdir(config.Cwd); err != nil {
+	// we only do chdir if it's specified
+	doChdir := config.Cwd != ""
+	if doChdir {
+		// First, attempt the chdir before setting up the user.
+		// This could allow us to access a directory that the user running runc can access
+		// but the container user cannot.
+		err := unix.Chdir(config.Cwd)
+		switch {
+		case err == nil:
+			doChdir = false
+		case os.IsPermission(err):
+			// If we hit an EPERM, we should attempt again after setting up user.
+			// This will allow us to successfully chdir if the container user has access
+			// to the directory, but the user running runc does not.
+			// This is useful in cases where the cwd is also a volume that's been chowned to the container user.
+		default:
 			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
 		}
 	}
 
-	capabilities := &configs.Capabilities{}
+	caps := &configs.Capabilities{}
 	if config.Capabilities != nil {
-		capabilities = config.Capabilities
+		caps = config.Capabilities
 	} else if config.Config.Capabilities != nil {
-		capabilities = config.Config.Capabilities
+		caps = config.Config.Capabilities
 	}
-	w, err := newContainerCapList(capabilities)
+	w, err := capabilities.New(caps)
 	if err != nil {
 		return err
 	}
@@ -154,6 +182,12 @@ func finalizeNamespace(config *initConfig) error {
 	}
 	if err := setupUser(config); err != nil {
 		return errors.Wrap(err, "setup user")
+	}
+	// Change working directory AFTER the user has been set up, if we haven't done it yet.
+	if doChdir {
+		if err := unix.Chdir(config.Cwd); err != nil {
+			return fmt.Errorf("chdir to cwd (%q) set in config.json failed: %v", config.Cwd, err)
+		}
 	}
 	if err := system.ClearKeepCaps(); err != nil {
 		return errors.Wrap(err, "clear keep caps")
@@ -304,7 +338,7 @@ func setupUser(config *initConfig) error {
 	// There's nothing we can do about /etc/group entries, so we silently
 	// ignore setting groups here (since the user didn't explicitly ask us to
 	// set the group).
-	allowSupGroups := !config.RootlessEUID && strings.TrimSpace(string(setgroups)) != "deny"
+	allowSupGroups := !config.RootlessEUID && string(bytes.TrimSpace(setgroups)) != "deny"
 
 	if allowSupGroups {
 		suppGroups := append(execUser.Sgids, addGroups...)
@@ -431,6 +465,7 @@ func setupRlimits(limits []configs.Rlimit, pid int) error {
 
 const _P_PID = 1
 
+//nolint:structcheck,unused
 type siginfo struct {
 	si_signo int32
 	si_errno int32
@@ -480,7 +515,9 @@ func signalAllProcesses(m cgroups.Manager, s os.Signal) error {
 	}
 	pids, err := m.GetAllPids()
 	if err != nil {
-		m.Freeze(configs.Thawed)
+		if err := m.Freeze(configs.Thawed); err != nil {
+			logrus.Warn(err)
+		}
 		return err
 	}
 	for _, pid := range pids {

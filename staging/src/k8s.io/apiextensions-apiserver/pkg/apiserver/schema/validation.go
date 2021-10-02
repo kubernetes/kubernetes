@@ -145,33 +145,43 @@ func validateStructuralInvariants(s *Structural, lvl level, fldPath *field.Path)
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("apiVersion").Child("type"), apiVersion.Type, "must be string"))
 		}
 	}
-	if metadata, found := s.Properties["metadata"]; found && checkMetadata {
-		if metadata.Type != "object" {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("properties").Key("metadata").Child("type"), metadata.Type, "must be object"))
-		}
-	}
-	if metadata, found := s.Properties["metadata"]; found && lvl == rootLevel {
-		// metadata is a shallow copy. We can mutate it.
-		_, foundName := metadata.Properties["name"]
-		_, foundGenerateName := metadata.Properties["generateName"]
-		if foundName && foundGenerateName && len(metadata.Properties) == 2 {
-			metadata.Properties = nil
-		} else if (foundName || foundGenerateName) && len(metadata.Properties) == 1 {
-			metadata.Properties = nil
-		}
-		metadata.Type = ""
-		metadata.Default.Object = nil // this is checked in API validation (and also tested)
-		if metadata.ValueValidation == nil {
-			metadata.ValueValidation = &ValueValidation{}
-		}
-		if !reflect.DeepEqual(metadata, Structural{ValueValidation: &ValueValidation{}}) {
-			// TODO: this is actually a field.Invalid error, but we cannot do JSON serialization of metadata here to get a proper message
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("properties").Key("metadata"), "must not specify anything other than name and generateName, but metadata is implicitly specified"))
-		}
+
+	if metadata, found := s.Properties["metadata"]; found {
+		allErrs = append(allErrs, validateStructuralMetadataInvariants(&metadata, checkMetadata, lvl, fldPath.Child("properties").Key("metadata"))...)
 	}
 
 	if s.XEmbeddedResource && !s.XPreserveUnknownFields && len(s.Properties) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("properties"), "must not be empty if x-kubernetes-embedded-resource is true without x-kubernetes-preserve-unknown-fields"))
+	}
+
+	return allErrs
+}
+
+func validateStructuralMetadataInvariants(s *Structural, checkMetadata bool, lvl level, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if checkMetadata && s.Type != "object" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), s.Type, "must be object"))
+	}
+
+	if lvl == rootLevel {
+		// metadata is a shallow copy. We can mutate it.
+		_, foundName := s.Properties["name"]
+		_, foundGenerateName := s.Properties["generateName"]
+		if foundName && foundGenerateName && len(s.Properties) == 2 {
+			s.Properties = nil
+		} else if (foundName || foundGenerateName) && len(s.Properties) == 1 {
+			s.Properties = nil
+		}
+		s.Type = ""
+		s.Default.Object = nil // this is checked in API validation (and also tested)
+		if s.ValueValidation == nil {
+			s.ValueValidation = &ValueValidation{}
+		}
+		if !reflect.DeepEqual(*s, Structural{ValueValidation: &ValueValidation{}}) {
+			// TODO: this is actually a field.Invalid error, but we cannot do JSON serialization of metadata here to get a proper message
+			allErrs = append(allErrs, field.Forbidden(fldPath, "must not specify anything other than name and generateName, but metadata is implicitly specified"))
+		}
 	}
 
 	return allErrs

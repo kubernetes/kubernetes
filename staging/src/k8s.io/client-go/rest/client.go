@@ -127,7 +127,7 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 	}, nil
 }
 
-// GetRateLimiter returns rate limier for a given client, or nil if it's called on a nil client
+// GetRateLimiter returns rate limiter for a given client, or nil if it's called on a nil client
 func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	if c == nil {
 		return nil

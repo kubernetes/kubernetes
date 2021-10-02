@@ -30,6 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/apiserver/pkg/warning"
 )
 
 // RESTUpdateStrategy defines the minimum validation, accepted input, and
@@ -51,6 +52,26 @@ type RESTUpdateStrategy interface {
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
 	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
+	// WarningsOnUpdate returns warnings to the client performing the update.
+	// WarningsOnUpdate is invoked after default fields in the object have been filled in
+	// and after ValidateUpdate has passed, before Canonicalize is called, and before the object is persisted.
+	// This method must not mutate either object.
+	//
+	// Be brief; limit warnings to 120 characters if possible.
+	// Don't include a "Warning:" prefix in the message (that is added by clients on output).
+	// Warnings returned about a specific field should be formatted as "path.to.field: message".
+	// For example: `spec.imagePullSecrets[0].name: invalid empty name ""`
+	//
+	// Use warning messages to describe problems the client making the API request should correct or be aware of.
+	// For example:
+	// - use of deprecated fields/labels/annotations that will stop working in a future release
+	// - use of obsolete fields/labels/annotations that are non-functional
+	// - malformed or invalid specifications that prevent successful handling of the submitted object,
+	//   but are not rejected by validation for compatibility reasons
+	//
+	// Warnings should not be returned for fields which cannot be resolved by the caller.
+	// For example, do not warn about spec fields in a status update.
+	WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string
 	// Canonicalize allows an object to be mutated into a canonical form. This
 	// ensures that code that operates on these objects can rely on the common
 	// form for things like comparison.  Canonicalize is invoked after
@@ -142,6 +163,10 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx context.Context, obj, old run
 	errs = append(errs, strategy.ValidateUpdate(ctx, obj, old)...)
 	if len(errs) > 0 {
 		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
+	}
+
+	for _, w := range strategy.WarningsOnUpdate(ctx, obj, old) {
+		warning.AddWarning(ctx, "", w)
 	}
 
 	strategy.Canonicalize(obj)

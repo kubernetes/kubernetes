@@ -55,6 +55,9 @@ func (leaseStrategy) Validate(ctx context.Context, obj runtime.Object) field.Err
 	return validation.ValidateLease(lease)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (leaseStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (leaseStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -67,6 +70,11 @@ func (leaseStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (leaseStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateLeaseUpdate(obj.(*coordination.Lease), old.(*coordination.Lease))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (leaseStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for Lease objects.

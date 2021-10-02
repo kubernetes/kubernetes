@@ -326,7 +326,7 @@ func removeNodeIDFromNode(csiDriverName string) nodeUpdateFunc {
 // topology information.
 func updateTopologyLabels(topology map[string]string) nodeUpdateFunc {
 	return func(node *v1.Node) (*v1.Node, bool, error) {
-		if topology == nil || len(topology) == 0 {
+		if len(topology) == 0 {
 			return node, false, nil
 		}
 

@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -249,7 +250,7 @@ func TestMakeMounts(t *testing.T) {
 				},
 			}
 
-			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil)
+			mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, false)
 
 			// validate only the error if we expect an error
 			if tc.expectErr {

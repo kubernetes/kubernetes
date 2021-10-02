@@ -55,7 +55,7 @@ func readConntrackStat(path string) ([]ConntrackStatEntry, error) {
 
 	stat, err := parseConntrackStat(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("failed to read conntrack stats from %q: %v", path, err)
+		return nil, fmt.Errorf("failed to read conntrack stats from %q: %w", path, err)
 	}
 
 	return stat, nil
@@ -147,7 +147,7 @@ func parseConntrackStatEntry(fields []string) (*ConntrackStatEntry, error) {
 func parseConntrackStatField(field string) (uint64, error) {
 	val, err := strconv.ParseUint(field, 16, 64)
 	if err != nil {
-		return 0, fmt.Errorf("couldn't parse \"%s\" field: %s", field, err)
+		return 0, fmt.Errorf("couldn't parse %q field: %w", field, err)
 	}
 	return val, err
 }

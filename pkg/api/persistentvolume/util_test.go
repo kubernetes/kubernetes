@@ -20,7 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -83,10 +84,10 @@ func TestDropDisabledFields(t *testing.T) {
 
 			DropDisabledFields(tc.newSpec, tc.oldSpec)
 			if !reflect.DeepEqual(tc.newSpec, tc.expectNewSpec) {
-				t.Error(diff.ObjectReflectDiff(tc.newSpec, tc.expectNewSpec))
+				t.Error(cmp.Diff(tc.newSpec, tc.expectNewSpec))
 			}
 			if !reflect.DeepEqual(tc.oldSpec, tc.expectOldSpec) {
-				t.Error(diff.ObjectReflectDiff(tc.oldSpec, tc.expectOldSpec))
+				t.Error(cmp.Diff(tc.oldSpec, tc.expectOldSpec))
 			}
 		})
 	}

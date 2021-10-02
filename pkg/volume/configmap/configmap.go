@@ -268,7 +268,7 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 // MakePayload function is exported so that it can be called from the projection volume driver
 func MakePayload(mappings []v1.KeyToPath, configMap *v1.ConfigMap, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
 
 	payload := make(map[string]volumeutil.FileProjection, (len(configMap.Data) + len(configMap.BinaryData)))

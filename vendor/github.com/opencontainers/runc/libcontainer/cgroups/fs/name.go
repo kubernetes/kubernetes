@@ -19,12 +19,12 @@ func (s *NameGroup) Name() string {
 func (s *NameGroup) Apply(path string, d *cgroupData) error {
 	if s.Join {
 		// ignore errors if the named cgroup does not exist
-		join(path, d.pid)
+		_ = join(path, d.pid)
 	}
 	return nil
 }
 
-func (s *NameGroup) Set(path string, cgroup *configs.Cgroup) error {
+func (s *NameGroup) Set(_ string, _ *configs.Resources) error {
 	return nil
 }
 

@@ -186,15 +186,17 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.UID = types.UID(c.RandString())
 
-			var sec, nsec int64
+			// Fuzzing sec and nsec in a smaller range (uint32 instead of int64),
+			// so that the result Unix time is a valid date and can be parsed into RFC3339 format.
+			var sec, nsec uint32
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
-			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+			j.CreationTimestamp = metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 
 			if j.DeletionTimestamp != nil {
 				c.Fuzz(&sec)
 				c.Fuzz(&nsec)
-				t := metav1.Unix(sec, nsec).Rfc3339Copy()
+				t := metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 				j.DeletionTimestamp = &t
 			}
 

@@ -3,7 +3,6 @@
 package libcontainer
 
 import (
-	"fmt"
 	"os"
 	"runtime"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -22,10 +22,11 @@ type linuxSetnsInit struct {
 	pipe          *os.File
 	consoleSocket *os.File
 	config        *initConfig
+	logFd         int
 }
 
 func (l *linuxSetnsInit) getSessionRingName() string {
-	return fmt.Sprintf("_ses.%s", l.config.ContainerId)
+	return "_ses." + l.config.ContainerId
 }
 
 func (l *linuxSetnsInit) Init() error {
@@ -36,7 +37,7 @@ func (l *linuxSetnsInit) Init() error {
 		if err := selinux.SetKeyLabel(l.config.ProcessLabel); err != nil {
 			return err
 		}
-		defer selinux.SetKeyLabel("")
+		defer selinux.SetKeyLabel("") //nolint: errcheck
 		// Do not inherit the parent's session keyring.
 		if _, err := keys.JoinSessionKeyring(l.getSessionRingName()); err != nil {
 			// Same justification as in standart_init_linux.go as to why we
@@ -64,7 +65,7 @@ func (l *linuxSetnsInit) Init() error {
 	if err := selinux.SetExecLabel(l.config.ProcessLabel); err != nil {
 		return err
 	}
-	defer selinux.SetExecLabel("")
+	defer selinux.SetExecLabel("") //nolint: errcheck
 	// Without NoNewPrivileges seccomp is a privileged operation, so we need to
 	// do this before dropping capabilities; otherwise do it as late as possible
 	// just before execve so as few syscalls take place after it as possible.
@@ -87,5 +88,11 @@ func (l *linuxSetnsInit) Init() error {
 			return newSystemErrorWithCause(err, "init seccomp")
 		}
 	}
+	logrus.Debugf("setns_init: about to exec")
+	// Close the log pipe fd so the parent's ForwardLogs can exit.
+	if err := unix.Close(l.logFd); err != nil {
+		return newSystemErrorWithCause(err, "closing log pipe fd")
+	}
+
 	return system.Execv(l.config.Args[0], l.config.Args[0:], os.Environ())
 }

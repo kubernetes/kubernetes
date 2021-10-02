@@ -36,31 +36,10 @@ type goCollector struct {
 	msMaxAge        time.Duration           // Maximum allowed age of old memstats.
 }
 
-// NewGoCollector returns a collector that exports metrics about the current Go
-// process. This includes memory stats. To collect those, runtime.ReadMemStats
-// is called. This requires to “stop the world”, which usually only happens for
-// garbage collection (GC). Take the following implications into account when
-// deciding whether to use the Go collector:
+// NewGoCollector is the obsolete version of collectors.NewGoCollector.
+// See there for documentation.
 //
-// 1. The performance impact of stopping the world is the more relevant the more
-// frequently metrics are collected. However, with Go1.9 or later the
-// stop-the-world time per metrics collection is very short (~25µs) so that the
-// performance impact will only matter in rare cases. However, with older Go
-// versions, the stop-the-world duration depends on the heap size and can be
-// quite significant (~1.7 ms/GiB as per
-// https://go-review.googlesource.com/c/go/+/34937).
-//
-// 2. During an ongoing GC, nothing else can stop the world. Therefore, if the
-// metrics collection happens to coincide with GC, it will only complete after
-// GC has finished. Usually, GC is fast enough to not cause problems. However,
-// with a very large heap, GC might take multiple seconds, which is enough to
-// cause scrape timeouts in common setups. To avoid this problem, the Go
-// collector will use the memstats from a previous collection if
-// runtime.ReadMemStats takes more than 1s. However, if there are no previously
-// collected memstats, or their collection is more than 5m ago, the collection
-// will block until runtime.ReadMemStats succeeds. (The problem might be solved
-// in Go1.13, see https://github.com/golang/go/issues/19812 for the related Go
-// issue.)
+// Deprecated: Use collectors.NewGoCollector instead.
 func NewGoCollector() Collector {
 	return &goCollector{
 		goroutinesDesc: NewDesc(
@@ -365,25 +344,17 @@ type memStatsMetrics []struct {
 	valType ValueType
 }
 
-// NewBuildInfoCollector returns a collector collecting a single metric
-// "go_build_info" with the constant value 1 and three labels "path", "version",
-// and "checksum". Their label values contain the main module path, version, and
-// checksum, respectively. The labels will only have meaningful values if the
-// binary is built with Go module support and from source code retrieved from
-// the source repository (rather than the local file system). This is usually
-// accomplished by building from outside of GOPATH, specifying the full address
-// of the main package, e.g. "GO111MODULE=on go run
-// github.com/prometheus/client_golang/examples/random". If built without Go
-// module support, all label values will be "unknown". If built with Go module
-// support but using the source code from the local file system, the "path" will
-// be set appropriately, but "checksum" will be empty and "version" will be
-// "(devel)".
+// NewBuildInfoCollector is the obsolete version of collectors.NewBuildInfoCollector.
+// See there for documentation.
 //
-// This collector uses only the build information for the main module. See
-// https://github.com/povilasv/prommod for an example of a collector for the
-// module dependencies.
+// Deprecated: Use collectors.NewBuildInfoCollector instead.
 func NewBuildInfoCollector() Collector {
-	path, version, sum := readBuildInfo()
+	path, version, sum := "unknown", "unknown", "unknown"
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		path = bi.Main.Path
+		version = bi.Main.Version
+		sum = bi.Main.Sum
+	}
 	c := &selfCollector{MustNewConstMetric(
 		NewDesc(
 			"go_build_info",

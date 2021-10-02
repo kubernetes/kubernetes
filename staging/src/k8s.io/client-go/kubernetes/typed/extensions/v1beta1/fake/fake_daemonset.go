@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta1 "k8s.io/api/extensions/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	extensionsv1beta1 "k8s.io/client-go/applyconfigurations/extensions/v1beta1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -134,6 +137,51 @@ func (c *FakeDaemonSets) DeleteCollection(ctx context.Context, opts v1.DeleteOpt
 func (c *FakeDaemonSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.DaemonSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, name, pt, data, subresources...), &v1beta1.DaemonSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.DaemonSet), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied daemonSet.
+func (c *FakeDaemonSets) Apply(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.DaemonSet, err error) {
+	if daemonSet == nil {
+		return nil, fmt.Errorf("daemonSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(daemonSet)
+	if err != nil {
+		return nil, err
+	}
+	name := daemonSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("daemonSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta1.DaemonSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta1.DaemonSet), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeDaemonSets) ApplyStatus(ctx context.Context, daemonSet *extensionsv1beta1.DaemonSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.DaemonSet, err error) {
+	if daemonSet == nil {
+		return nil, fmt.Errorf("daemonSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(daemonSet)
+	if err != nil {
+		return nil, err
+	}
+	name := daemonSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("daemonSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(daemonsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta1.DaemonSet{})
 
 	if obj == nil {
 		return nil, err

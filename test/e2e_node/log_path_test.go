@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -35,7 +36,7 @@ const (
 	logContainerName = "logger"
 )
 
-var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
+var _ = SIGDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	var podClient *framework.PodClient
 
@@ -74,7 +75,12 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 						Containers: []v1.Container{
 							{
 								Image: busyboxImage,
-								Name:  podName,
+								SecurityContext: &v1.SecurityContext{
+									SELinuxOptions: &v1.SELinuxOptions{
+										Type: "container_logreader_t",
+									},
+								},
+								Name: podName,
 								// If we find expected log file and contains right content, exit 0
 								// else, keep checking until test timeout
 								Command: []string{"sh", "-c", "while true; do if [ -e " + expectedLogPath + " ] && grep -q " + log + " " + expectedLogPath + "; then exit 0; fi; sleep 1; done"},

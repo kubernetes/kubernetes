@@ -28,6 +28,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -47,7 +48,8 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		c                 clientset.Interface
 		ns                string
 		pvc               *v1.PersistentVolumeClaim
-		resizableSc       *storagev1.StorageClass
+		sc                *storagev1.StorageClass
+		cleanStorageClass func()
 		nodeName          string
 		isNodeLabeled     bool
 		nodeKeyValueLabel map[string]string
@@ -82,14 +84,15 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 			ClaimSize:            "2Gi",
 			AllowVolumeExpansion: true,
 			DelayBinding:         true,
+			Parameters:           make(map[string]string),
 		}
-		resizableSc, err = c.StorageV1().StorageClasses().Create(context.TODO(), newStorageClass(test, ns, "resizing"), metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Error creating resizable storage class")
-		framework.ExpectEqual(*resizableSc.AllowVolumeExpansion, true)
+
+		sc, cleanStorageClass = testsuites.SetupStorageClass(c, newStorageClass(test, ns, "resizing"))
+		framework.ExpectEqual(*sc.AllowVolumeExpansion, true)
 
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        test.ClaimSize,
-			StorageClassName: &(resizableSc.Name),
+			StorageClassName: &(sc.Name),
 			VolumeMode:       &test.VolumeMode,
 		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
@@ -112,6 +115,8 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
 			nodeKeyValueLabel = make(map[string]string)
 		}
+
+		cleanStorageClass()
 	})
 
 	ginkgo.It("Should verify mounted devices can be resized", func() {

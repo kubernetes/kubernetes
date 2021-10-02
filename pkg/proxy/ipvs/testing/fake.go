@@ -40,10 +40,10 @@ func NewFakeNetlinkHandle() *FakeNetlinkHandle {
 // EnsureAddressBind is a mock implementation
 func (h *FakeNetlinkHandle) EnsureAddressBind(address, devName string) (exist bool, err error) {
 	if len(devName) == 0 {
-		return false, fmt.Errorf("Device name can't be empty")
+		return false, fmt.Errorf("device name can't be empty")
 	}
 	if _, ok := h.localAddresses[devName]; !ok {
-		return false, fmt.Errorf("Error bind address: %s to a non-exist interface: %s", address, devName)
+		return false, fmt.Errorf("error bind address: %s to a non-exist interface: %s", address, devName)
 	}
 	for _, addr := range h.localAddresses[devName] {
 		if addr == address {
@@ -58,10 +58,10 @@ func (h *FakeNetlinkHandle) EnsureAddressBind(address, devName string) (exist bo
 // UnbindAddress is a mock implementation
 func (h *FakeNetlinkHandle) UnbindAddress(address, devName string) error {
 	if len(devName) == 0 {
-		return fmt.Errorf("Device name can't be empty")
+		return fmt.Errorf("device name can't be empty")
 	}
 	if _, ok := h.localAddresses[devName]; !ok {
-		return fmt.Errorf("Error unbind address: %s from a non-exist interface: %s", address, devName)
+		return fmt.Errorf("error unbind address: %s from a non-exist interface: %s", address, devName)
 	}
 	for i, addr := range h.localAddresses[devName] {
 		if addr == address {
@@ -71,13 +71,13 @@ func (h *FakeNetlinkHandle) UnbindAddress(address, devName string) error {
 		}
 	}
 	// return error message if address is not found in slice h.localAddresses[devName]
-	return fmt.Errorf("Address: %s is not found in interface: %s", address, devName)
+	return fmt.Errorf("address: %s is not found in interface: %s", address, devName)
 }
 
 // EnsureDummyDevice is a mock implementation
 func (h *FakeNetlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 	if len(devName) == 0 {
-		return false, fmt.Errorf("Device name can't be empty")
+		return false, fmt.Errorf("device name can't be empty")
 	}
 	if _, ok := h.localAddresses[devName]; !ok {
 		// create dummy interface if devName is not found in localAddress map
@@ -91,10 +91,10 @@ func (h *FakeNetlinkHandle) EnsureDummyDevice(devName string) (bool, error) {
 // DeleteDummyDevice is a mock implementation
 func (h *FakeNetlinkHandle) DeleteDummyDevice(devName string) error {
 	if len(devName) == 0 {
-		return fmt.Errorf("Device name can't be empty")
+		return fmt.Errorf("device name can't be empty")
 	}
 	if _, ok := h.localAddresses[devName]; !ok {
-		return fmt.Errorf("Error deleting a non-exist interface: %s", devName)
+		return fmt.Errorf("error deleting a non-exist interface: %s", devName)
 	}
 	delete(h.localAddresses, devName)
 	return nil
@@ -103,10 +103,10 @@ func (h *FakeNetlinkHandle) DeleteDummyDevice(devName string) error {
 // ListBindAddress is a mock implementation
 func (h *FakeNetlinkHandle) ListBindAddress(devName string) ([]string, error) {
 	if len(devName) == 0 {
-		return nil, fmt.Errorf("Device name can't be empty")
+		return nil, fmt.Errorf("device name can't be empty")
 	}
 	if _, ok := h.localAddresses[devName]; !ok {
-		return nil, fmt.Errorf("Error list addresses from a non-exist interface: %s", devName)
+		return nil, fmt.Errorf("error list addresses from a non-exist interface: %s", devName)
 	}
 	return h.localAddresses[devName], nil
 }

@@ -19,10 +19,12 @@ package options
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
@@ -34,6 +36,7 @@ type ServerRunOptions struct {
 	AdvertiseAddress net.IP
 
 	CorsAllowedOriginList       []string
+	HSTSDirectives              []string
 	ExternalHost                string
 	MaxRequestsInFlight         int
 	MaxMutatingRequestsInFlight int
@@ -51,6 +54,15 @@ type ServerRunOptions struct {
 	// apiserver library can wire it to a flag.
 	MaxRequestBodyBytes       int64
 	EnablePriorityAndFairness bool
+
+	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
+	// Server during the graceful termination of the apiserver. If true, we wait
+	// for non longrunning requests in flight to be drained and then initiate a
+	// shutdown of the HTTP Server. If false, we initiate a shutdown of the HTTP
+	// Server as soon as ShutdownDelayDuration has elapsed.
+	// If enabled, after ShutdownDelayDuration elapses, any incoming request is
+	// rejected with a 429 status code and a 'Retry-After' response.
+	ShutdownSendRetryAfter bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -65,12 +77,14 @@ func NewServerRunOptions() *ServerRunOptions {
 		JSONPatchMaxCopyBytes:       defaults.JSONPatchMaxCopyBytes,
 		MaxRequestBodyBytes:         defaults.MaxRequestBodyBytes,
 		EnablePriorityAndFairness:   true,
+		ShutdownSendRetryAfter:      false,
 	}
 }
 
 // ApplyTo applies the run options to the method receiver and returns self
 func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.CorsAllowedOriginList = s.CorsAllowedOriginList
+	c.HSTSDirectives = s.HSTSDirectives
 	c.ExternalAddress = s.ExternalHost
 	c.MaxRequestsInFlight = s.MaxRequestsInFlight
 	c.MaxMutatingRequestsInFlight = s.MaxMutatingRequestsInFlight
@@ -82,6 +96,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
+	c.ShutdownSendRetryAfter = s.ShutdownSendRetryAfter
 
 	return nil
 }
@@ -143,7 +158,29 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--max-resource-write-bytes can not be negative value"))
 	}
 
+	if err := validateHSTSDirectives(s.HSTSDirectives); err != nil {
+		errors = append(errors, err)
+	}
 	return errors
+}
+
+func validateHSTSDirectives(hstsDirectives []string) error {
+	// HSTS Headers format: Strict-Transport-Security:max-age=expireTime [;includeSubDomains] [;preload]
+	// See https://tools.ietf.org/html/rfc6797#section-6.1 for more information
+	allErrors := []error{}
+	for _, hstsDirective := range hstsDirectives {
+		if len(strings.TrimSpace(hstsDirective)) == 0 {
+			allErrors = append(allErrors, fmt.Errorf("empty value in strict-transport-security-directives"))
+			continue
+		}
+		if hstsDirective != "includeSubDomains" && hstsDirective != "preload" {
+			maxAgeDirective := strings.Split(hstsDirective, "=")
+			if len(maxAgeDirective) != 2 || maxAgeDirective[0] != "max-age" {
+				allErrors = append(allErrors, fmt.Errorf("--strict-transport-security-directives invalid, allowed values: max-age=expireTime, includeSubDomains, preload. see https://tools.ietf.org/html/rfc6797#section-6.1 for more information"))
+			}
+		}
+	}
+	return errors.NewAggregate(allErrors)
 }
 
 // AddUniversalFlags adds flags for a specific APIServer to the specified FlagSet
@@ -161,6 +198,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
 		"expression to support subdomain matching. If this list is empty CORS will not be enabled.")
 
+	fs.StringSliceVar(&s.HSTSDirectives, "strict-transport-security-directives", s.HSTSDirectives, ""+
+		"List of directives for HSTS, comma separated. If this list is empty, then HSTS directives will not "+
+		"be added. Example: 'max-age=31536000,includeSubDomains,preload'")
+
 	deprecatedTargetRAMMB := 0
 	fs.IntVar(&deprecatedTargetRAMMB, "target-ram-mb", deprecatedTargetRAMMB,
 		"DEPRECATED: Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
@@ -174,12 +215,16 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"DEPRECATED: the namespace from which the Kubernetes master services should be injected into pods.")
 
 	fs.IntVar(&s.MaxRequestsInFlight, "max-requests-inflight", s.MaxRequestsInFlight, ""+
-		"The maximum number of non-mutating requests in flight at a given time. When the server exceeds this, "+
-		"it rejects requests. Zero for no limit.")
+		"This and --max-mutating-requests-inflight are summed to determine the server's total concurrency limit "+
+		"(which must be positive) if --enable-priority-and-fairness is true. "+
+		"Otherwise, this flag limits the maximum number of non-mutating requests in flight, "+
+		"or a zero value disables the limit completely.")
 
 	fs.IntVar(&s.MaxMutatingRequestsInFlight, "max-mutating-requests-inflight", s.MaxMutatingRequestsInFlight, ""+
-		"The maximum number of mutating requests in flight at a given time. When the server exceeds this, "+
-		"it rejects requests. Zero for no limit.")
+		"This and --max-requests-inflight are summed to determine the server's total concurrency limit "+
+		"(which must be positive) if --enable-priority-and-fairness is true. "+
+		"Otherwise, this flag limits the maximum number of mutating requests in flight, "+
+		"or a zero value disables the limit completely.")
 
 	fs.DurationVar(&s.RequestTimeout, "request-timeout", s.RequestTimeout, ""+
 		"An optional field indicating the duration a handler must keep a request open before timing "+
@@ -210,6 +255,11 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"Time to delay the termination. During that time the server keeps serving requests normally. The endpoints /healthz and /livez "+
 		"will return success, but /readyz immediately returns failure. Graceful termination starts after this delay "+
 		"has elapsed. This can be used to allow load balancer to stop sending traffic to this server.")
+
+	fs.BoolVar(&s.ShutdownSendRetryAfter, "shutdown-send-retry-after", s.ShutdownSendRetryAfter, ""+
+		"If true the HTTP Server will continue listening until all non long running request(s) in flight have been drained, "+
+		"during this window all incoming requests will be rejected with a status code 429 and a 'Retry-After' response header, "+
+		"in addition 'Connection: close' response header is set in order to tear down the TCP connection when idle.")
 
 	utilfeature.DefaultMutableFeatureGate.AddFlag(fs)
 }

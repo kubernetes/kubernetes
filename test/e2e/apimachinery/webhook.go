@@ -18,6 +18,7 @@ package apimachinery
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -2127,13 +2128,13 @@ func labelNamespace(f *framework.Framework, namespace string) {
 	client := f.ClientSet
 
 	// Add a unique label to the namespace
-	ns, err := client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
-	framework.ExpectNoError(err, "error getting namespace %s", namespace)
-	if ns.Labels == nil {
-		ns.Labels = map[string]string{}
-	}
-	ns.Labels[f.UniqueName] = "true"
-	_, err = client.CoreV1().Namespaces().Update(context.TODO(), ns, metav1.UpdateOptions{})
+	nsPatch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": map[string]string{f.UniqueName: "true"},
+		},
+	})
+	framework.ExpectNoError(err, "error marshaling namespace %s", namespace)
+	_, err = client.CoreV1().Namespaces().Patch(context.TODO(), namespace, types.StrategicMergePatchType, nsPatch, metav1.PatchOptions{})
 	framework.ExpectNoError(err, "error labeling namespace %s", namespace)
 }
 

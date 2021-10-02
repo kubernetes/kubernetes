@@ -144,5 +144,5 @@ const (
 	EtcdUpgrade = "etcd-upgrade"
 
 	// Patches flag sets the folder where kubeadm component patches are stored
-	Patches = "experimental-patches"
+	Patches = "patches"
 )

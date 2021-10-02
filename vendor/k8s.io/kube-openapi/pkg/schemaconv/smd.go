@@ -27,6 +27,10 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v4/schema"
 )
 
+const (
+	quantityResource = "io.k8s.apimachinery.pkg.api.resource.Quantity"
+)
+
 // ToSchema converts openapi definitions into a schema suitable for structured
 // merge (i.e. kubectl apply v2).
 func ToSchema(models proto.Models) (*schema.Schema, error) {
@@ -414,37 +418,38 @@ func ptr(s schema.Scalar) *schema.Scalar { return &s }
 
 func (c *convert) VisitPrimitive(p *proto.Primitive) {
 	a := c.top()
-	switch p.Type {
-	case proto.Integer:
-		a.Scalar = ptr(schema.Numeric)
-	case proto.Number:
-		a.Scalar = ptr(schema.Numeric)
-	case proto.String:
-		switch p.Format {
-		case "":
-			a.Scalar = ptr(schema.String)
-		case "byte":
-			// byte really means []byte and is encoded as a string.
-			a.Scalar = ptr(schema.String)
-		case "int-or-string":
-			a.Scalar = ptr(schema.Scalar("untyped"))
-		case "date-time":
-			a.Scalar = ptr(schema.Scalar("untyped"))
+	if c.currentName == quantityResource {
+		a.Scalar = ptr(schema.Scalar("untyped"))
+	} else {
+		switch p.Type {
+		case proto.Integer:
+			a.Scalar = ptr(schema.Numeric)
+		case proto.Number:
+			a.Scalar = ptr(schema.Numeric)
+		case proto.String:
+			switch p.Format {
+			case "":
+				a.Scalar = ptr(schema.String)
+			case "byte":
+				// byte really means []byte and is encoded as a string.
+				a.Scalar = ptr(schema.String)
+			case "int-or-string":
+				a.Scalar = ptr(schema.Scalar("untyped"))
+			case "date-time":
+				a.Scalar = ptr(schema.Scalar("untyped"))
+			default:
+				a.Scalar = ptr(schema.Scalar("untyped"))
+			}
+		case proto.Boolean:
+			a.Scalar = ptr(schema.Boolean)
 		default:
 			a.Scalar = ptr(schema.Scalar("untyped"))
 		}
-	case proto.Boolean:
-		a.Scalar = ptr(schema.Boolean)
-	default:
-		a.Scalar = ptr(schema.Scalar("untyped"))
 	}
 }
 
 func (c *convert) VisitArbitrary(a *proto.Arbitrary) {
-	*c.top() = untypedDef.Atom
-	if c.preserveUnknownFields {
-		*c.top() = deducedDef.Atom
-	}
+	*c.top() = deducedDef.Atom
 }
 
 func (c *convert) VisitReference(proto.Reference) {

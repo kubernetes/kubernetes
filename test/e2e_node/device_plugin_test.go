@@ -63,7 +63,7 @@ var (
 )
 
 // Serial because the test restarts Kubelet
-var _ = framework.KubeDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
+var _ = SIGDescribe("Device Plugin [Feature:DevicePluginProbe][NodeFeature:DevicePluginProbe][Serial]", func() {
 	f := framework.NewDefaultFramework("device-plugin-errors")
 	testDevicePlugin(f, "/var/lib/kubelet/plugins_registry")
 })
@@ -119,7 +119,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}
 			initialConfig.FeatureGates[string(features.KubeletPodResources)] = true
 		})
-		ginkgo.It("Verifies the Kubelet device plugin functionality.", func() {
+		ginkgo.It("[Flaky] Verifies the Kubelet device plugin functionality.", func() {
 			ginkgo.By("Wait for node is ready to start with")
 			e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
 			dp := getSampleDevicePluginPod()
@@ -253,7 +253,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 
 			ensurePodContainerRestart(f, pod1.Name, pod1.Name)
-			ginkgo.By("Confirming that after a kubelet restart, fake-device assignement is kept")
+			ginkgo.By("Confirming that after a kubelet restart, fake-device assignment is kept")
 			devIDRestart1 := parseLog(f, pod1.Name, pod1.Name, deviceIDRE)
 			framework.ExpectEqual(devIDRestart1, devID1)
 

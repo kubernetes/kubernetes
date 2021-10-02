@@ -57,7 +57,7 @@ func TestConformance(t *testing.T) {
 			filename: "e2e/foo.go",
 			code: `package test
 
-	var _ = framework.KubeDescribe("Feature", func() {
+	var _ = SIGDescribe("Feature", func() {
 		   Context("with context and extra spaces before It block should still pick up Testname", func() {
 				   //                                      Testname: Test with spaces
 				   //Description: Should pick up testname even if it is not within 3 spaces
@@ -77,7 +77,7 @@ func TestConformance(t *testing.T) {
 			filename: "e2e/foo.go",
 			code: `package test
 
-	var _ = framework.KubeDescribe("Feature", func() {
+	var _ = SIGDescribe("Feature", func() {
 		   Context("with context and extra spaces before It block should still pick up Testname", func() {
 				   // Testname: First test
 				   // Description: Should pick up testname even if it is not within 3 spaces
@@ -101,7 +101,7 @@ func TestConformance(t *testing.T) {
 			filename: "e2e/foo.go",
 			code: `package test
 
-	var _ = framework.KubeDescribe("Feature", func() {
+	var _ = SIGDescribe("Feature", func() {
 		   Context("with context and extra spaces before It block should still pick up Testname", func() {
 				   // Testname: First test
 				   // Description: Should target the correct test/comment based on the line numbers

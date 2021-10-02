@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -36,7 +37,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -127,7 +127,15 @@ func newTestCAWithClient(caSubject pkix.Name, caSerial *big.Int, clientSubject p
 	}, nil
 }
 
-func TestClientCA(t *testing.T) {
+func TestClientCAUpdate(t *testing.T) {
+	testClientCA(t, false)
+}
+
+func TestClientCARecreate(t *testing.T) {
+	testClientCA(t, true)
+}
+
+func testClientCA(t *testing.T, recreate bool) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
@@ -172,7 +180,6 @@ func TestClientCA(t *testing.T) {
 			clientCAFilename = opts.Authentication.ClientCert.ClientCA
 			frontProxyCAFilename = opts.Authentication.RequestHeader.ClientCAFile
 			opts.Authentication.RequestHeader.AllowedNames = append(opts.Authentication.RequestHeader.AllowedNames, "test-aggregated-apiserver")
-			dynamiccertificates.FileRefreshDuration = 1 * time.Second
 		},
 	})
 
@@ -185,6 +192,15 @@ func TestClientCA(t *testing.T) {
 	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if recreate {
+		if err := os.Remove(path.Join(clientCAFilename)); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(path.Join(frontProxyCAFilename)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// when we run this the second time, we know which one we are expecting
@@ -446,7 +462,15 @@ iUnnLkZt2ya1cDJDiCnJjo7r5KxMo0XXFDc=
 -----END CERTIFICATE-----
 `)
 
-func TestServingCert(t *testing.T) {
+func TestServingCertUpdate(t *testing.T) {
+	testServingCert(t, false)
+}
+
+func TestServingCertRecreate(t *testing.T) {
+	testServingCert(t, true)
+}
+
+func testServingCert(t *testing.T, recreate bool) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
@@ -456,9 +480,17 @@ func TestServingCert(t *testing.T) {
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			servingCertPath = opts.SecureServing.ServerCert.CertDirectory
-			dynamiccertificates.FileRefreshDuration = 1 * time.Second
 		},
 	})
+
+	if recreate {
+		if err := os.Remove(path.Join(servingCertPath, "apiserver.key")); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(path.Join(servingCertPath, "apiserver.crt")); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	if err := ioutil.WriteFile(path.Join(servingCertPath, "apiserver.key"), serverKey, 0644); err != nil {
 		t.Fatal(err)
@@ -497,7 +529,6 @@ func TestSNICert(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			dynamiccertificates.FileRefreshDuration = 1 * time.Second
 			opts.SecureServing.SNICertKeys = []flag.NamedCertKey{{
 				Names:    []string{"foo"},
 				CertFile: path.Join(servingCertPath, "foo.crt"),

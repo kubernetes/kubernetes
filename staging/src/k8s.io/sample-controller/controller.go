@@ -122,7 +122,7 @@ func NewController(
 	})
 	// Set up an event handler for when Deployment resources change. This
 	// handler will lookup the owner of the given Deployment, and if it is
-	// owned by a Foo resource will enqueue that Foo resource for
+	// owned by a Foo resource then the handler will enqueue that Foo resource for
 	// processing. This way, we don't need to implement custom logic for
 	// handling Deployment resources. More info on this pattern:
 	// https://github.com/kubernetes/community/blob/8cafef897a22026d42f5e5bb3f104febe7e29830/contributors/devel/controllers.md
@@ -148,7 +148,7 @@ func NewController(
 // as syncing informer caches and starting workers. It will block until stopCh
 // is closed, at which point it will shutdown the workqueue and wait for
 // workers to finish processing their current work items.
-func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
+func (c *Controller) Run(workers int, stopCh <-chan struct{}) error {
 	defer utilruntime.HandleCrash()
 	defer c.workqueue.ShutDown()
 
@@ -163,7 +163,7 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) error {
 
 	klog.Info("Starting workers")
 	// Launch two workers to process Foo resources
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 
@@ -289,7 +289,7 @@ func (c *Controller) syncHandler(key string) error {
 	if !metav1.IsControlledBy(deployment, foo) {
 		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
 		c.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	// If this number of the replicas on the Foo resource is specified, and the

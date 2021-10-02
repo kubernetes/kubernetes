@@ -17,6 +17,7 @@ limitations under the License.
 package endpoint
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -32,18 +33,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	controllerpkg "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -219,6 +218,29 @@ func newController(url string, batchPeriod time.Duration) *endpointController {
 	endpoints.endpointsSynced = alwaysReady
 	return &endpointController{
 		endpoints,
+		informerFactory.Core().V1().Pods().Informer().GetStore(),
+		informerFactory.Core().V1().Services().Informer().GetStore(),
+		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
+	}
+}
+
+func newFakeController(batchPeriod time.Duration) (*fake.Clientset, *endpointController) {
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
+
+	eController := NewEndpointController(
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Endpoints(),
+		client,
+		batchPeriod)
+
+	eController.podsSynced = alwaysReady
+	eController.servicesSynced = alwaysReady
+	eController.endpointsSynced = alwaysReady
+
+	return client, &endpointController{
+		eController,
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
 		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
@@ -1182,209 +1204,154 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 	ipv6 := v1.IPv6Protocol
 
 	testCases := []struct {
-		name string
-
-		enableDualStack bool
-		ipFamilies      []v1.IPFamily
-
-		service v1.Service
-
+		name                   string
+		ipFamilies             []v1.IPFamily
+		service                v1.Service
 		expectedEndpointFamily v1.IPFamily
 		expectError            bool
 	}{
 		{
-			name: "v4 service, in a single stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4only,
-
+			name:       "v4 service, in a single stack cluster",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 service, in a dual stack cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v4 service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 service, in a dual stack ipv6-primary cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv6ipv4,
-
+			name:       "v4 service, in a dual stack ipv6-primary cluster",
+			ipFamilies: ipv6ipv4,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "10.0.0.1",
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 headless service, in a single stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4only,
-
+			name:       "v4 headless service, in a single stack cluster",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 headless service, in a dual stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v4 headless service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP:  v1.ClusterIPNone,
 					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 legacy headless service, in a dual stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v4 legacy headless service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
 		{
-			name: "v4 legacy headless service, in a dual stack ipv6-primary cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv6ipv4,
-
+			name:       "v4 legacy headless service, in a dual stack ipv6-primary cluster",
+			ipFamilies: ipv6ipv4,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 service, in a dual stack cluster",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v6 service, in a dual stack cluster",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a single stack cluster",
-
-			enableDualStack: false,
-			ipFamilies:      ipv6only,
-
+			name:       "v6 headless service, in a single stack cluster",
+			ipFamilies: ipv6only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone,
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a dual stack cluster (connected to a new api-server)",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v6 headless service, in a dual stack cluster (connected to a new api-server)",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP:  v1.ClusterIPNone,
 					IPFamilies: []v1.IPFamily{v1.IPv6Protocol}, // <- set by a api-server defaulting logic
 				},
 			},
-
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4ipv6,
-
+			name:       "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
+			ipFamilies: ipv4ipv6,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: v1.ClusterIPNone, // <- families are not set by api-server
 				},
 			},
-
 			expectedEndpointFamily: ipv4,
 		},
-
 		// in reality this is a misconfigured cluster
 		// i.e user is not using dual stack and have PodIP == v4 and ServiceIP==v6
-		// we are testing that we will keep producing the expected behavior
+		// previously controller could assign wrong ip to endpoint address
+		// with gate removed. this is no longer the case. this is *not* behavior change
+		// because previously things would have failed in kube-proxy anyway (due to editing wrong iptables).
 		{
-			name: "v6 service, in a v4 only cluster. dual stack disabled",
-
-			enableDualStack: false,
-			ipFamilies:      ipv4only,
-
+			name:       "v6 service, in a v4 only cluster.",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
-
+			expectError:            true,
 			expectedEndpointFamily: ipv4,
 		},
 		// but this will actually give an error
 		{
-			name: "v6 service, in a v4 only cluster - dual stack enabled",
-
-			enableDualStack: true,
-			ipFamilies:      ipv4only,
-
+			name:       "v6 service, in a v4 only cluster",
+			ipFamilies: ipv4only,
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIP: "3000::1",
 				},
 			},
-
 			expectError: true,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 			ns := "test"
 			addPods(podStore, ns, 1, 1, 0, tc.ipFamilies)
@@ -1979,6 +1946,234 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 	endpoints.syncService(ns + "/foo")
 	endpointsHandler.ValidateRequestCount(t, 1)
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "DELETE", nil)
+}
+
+func TestSyncServiceOverCapacity(t *testing.T) {
+	testCases := []struct {
+		name                string
+		startingAnnotation  *string
+		numExisting         int
+		numDesired          int
+		numDesiredNotReady  int
+		numExpectedReady    int
+		numExpectedNotReady int
+		expectedAnnotation  bool
+	}{{
+		name:                "empty",
+		startingAnnotation:  nil,
+		numExisting:         0,
+		numDesired:          0,
+		numExpectedReady:    0,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
+	}, {
+		name:                "annotation added past capacity, < than maxCapacity of Ready Addresses",
+		startingAnnotation:  nil,
+		numExisting:         maxCapacity - 1,
+		numDesired:          maxCapacity - 3,
+		numDesiredNotReady:  4,
+		numExpectedReady:    maxCapacity - 3,
+		numExpectedNotReady: 3,
+		expectedAnnotation:  true,
+	}, {
+		name:                "annotation added past capacity, maxCapacity of Ready Addresses ",
+		startingAnnotation:  nil,
+		numExisting:         maxCapacity - 1,
+		numDesired:          maxCapacity,
+		numDesiredNotReady:  10,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  true,
+	}, {
+		name:                "annotation removed below capacity",
+		startingAnnotation:  utilpointer.StringPtr("truncated"),
+		numExisting:         maxCapacity - 1,
+		numDesired:          maxCapacity - 1,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity - 1,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
+	}, {
+		name:                "annotation was set to warning previously, annotation removed at capacity",
+		startingAnnotation:  utilpointer.StringPtr("warning"),
+		numExisting:         maxCapacity,
+		numDesired:          maxCapacity,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
+	}, {
+		name:                "annotation was set to warning previously but still over capacity",
+		startingAnnotation:  utilpointer.StringPtr("warning"),
+		numExisting:         maxCapacity + 1,
+		numDesired:          maxCapacity + 1,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  true,
+	}, {
+		name:                "annotation removed at capacity",
+		startingAnnotation:  utilpointer.StringPtr("truncated"),
+		numExisting:         maxCapacity,
+		numDesired:          maxCapacity,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  false,
+	}, {
+		name:                "no endpoints change, annotation value corrected",
+		startingAnnotation:  utilpointer.StringPtr("invalid"),
+		numExisting:         maxCapacity + 1,
+		numDesired:          maxCapacity + 1,
+		numDesiredNotReady:  0,
+		numExpectedReady:    maxCapacity,
+		numExpectedNotReady: 0,
+		expectedAnnotation:  true,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := "test"
+			client, c := newFakeController(0 * time.Second)
+
+			addPods(c.podStore, ns, tc.numDesired, 1, tc.numDesiredNotReady, ipv4only)
+			pods := c.podStore.List()
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []v1.ServicePort{{Port: 80}},
+				},
+			}
+			c.serviceStore.Add(svc)
+
+			subset := v1.EndpointSubset{}
+			for i := 0; i < tc.numExisting; i++ {
+				pod := pods[i].(*v1.Pod)
+				epa, _ := podToEndpointAddressForService(svc, pod)
+				subset.Addresses = append(subset.Addresses, *epa)
+			}
+			endpoints := &v1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            svc.Name,
+					Namespace:       ns,
+					ResourceVersion: "1",
+					Annotations:     map[string]string{},
+				},
+				Subsets: []v1.EndpointSubset{subset},
+			}
+			if tc.startingAnnotation != nil {
+				endpoints.Annotations[v1.EndpointsOverCapacity] = *tc.startingAnnotation
+			}
+			c.endpointsStore.Add(endpoints)
+			client.CoreV1().Endpoints(ns).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+
+			c.syncService(fmt.Sprintf("%s/%s", ns, svc.Name))
+
+			actualEndpoints, err := client.CoreV1().Endpoints(ns).Get(context.TODO(), endpoints.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error getting endpoints: %v", err)
+			}
+
+			actualAnnotation, ok := actualEndpoints.Annotations[v1.EndpointsOverCapacity]
+			if tc.expectedAnnotation {
+				if !ok {
+					t.Errorf("Expected EndpointsOverCapacity annotation to be set")
+				} else if actualAnnotation != "truncated" {
+					t.Errorf("Expected EndpointsOverCapacity annotation to be 'truncated', got %s", actualAnnotation)
+				}
+			} else {
+				if ok {
+					t.Errorf("Expected EndpointsOverCapacity annotation not to be set, got %s", actualAnnotation)
+				}
+			}
+			numActualReady := 0
+			numActualNotReady := 0
+			for _, subset := range actualEndpoints.Subsets {
+				numActualReady += len(subset.Addresses)
+				numActualNotReady += len(subset.NotReadyAddresses)
+			}
+			if numActualReady != tc.numExpectedReady {
+				t.Errorf("Unexpected number of actual ready Endpoints: got %d endpoints, want %d endpoints", numActualReady, tc.numExpectedReady)
+			}
+			if numActualNotReady != tc.numExpectedNotReady {
+				t.Errorf("Unexpected number of actual not ready Endpoints: got %d endpoints, want %d endpoints", numActualNotReady, tc.numExpectedNotReady)
+			}
+		})
+	}
+}
+
+func TestTruncateEndpoints(t *testing.T) {
+	testCases := []struct {
+		desc string
+		// subsetsReady, subsetsNotReady, expectedReady, expectedNotReady
+		// must all be the same length
+		subsetsReady     []int
+		subsetsNotReady  []int
+		expectedReady    []int
+		expectedNotReady []int
+	}{{
+		desc:             "empty",
+		subsetsReady:     []int{},
+		subsetsNotReady:  []int{},
+		expectedReady:    []int{},
+		expectedNotReady: []int{},
+	}, {
+		desc:             "total endpoints < max capacity",
+		subsetsReady:     []int{50, 100, 100, 100, 100},
+		subsetsNotReady:  []int{50, 100, 100, 100, 100},
+		expectedReady:    []int{50, 100, 100, 100, 100},
+		expectedNotReady: []int{50, 100, 100, 100, 100},
+	}, {
+		desc:             "total endpoints = max capacity",
+		subsetsReady:     []int{100, 100, 100, 100, 100},
+		subsetsNotReady:  []int{100, 100, 100, 100, 100},
+		expectedReady:    []int{100, 100, 100, 100, 100},
+		expectedNotReady: []int{100, 100, 100, 100, 100},
+	}, {
+		desc:             "total ready endpoints < max capacity, but total endpoints > max capacity",
+		subsetsReady:     []int{90, 110, 50, 10, 20},
+		subsetsNotReady:  []int{101, 200, 200, 201, 298},
+		expectedReady:    []int{90, 110, 50, 10, 20},
+		expectedNotReady: []int{73, 144, 144, 145, 214},
+	}, {
+		desc:             "total ready endpoints > max capacity",
+		subsetsReady:     []int{205, 400, 402, 400, 693},
+		subsetsNotReady:  []int{100, 200, 200, 200, 300},
+		expectedReady:    []int{98, 191, 192, 191, 328},
+		expectedNotReady: []int{0, 0, 0, 0, 0},
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.desc, func(t *testing.T) {
+			var subsets []v1.EndpointSubset
+			for subsetIndex, numReady := range tc.subsetsReady {
+				subset := v1.EndpointSubset{}
+				for i := 0; i < numReady; i++ {
+					subset.Addresses = append(subset.Addresses, v1.EndpointAddress{})
+				}
+
+				numNotReady := tc.subsetsNotReady[subsetIndex]
+				for i := 0; i < numNotReady; i++ {
+					subset.NotReadyAddresses = append(subset.NotReadyAddresses, v1.EndpointAddress{})
+				}
+				subsets = append(subsets, subset)
+			}
+
+			endpoints := &v1.Endpoints{Subsets: subsets}
+			truncateEndpoints(endpoints)
+
+			for i, subset := range endpoints.Subsets {
+				if len(subset.Addresses) != tc.expectedReady[i] {
+					t.Errorf("Unexpected number of actual ready Endpoints for subset %d: got %d endpoints, want %d endpoints", i, len(subset.Addresses), tc.expectedReady[i])
+				}
+				if len(subset.NotReadyAddresses) != tc.expectedNotReady[i] {
+					t.Errorf("Unexpected number of actual not ready Endpoints for subset %d: got %d endpoints, want %d endpoints", i, len(subset.NotReadyAddresses), tc.expectedNotReady[i])
+				}
+			}
+		})
+	}
 }
 
 func TestEndpointPortFromServicePort(t *testing.T) {

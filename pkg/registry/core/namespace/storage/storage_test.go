@@ -109,6 +109,8 @@ func TestGet(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.store.DestroyFunc()
 	test := genericregistrytest.New(t, storage.store).ClusterScope()
+
+	// note that this ultimately may call validation
 	test.TestGet(validNewNamespace())
 }
 

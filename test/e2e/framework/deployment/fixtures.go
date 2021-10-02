@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // UpdateDeploymentWithRetries updates the specified deployment with retries.
@@ -199,13 +199,10 @@ func testDeployment(replicas int32, podLabels map[string]string, nodeSelector ma
 					TerminationGracePeriodSeconds: &zero,
 					Containers: []v1.Container{
 						{
-							Name:    "write-pod",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"/bin/sh"},
-							Args:    []string{"-c", command},
-							SecurityContext: &v1.SecurityContext{
-								Privileged: &isPrivileged,
-							},
+							Name:            "write-pod",
+							Image:           e2epod.GetDefaultTestImage(),
+							Command:         e2epod.GenerateScriptCmd(command),
+							SecurityContext: e2epod.GenerateContainerSecurityContext(isPrivileged),
 						},
 					},
 					RestartPolicy: v1.RestartPolicyAlways,

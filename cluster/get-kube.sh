@@ -241,7 +241,7 @@ fi
 
 if "${need_download}"; then
   if [[ $(which gsutil) ]] && [[ "$kubernetes_tar_url" =~ ^https://storage.googleapis.com/.* ]]; then
-    gsutil cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/'gs://'}" "${file}"
+    gsutil cp "${kubernetes_tar_url//'https://storage.googleapis.com/'/gs://}" "${file}"
   elif [[ $(which curl) ]]; then
     # if the url belongs to GCS API we should use oauth2_token in the headers
     curl_headers=""

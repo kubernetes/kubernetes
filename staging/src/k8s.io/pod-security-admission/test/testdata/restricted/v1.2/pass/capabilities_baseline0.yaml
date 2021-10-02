@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: capabilities_baseline0
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      capabilities:
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
+        - SYS_CHROOT
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext:
+      capabilities:
+        add:
+        - AUDIT_WRITE
+        - CHOWN
+        - DAC_OVERRIDE
+        - FOWNER
+        - FSETID
+        - KILL
+        - MKNOD
+        - NET_BIND_SERVICE
+        - SETFCAP
+        - SETGID
+        - SETPCAP
+        - SETUID
+        - SYS_CHROOT
+  securityContext:
+    runAsNonRoot: true

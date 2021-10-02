@@ -64,9 +64,9 @@ func (virtualDisk *VirtualDisk) Create(ctx context.Context, datastore *vclib.Dat
 	if virtualDisk.VolumeOptions.DiskFormat == "" {
 		virtualDisk.VolumeOptions.DiskFormat = vclib.ThinDiskType
 	}
-	if !virtualDisk.VolumeOptions.VerifyVolumeOptions() {
-		klog.Error("VolumeOptions verification failed. volumeOptions: ", virtualDisk.VolumeOptions)
-		return "", vclib.ErrInvalidVolumeOptions
+	if err := virtualDisk.VolumeOptions.VerifyVolumeOptions(); err != nil {
+		klog.Errorf("VolumeOptions verification failed: %s (options: %+v)", err, virtualDisk.VolumeOptions)
+		return "", fmt.Errorf("validation of parameters failed: %s", err)
 	}
 	if virtualDisk.VolumeOptions.StoragePolicyID != "" && virtualDisk.VolumeOptions.StoragePolicyName != "" {
 		return "", fmt.Errorf("Storage Policy ID and Storage Policy Name both set, Please set only one parameter")

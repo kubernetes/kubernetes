@@ -56,15 +56,18 @@ var (
 		by providing the "delete" keyword as the value to the --for flag.
 
 		A successful message will be printed to stdout indicating when the specified
-        condition has been met. One can use -o option to change to output destination.`))
+        condition has been met. You can use -o option to change to output destination.`))
 
-	waitExample = templates.Examples(`
-		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
+	waitExample = templates.Examples(i18n.T(`
+		# Wait for the pod "busybox1" to contain the status condition of type "Ready"
 		kubectl wait --for=condition=Ready pod/busybox1
 
-		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
+		# The default value of status condition is true; you can set it to false
+		kubectl wait --for=condition=Ready=false pod/busybox1
+
+		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
+		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
@@ -109,7 +112,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 
 	cmd := &cobra.Command{
 		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
-		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources."),
+		Short:   i18n.T("Experimental: Wait for a specific condition on one or many resources"),
 		Long:    waitLong,
 		Example: waitExample,
 
@@ -117,8 +120,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 		Run: func(cmd *cobra.Command, args []string) {
 			o, err := flags.ToOptions(args)
 			cmdutil.CheckErr(err)
-			err = o.RunWait()
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.RunWait())
 		},
 		SuggestFor: []string{"list", "ps"},
 	}
@@ -134,7 +136,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name].")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name]. The default status value of condition-name is true, you can set false with condition=condition-name=false")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -247,7 +249,8 @@ func (o *WaitOptions) RunWait() error {
 		return err
 	}
 	visitor := o.ResourceFinder.Do()
-	if visitor, ok := visitor.(*resource.Result); ok && strings.ToLower(o.ForCondition) == "delete" {
+	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
 		visitor.IgnoreErrors(apierrors.IsNotFound)
 	}
 
@@ -255,7 +258,7 @@ func (o *WaitOptions) RunWait() error {
 	if err != nil {
 		return err
 	}
-	if visitCount == 0 {
+	if visitCount == 0 && !isForDelete {
 		return errNoMatchingResources
 	}
 	return err
@@ -442,6 +445,13 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 		if !found || err != nil {
 			continue
 		}
+		generation, found, _ := unstructured.NestedInt64(obj.Object, "metadata", "generation")
+		if found {
+			observedGeneration, found := getObservedGeneration(obj, condition)
+			if found && observedGeneration < generation {
+				return false, nil
+			}
+		}
 		return strings.EqualFold(status, w.conditionStatus), nil
 	}
 
@@ -466,4 +476,13 @@ func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 
 func extendErrWaitTimeout(err error, info *resource.Info) error {
 	return fmt.Errorf("%s on %s/%s", err.Error(), info.Mapping.Resource.Resource, info.Name)
+}
+
+func getObservedGeneration(obj *unstructured.Unstructured, condition map[string]interface{}) (int64, bool) {
+	conditionObservedGeneration, found, _ := unstructured.NestedInt64(condition, "observedGeneration")
+	if found {
+		return conditionObservedGeneration, true
+	}
+	statusObservedGeneration, found, _ := unstructured.NestedInt64(obj.Object, "status", "observedGeneration")
+	return statusObservedGeneration, found
 }

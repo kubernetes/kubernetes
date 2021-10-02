@@ -213,7 +213,7 @@ func (e *Runner) Run(args []string) error {
 		// Errors if phases that are meant to create special subcommands only
 		// are wrongly assigned Run Methods
 		if p.RunAllSiblings && (p.RunIf != nil || p.Run != nil) {
-			return errors.Wrapf(err, "phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
+			return errors.Errorf("phase marked as RunAllSiblings can not have Run functions %s", p.generatedName)
 		}
 
 		// If the phase defines a condition to be checked before executing the phase action.

@@ -1,10 +1,19 @@
 after_success:
 - bash <(curl -s https://codecov.io/bash)
 go:
-- 1.11.x
-- 1.12.x
+- 1.14.x
+- 1.x
 install:
-- GO111MODULE=off go get -u gotest.tools/gotestsum
+- go get gotest.tools/gotestsum
+jobs:
+  include:
+  # include linting job, but only for latest go version and amd64 arch
+  - go: 1.x
+    arch: amd64
+    install:
+      go get github.com/golangci/golangci-lint/cmd/golangci-lint
+    script:
+    - golangci-lint run --new-from-rev master
 env:
 - GO111MODULE=on
 language: go

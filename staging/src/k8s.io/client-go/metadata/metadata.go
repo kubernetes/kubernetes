@@ -124,6 +124,12 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 	if len(name) == 0 {
 		return fmt.Errorf("name is required")
 	}
+	// if DeleteOptions are delivered to Negotiator for serialization,
+	// HTTP-Request header will bring "Content-Type: application/vnd.kubernetes.protobuf"
+	// apiextensions-apiserver uses unstructuredNegotiatedSerializer to decode the input,
+	// server-side will reply with 406 errors.
+	// The special treatment here is to be compatible with CRD Handler
+	// see: https://github.com/kubernetes/kubernetes/blob/1a845ccd076bbf1b03420fe694c85a5cd3bd6bed/staging/src/k8s.io/apiextensions-apiserver/pkg/apiserver/customresource_handler.go#L843
 	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
@@ -132,6 +138,7 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 	result := c.client.client.
 		Delete().
 		AbsPath(append(c.makeURLSegments(name), subresources...)...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		Do(ctx)
 	return result.Error()
@@ -139,6 +146,7 @@ func (c *client) Delete(ctx context.Context, name string, opts metav1.DeleteOpti
 
 // DeleteCollection triggers deletion of all resources in the specified scope (namespace or cluster).
 func (c *client) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	// See comment on Delete
 	deleteOptionsByte, err := runtime.Encode(deleteOptionsCodec.LegacyCodec(schema.GroupVersion{Version: "v1"}), &opts)
 	if err != nil {
 		return err
@@ -147,6 +155,7 @@ func (c *client) DeleteCollection(ctx context.Context, opts metav1.DeleteOptions
 	result := c.client.client.
 		Delete().
 		AbsPath(c.makeURLSegments("")...).
+		SetHeader("Content-Type", runtime.ContentTypeJSON).
 		Body(deleteOptionsByte).
 		SpecificallyVersionedParams(&listOptions, dynamicParameterCodec, versionV1).
 		Do(ctx)

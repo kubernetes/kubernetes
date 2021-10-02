@@ -179,18 +179,23 @@ func (r *SpecRunner) combineCoverprofiles(runners []*testrunner.TestRunner) erro
 	for index, runner := range runners {
 		contents, err := ioutil.ReadFile(runner.CoverageFile)
 
+		if err != nil {
+			fmt.Printf("Unable to read coverage file %s to combine, %v\n", runner.CoverageFile, err)
+			return nil // non-fatal error
+		}
+
 		// remove the cover mode line from every file
 		// except the first one
 		if index > 0 {
 			contents = modeRegex.ReplaceAll(contents, []byte{})
 		}
 
-		if err != nil {
-			fmt.Printf("Unable to read coverage file %s to combine, %v\n", runner.CoverageFile, err)
-			return nil // non-fatal error
-		}
-
 		_, err = combined.Write(contents)
+
+		// Add a newline to the end of every file if missing.
+		if err == nil && len(contents) > 0 && contents[len(contents)-1] != '\n' {
+			_, err = combined.Write([]byte("\n"))
+		}
 
 		if err != nil {
 			fmt.Printf("Unable to append to coverprofile, %v\n", err)

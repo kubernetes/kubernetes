@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
-func newTestBasicWorkQueue() (*basicWorkQueue, *clock.FakeClock) {
-	fakeClock := clock.NewFakeClock(time.Now())
+func newTestBasicWorkQueue() (*basicWorkQueue, *testingclock.FakeClock) {
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	wq := &basicWorkQueue{
 		clock: fakeClock,
 		queue: make(map[types.UID]time.Time),

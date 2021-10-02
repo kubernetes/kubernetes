@@ -172,8 +172,7 @@ func (pr pruneResource) String() string {
 
 func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
 	if len(*pruneResources) == 0 {
-		// default whitelist
-		// TODO: need to handle the older api versions - e.g. v1beta1 jobs. Github issue: #35991
+		// default allowlist
 		*pruneResources = []pruneResource{
 			{"", "v1", "ConfigMap", true},
 			{"", "v1", "Endpoints", true},
@@ -185,8 +184,8 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Secret", true},
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
-			{"batch", "v1beta1", "CronJob", true},
-			{"extensions", "v1beta1", "Ingress", true},
+			{"batch", "v1", "CronJob", true},
+			{"networking.k8s.io", "v1", "Ingress", true},
 			{"apps", "v1", "DaemonSet", true},
 			{"apps", "v1", "Deployment", true},
 			{"apps", "v1", "ReplicaSet", true},

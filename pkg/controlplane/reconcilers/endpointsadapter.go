@@ -18,15 +18,14 @@ package reconcilers
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
-	"k8s.io/kubernetes/pkg/features"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -175,12 +174,7 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 	}
 
 	if address.NodeName != nil {
-		ep.Topology = map[string]string{
-			"kubernetes.io/hostname": *address.NodeName,
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
-			ep.NodeName = address.NodeName
-		}
+		ep.NodeName = address.NodeName
 	}
 
 	return ep

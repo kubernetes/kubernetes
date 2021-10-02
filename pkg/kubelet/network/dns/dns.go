@@ -27,9 +27,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 
@@ -99,19 +102,37 @@ func omitDuplicates(strs []string) []string {
 func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Pod) []string {
 	limitsExceeded := false
 
-	if len(composedSearch) > validation.MaxDNSSearchPaths {
-		composedSearch = composedSearch[:validation.MaxDNSSearchPaths]
+	maxDNSSearchPaths, maxDNSSearchListChars := validation.MaxDNSSearchPathsLegacy, validation.MaxDNSSearchListCharsLegacy
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) {
+		maxDNSSearchPaths, maxDNSSearchListChars = validation.MaxDNSSearchPathsExpanded, validation.MaxDNSSearchListCharsExpanded
+	}
+
+	if len(composedSearch) > maxDNSSearchPaths {
+		composedSearch = composedSearch[:maxDNSSearchPaths]
 		limitsExceeded = true
 	}
 
-	if resolvSearchLineStrLen := len(strings.Join(composedSearch, " ")); resolvSearchLineStrLen > validation.MaxDNSSearchListChars {
+	// In some DNS resolvers(e.g. glibc 2.28), DNS resolving causes abort() if there is a
+	// search path exceeding 255 characters. We have to filter them out.
+	l := 0
+	for _, search := range composedSearch {
+		if len(search) > utilvalidation.DNS1123SubdomainMaxLength {
+			limitsExceeded = true
+			continue
+		}
+		composedSearch[l] = search
+		l++
+	}
+	composedSearch = composedSearch[:l]
+
+	if resolvSearchLineStrLen := len(strings.Join(composedSearch, " ")); resolvSearchLineStrLen > maxDNSSearchListChars {
 		cutDomainsNum := 0
 		cutDomainsLen := 0
 		for i := len(composedSearch) - 1; i >= 0; i-- {
 			cutDomainsLen += len(composedSearch[i]) + 1
 			cutDomainsNum++
 
-			if (resolvSearchLineStrLen - cutDomainsLen) <= validation.MaxDNSSearchListChars {
+			if (resolvSearchLineStrLen - cutDomainsLen) <= maxDNSSearchListChars {
 				break
 			}
 		}
@@ -121,9 +142,9 @@ func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Po
 	}
 
 	if limitsExceeded {
-		log := fmt.Sprintf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", log)
-		klog.Error(log)
+		err := fmt.Errorf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
+		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		klog.ErrorS(err, "Search Line limits exceeded")
 	}
 	return composedSearch
 }
@@ -131,9 +152,9 @@ func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Po
 func (c *Configurer) formDNSNameserversFitsLimits(nameservers []string, pod *v1.Pod) []string {
 	if len(nameservers) > validation.MaxDNSNameservers {
 		nameservers = nameservers[0:validation.MaxDNSNameservers]
-		log := fmt.Sprintf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", log)
-		klog.Error(log)
+		err := fmt.Errorf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
+		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		klog.ErrorS(err, "Nameserver limits exceeded")
 	}
 	return nameservers
 }
@@ -161,7 +182,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	f, err := os.Open(c.ResolverConfig)
 	if err != nil {
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
-		klog.V(4).Infof("Check limits for resolv.conf failed at file open: %v", err)
+		klog.V(4).InfoS("Check limits for resolv.conf failed at file open", "err", err)
 		return
 	}
 	defer f.Close()
@@ -169,11 +190,14 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	_, hostSearch, _, err := parseResolvConf(f)
 	if err != nil {
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
-		klog.V(4).Infof("Check limits for resolv.conf failed at parse resolv.conf: %v", err)
+		klog.V(4).InfoS("Check limits for resolv.conf failed at parse resolv.conf", "err", err)
 		return
 	}
 
-	domainCountLimit := validation.MaxDNSSearchPaths
+	domainCountLimit, maxDNSSearchListChars := validation.MaxDNSSearchPathsLegacy, validation.MaxDNSSearchListCharsLegacy
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) {
+		domainCountLimit, maxDNSSearchListChars = validation.MaxDNSSearchPathsExpanded, validation.MaxDNSSearchListCharsExpanded
+	}
 
 	if c.ClusterDomain != "" {
 		domainCountLimit -= 3
@@ -182,14 +206,23 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	if len(hostSearch) > domainCountLimit {
 		log := fmt.Sprintf("Resolv.conf file '%s' contains search line consisting of more than %d domains!", c.ResolverConfig, domainCountLimit)
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
-		klog.V(4).Infof("Check limits for resolv.conf failed: %s", log)
+		klog.V(4).InfoS("Check limits for resolv.conf failed", "eventlog", log)
 		return
 	}
 
-	if len(strings.Join(hostSearch, " ")) > validation.MaxDNSSearchListChars {
-		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, validation.MaxDNSSearchListChars)
+	for _, search := range hostSearch {
+		if len(search) > utilvalidation.DNS1123SubdomainMaxLength {
+			log := fmt.Sprintf("Resolv.conf file %q contains a search path which length is more than allowed %d chars!", c.ResolverConfig, utilvalidation.DNS1123SubdomainMaxLength)
+			c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
+			klog.V(4).InfoS("Check limits for resolv.conf failed", "eventlog", log)
+			return
+		}
+	}
+
+	if len(strings.Join(hostSearch, " ")) > maxDNSSearchListChars {
+		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, maxDNSSearchListChars)
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
-		klog.V(4).Infof("Check limits for resolv.conf failed: %s", log)
+		klog.V(4).InfoS("Check limits for resolv.conf failed", "eventlog", log)
 		return
 	}
 }
@@ -337,7 +370,7 @@ func (c *Configurer) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 
 	dnsType, err := getPodDNSType(pod)
 	if err != nil {
-		klog.Errorf("Failed to get DNS type for pod %q: %v. Falling back to DNSClusterFirst policy.", format.Pod(pod), err)
+		klog.ErrorS(err, "Failed to get DNS type for pod. Falling back to DNSClusterFirst policy.", "pod", klog.KObj(pod))
 		dnsType = podDNSCluster
 	}
 	switch dnsType {
@@ -404,12 +437,12 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 	if c.ResolverConfig != "" {
 		f, err := os.Open(c.ResolverConfig)
 		if err != nil {
-			klog.Error("Could not open resolverConf file")
+			klog.ErrorS(err, "Could not open resolverConf file")
 		} else {
 			defer f.Close()
 			_, hostSearch, _, err := parseResolvConf(f)
 			if err != nil {
-				klog.Errorf("Error for parsing the resolv.conf file: %v", err)
+				klog.ErrorS(err, "Error for parsing the resolv.conf file")
 			} else {
 				dnsString = dnsString + "search"
 				for _, search := range hostSearch {
@@ -420,6 +453,6 @@ func (c *Configurer) SetupDNSinContainerizedMounter(mounterPath string) {
 		}
 	}
 	if err := ioutil.WriteFile(resolvePath, []byte(dnsString), 0600); err != nil {
-		klog.Errorf("Could not write dns nameserver in file %s, with error %v", resolvePath, err)
+		klog.ErrorS(err, "Could not write dns nameserver in the file", "path", resolvePath)
 	}
 }

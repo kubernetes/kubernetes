@@ -81,6 +81,7 @@ func ValidateLabels(labels map[string]string, fldPath *field.Path) field.ErrorLi
 
 func ValidateDeleteOptions(options *metav1.DeleteOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
+	//lint:file-ignore SA1019 Keep validation for deprecated OrphanDependents option until it's being removed
 	if options.OrphanDependents != nil && options.PropagationPolicy != nil {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("propagationPolicy"), options.PropagationPolicy, "orphanDependents and deletionPropagation cannot be both set"))
 	}
@@ -171,9 +172,12 @@ func ValidateTableOptions(opts *metav1.TableOptions) field.ErrorList {
 	return allErrs
 }
 
+const MaxSubresourceNameLength = 256
+
 func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
-	for _, fields := range fieldsList {
+	for i, fields := range fieldsList {
+		fldPath := fldPath.Index(i)
 		switch fields.Operation {
 		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
 		default:
@@ -181,6 +185,11 @@ func ValidateManagedFields(fieldsList []metav1.ManagedFieldsEntry, fldPath *fiel
 		}
 		if len(fields.FieldsType) > 0 && fields.FieldsType != "FieldsV1" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("fieldsType"), fields.FieldsType, "must be `FieldsV1`"))
+		}
+		allErrs = append(allErrs, ValidateFieldManager(fields.Manager, fldPath.Child("manager"))...)
+
+		if len(fields.Subresource) > MaxSubresourceNameLength {
+			allErrs = append(allErrs, field.TooLong(fldPath.Child("subresource"), fields.Subresource, MaxSubresourceNameLength))
 		}
 	}
 	return allErrs

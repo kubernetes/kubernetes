@@ -49,7 +49,7 @@ import (
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
 	"k8s.io/component-base/version"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -58,6 +58,7 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/volume/util"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -2484,7 +2485,7 @@ func TestValidateNodeIPParam(t *testing.T) {
 		tests = append(tests, successTest)
 	}
 	for _, test := range tests {
-		err := validateNodeIP(net.ParseIP(test.nodeIP))
+		err := validateNodeIP(netutils.ParseIPSloppy(test.nodeIP))
 		if test.success {
 			assert.NoError(t, err, "test %s", test.testName)
 		} else {

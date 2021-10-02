@@ -74,6 +74,22 @@ func NewBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *B
 	return m
 }
 
+// NewLongQueueBroadcaster functions nearly identically to NewBroadcaster,
+// except that the incoming queue is the same size as the outgoing queues
+// (specified by queueLength).
+func NewLongQueueBroadcaster(queueLength int, fullChannelBehavior FullChannelBehavior) *Broadcaster {
+	m := &Broadcaster{
+		watchers:            map[int64]*broadcasterWatcher{},
+		incoming:            make(chan Event, queueLength),
+		stopped:             make(chan struct{}),
+		watchQueueLength:    queueLength,
+		fullChannelBehavior: fullChannelBehavior,
+	}
+	m.distributing.Add(1)
+	go m.loop()
+	return m
+}
+
 const internalRunFunctionMarker = "internal-do-function"
 
 // a function type we can shoehorn into the queue.
@@ -196,6 +212,18 @@ func (m *Broadcaster) closeAll() {
 // Action distributes the given event among all watchers.
 func (m *Broadcaster) Action(action EventType, obj runtime.Object) {
 	m.incoming <- Event{action, obj}
+}
+
+// Action distributes the given event among all watchers, or drops it on the floor
+// if too many incoming actions are queued up.  Returns true if the action was sent,
+// false if dropped.
+func (m *Broadcaster) ActionOrDrop(action EventType, obj runtime.Object) bool {
+	select {
+	case m.incoming <- Event{action, obj}:
+		return true
+	default:
+		return false
+	}
 }
 
 // Shutdown disconnects all watchers (but any queued events will still be distributed).

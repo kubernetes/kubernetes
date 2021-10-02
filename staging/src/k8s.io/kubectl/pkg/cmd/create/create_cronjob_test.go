@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,20 +32,20 @@ func TestCreateCronJob(t *testing.T) {
 		command  []string
 		schedule string
 		restart  string
-		expected *batchv1beta1.CronJob
+		expected *batchv1.CronJob
 	}{
 		"just image and OnFailure restart policy": {
 			image:    "busybox",
 			schedule: "0/5 * * * ?",
 			restart:  "OnFailure",
-			expected: &batchv1beta1.CronJob{
-				TypeMeta: metav1.TypeMeta{APIVersion: batchv1beta1.SchemeGroupVersion.String(), Kind: "CronJob"},
+			expected: &batchv1.CronJob{
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "CronJob"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: cronjobName,
 				},
-				Spec: batchv1beta1.CronJobSpec{
+				Spec: batchv1.CronJobSpec{
 					Schedule: "0/5 * * * ?",
-					JobTemplate: batchv1beta1.JobTemplateSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: cronjobName,
 						},
@@ -72,14 +71,14 @@ func TestCreateCronJob(t *testing.T) {
 			command:  []string{"date"},
 			schedule: "0/5 * * * ?",
 			restart:  "Never",
-			expected: &batchv1beta1.CronJob{
-				TypeMeta: metav1.TypeMeta{APIVersion: batchv1beta1.SchemeGroupVersion.String(), Kind: "CronJob"},
+			expected: &batchv1.CronJob{
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "CronJob"},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: cronjobName,
 				},
-				Spec: batchv1beta1.CronJobSpec{
+				Spec: batchv1.CronJobSpec{
 					Schedule: "0/5 * * * ?",
-					JobTemplate: batchv1beta1.JobTemplateSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: cronjobName,
 						},

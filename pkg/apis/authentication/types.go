@@ -25,6 +25,9 @@ const (
 	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
 	ImpersonateUserHeader = "Impersonate-User"
 
+	// ImpersonateUIDHeader is used to impersonate a particular UID during an API server request.
+	ImpersonateUidHeader = "Impersonate-Uid"
+
 	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
 	// It can be repeated multiplied times for multiple groups.
 	ImpersonateGroupHeader = "Impersonate-Group"
@@ -118,7 +121,7 @@ type TokenRequest struct {
 
 // TokenRequestSpec contains client provided parameters of a token request.
 type TokenRequestSpec struct {
-	// Audiences are the intendend audiences of the token. A recipient of a
+	// Audiences are the intended audiences of the token. A recipient of a
 	// token must identify themself with an identifier in the list of
 	// audiences of the token, and otherwise should reject the token. A
 	// token issued for multiple audiences may be used to authenticate

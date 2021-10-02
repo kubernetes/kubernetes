@@ -179,7 +179,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 }
 
 // Run starts the controller.
-func (c *KubernetesAPIApprovalPolicyConformantConditionController) Run(threadiness int, stopCh <-chan struct{}) {
+func (c *KubernetesAPIApprovalPolicyConformantConditionController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -190,7 +190,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) Run(threadine
 		return
 	}
 
-	for i := 0; i < threadiness; i++ {
+	for i := 0; i < workers; i++ {
 		go wait.Until(c.runWorker, time.Second, stopCh)
 	}
 

@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -23,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
@@ -63,6 +65,7 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 			},
 		}
 		vm.VirtualMachineProperties = &compute.VirtualMachineProperties{
+			ProvisioningState: to.StringPtr(string(compute.ProvisioningStateSucceeded)),
 			HardwareProfile: &compute.HardwareProfile{
 				VMSize: compute.VirtualMachineSizeTypesStandardA0,
 			},
@@ -252,12 +255,13 @@ func TestInstanceID(t *testing.T) {
 
 func TestInstanceShutdownByProviderID(t *testing.T) {
 	testcases := []struct {
-		name           string
-		vmList         map[string]string
-		nodeName       string
-		providerID     string
-		expected       bool
-		expectedErrMsg error
+		name              string
+		vmList            map[string]string
+		nodeName          string
+		providerID        string
+		provisioningState string
+		expected          bool
+		expectedErrMsg    error
 	}{
 		{
 			name:       "InstanceShutdownByProviderID should return false if the vm is in PowerState/Running status",
@@ -294,6 +298,7 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 			providerID: "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm5",
 			expected:   true,
 		},
+
 		{
 			name:       "InstanceShutdownByProviderID should return false if the vm is in PowerState/Stopping status",
 			vmList:     map[string]string{"vm6": "PowerState/Stopping"},
@@ -316,12 +321,22 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 			expected:   false,
 		},
 		{
+			name:              "InstanceShutdownByProviderID should return false if the vm is in PowerState/Stopped state with Creating provisioning state",
+			vmList:            map[string]string{"vm9": "PowerState/Stopped"},
+			nodeName:          "vm9",
+			provisioningState: "Creating",
+			providerID:        "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/virtualMachines/vm9",
+			expected:          false,
+		},
+		{
 			name:     "InstanceShutdownByProviderID should report error if providerID is null",
+			nodeName: "vmm",
 			expected: false,
 		},
 		{
 			name:           "InstanceShutdownByProviderID should report error if providerID is invalid",
-			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/VM/vm9",
+			providerID:     "azure:///subscriptions/subscription/resourceGroups/rg/providers/Microsoft.Compute/VM/vm10",
+			nodeName:       "vm10",
 			expected:       false,
 			expectedErrMsg: fmt.Errorf("error splitting providerID"),
 		},
@@ -332,11 +347,14 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 	for _, test := range testcases {
 		cloud := GetTestCloud(ctrl)
 		expectedVMs := setTestVirtualMachines(cloud, test.vmList, false)
+		if test.provisioningState != "" {
+			expectedVMs[0].ProvisioningState = to.StringPtr(test.provisioningState)
+		}
 		mockVMsClient := cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
 		for _, vm := range expectedVMs {
 			mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, *vm.Name, gomock.Any()).Return(vm, nil).AnyTimes()
 		}
-		mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, "vm8", gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
+		mockVMsClient.EXPECT().Get(gomock.Any(), cloud.ResourceGroup, test.nodeName, gomock.Any()).Return(compute.VirtualMachine{}, &retry.Error{HTTPStatusCode: http.StatusNotFound, RawError: cloudprovider.InstanceNotFound}).AnyTimes()
 
 		hasShutdown, err := cloud.InstanceShutdownByProviderID(context.Background(), test.providerID)
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
@@ -399,7 +417,7 @@ func TestNodeAddresses(t *testing.T) {
 		},
 	}
 	metadataTemplate := `{"compute":{"name":"%s"},"network":{"interface":[{"ipv4":{"ipAddress":[{"privateIpAddress":"%s","publicIpAddress":"%s"}]},"ipv6":{"ipAddress":[{"privateIpAddress":"%s","publicIpAddress":"%s"}]}}]}}`
-
+	loadbalancerTemplate := `{"loadbalancer": {"publicIpAddresses": [{"frontendIpAddress": "%s","privateIpAddress": "%s"},{"frontendIpAddress": "%s","privateIpAddress": "%s"}]}}`
 	testcases := []struct {
 		name                string
 		nodeName            string
@@ -410,6 +428,7 @@ func TestNodeAddresses(t *testing.T) {
 		ipV6                string
 		ipV4Public          string
 		ipV6Public          string
+		loadBalancerSku     string
 		expectedAddress     []v1.NodeAddress
 		useInstanceMetadata bool
 		useCustomImsCache   bool
@@ -484,7 +503,7 @@ func TestNodeAddresses(t *testing.T) {
 			expectedAddress: expectedNodeAddress,
 		},
 		{
-			name:                "NodeAddresses should get IP addresses from local if node's name is equal to metadataName",
+			name:                "NodeAddresses should get IP addresses from local IMDS if node's name is equal to metadataName",
 			nodeName:            "vm1",
 			metadataName:        "vm1",
 			vmType:              vmTypeStandard,
@@ -492,6 +511,41 @@ func TestNodeAddresses(t *testing.T) {
 			ipV4Public:          "192.168.1.12",
 			ipV6:                "1111:11111:00:00:1111:1111:000:111",
 			ipV6Public:          "2222:22221:00:00:2222:2222:000:111",
+			loadBalancerSku:     "basic",
+			useInstanceMetadata: true,
+			expectedAddress: []v1.NodeAddress{
+				{
+					Type:    v1.NodeHostName,
+					Address: "vm1",
+				},
+				{
+					Type:    v1.NodeInternalIP,
+					Address: "10.240.0.1",
+				},
+				{
+					Type:    v1.NodeExternalIP,
+					Address: "192.168.1.12",
+				},
+				{
+					Type:    v1.NodeInternalIP,
+					Address: "1111:11111:00:00:1111:1111:000:111",
+				},
+				{
+					Type:    v1.NodeExternalIP,
+					Address: "2222:22221:00:00:2222:2222:000:111",
+				},
+			},
+		},
+		{
+			name:                "NodeAddresses should get IP addresses from local IMDS for standard LoadBalancer if node's name is equal to metadataName",
+			nodeName:            "vm1",
+			metadataName:        "vm1",
+			vmType:              vmTypeStandard,
+			ipV4:                "10.240.0.1",
+			ipV4Public:          "192.168.1.12",
+			ipV6:                "1111:11111:00:00:1111:1111:000:111",
+			ipV6Public:          "2222:22221:00:00:2222:2222:000:111",
+			loadBalancerSku:     "standard",
 			useInstanceMetadata: true,
 			expectedAddress: []v1.NodeAddress{
 				{
@@ -533,10 +587,19 @@ func TestNodeAddresses(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.Contains(r.RequestURI, imdsLoadBalancerURI) {
+				fmt.Fprintf(w, loadbalancerTemplate, test.ipV4Public, test.ipV4, test.ipV6Public, test.ipV6)
+				return
+			}
+
 			if test.metadataTemplate != "" {
 				fmt.Fprintf(w, test.metadataTemplate)
 			} else {
-				fmt.Fprintf(w, metadataTemplate, test.metadataName, test.ipV4, test.ipV4Public, test.ipV6, test.ipV6Public)
+				if test.loadBalancerSku == "standard" {
+					fmt.Fprintf(w, metadataTemplate, test.metadataName, test.ipV4, "", test.ipV6, "")
+				} else {
+					fmt.Fprintf(w, metadataTemplate, test.metadataName, test.ipV4, test.ipV4Public, test.ipV6, test.ipV6Public)
+				}
 			}
 		}))
 		go func() {

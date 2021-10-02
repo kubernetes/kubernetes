@@ -97,6 +97,7 @@ package module
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 	"unicode"
@@ -223,19 +224,34 @@ func firstPathOK(r rune) bool {
 		'a' <= r && r <= 'z'
 }
 
-// pathOK reports whether r can appear in an import path element.
-// Paths can be ASCII letters, ASCII digits, and limited ASCII punctuation: + - . _ and ~.
-// This matches what "go get" has historically recognized in import paths.
+// modPathOK reports whether r can appear in a module path element.
+// Paths can be ASCII letters, ASCII digits, and limited ASCII punctuation: - . _ and ~.
+//
+// This matches what "go get" has historically recognized in import paths,
+// and avoids confusing sequences like '%20' or '+' that would change meaning
+// if used in a URL.
+//
 // TODO(rsc): We would like to allow Unicode letters, but that requires additional
 // care in the safe encoding (see "escaped paths" above).
-func pathOK(r rune) bool {
+func modPathOK(r rune) bool {
 	if r < utf8.RuneSelf {
-		return r == '+' || r == '-' || r == '.' || r == '_' || r == '~' ||
+		return r == '-' || r == '.' || r == '_' || r == '~' ||
 			'0' <= r && r <= '9' ||
 			'A' <= r && r <= 'Z' ||
 			'a' <= r && r <= 'z'
 	}
 	return false
+}
+
+// modPathOK reports whether r can appear in a package import path element.
+//
+// Import paths are intermediate between module paths and file paths: we allow
+// disallow characters that would be confusing or ambiguous as arguments to
+// 'go get' (such as '@' and ' ' ), but allow certain characters that are
+// otherwise-unambiguous on the command line and historically used for some
+// binary names (such as '++' as a suffix for compiler binaries and wrappers).
+func importPathOK(r rune) bool {
+	return modPathOK(r) || r == '+'
 }
 
 // fileNameOK reports whether r can appear in a file name.
@@ -269,7 +285,7 @@ func fileNameOK(r rune) bool {
 
 // CheckPath checks that a module path is valid.
 // A valid module path is a valid import path, as checked by CheckImportPath,
-// with two additional constraints.
+// with three additional constraints.
 // First, the leading path element (up to the first slash, if any),
 // by convention a domain name, must contain only lower-case ASCII letters,
 // ASCII digits, dots (U+002E), and dashes (U+002D);
@@ -279,8 +295,9 @@ func fileNameOK(r rune) bool {
 // and must not contain any dots. For paths beginning with "gopkg.in/",
 // this second requirement is replaced by a requirement that the path
 // follow the gopkg.in server's conventions.
+// Third, no path element may begin with a dot.
 func CheckPath(path string) error {
-	if err := checkPath(path, false); err != nil {
+	if err := checkPath(path, modulePath); err != nil {
 		return fmt.Errorf("malformed module path %q: %v", path, err)
 	}
 	i := strings.Index(path, "/")
@@ -313,21 +330,33 @@ func CheckPath(path string) error {
 // separated by slashes (U+002F). (It must not begin with nor end in a slash.)
 //
 // A valid path element is a non-empty string made up of
-// ASCII letters, ASCII digits, and limited ASCII punctuation: + - . _ and ~.
-// It must not begin or end with a dot (U+002E), nor contain two dots in a row.
+// ASCII letters, ASCII digits, and limited ASCII punctuation: - . _ and ~.
+// It must not end with a dot (U+002E), nor contain two dots in a row.
 //
 // The element prefix up to the first dot must not be a reserved file name
-// on Windows, regardless of case (CON, com1, NuL, and so on).
+// on Windows, regardless of case (CON, com1, NuL, and so on). The element
+// must not have a suffix of a tilde followed by one or more ASCII digits
+// (to exclude paths elements that look like Windows short-names).
 //
 // CheckImportPath may be less restrictive in the future, but see the
 // top-level package documentation for additional information about
 // subtleties of Unicode.
 func CheckImportPath(path string) error {
-	if err := checkPath(path, false); err != nil {
+	if err := checkPath(path, importPath); err != nil {
 		return fmt.Errorf("malformed import path %q: %v", path, err)
 	}
 	return nil
 }
+
+// pathKind indicates what kind of path we're checking. Module paths,
+// import paths, and file paths have different restrictions.
+type pathKind int
+
+const (
+	modulePath pathKind = iota
+	importPath
+	filePath
+)
 
 // checkPath checks that a general path is valid.
 // It returns an error describing why but not mentioning path.
@@ -335,7 +364,7 @@ func CheckImportPath(path string) error {
 // the caller is expected to add the "malformed ___ path %q: " prefix.
 // fileName indicates whether the final element of the path is a file name
 // (as opposed to a directory name).
-func checkPath(path string, fileName bool) error {
+func checkPath(path string, kind pathKind) error {
 	if !utf8.ValidString(path) {
 		return fmt.Errorf("invalid UTF-8")
 	}
@@ -354,39 +383,45 @@ func checkPath(path string, fileName bool) error {
 	elemStart := 0
 	for i, r := range path {
 		if r == '/' {
-			if err := checkElem(path[elemStart:i], fileName); err != nil {
+			if err := checkElem(path[elemStart:i], kind); err != nil {
 				return err
 			}
 			elemStart = i + 1
 		}
 	}
-	if err := checkElem(path[elemStart:], fileName); err != nil {
+	if err := checkElem(path[elemStart:], kind); err != nil {
 		return err
 	}
 	return nil
 }
 
 // checkElem checks whether an individual path element is valid.
-// fileName indicates whether the element is a file name (not a directory name).
-func checkElem(elem string, fileName bool) error {
+func checkElem(elem string, kind pathKind) error {
 	if elem == "" {
 		return fmt.Errorf("empty path element")
 	}
 	if strings.Count(elem, ".") == len(elem) {
 		return fmt.Errorf("invalid path element %q", elem)
 	}
-	if elem[0] == '.' && !fileName {
+	if elem[0] == '.' && kind == modulePath {
 		return fmt.Errorf("leading dot in path element")
 	}
 	if elem[len(elem)-1] == '.' {
 		return fmt.Errorf("trailing dot in path element")
 	}
-	charOK := pathOK
-	if fileName {
-		charOK = fileNameOK
-	}
 	for _, r := range elem {
-		if !charOK(r) {
+		ok := false
+		switch kind {
+		case modulePath:
+			ok = modPathOK(r)
+		case importPath:
+			ok = importPathOK(r)
+		case filePath:
+			ok = fileNameOK(r)
+		default:
+			panic(fmt.Sprintf("internal error: invalid kind %v", kind))
+		}
+		if !ok {
 			return fmt.Errorf("invalid char %q", r)
 		}
 	}
@@ -402,6 +437,29 @@ func checkElem(elem string, fileName bool) error {
 			return fmt.Errorf("%q disallowed as path element component on Windows", short)
 		}
 	}
+
+	if kind == filePath {
+		// don't check for Windows short-names in file names. They're
+		// only an issue for import paths.
+		return nil
+	}
+
+	// Reject path components that look like Windows short-names.
+	// Those usually end in a tilde followed by one or more ASCII digits.
+	if tilde := strings.LastIndexByte(short, '~'); tilde >= 0 && tilde < len(short)-1 {
+		suffix := short[tilde+1:]
+		suffixIsDigits := true
+		for _, r := range suffix {
+			if r < '0' || r > '9' {
+				suffixIsDigits = false
+				break
+			}
+		}
+		if suffixIsDigits {
+			return fmt.Errorf("trailing tilde and digits in path element")
+		}
+	}
+
 	return nil
 }
 
@@ -418,7 +476,7 @@ func checkElem(elem string, fileName bool) error {
 // top-level package documentation for additional information about
 // subtleties of Unicode.
 func CheckFilePath(path string) error {
-	if err := checkPath(path, true); err != nil {
+	if err := checkPath(path, filePath); err != nil {
 		return fmt.Errorf("malformed file path %q: %v", path, err)
 	}
 	return nil
@@ -621,7 +679,7 @@ func EscapePath(path string) (escaped string, err error) {
 // Versions are allowed to be in non-semver form but must be valid file names
 // and not contain exclamation marks.
 func EscapeVersion(v string) (escaped string, err error) {
-	if err := checkElem(v, true); err != nil || strings.Contains(v, "!") {
+	if err := checkElem(v, filePath); err != nil || strings.Contains(v, "!") {
 		return "", &InvalidVersionError{
 			Version: v,
 			Err:     fmt.Errorf("disallowed version string"),
@@ -680,7 +738,7 @@ func UnescapeVersion(escaped string) (v string, err error) {
 	if !ok {
 		return "", fmt.Errorf("invalid escaped version %q", escaped)
 	}
-	if err := checkElem(v, true); err != nil {
+	if err := checkElem(v, filePath); err != nil {
 		return "", fmt.Errorf("invalid escaped version %q: %v", v, err)
 	}
 	return v, nil
@@ -715,4 +773,50 @@ func unescapeString(escaped string) (string, bool) {
 		return "", false
 	}
 	return string(buf), true
+}
+
+// MatchPrefixPatterns reports whether any path prefix of target matches one of
+// the glob patterns (as defined by path.Match) in the comma-separated globs
+// list. This implements the algorithm used when matching a module path to the
+// GOPRIVATE environment variable, as described by 'go help module-private'.
+//
+// It ignores any empty or malformed patterns in the list.
+func MatchPrefixPatterns(globs, target string) bool {
+	for globs != "" {
+		// Extract next non-empty glob in comma-separated list.
+		var glob string
+		if i := strings.Index(globs, ","); i >= 0 {
+			glob, globs = globs[:i], globs[i+1:]
+		} else {
+			glob, globs = globs, ""
+		}
+		if glob == "" {
+			continue
+		}
+
+		// A glob with N+1 path elements (N slashes) needs to be matched
+		// against the first N+1 path elements of target,
+		// which end just before the N+1'th slash.
+		n := strings.Count(glob, "/")
+		prefix := target
+		// Walk target, counting slashes, truncating at the N+1'th slash.
+		for i := 0; i < len(target); i++ {
+			if target[i] == '/' {
+				if n == 0 {
+					prefix = target[:i]
+					break
+				}
+				n--
+			}
+		}
+		if n > 0 {
+			// Not enough prefix elements.
+			continue
+		}
+		matched, _ := path.Match(glob, prefix)
+		if matched {
+			return true
+		}
+	}
+	return false
 }

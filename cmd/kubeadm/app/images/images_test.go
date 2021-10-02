@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -50,14 +51,6 @@ func TestGetKubernetesImage(t *testing.T) {
 		expected string
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
-		{
-			expected: GetGenericImage(gcrPrefix, constants.HyperKube, expected),
-			cfg: &kubeadmapi.ClusterConfiguration{
-				ImageRepository:   gcrPrefix,
-				KubernetesVersion: testversion,
-				UseHyperKubeImage: true,
-			},
-		},
 		{
 			image:    constants.KubeAPIServer,
 			expected: GetGenericImage(gcrPrefix, "kube-apiserver", expected),
@@ -216,40 +209,9 @@ func TestGetAllImages(t *testing.T) {
 			expect: constants.Etcd,
 		},
 		{
-			name: "CoreDNS image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
-			},
+			name:   "CoreDNS image is returned",
+			cfg:    &kubeadmapi.ClusterConfiguration{},
 			expect: constants.CoreDNSImageName,
-		},
-		{
-			name: "main kube-dns image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
-				},
-			},
-			expect: constants.KubeDNSKubeDNSImageName,
-		},
-		{
-			name: "kube-dns sidecar image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
-				},
-			},
-			expect: constants.KubeDNSSidecarImageName,
-		},
-		{
-			name: "kube-dns dnsmasq-nanny image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
-				},
-			},
-			expect: constants.KubeDNSDnsMasqNannyImageName,
 		},
 	}
 	for _, tc := range testcases {
@@ -262,5 +224,54 @@ func TestGetAllImages(t *testing.T) {
 			}
 			t.Fatalf("did not find %q in %q", tc.expect, imgs)
 		})
+	}
+}
+
+func TestGetDNSImage(t *testing.T) {
+	var tests = []struct {
+		expected string
+		cfg      *kubeadmapi.ClusterConfiguration
+	}{
+		{
+			expected: "foo.io/coredns:v1.8.4",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "foo.io",
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
+			},
+		},
+		{
+			expected: kubeadmapiv1beta2.DefaultImageRepository + "/coredns/coredns:v1.8.4",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: kubeadmapiv1beta2.DefaultImageRepository,
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+				},
+			},
+		},
+		{
+			expected: "foo.io/coredns/coredns:v1.8.4",
+			cfg: &kubeadmapi.ClusterConfiguration{
+				ImageRepository: "foo.io",
+				DNS: kubeadmapi.DNS{
+					Type: kubeadmapi.CoreDNS,
+					ImageMeta: kubeadmapi.ImageMeta{
+						ImageRepository: "foo.io/coredns",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		actual := GetDNSImage(test.cfg)
+		if actual != test.expected {
+			t.Errorf(
+				"failed to GetDNSImage:\n\texpected: %s\n\t actual: %s",
+				test.expected,
+				actual,
+			)
+		}
 	}
 }

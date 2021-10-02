@@ -17,6 +17,7 @@ limitations under the License.
 package healthz
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -252,11 +253,11 @@ func TestMetrics(t *testing.T) {
 	}
 
 	expected := strings.NewReader(`
-        # HELP apiserver_request_total [ALPHA] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response contentType and code.
+        # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
         # TYPE apiserver_request_total counter
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
 `)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
 		t.Error(err)
@@ -310,4 +311,67 @@ type cacheSyncWaiterStub struct {
 // that simply returns the value passed during stub initialization.
 func (s cacheSyncWaiterStub) WaitForCacheSync(_ <-chan struct{}) map[reflect.Type]bool {
 	return s.startedByInformerType
+}
+
+func TestInstallReadyzHandlerWithHealthyFunc(t *testing.T) {
+	mux := http.NewServeMux()
+	readyzCh := make(chan struct{})
+
+	hasBeenReadyCounter := 0
+	hasBeenReadyFn := func() {
+		hasBeenReadyCounter++
+	}
+	InstallReadyzHandlerWithHealthyFunc(mux, hasBeenReadyFn, readyOnChanClose{readyzCh})
+
+	// scenario 1: expect the check to fail since the channel hasn't been closed
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", "/readyz"), nil)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("scenario 1: unexpected status code returned, expected %d, got %d", http.StatusInternalServerError, rr.Code)
+	}
+
+	// scenario 2: close the channel that will cause the readyz checker to report success,
+	//             verify that hasBeenReadyFn was called
+	close(readyzCh)
+	rr = httptest.NewRecorder()
+	req = req.Clone(context.TODO())
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Errorf("scenario 2: unexpected status code returned, expected %d, got %d", http.StatusOK, rr.Code)
+	}
+	if hasBeenReadyCounter != 1 {
+		t.Errorf("scenario 2: unexpected value of hasBeenReadyCounter, expected 1, got %d", hasBeenReadyCounter)
+	}
+
+	// scenario 3: checks if hasBeenReadyFn hasn't been called again.
+	rr = httptest.NewRecorder()
+	req = req.Clone(context.TODO())
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Errorf("scenario 3: unexpected status code returned, expected %d, got %d", http.StatusOK, rr.Code)
+	}
+	if hasBeenReadyCounter != 1 {
+		t.Errorf("scenario 3: unexpected value of hasBeenReadyCounter, expected 1, got %d", hasBeenReadyCounter)
+	}
+}
+
+type readyOnChanClose struct {
+	ch <-chan struct{}
+}
+
+func (readyOnChanClose) Name() string {
+	return "readyOnChanClose"
+}
+
+func (c readyOnChanClose) Check(_ *http.Request) error {
+	select {
+	case <-c.ch:
+		return nil
+	default:
+	}
+	return fmt.Errorf("the provided channel hasn't been closed")
 }

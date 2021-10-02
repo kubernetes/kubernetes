@@ -1,4 +1,4 @@
-// +build !selinux !linux
+// +build !linux
 
 package label
 

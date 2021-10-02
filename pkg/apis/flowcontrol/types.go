@@ -171,13 +171,17 @@ type PolicyRulesWithSubjects struct {
 // ways of matching an originator; by user, group, or service account.
 // +union
 type Subject struct {
+	// `kind` indicates which one of the other fields is non-empty.
 	// Required
 	// +unionDiscriminator
 	Kind SubjectKind
+	// `user` matches based on username.
 	// +optional
 	User *UserSubject
+	// `group` matches based on user group name.
 	// +optional
 	Group *GroupSubject
+	// `serviceAccount` matches ServiceAccounts.
 	// +optional
 	ServiceAccount *ServiceAccountSubject
 }
@@ -392,7 +396,7 @@ const (
 type LimitedPriorityLevelConfiguration struct {
 	// `assuredConcurrencyShares` (ACS) configures the execution
 	// limit, which is a limit on the number of requests of this
-	// priority level that may be exeucting at a given time.  ACS must
+	// priority level that may be executing at a given time.  ACS must
 	// be a positive number. The server's concurrency limit (SCL) is
 	// divided among the concurrency-controlled priority levels in
 	// proportion to their assured concurrency shares. This produces

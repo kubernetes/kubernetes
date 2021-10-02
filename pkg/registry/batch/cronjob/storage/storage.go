@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/batch/cronjob"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // REST implements a RESTStorage for scheduled jobs against etcd
@@ -43,9 +44,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		NewListFunc:              func() runtime.Object { return &batch.CronJobList{} },
 		DefaultQualifiedResource: batch.Resource("cronjobs"),
 
-		CreateStrategy: cronjob.Strategy,
-		UpdateStrategy: cronjob.Strategy,
-		DeleteStrategy: cronjob.Strategy,
+		CreateStrategy:      cronjob.Strategy,
+		UpdateStrategy:      cronjob.Strategy,
+		DeleteStrategy:      cronjob.Strategy,
+		ResetFieldsStrategy: cronjob.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -56,6 +58,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = cronjob.StatusStrategy
+	statusStore.ResetFieldsStrategy = cronjob.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
@@ -93,4 +96,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

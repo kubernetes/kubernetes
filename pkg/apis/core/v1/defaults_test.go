@@ -29,16 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
@@ -1417,6 +1416,21 @@ func TestSetDefaultNamespace(t *testing.T) {
 	}
 }
 
+func TestSetDefaultNamespaceLabels(t *testing.T) {
+	theNs := "default-ns-labels-are-great"
+	s := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: theNs,
+		},
+	}
+	obj2 := roundTrip(t, runtime.Object(s))
+	s2 := obj2.(*v1.Namespace)
+
+	if s2.ObjectMeta.Labels[v1.LabelMetadataName] != theNs {
+		t.Errorf("Expected default namespace label value of %v, but got %v", theNs, s2.ObjectMeta.Labels[v1.LabelMetadataName])
+	}
+}
+
 func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 	portNum := int32(8080)
 	s := v1.PodSpec{}
@@ -1803,252 +1817,63 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	}
 }
 
-func TestSetDefaultIPFamilies(t *testing.T) {
-	preferDualStack := v1.IPFamilyPolicyPreferDualStack
-	requireDualStack := v1.IPFamilyPolicyRequireDualStack
+func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	local := v1.ServiceInternalTrafficPolicyLocal
 	testCases := []struct {
-		name                       string
-		expectedIPFamiliesWithGate []v1.IPFamily
-		svc                        v1.Service
+		name                          string
+		expectedInternalTrafficPolicy v1.ServiceInternalTrafficPolicyType
+		svc                           v1.Service
+		featureGateOn                 bool
 	}{
 		{
-			name:                       "must not set for ExternalName",
-			expectedIPFamiliesWithGate: nil,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeExternalName,
-				},
-			},
+			name:                          "must set default internalTrafficPolicy",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
+			svc:                           v1.Service{},
+			featureGateOn:                 true,
 		},
 		{
-			name:                       "must not set for single stack",
-			expectedIPFamiliesWithGate: nil,
-
+			name:                          "must not set default internalTrafficPolicy when it's cluster",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
 			svc: v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeClusterIP,
+					InternalTrafficPolicy: &cluster,
 				},
 			},
+			featureGateOn: true,
 		},
 		{
-			name:                       "must not set for single stack, even when a family is set",
-			expectedIPFamiliesWithGate: []v1.IPFamily{v1.IPv6Protocol},
-
+			name:                          "must not set default internalTrafficPolicy when it's local",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyLocal,
 			svc: v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:       v1.ServiceTypeClusterIP,
-					IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+					InternalTrafficPolicy: &local,
 				},
 			},
+			featureGateOn: true,
 		},
 		{
-			name:                       "must not set for preferDualStack",
-			expectedIPFamiliesWithGate: []v1.IPFamily{v1.IPv6Protocol},
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					Type:           v1.ServiceTypeClusterIP,
-					IPFamilyPolicy: &preferDualStack,
-					IPFamilies:     []v1.IPFamily{v1.IPv6Protocol},
-				},
-			},
-		},
-		{
-			name:                       "must set for requireDualStack (6,4)",
-			expectedIPFamiliesWithGate: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					Type:           v1.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []v1.IPFamily{v1.IPv6Protocol},
-				},
-			},
-		},
-		{
-			name:                       "must set for requireDualStack (4,6)",
-			expectedIPFamiliesWithGate: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					Type:           v1.ServiceTypeClusterIP,
-					IPFamilyPolicy: &requireDualStack,
-					IPFamilies:     []v1.IPFamily{v1.IPv4Protocol},
-				},
-			},
+			name:                          "must not set default internalTrafficPolicy when gate is disabled",
+			expectedInternalTrafficPolicy: "",
+			svc:                           v1.Service{},
+			featureGateOn:                 false,
 		},
 	}
 	for _, test := range testCases {
-		// run with gate
 		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-			obj2 := roundTrip(t, runtime.Object(&test.svc))
-			svc2 := obj2.(*v1.Service)
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, test.featureGateOn)()
+			obj := roundTrip(t, runtime.Object(&test.svc))
+			svc := obj.(*v1.Service)
 
-			if len(test.expectedIPFamiliesWithGate) != len(svc2.Spec.IPFamilies) {
-				t.Fatalf("expected .spec.IPFamilies len:%v got %v", len(test.expectedIPFamiliesWithGate), len(svc2.Spec.IPFamilies))
-			}
-
-			for i, family := range test.expectedIPFamiliesWithGate {
-				if svc2.Spec.IPFamilies[i] != family {
-					t.Fatalf("failed. expected family %v at %v got %v", family, i, svc2.Spec.IPFamilies[i])
+			if test.expectedInternalTrafficPolicy == "" {
+				if svc.Spec.InternalTrafficPolicy != nil {
+					t.Fatalf("expected .spec.internalTrafficPolicy: null, got %v", *svc.Spec.InternalTrafficPolicy)
+				}
+			} else {
+				if *svc.Spec.InternalTrafficPolicy != test.expectedInternalTrafficPolicy {
+					t.Fatalf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, *svc.Spec.InternalTrafficPolicy)
 				}
 			}
 		})
-
-		// run without gate (families should not change)
-		t.Run(fmt.Sprintf("without-gate:%s", test.name), func(t *testing.T) {
-			obj2 := roundTrip(t, runtime.Object(&test.svc))
-			svc2 := obj2.(*v1.Service)
-
-			if len(test.svc.Spec.IPFamilies) != len(svc2.Spec.IPFamilies) {
-				t.Fatalf("expected .spec.IPFamilies len:%v got %v", len(test.expectedIPFamiliesWithGate), len(svc2.Spec.IPFamilies))
-			}
-
-			for i, family := range test.svc.Spec.IPFamilies {
-				if svc2.Spec.IPFamilies[i] != family {
-					t.Fatalf("failed. expected family %v at %v got %v", family, i, svc2.Spec.IPFamilies[i])
-				}
-			}
-		})
-
-	}
-}
-
-func TestSetDefaultServiceIPFamilyPolicy(t *testing.T) {
-	singleStack := v1.IPFamilyPolicySingleStack
-	preferDualStack := v1.IPFamilyPolicyPreferDualStack
-	requireDualStack := v1.IPFamilyPolicyRequireDualStack
-
-	testCases := []struct {
-		name                   string
-		expectedIPfamilyPolicy *v1.IPFamilyPolicyType
-		svc                    v1.Service
-	}{
-		{
-			name:                   "must not set for ExternalName",
-			expectedIPfamilyPolicy: nil,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					Type: v1.ServiceTypeExternalName,
-				},
-			},
-		},
-		{
-			name:                   "must not set for ExternalName even with semantically valid data",
-			expectedIPfamilyPolicy: nil,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					Type:       v1.ServiceTypeExternalName,
-					ClusterIPs: []string{"1.2.3.4", "2001::1"},
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-				},
-			},
-		},
-		{
-			name:                   "must set if there are more than one ip",
-			expectedIPfamilyPolicy: &requireDualStack,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIPs: []string{"1.2.3.4", "2001::1"},
-				},
-			},
-		},
-		{
-			name:                   "must set if there are more than one ip family",
-			expectedIPfamilyPolicy: &requireDualStack,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-				},
-			},
-		},
-		{
-			name:                   "must not set if there is one ip",
-			expectedIPfamilyPolicy: nil,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					ClusterIPs: []string{"1.2.3.4"},
-				},
-			},
-		},
-		{
-			name:                   "must not set if there is one ip family",
-			expectedIPfamilyPolicy: nil,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
-				},
-			},
-		},
-		{
-			name:                   "must not override user input",
-			expectedIPfamilyPolicy: &singleStack,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					IPFamilyPolicy: &singleStack,
-				},
-			},
-		},
-		{
-			name:                   "must not override user input/ preferDualStack",
-			expectedIPfamilyPolicy: &preferDualStack,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
-		},
-
-		{
-			name:                   "must not override user input even when it is invalid",
-			expectedIPfamilyPolicy: &preferDualStack,
-
-			svc: v1.Service{
-				Spec: v1.ServiceSpec{
-					IPFamilies:     []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
-					IPFamilyPolicy: &preferDualStack,
-				},
-			},
-		},
-	}
-
-	for _, test := range testCases {
-		// with gate
-		t.Run(test.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, true)()
-			obj2 := roundTrip(t, runtime.Object(&test.svc))
-			svc2 := obj2.(*v1.Service)
-
-			if test.expectedIPfamilyPolicy == nil && svc2.Spec.IPFamilyPolicy != nil {
-				t.Fatalf("expected .spec.PreferDualStack to be unset (nil)")
-			}
-			if test.expectedIPfamilyPolicy != nil && (svc2.Spec.IPFamilyPolicy == nil || *(svc2.Spec.IPFamilyPolicy) != *(test.expectedIPfamilyPolicy)) {
-				t.Fatalf("expected .spec.PreferDualStack to be set to %v got %v", *(test.expectedIPfamilyPolicy), svc2.Spec.IPFamilyPolicy)
-			}
-		})
-
-		// without gate. IPFamilyPolicy should never change
-		t.Run(test.name, func(t *testing.T) {
-			obj2 := roundTrip(t, runtime.Object(&test.svc))
-			svc2 := obj2.(*v1.Service)
-
-			if test.svc.Spec.IPFamilyPolicy == nil && svc2.Spec.IPFamilyPolicy != nil {
-				t.Fatalf("expected .spec.PreferDualStack to be unset (nil)")
-			}
-			if test.svc.Spec.IPFamilyPolicy != nil && (svc2.Spec.IPFamilyPolicy == nil || *(svc2.Spec.IPFamilyPolicy) != *(test.expectedIPfamilyPolicy)) {
-				t.Fatalf("expected .spec.PreferDualStack to be set to %v got %v", *(test.expectedIPfamilyPolicy), svc2.Spec.IPFamilyPolicy)
-			}
-		})
-
 	}
 }

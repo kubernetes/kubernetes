@@ -259,7 +259,14 @@ __EOF__
   mv "${TMP_LICENSE_FILE}" "${dest_dir}/LICENSE"
 done
 
+# copy licenses for forked code from vendor and third_party directories
+(cd "${KUBE_ROOT}" && \
+  find vendor third_party -iname 'licen[sc]e*' -o -iname 'notice*' -o -iname 'copying*' | \
+  grep -E 'third_party|forked' | \
+  xargs tar -czf - | tar -C "${TMP_LICENSES_DIR}" -xzf -)
+
 # Leave things like OWNERS alone.
 rm -f "${LICENSES_DIR}/LICENSE"
 rm -rf "${LICENSES_DIR}/vendor"
+rm -rf "${LICENSES_DIR}/third_party"
 mv "${TMP_LICENSES_DIR}"/* "${LICENSES_DIR}"

@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	appslisters "k8s.io/client-go/listers/apps/v1"
@@ -311,7 +312,12 @@ func (classes StorageClassLister) Get(name string) (*storagev1.StorageClass, err
 			return &sc, nil
 		}
 	}
-	return nil, fmt.Errorf("unable to find storage class: %s", name)
+	return nil, &errors.StatusError{
+		ErrStatus: metav1.Status{
+			Reason:  metav1.StatusReasonNotFound,
+			Message: fmt.Sprintf("unable to find storage class: %s", name),
+		},
+	}
 }
 
 // List lists all StorageClass in the indexer.

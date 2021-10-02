@@ -20,6 +20,7 @@ import (
 	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
@@ -43,7 +44,7 @@ var (
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "addon",
-		Short: "Install required addons for passing Conformance tests",
+		Short: "Install required addons for passing conformance tests",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{

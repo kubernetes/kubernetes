@@ -92,7 +92,7 @@ func validateScalar(t *schema.Scalar, v value.Value, prefix string) (errs Valida
 	case schema.Numeric:
 		if !v.IsFloat() && !v.IsInt() {
 			// TODO: should the schema separate int and float?
-			return errorf("%vexpected numeric (int or float), got %T", prefix, v)
+			return errorf("%vexpected numeric (int or float), got %T", prefix, v.Unstructured())
 		}
 	case schema.String:
 		if !v.IsString() {

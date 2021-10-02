@@ -48,7 +48,7 @@ func TestCanSupport(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/fc")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/fc" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())

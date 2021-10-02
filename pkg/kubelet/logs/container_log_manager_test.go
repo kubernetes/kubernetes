@@ -30,9 +30,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	critest "k8s.io/cri-api/pkg/apis/testing"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestGetAllLogs(t *testing.T) {
@@ -92,7 +92,7 @@ func TestRotateLogs(t *testing.T) {
 			MaxFiles: testMaxFiles,
 		},
 		osInterface: container.RealOS{},
-		clock:       clock.NewFakeClock(now),
+		clock:       testingclock.NewFakeClock(now),
 	}
 	testLogs := []string{
 		"test-log-1",
@@ -179,7 +179,7 @@ func TestClean(t *testing.T) {
 			MaxFiles: testMaxFiles,
 		},
 		osInterface: container.RealOS{},
-		clock:       clock.NewFakeClock(now),
+		clock:       testingclock.NewFakeClock(now),
 	}
 	testLogs := []string{
 		"test-log-1",
@@ -382,7 +382,7 @@ func TestRotateLatestLog(t *testing.T) {
 			runtimeService: f,
 			policy:         LogRotatePolicy{MaxFiles: test.maxFiles},
 			osInterface:    container.RealOS{},
-			clock:          clock.NewFakeClock(now),
+			clock:          testingclock.NewFakeClock(now),
 		}
 		if test.runtimeError != nil {
 			f.InjectError("ReopenContainerLog", test.runtimeError)

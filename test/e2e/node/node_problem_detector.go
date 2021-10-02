@@ -40,11 +40,12 @@ import (
 )
 
 // This test checks if node-problem-detector (NPD) runs fine without error on
-// the nodes in the cluster. NPD's functionality is tested in e2e_node tests.
-var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
+// the up to 10 nodes in the cluster. NPD's functionality is tested in e2e_node tests.
+var _ = SIGDescribe("NodeProblemDetector", func() {
 	const (
-		pollInterval = 1 * time.Second
-		pollTimeout  = 1 * time.Minute
+		pollInterval      = 1 * time.Second
+		pollTimeout       = 1 * time.Minute
+		maxNodesToProcess = 10
 	)
 	f := framework.NewDefaultFramework("node-problem-detector")
 
@@ -60,18 +61,34 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 		e2eskipper.SkipUnlessSSHKeyPresent()
 
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
-		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		readyNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
+
+		nodes := []v1.Node{}
 		hosts := []string{}
-		for _, node := range nodes.Items {
+		for _, node := range readyNodes.Items {
+			host := ""
 			for _, addr := range node.Status.Addresses {
 				if addr.Type == v1.NodeExternalIP {
-					hosts = append(hosts, net.JoinHostPort(addr.Address, "22"))
+					host = net.JoinHostPort(addr.Address, "22")
 					break
 				}
 			}
+			// Not every node has to have an external IP address.
+			if len(host) > 0 {
+				nodes = append(nodes, node)
+				hosts = append(hosts, host)
+			}
 		}
-		framework.ExpectEqual(len(hosts), len(nodes.Items))
+
+		if len(nodes) == 0 {
+			ginkgo.Skip("Skipping test due to lack of ready nodes with public IP")
+		}
+
+		if len(nodes) > maxNodesToProcess {
+			nodes = nodes[:maxNodesToProcess]
+			hosts = hosts[:maxNodesToProcess]
+		}
 
 		isStandaloneMode := make(map[string]bool)
 		cpuUsageStats := make(map[string][]float64)
@@ -112,8 +129,8 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 				uptimeStats[host] = append(uptimeStats[host], uptime)
 			}
 
-			ginkgo.By(fmt.Sprintf("Inject log to trigger AUFSUmountHung on node %q", host))
-			log := "INFO: task umount.aufs:21568 blocked for more than 120 seconds."
+			ginkgo.By(fmt.Sprintf("Inject log to trigger DockerHung on node %q", host))
+			log := "INFO: task docker:12345 blocked for more than 120 seconds."
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
 			_, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
@@ -121,16 +138,16 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 		}
 
 		ginkgo.By("Check node-problem-detector can post conditions and events to API server")
-		for _, node := range nodes.Items {
+		for _, node := range nodes {
 			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KernelDeadlock condition on node %q", node.Name))
 			gomega.Eventually(func() error {
-				return verifyNodeCondition(f, "KernelDeadlock", v1.ConditionTrue, "AUFSUmountHung", node.Name)
+				return verifyNodeCondition(f, "KernelDeadlock", v1.ConditionTrue, "DockerHung", node.Name)
 			}, pollTimeout, pollInterval).Should(gomega.Succeed())
 
-			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted AUFSUmountHung event on node %q", node.Name))
+			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted DockerHung event on node %q", node.Name))
 			eventListOptions := metav1.ListOptions{FieldSelector: fields.Set{"involvedObject.kind": "Node"}.AsSelector().String()}
 			gomega.Eventually(func() error {
-				return verifyEvents(f, eventListOptions, 1, "AUFSUmountHung", node.Name)
+				return verifyEvents(f, eventListOptions, 1, "DockerHung", node.Name)
 			}, pollTimeout, pollInterval).Should(gomega.Succeed())
 
 			// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
@@ -156,7 +173,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 						uptimeStats[host] = append(uptimeStats[host], uptime)
 					}
 				} else {
-					cpuUsage, rss, workingSet := getNpdPodStat(f, nodes.Items[j].Name)
+					cpuUsage, rss, workingSet := getNpdPodStat(f, nodes[j].Name)
 					cpuUsageStats[host] = append(cpuUsageStats[host], cpuUsage)
 					rssStats[host] = append(rssStats[host], rss)
 					workingSetStats[host] = append(workingSetStats[host], workingSet)
@@ -174,19 +191,19 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 				// calculate its cpu usage from cgroup cpuacct value differences.
 				cpuUsage := cpuUsageStats[host][1] - cpuUsageStats[host][0]
 				totaltime := uptimeStats[host][1] - uptimeStats[host][0]
-				cpuStatsMsg += fmt.Sprintf(" %s[%.3f];", nodes.Items[i].Name, cpuUsage/totaltime)
+				cpuStatsMsg += fmt.Sprintf(" %s[%.3f];", nodes[i].Name, cpuUsage/totaltime)
 			} else {
 				sort.Float64s(cpuUsageStats[host])
-				cpuStatsMsg += fmt.Sprintf(" %s[%.3f|%.3f|%.3f];", nodes.Items[i].Name,
+				cpuStatsMsg += fmt.Sprintf(" %s[%.3f|%.3f|%.3f];", nodes[i].Name,
 					cpuUsageStats[host][0], cpuUsageStats[host][len(cpuUsageStats[host])/2], cpuUsageStats[host][len(cpuUsageStats[host])-1])
 			}
 
 			sort.Float64s(rssStats[host])
-			rssStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes.Items[i].Name,
+			rssStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes[i].Name,
 				rssStats[host][0], rssStats[host][len(rssStats[host])/2], rssStats[host][len(rssStats[host])-1])
 
 			sort.Float64s(workingSetStats[host])
-			workingSetStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes.Items[i].Name,
+			workingSetStatsMsg += fmt.Sprintf(" %s[%.1f|%.1f|%.1f];", nodes[i].Name,
 				workingSetStats[host][0], workingSetStats[host][len(workingSetStats[host])/2], workingSetStats[host][len(workingSetStats[host])-1])
 		}
 		framework.Logf("Node-Problem-Detector CPU and Memory Stats:\n\t%s\n\t%s\n\t%s", cpuStatsMsg, rssStatsMsg, workingSetStatsMsg)

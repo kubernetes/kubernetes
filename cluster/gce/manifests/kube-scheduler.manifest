@@ -45,7 +45,8 @@
     "livenessProbe": {
       "httpGet": {
         "host": "127.0.0.1",
-        "port": 10251,
+        "port": 10259,
+        "scheme": "HTTPS",
         "path": "/healthz"
       },
       "initialDelaySeconds": 15,

@@ -58,7 +58,6 @@ type ConfigMapCAController struct {
 	preRunCaches []cache.InformerSynced
 }
 
-var _ Notifier = &ConfigMapCAController{}
 var _ CAContentProvider = &ConfigMapCAController{}
 var _ ControllerRunner = &ConfigMapCAController{}
 
@@ -199,8 +198,8 @@ func (c *ConfigMapCAController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting %s", c.name)
-	defer klog.Infof("Shutting down %s", c.name)
+	klog.InfoS("Starting controller", "name", c.name)
+	defer klog.InfoS("Shutting down controller", "name", c.name)
 
 	// we have a personal informer that is narrowly scoped, start it.
 	go c.configMapInformer.Run(stopCh)

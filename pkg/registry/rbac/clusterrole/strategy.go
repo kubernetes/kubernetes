@@ -74,6 +74,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateClusterRole(clusterRole)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (strategy) Canonicalize(obj runtime.Object) {
 	_ = obj.(*rbac.ClusterRole)
@@ -84,6 +87,11 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newObj := obj.(*rbac.ClusterRole)
 	errorList := validation.ValidateClusterRole(newObj)
 	return append(errorList, validation.ValidateClusterRoleUpdate(newObj, old.(*rbac.ClusterRole))...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // If AllowUnconditionalUpdate() is true and the object specified by

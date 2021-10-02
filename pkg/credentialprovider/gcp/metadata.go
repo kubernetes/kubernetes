@@ -23,63 +23,40 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/cloud-provider/credentialconfig"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/legacy-cloud-providers/gce/gcpcredential"
 )
 
 const (
-	metadataURL              = "http://metadata.google.internal./computeMetadata/v1/"
-	metadataAttributes       = metadataURL + "instance/attributes/"
-	dockerConfigKey          = metadataAttributes + "google-dockercfg"
-	dockerConfigURLKey       = metadataAttributes + "google-dockercfg-url"
-	serviceAccounts          = metadataURL + "instance/service-accounts/"
-	metadataScopes           = metadataURL + "instance/service-accounts/default/scopes"
-	metadataToken            = metadataURL + "instance/service-accounts/default/token"
-	metadataEmail            = metadataURL + "instance/service-accounts/default/email"
-	storageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
+	metadataURL        = "http://metadata.google.internal./computeMetadata/v1/"
+	metadataAttributes = metadataURL + "instance/attributes/"
+	// DockerConfigKey is the URL of the dockercfg metadata key used by DockerConfigKeyProvider.
+	DockerConfigKey = metadataAttributes + "google-dockercfg"
+	// DockerConfigURLKey is the URL of the dockercfg metadata key used by DockerConfigURLKeyProvider.
+	DockerConfigURLKey = metadataAttributes + "google-dockercfg-url"
+	serviceAccounts    = metadataURL + "instance/service-accounts/"
+	metadataScopes     = metadataURL + "instance/service-accounts/default/scopes"
+	// StorageScopePrefix is the prefix checked by ContainerRegistryProvider.Enabled.
+	StorageScopePrefix       = "https://www.googleapis.com/auth/devstorage"
 	cloudPlatformScopePrefix = "https://www.googleapis.com/auth/cloud-platform"
 	defaultServiceAccount    = "default/"
 )
 
-// Product file path that contains the cloud service name.
+// gceProductNameFile is the product file path that contains the cloud service name.
 // This is a variable instead of a const to enable testing.
 var gceProductNameFile = "/sys/class/dmi/id/product_name"
-
-// For these urls, the parts of the host name can be glob, for example '*.gcr.io" will match
-// "foo.gcr.io" and "bar.gcr.io".
-var containerRegistryUrls = []string{"container.cloud.google.com", "gcr.io", "*.gcr.io", "*.pkg.dev"}
 
 var metadataHeader = &http.Header{
 	"Metadata-Flavor": []string{"Google"},
 }
 
-// A DockerConfigProvider that reads its configuration from Google
-// Compute Engine metadata.
-type metadataProvider struct {
-	Client *http.Client
-}
-
-// A DockerConfigProvider that reads its configuration from a specific
-// Google Compute Engine metadata key: 'google-dockercfg'.
-type dockerConfigKeyProvider struct {
-	metadataProvider
-}
-
-// A DockerConfigProvider that reads its configuration from a URL read from
-// a specific Google Compute Engine metadata key: 'google-dockercfg-url'.
-type dockerConfigURLKeyProvider struct {
-	metadataProvider
-}
-
-// A DockerConfigProvider that provides a dockercfg with:
-//    Username: "_token"
-//    Password: "{access token from metadata}"
-type containerRegistryProvider struct {
-	metadataProvider
-}
+var warnOnce sync.Once
 
 // init registers the various means by which credentials may
 // be resolved on GCP.
@@ -92,16 +69,16 @@ func init() {
 	}
 	credentialprovider.RegisterCredentialProvider("google-dockercfg",
 		&credentialprovider.CachingDockerConfigProvider{
-			Provider: &dockerConfigKeyProvider{
-				metadataProvider{Client: httpClient},
+			Provider: &DockerConfigKeyProvider{
+				MetadataProvider: MetadataProvider{Client: httpClient},
 			},
 			Lifetime: 60 * time.Second,
 		})
 
 	credentialprovider.RegisterCredentialProvider("google-dockercfg-url",
 		&credentialprovider.CachingDockerConfigProvider{
-			Provider: &dockerConfigURLKeyProvider{
-				metadataProvider{Client: httpClient},
+			Provider: &DockerConfigURLKeyProvider{
+				MetadataProvider: MetadataProvider{Client: httpClient},
 			},
 			Lifetime: 60 * time.Second,
 		})
@@ -109,9 +86,34 @@ func init() {
 	credentialprovider.RegisterCredentialProvider("google-container-registry",
 		// Never cache this.  The access token is already
 		// cached by the metadata service.
-		&containerRegistryProvider{
-			metadataProvider{Client: httpClient},
+		&ContainerRegistryProvider{
+			MetadataProvider: MetadataProvider{Client: httpClient},
 		})
+}
+
+// MetadataProvider is a DockerConfigProvider that reads its configuration from Google
+// Compute Engine metadata.
+type MetadataProvider struct {
+	Client *http.Client
+}
+
+// DockerConfigKeyProvider is a DockerConfigProvider that reads its configuration from a specific
+// Google Compute Engine metadata key: 'google-dockercfg'.
+type DockerConfigKeyProvider struct {
+	MetadataProvider
+}
+
+// DockerConfigURLKeyProvider is a DockerConfigProvider that reads its configuration from a URL read from
+// a specific Google Compute Engine metadata key: 'google-dockercfg-url'.
+type DockerConfigURLKeyProvider struct {
+	MetadataProvider
+}
+
+// ContainerRegistryProvider is a DockerConfigProvider that provides a dockercfg with:
+//    Username: "_token"
+//    Password: "{access token from metadata}"
+type ContainerRegistryProvider struct {
+	MetadataProvider
 }
 
 // Returns true if it finds a local GCE VM.
@@ -142,42 +144,28 @@ func onGCEVM() bool {
 }
 
 // Enabled implements DockerConfigProvider for all of the Google implementations.
-func (g *metadataProvider) Enabled() bool {
-	return onGCEVM()
+func (g *MetadataProvider) Enabled() bool {
+	onGCE := onGCEVM()
+	if !onGCE {
+		return false
+	}
+	if credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
+		warnOnce.Do(func() {
+			klog.V(4).Infof("GCP credential provider is now disabled. Please refer to sig-cloud-provider for guidance on external credential provider integration for GCP")
+		})
+		return false
+	}
+	return true
 }
 
 // Provide implements DockerConfigProvider
-func (g *dockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
-	// Read the contents of the google-dockercfg metadata key and
-	// parse them as an alternate .dockercfg
-	if cfg, err := credentialprovider.ReadDockerConfigFileFromURL(dockerConfigKey, g.Client, metadataHeader); err != nil {
-		klog.Errorf("while reading 'google-dockercfg' metadata: %v", err)
-	} else {
-		return cfg
-	}
-
-	return credentialprovider.DockerConfig{}
+func (g *DockerConfigKeyProvider) Provide(image string) credentialprovider.DockerConfig {
+	return registryToDocker(gcpcredential.ProvideConfigKey(g.Client, image))
 }
 
 // Provide implements DockerConfigProvider
-func (g *dockerConfigURLKeyProvider) Provide(image string) credentialprovider.DockerConfig {
-	// Read the contents of the google-dockercfg-url key and load a .dockercfg from there
-	if url, err := credentialprovider.ReadURL(dockerConfigURLKey, g.Client, metadataHeader); err != nil {
-		klog.Errorf("while reading 'google-dockercfg-url' metadata: %v", err)
-	} else {
-		if strings.HasPrefix(string(url), "http") {
-			if cfg, err := credentialprovider.ReadDockerConfigFileFromURL(string(url), g.Client, nil); err != nil {
-				klog.Errorf("while reading 'google-dockercfg-url'-specified url: %s, %v", string(url), err)
-			} else {
-				return cfg
-			}
-		} else {
-			// TODO(mattmoor): support reading alternate scheme URLs (e.g. gs:// or s3://)
-			klog.Errorf("Unsupported URL scheme: %s", string(url))
-		}
-	}
-
-	return credentialprovider.DockerConfig{}
+func (g *DockerConfigURLKeyProvider) Provide(image string) credentialprovider.DockerConfig {
+	return registryToDocker(gcpcredential.ProvideURLKey(g.Client, image))
 }
 
 // runWithBackoff runs input function `f` with an exponential backoff.
@@ -208,13 +196,21 @@ func runWithBackoff(f func() ([]byte, error)) []byte {
 // It is expected that "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/" will return a `200`
 // and "http://metadata.google.internal./computeMetadata/v1/instance/service-accounts/default/scopes" will also return `200`.
 // More information on metadata service can be found here - https://cloud.google.com/compute/docs/storing-retrieving-metadata
-func (g *containerRegistryProvider) Enabled() bool {
+func (g *ContainerRegistryProvider) Enabled() bool {
 	if !onGCEVM() {
 		return false
 	}
+
+	if credentialprovider.AreLegacyCloudCredentialProvidersDisabled() {
+		warnOnce.Do(func() {
+			klog.V(4).Infof("GCP credential provider is now disabled. Please refer to sig-cloud-provider for guidance on external credential provider integration for GCP")
+		})
+		return false
+	}
+
 	// Given that we are on GCE, we should keep retrying until the metadata server responds.
 	value := runWithBackoff(func() ([]byte, error) {
-		value, err := credentialprovider.ReadURL(serviceAccounts, g.Client, metadataHeader)
+		value, err := gcpcredential.ReadURL(serviceAccounts, g.Client, metadataHeader)
 		if err != nil {
 			klog.V(2).Infof("Failed to Get service accounts from gce metadata server: %v", err)
 		}
@@ -237,7 +233,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 	url := metadataScopes + "?alt=json"
 	value = runWithBackoff(func() ([]byte, error) {
-		value, err := credentialprovider.ReadURL(url, g.Client, metadataHeader)
+		value, err := gcpcredential.ReadURL(url, g.Client, metadataHeader)
 		if err != nil {
 			klog.V(2).Infof("Failed to Get scopes in default service account from gce metadata server: %v", err)
 		}
@@ -250,7 +246,7 @@ func (g *containerRegistryProvider) Enabled() bool {
 	}
 	for _, v := range scopes {
 		// cloudPlatformScope implies storage scope.
-		if strings.HasPrefix(v, storageScopePrefix) || strings.HasPrefix(v, cloudPlatformScopePrefix) {
+		if strings.HasPrefix(v, StorageScopePrefix) || strings.HasPrefix(v, cloudPlatformScopePrefix) {
 			return true
 		}
 	}
@@ -258,43 +254,19 @@ func (g *containerRegistryProvider) Enabled() bool {
 	return false
 }
 
-// tokenBlob is used to decode the JSON blob containing an access token
-// that is returned by GCE metadata.
-type tokenBlob struct {
-	AccessToken string `json:"access_token"`
+// Provide implements DockerConfigProvider
+func (g *ContainerRegistryProvider) Provide(image string) credentialprovider.DockerConfig {
+	return registryToDocker(gcpcredential.ProvideContainerRegistry(g.Client, image))
 }
 
-// Provide implements DockerConfigProvider
-func (g *containerRegistryProvider) Provide(image string) credentialprovider.DockerConfig {
-	cfg := credentialprovider.DockerConfig{}
-
-	tokenJSONBlob, err := credentialprovider.ReadURL(metadataToken, g.Client, metadataHeader)
-	if err != nil {
-		klog.Errorf("while reading access token endpoint: %v", err)
-		return cfg
+func registryToDocker(registryConfig credentialconfig.RegistryConfig) credentialprovider.DockerConfig {
+	dockerConfig := credentialprovider.DockerConfig{}
+	for k, v := range registryConfig {
+		dockerConfig[k] = credentialprovider.DockerConfigEntry{
+			Username: v.Username,
+			Password: v.Password,
+			Email:    v.Email,
+		}
 	}
-
-	email, err := credentialprovider.ReadURL(metadataEmail, g.Client, metadataHeader)
-	if err != nil {
-		klog.Errorf("while reading email endpoint: %v", err)
-		return cfg
-	}
-
-	var parsedBlob tokenBlob
-	if err := json.Unmarshal([]byte(tokenJSONBlob), &parsedBlob); err != nil {
-		klog.Errorf("while parsing json blob %s: %v", tokenJSONBlob, err)
-		return cfg
-	}
-
-	entry := credentialprovider.DockerConfigEntry{
-		Username: "_token",
-		Password: parsedBlob.AccessToken,
-		Email:    string(email),
-	}
-
-	// Add our entry for each of the supported container registry URLs
-	for _, k := range containerRegistryUrls {
-		cfg[k] = entry
-	}
-	return cfg
+	return dockerConfig
 }

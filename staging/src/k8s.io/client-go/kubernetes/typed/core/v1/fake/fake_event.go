@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -122,6 +125,28 @@ func (c *FakeEvents) DeleteCollection(ctx context.Context, opts v1.DeleteOptions
 func (c *FakeEvents) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Event, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, name, pt, data, subresources...), &corev1.Event{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.Event), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied event.
+func (c *FakeEvents) Apply(ctx context.Context, event *applyconfigurationscorev1.EventApplyConfiguration, opts v1.ApplyOptions) (result *corev1.Event, err error) {
+	if event == nil {
+		return nil, fmt.Errorf("event provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		return nil, err
+	}
+	name := event.Name
+	if name == nil {
+		return nil, fmt.Errorf("event.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(eventsResource, c.ns, *name, types.ApplyPatchType, data), &corev1.Event{})
 
 	if obj == nil {
 		return nil, err

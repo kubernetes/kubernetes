@@ -117,9 +117,6 @@ func (m *Mgr) CreateService(name, exepath string, c Config, args ...string) (*Se
 	if c.StartType == 0 {
 		c.StartType = StartManual
 	}
-	if c.ErrorControl == 0 {
-		c.ErrorControl = ErrorNormal
-	}
 	if c.ServiceType == 0 {
 		c.ServiceType = windows.SERVICE_WIN32_OWN_PROCESS
 	}

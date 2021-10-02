@@ -435,16 +435,20 @@ func TestSetEnvRemote(t *testing.T) {
 			args:         []string{"statefulset", "nginx", "env=prod"},
 		},
 		{
-			name: "test batchv1 Job",
-			object: &batchv1.Job{
+			name: "set image batchv1 CronJob",
+			object: &batchv1.CronJob{
 				ObjectMeta: metav1.ObjectMeta{Name: "nginx"},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "nginx",
-									Image: "nginx",
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						Spec: batchv1.JobSpec{
+							Template: corev1.PodTemplateSpec{
+								Spec: corev1.PodSpec{
+									Containers: []corev1.Container{
+										{
+											Name:  "nginx",
+											Image: "nginx",
+										},
+									},
 								},
 							},
 						},
@@ -452,8 +456,8 @@ func TestSetEnvRemote(t *testing.T) {
 				},
 			},
 			groupVersion: batchv1.SchemeGroupVersion,
-			path:         "/namespaces/test/jobs/nginx",
-			args:         []string{"job", "nginx", "env=prod"},
+			path:         "/namespaces/test/cronjobs/nginx",
+			args:         []string{"cronjob", "nginx", "env=prod"},
 		},
 		{
 			name: "test corev1 replication controller",
@@ -665,4 +669,132 @@ func TestSetEnvFromResource(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestSetEnvRemoteWithSpecificContainers(t *testing.T) {
+	inputs := []struct {
+		name     string
+		args     []string
+		selector string
+
+		expectedContainers int
+	}{
+		{
+			name:               "all containers",
+			args:               []string{"deployments", "redis", "env=prod"},
+			selector:           "*",
+			expectedContainers: 2,
+		},
+		{
+			name:               "use wildcards to select some containers",
+			args:               []string{"deployments", "redis", "env=prod"},
+			selector:           "red*",
+			expectedContainers: 1,
+		},
+		{
+			name:               "single container",
+			args:               []string{"deployments", "redis", "env=prod"},
+			selector:           "redis",
+			expectedContainers: 1,
+		},
+	}
+
+	for _, input := range inputs {
+		mockDeployment := &appsv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "redis",
+				Namespace: "test",
+			},
+			Spec: appsv1.DeploymentSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						InitContainers: []corev1.Container{
+							{
+								Name:  "init",
+								Image: "redis",
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name:  "redis",
+								Image: "redis",
+							},
+						},
+					},
+				},
+			},
+		}
+		t.Run(input.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+			tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+			tf.Client = &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					switch p, m := req.URL.Path, req.Method; {
+					case p == "/namespaces/test/deployments/redis" && m == http.MethodGet:
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
+					case p == "/namespaces/test/deployments/redis" && m == http.MethodPatch:
+						stream, err := req.GetBody()
+						if err != nil {
+							return nil, err
+						}
+						bytes, err := ioutil.ReadAll(stream)
+						if err != nil {
+							return nil, err
+						}
+						updated := strings.Count(string(bytes), `"value":`+`"`+"prod"+`"`)
+						if updated != input.expectedContainers {
+							t.Errorf("expected %d containers to be selected but got %d \n", input.expectedContainers, updated)
+						}
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: objBody(mockDeployment)}, nil
+					default:
+						t.Errorf("%s: unexpected request: %#v\n%#v", input.name, req.URL, req)
+						return nil, nil
+					}
+				}),
+			}
+			streams := genericclioptions.NewTestIOStreamsDiscard()
+			opts := &EnvOptions{
+				PrintFlags:        genericclioptions.NewPrintFlags("").WithDefaultOutput("yaml").WithTypeSetter(scheme.Scheme),
+				ContainerSelector: input.selector,
+				Overwrite:         true,
+				IOStreams:         streams,
+			}
+			err := opts.Complete(tf, NewCmdEnv(tf, streams), input.args)
+			assert.NoError(t, err)
+			err = opts.RunEnv()
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestSetEnvDoubleStdinUsage(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: ""},
+		NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+			return nil, nil
+		}),
+	}
+	tf.ClientConfigVal = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Version: ""}}}
+
+	streams, bufIn, _, _ := genericclioptions.NewTestIOStreams()
+	bufIn.WriteString("SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL")
+	opts := NewEnvOptions(streams)
+	opts.FilenameOptions = resource.FilenameOptions{
+		Filenames: []string{"-"},
+	}
+
+	err := opts.Complete(tf, NewCmdEnv(tf, streams), []string{"-"})
+	assert.NoError(t, err)
+	err = opts.Validate()
+	assert.NoError(t, err)
+	err = opts.RunEnv()
+	assert.ErrorIs(t, err, resource.StdinMultiUseError)
 }

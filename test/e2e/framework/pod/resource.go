@@ -25,7 +25,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -34,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/podutils"
+
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -318,6 +318,20 @@ func podContainerFailed(c clientset.Interface, namespace, podName string, contai
 			return false, fmt.Errorf("pod was expected to be pending, but it is in the state: %s", pod.Status.Phase)
 		}
 		return false, nil
+	}
+}
+
+func podContainerStarted(c clientset.Interface, namespace, podName string, containerIndex int) wait.ConditionFunc {
+	return func() (bool, error) {
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if containerIndex > len(pod.Status.ContainerStatuses)-1 {
+			return false, nil
+		}
+		containerStatus := pod.Status.ContainerStatuses[containerIndex]
+		return *containerStatus.Started, nil
 	}
 }
 

@@ -40,7 +40,7 @@ const (
 	maxStatsAge = time.Minute
 )
 
-var _ = framework.KubeDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
+var _ = SIGDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]", func() {
 	f := framework.NewDefaultFramework("resource-metrics")
 	ginkgo.Context("when querying /resource/metrics", func() {
 		ginkgo.BeforeEach(func() {
@@ -86,6 +86,11 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI [NodeFeature:ResourceMetrics]
 				"container_memory_working_set_bytes": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
 					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(10*e2evolume.Kb, 80*e2evolume.Mb),
+				}),
+
+				"container_start_time_seconds": gstruct.MatchElements(containerID, gstruct.IgnoreExtras, gstruct.Elements{
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod0, "busybox-container"): boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
+					fmt.Sprintf("%s::%s::%s", f.Namespace.Name, pod1, "busybox-container"): boundedSample(time.Now().Add(-maxStatsAge).Unix(), time.Now().Add(2*time.Minute).Unix()),
 				}),
 
 				"pod_cpu_usage_seconds_total": gstruct.MatchElements(podID, gstruct.IgnoreExtras, gstruct.Elements{

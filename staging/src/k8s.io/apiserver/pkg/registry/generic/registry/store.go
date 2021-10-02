@@ -19,7 +19,6 @@ package registry
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -45,28 +44,43 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	"k8s.io/klog/v2"
 )
 
-// ObjectFunc is a function to act on a given object. An error may be returned
-// if the hook cannot be completed. An ObjectFunc may transform the provided
-// object.
-type ObjectFunc func(obj runtime.Object) error
+// FinishFunc is a function returned by Begin hooks to complete an operation.
+type FinishFunc func(ctx context.Context, success bool)
+
+// AfterDeleteFunc is the type used for the Store.AfterDelete hook.
+type AfterDeleteFunc func(obj runtime.Object, options *metav1.DeleteOptions)
+
+// BeginCreateFunc is the type used for the Store.BeginCreate hook.
+type BeginCreateFunc func(ctx context.Context, obj runtime.Object, options *metav1.CreateOptions) (FinishFunc, error)
+
+// AfterCreateFunc is the type used for the Store.AfterCreate hook.
+type AfterCreateFunc func(obj runtime.Object, options *metav1.CreateOptions)
+
+// BeginUpdateFunc is the type used for the Store.BeginUpdate hook.
+type BeginUpdateFunc func(ctx context.Context, obj, old runtime.Object, options *metav1.UpdateOptions) (FinishFunc, error)
+
+// AfterUpdateFunc is the type used for the Store.AfterUpdate hook.
+type AfterUpdateFunc func(obj runtime.Object, options *metav1.UpdateOptions)
 
 // GenericStore interface can be used for type assertions when we need to access the underlying strategies.
 type GenericStore interface {
 	GetCreateStrategy() rest.RESTCreateStrategy
 	GetUpdateStrategy() rest.RESTUpdateStrategy
 	GetDeleteStrategy() rest.RESTDeleteStrategy
-	GetExportStrategy() rest.RESTExportStrategy
 }
 
-// Store implements pkg/api/rest.StandardStorage. It's intended to be
-// embeddable and allows the consumer to implement any non-generic functions
-// that are required. This object is intended to be copyable so that it can be
-// used in different ways but share the same underlying behavior.
+// Store implements k8s.io/apiserver/pkg/registry/rest.StandardStorage. It's
+// intended to be embeddable and allows the consumer to implement any
+// non-generic functions that are required. This object is intended to be
+// copyable so that it can be used in different ways but share the same
+// underlying behavior.
 //
 // All fields are required unless specified.
 //
@@ -145,24 +159,37 @@ type Store struct {
 	// integrations that are above storage and should only be used for
 	// specific cases where storage of the value is not appropriate, since
 	// they cannot be watched.
-	Decorator ObjectFunc
+	Decorator func(runtime.Object)
+
 	// CreateStrategy implements resource-specific behavior during creation.
 	CreateStrategy rest.RESTCreateStrategy
+	// BeginCreate is an optional hook that returns a "transaction-like"
+	// commit/revert function which will be called at the end of the operation,
+	// but before AfterCreate and Decorator, indicating via the argument
+	// whether the operation succeeded.  If this returns an error, the function
+	// is not called.  Almost nobody should use this hook.
+	BeginCreate BeginCreateFunc
 	// AfterCreate implements a further operation to run after a resource is
 	// created and before it is decorated, optional.
-	AfterCreate ObjectFunc
+	AfterCreate AfterCreateFunc
 
 	// UpdateStrategy implements resource-specific behavior during updates.
 	UpdateStrategy rest.RESTUpdateStrategy
+	// BeginUpdate is an optional hook that returns a "transaction-like"
+	// commit/revert function which will be called at the end of the operation,
+	// but before AfterUpdate and Decorator, indicating via the argument
+	// whether the operation succeeded.  If this returns an error, the function
+	// is not called.  Almost nobody should use this hook.
+	BeginUpdate BeginUpdateFunc
 	// AfterUpdate implements a further operation to run after a resource is
 	// updated and before it is decorated, optional.
-	AfterUpdate ObjectFunc
+	AfterUpdate AfterUpdateFunc
 
 	// DeleteStrategy implements resource-specific behavior during deletion.
 	DeleteStrategy rest.RESTDeleteStrategy
 	// AfterDelete implements a further operation to run after a resource is
 	// deleted and before it is decorated, optional.
-	AfterDelete ObjectFunc
+	AfterDelete AfterDeleteFunc
 	// ReturnDeletedObject determines whether the Store returns the object
 	// that was deleted. Otherwise, return a generic success status response.
 	ReturnDeletedObject bool
@@ -171,12 +198,14 @@ type Store struct {
 	// If specified, this is checked in addition to standard finalizer,
 	// deletionTimestamp, and deletionGracePeriodSeconds checks.
 	ShouldDeleteDuringUpdate func(ctx context.Context, key string, obj, existing runtime.Object) bool
-	// ExportStrategy implements resource-specific behavior during export,
-	// optional. Exported objects are not decorated.
-	ExportStrategy rest.RESTExportStrategy
+
 	// TableConvertor is an optional interface for transforming items or lists
 	// of items into tabular output. If unset, the default will be used.
 	TableConvertor rest.TableConvertor
+
+	// ResetFieldsStrategy provides the fields reset by the strategy that
+	// should not be modified by the user.
+	ResetFieldsStrategy rest.ResetFieldsStrategy
 
 	// Storage is the interface for the underlying storage for the
 	// resource. It is wrapped into a "DryRunnableStorage" that will
@@ -194,7 +223,6 @@ type Store struct {
 
 // Note: the rest.StandardStorage interface aggregates the common REST verbs
 var _ rest.StandardStorage = &Store{}
-var _ rest.Exporter = &Store{}
 var _ rest.TableConvertor = &Store{}
 var _ GenericStore = &Store{}
 
@@ -283,11 +311,6 @@ func (e *Store) GetDeleteStrategy() rest.RESTDeleteStrategy {
 	return e.DeleteStrategy
 }
 
-// GetExportStrategy implements GenericStore.
-func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
-	return e.ExportStrategy
-}
-
 // List returns a list of items matching labels and field according to the
 // store's PredicateFunc.
 func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
@@ -304,9 +327,7 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 		return nil, err
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(out); err != nil {
-			return nil, err
-		}
+		e.Decorator(out)
 	}
 	return out, nil
 }
@@ -335,8 +356,27 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 	return list, storeerr.InterpretListError(err, qualifiedResource)
 }
 
+// finishNothing is a do-nothing FinishFunc.
+func finishNothing(context.Context, bool) {}
+
 // Create inserts a new item according to the unique key from the object.
+// Note that registries may mutate the input object (e.g. in the strategy
+// hooks).  Tests which call this might want to call DeepCopy if they expect to
+// be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	var finishCreate FinishFunc = finishNothing
+
+	if e.BeginCreate != nil {
+		fn, err := e.BeginCreate(ctx, obj, options)
+		if err != nil {
+			return nil, err
+		}
+		finishCreate = fn
+		defer func() {
+			finishCreate(ctx, false)
+		}()
+	}
+
 	if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
 		return nil, err
 	}
@@ -364,7 +404,7 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 	out := e.NewFunc()
 	if err := e.Storage.Create(ctx, key, obj, out, ttl, dryrun.IsDryRun(options.DryRun)); err != nil {
 		err = storeerr.InterpretCreateError(err, qualifiedResource, name)
-		err = rest.CheckGeneratedNameError(e.CreateStrategy, err, obj)
+		err = rest.CheckGeneratedNameError(ctx, e.CreateStrategy, err, obj)
 		if !apierrors.IsAlreadyExists(err) {
 			return nil, err
 		}
@@ -381,15 +421,17 @@ func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation
 		}
 		return nil, err
 	}
+	// The operation has succeeded.  Call the finish function if there is one,
+	// and then make sure the defer doesn't call it again.
+	fn := finishCreate
+	finishCreate = finishNothing
+	fn(ctx, true)
+
 	if e.AfterCreate != nil {
-		if err := e.AfterCreate(out); err != nil {
-			return nil, err
-		}
+		e.AfterCreate(out, options)
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(out); err != nil {
-			return nil, err
-		}
+		e.Decorator(out)
 	}
 	return out, nil
 }
@@ -424,16 +466,16 @@ func ShouldDeleteDuringUpdate(ctx context.Context, key string, obj, existing run
 
 // deleteWithoutFinalizers handles deleting an object ignoring its finalizer list.
 // Used for objects that are either been finalized or have never initialized.
-func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, dryRun bool) (runtime.Object, bool, error) {
+func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	out := e.NewFunc()
-	klog.V(6).Infof("going to delete %s from registry, triggered by update", name)
+	klog.V(6).InfoS("Going to delete object from registry, triggered by update", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
 	// Using the rest.ValidateAllObjectFunc because the request is an UPDATE request and has already passed the admission for the UPDATE verb.
-	if err := e.Storage.Delete(ctx, key, out, preconditions, rest.ValidateAllObjectFunc, dryRun, nil); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, preconditions, rest.ValidateAllObjectFunc, dryrun.IsDryRun(options.DryRun), nil); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
 		if storage.IsNotFound(err) {
-			_, err := e.finalizeDelete(ctx, obj, true)
+			_, err := e.finalizeDelete(ctx, obj, true, options)
 			// clients are expecting an updated object if a PUT succeeded,
 			// but finalizeDelete returns a metav1.Status, so return
 			// the object in the request instead.
@@ -441,7 +483,7 @@ func (e *Store) deleteWithoutFinalizers(ctx context.Context, name, key string, o
 		}
 		return nil, false, storeerr.InterpretDeleteError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
-	_, err := e.finalizeDelete(ctx, out, true)
+	_, err := e.finalizeDelete(ctx, out, true, options)
 	// clients are expecting an updated object if a PUT succeeded, but
 	// finalizeDelete returns a metav1.Status, so return the object in
 	// the request instead.
@@ -500,6 +542,19 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
 		if existingResourceVersion == 0 {
+			var finishCreate FinishFunc = finishNothing
+
+			if e.BeginCreate != nil {
+				fn, err := e.BeginCreate(ctx, obj, newCreateOptionsFromUpdateOptions(options))
+				if err != nil {
+					return nil, nil, err
+				}
+				finishCreate = fn
+				defer func() {
+					finishCreate(ctx, false)
+				}()
+			}
+
 			creating = true
 			creatingObj = obj
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -516,6 +571,12 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			if err != nil {
 				return nil, nil, err
 			}
+
+			// The operation has succeeded.  Call the finish function if there is one,
+			// and then make sure the defer doesn't call it again.
+			fn := finishCreate
+			finishCreate = finishNothing
+			fn(ctx, true)
 
 			return obj, &ttl, nil
 		}
@@ -544,6 +605,20 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 				return nil, nil, apierrors.NewConflict(qualifiedResource, name, fmt.Errorf(OptimisticLockErrorMsg))
 			}
 		}
+
+		var finishUpdate FinishFunc = finishNothing
+
+		if e.BeginUpdate != nil {
+			fn, err := e.BeginUpdate(ctx, obj, existing, options)
+			if err != nil {
+				return nil, nil, err
+			}
+			finishUpdate = fn
+			defer func() {
+				finishUpdate(ctx, false)
+			}()
+		}
+
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, nil, err
 		}
@@ -564,6 +639,13 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		if err != nil {
 			return nil, nil, err
 		}
+
+		// The operation has succeeded.  Call the finish function if there is one,
+		// and then make sure the defer doesn't call it again.
+		fn := finishUpdate
+		finishUpdate = finishNothing
+		fn(ctx, true)
+
 		if int64(ttl) != res.TTL {
 			return obj, &ttl, nil
 		}
@@ -573,11 +655,11 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	if err != nil {
 		// delete the object
 		if err == errEmptiedFinalizers {
-			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions, dryrun.IsDryRun(options.DryRun))
+			return e.deleteWithoutFinalizers(ctx, name, key, deleteObj, storagePreconditions, newDeleteOptionsFromUpdateOptions(options))
 		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, qualifiedResource, name)
-			err = rest.CheckGeneratedNameError(e.CreateStrategy, err, creatingObj)
+			err = rest.CheckGeneratedNameError(ctx, e.CreateStrategy, err, creatingObj)
 		} else {
 			err = storeerr.InterpretUpdateError(err, qualifiedResource, name)
 		}
@@ -586,23 +668,38 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 
 	if creating {
 		if e.AfterCreate != nil {
-			if err := e.AfterCreate(out); err != nil {
-				return nil, false, err
-			}
+			e.AfterCreate(out, newCreateOptionsFromUpdateOptions(options))
 		}
 	} else {
 		if e.AfterUpdate != nil {
-			if err := e.AfterUpdate(out); err != nil {
-				return nil, false, err
-			}
+			e.AfterUpdate(out, options)
 		}
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(out); err != nil {
-			return nil, false, err
-		}
+		e.Decorator(out)
 	}
 	return out, creating, nil
+}
+
+// This is a helper to convert UpdateOptions to CreateOptions for the
+// create-on-update path.
+func newCreateOptionsFromUpdateOptions(in *metav1.UpdateOptions) *metav1.CreateOptions {
+	co := &metav1.CreateOptions{
+		DryRun:       in.DryRun,
+		FieldManager: in.FieldManager,
+	}
+	co.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("CreateOptions"))
+	return co
+}
+
+// This is a helper to convert UpdateOptions to DeleteOptions for the
+// delete-on-update path.
+func newDeleteOptionsFromUpdateOptions(in *metav1.UpdateOptions) *metav1.DeleteOptions {
+	do := &metav1.DeleteOptions{
+		DryRun: in.DryRun,
+	}
+	do.TypeMeta.SetGroupVersionKind(metav1.SchemeGroupVersion.WithKind("DeleteOptions"))
+	return do
 }
 
 // Get retrieves the item from storage.
@@ -616,9 +713,7 @@ func (e *Store) Get(ctx context.Context, name string, options *metav1.GetOptions
 		return nil, storeerr.InterpretGetError(err, e.qualifiedResourceFromContext(ctx), name)
 	}
 	if e.Decorator != nil {
-		if err := e.Decorator(obj); err != nil {
-			return nil, err
-		}
+		e.Decorator(obj)
 	}
 	return obj, nil
 }
@@ -658,7 +753,9 @@ func shouldOrphanDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	}
 
 	// An explicit policy was set at deletion time, that overrides everything
+	//lint:ignore SA1019 backwards compatibility
 	if options != nil && options.OrphanDependents != nil {
+		//lint:ignore SA1019 backwards compatibility
 		return *options.OrphanDependents
 	}
 	if options != nil && options.PropagationPolicy != nil {
@@ -699,6 +796,7 @@ func shouldDeleteDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	}
 
 	// If an explicit policy was set at deletion time, that overrides both
+	//lint:ignore SA1019 backwards compatibility
 	if options != nil && options.OrphanDependents != nil {
 		return false
 	}
@@ -841,7 +939,8 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 			if !graceful {
 				// set the DeleteGracePeriods to 0 if the object has pendingFinalizers but not supporting graceful deletion
 				if pendingFinalizers {
-					klog.V(6).Infof("update the DeletionTimestamp to \"now\" and GracePeriodSeconds to 0 for object %s, because it has pending finalizers", name)
+					klog.V(6).InfoS("Object has pending finalizers, so the registry is going to update its status to deleting",
+						"object", klog.KRef(genericapirequest.NamespaceValue(ctx), name), "gracePeriod", time.Second*0)
 					err = markAsDeleting(existing, time.Now())
 					if err != nil {
 						return nil, err
@@ -879,7 +978,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 		// we should fall through and truly delete the object.
 		return nil, false, true, out, lastExisting
 	case errAlreadyDeleting:
-		out, err = e.finalizeDelete(ctx, in, true)
+		out, err = e.finalizeDelete(ctx, in, true, options)
 		return err, false, false, out, lastExisting
 	default:
 		return storeerr.InterpretUpdateError(err, e.qualifiedResourceFromContext(ctx), name), false, false, out, lastExisting
@@ -887,6 +986,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx context.Context, name
 }
 
 // Delete removes the item from storage.
+// options can be mutated by rest.BeforeDelete due to a graceful deletion strategy.
 func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
@@ -913,7 +1013,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	}
 	// this means finalizers cannot be updated via DeleteOptions if a deletion is already pending
 	if pendingGraceful {
-		out, err := e.finalizeDelete(ctx, obj, false)
+		out, err := e.finalizeDelete(ctx, obj, false, options)
 		return out, false, err
 	}
 	// check if obj has pending finalizers
@@ -961,7 +1061,7 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 	}
 
 	// delete immediately, or no graceful deletion supported
-	klog.V(6).Infof("going to delete %s from registry: ", name)
+	klog.V(6).InfoS("Going to delete object from registry", "object", klog.KRef(genericapirequest.NamespaceValue(ctx), name))
 	out = e.NewFunc()
 	if err := e.Storage.Delete(ctx, key, out, &preconditions, storage.ValidateObjectFunc(deleteValidation), dryrun.IsDryRun(options.DryRun), nil); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
@@ -969,12 +1069,12 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
 			// The lastExisting object may not be the last state of the object
 			// before its deletion, but it's the best approximation.
-			out, err := e.finalizeDelete(ctx, lastExisting, true)
+			out, err := e.finalizeDelete(ctx, lastExisting, true, options)
 			return out, true, err
 		}
 		return nil, false, storeerr.InterpretDeleteError(err, qualifiedResource, name)
 	}
-	out, err = e.finalizeDelete(ctx, out, true)
+	out, err = e.finalizeDelete(ctx, out, true, options)
 	return out, true, err
 }
 
@@ -1053,8 +1153,12 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 					errs <- err
 					return
 				}
-				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options); err != nil && !apierrors.IsNotFound(err) {
-					klog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
+				// DeepCopy the deletion options because individual graceful deleters communicate changes via a mutating
+				// function in the delete strategy called in the delete method.  While that is always ugly, it works
+				// when making a single call.  When making multiple calls via delete collection, the mutation applied to
+				// pod/A can change the option ultimately used for pod/B.
+				if _, _, err := e.Delete(ctx, accessor.GetName(), deleteValidation, options.DeepCopy()); err != nil && !apierrors.IsNotFound(err) {
+					klog.V(4).InfoS("Delete object in DeleteCollection failed", "object", klog.KObj(accessor), "err", err)
 					errs <- err
 					return
 				}
@@ -1072,17 +1176,13 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 
 // finalizeDelete runs the Store's AfterDelete hook if runHooks is set and
 // returns the decorated deleted object if appropriate.
-func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks bool) (runtime.Object, error) {
+func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks bool, options *metav1.DeleteOptions) (runtime.Object, error) {
 	if runHooks && e.AfterDelete != nil {
-		if err := e.AfterDelete(obj); err != nil {
-			return nil, err
-		}
+		e.AfterDelete(obj, options)
 	}
 	if e.ReturnDeletedObject {
 		if e.Decorator != nil {
-			if err := e.Decorator(obj); err != nil {
-				return nil, err
-			}
+			e.Decorator(obj)
 		}
 		return obj, nil
 	}
@@ -1136,7 +1236,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 				return nil, err
 			}
 			if e.Decorator != nil {
-				return newDecoratedWatcher(w, e.Decorator), nil
+				return newDecoratedWatcher(ctx, w, e.Decorator), nil
 			}
 			return w, nil
 		}
@@ -1149,7 +1249,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 		return nil, err
 	}
 	if e.Decorator != nil {
-		return newDecoratedWatcher(w, e.Decorator), nil
+		return newDecoratedWatcher(ctx, w, e.Decorator), nil
 	}
 	return w, nil
 }
@@ -1171,44 +1271,6 @@ func (e *Store) calculateTTL(obj runtime.Object, defaultTTL int64, update bool) 
 		ttl, err = e.TTLFunc(obj, ttl, update)
 	}
 	return ttl, err
-}
-
-// exportObjectMeta unsets the fields on the given object that should not be
-// present when the object is exported.
-func exportObjectMeta(accessor metav1.Object, exact bool) {
-	accessor.SetUID("")
-	if !exact {
-		accessor.SetNamespace("")
-	}
-	accessor.SetCreationTimestamp(metav1.Time{})
-	accessor.SetDeletionTimestamp(nil)
-	accessor.SetResourceVersion("")
-	accessor.SetSelfLink("")
-	if len(accessor.GetGenerateName()) > 0 && !exact {
-		accessor.SetName("")
-	}
-}
-
-// Export implements the rest.Exporter interface
-func (e *Store) Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error) {
-	obj, err := e.Get(ctx, name, &metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	if accessor, err := meta.Accessor(obj); err == nil {
-		exportObjectMeta(accessor, opts.Exact)
-	} else {
-		klog.V(4).Infof("Object of type %v does not have ObjectMeta: %v", reflect.TypeOf(obj), err)
-	}
-
-	if e.ExportStrategy != nil {
-		if err = e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
-			return nil, err
-		}
-	} else {
-		e.CreateStrategy.PrepareForCreate(ctx, obj)
-	}
-	return obj, nil
 }
 
 // CompleteWithOptions updates the store with the provided options and
@@ -1355,7 +1417,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.StorageVersioner = opts.StorageConfig.EncodeVersioner
 
 		if opts.CountMetricPollPeriod > 0 {
-			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod)
+			stopFunc := e.startObservingCount(opts.CountMetricPollPeriod, opts.StorageObjectCountTracker)
 			previousDestroy := e.DestroyFunc
 			e.DestroyFunc = func() {
 				stopFunc()
@@ -1370,18 +1432,21 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 }
 
 // startObservingCount starts monitoring given prefix and periodically updating metrics. It returns a function to stop collection.
-func (e *Store) startObservingCount(period time.Duration) func() {
+func (e *Store) startObservingCount(period time.Duration, objectCountTracker flowcontrolrequest.StorageObjectCountTracker) func() {
 	prefix := e.KeyRootFunc(genericapirequest.NewContext())
 	resourceName := e.DefaultQualifiedResource.String()
-	klog.V(2).Infof("Monitoring %v count at <storage-prefix>/%v", resourceName, prefix)
+	klog.V(2).InfoS("Monitoring resource count at path", "resource", resourceName, "path", "<storage-prefix>/"+prefix)
 	stopCh := make(chan struct{})
 	go wait.JitterUntil(func() {
 		count, err := e.Storage.Count(prefix)
 		if err != nil {
-			klog.V(5).Infof("Failed to update storage count metric: %v", err)
-			metrics.UpdateObjectCount(resourceName, -1)
-		} else {
-			metrics.UpdateObjectCount(resourceName, count)
+			klog.V(5).InfoS("Failed to update storage count metric", "err", err)
+			count = -1
+		}
+
+		metrics.UpdateObjectCount(resourceName, count)
+		if objectCountTracker != nil {
+			objectCountTracker.Set(resourceName, count)
 		}
 	}, period, resourceCountPollPeriodJitter, true, stopCh)
 	return func() { close(stopCh) }
@@ -1396,6 +1461,14 @@ func (e *Store) ConvertToTable(ctx context.Context, object runtime.Object, table
 
 func (e *Store) StorageVersion() runtime.GroupVersioner {
 	return e.StorageVersioner
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (e *Store) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	if e.ResetFieldsStrategy == nil {
+		return nil
+	}
+	return e.ResetFieldsStrategy.GetResetFields()
 }
 
 // validateIndexers will check the prefix of indexers.

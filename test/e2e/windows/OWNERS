@@ -1,10 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- benmoss
 - ddebroy
 - marosset
-- michmike
+- jayunit100
+- jsturtevant
+- ravisantoshgudimetla
 reviewers:
 - adelina-t
 - bclau
@@ -13,8 +14,13 @@ reviewers:
 - feiskyer
 - ksubrmnn
 - madhanrm
+- jayunit100
+- jsturtevant
 - yujuhong
+- ravisantoshgudimetla
 emeritus_approvers:
+- benmoss
+- michmike
 - dchen1107
 - patricklang
 labels:

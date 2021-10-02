@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -21,7 +22,6 @@ package openstack
 import (
 	"context"
 	"errors"
-	"net"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
+	netutils "k8s.io/utils/net"
 )
 
 var errNoRouterID = errors.New("router-id not set in cloud provider config")
@@ -154,7 +155,7 @@ func (r *Routes) CreateRoute(ctx context.Context, clusterName string, nameHint s
 
 	onFailure := newCaller()
 
-	ip, _, _ := net.ParseCIDR(route.DestinationCIDR)
+	ip, _, _ := netutils.ParseCIDRSloppy(route.DestinationCIDR)
 	isCIDRv6 := ip.To4() == nil
 	addr, err := getAddressByName(r.compute, route.TargetNode, isCIDRv6)
 
@@ -230,7 +231,7 @@ func (r *Routes) DeleteRoute(ctx context.Context, clusterName string, route *clo
 
 	onFailure := newCaller()
 
-	ip, _, _ := net.ParseCIDR(route.DestinationCIDR)
+	ip, _, _ := netutils.ParseCIDRSloppy(route.DestinationCIDR)
 	isCIDRv6 := ip.To4() == nil
 
 	var addr string

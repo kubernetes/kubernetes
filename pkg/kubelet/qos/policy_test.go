@@ -139,9 +139,24 @@ var (
 
 	systemCritical = scheduling.SystemCriticalPriority
 
-	critical = v1.Pod{
+	clusterCritical = v1.Pod{
 		Spec: v1.PodSpec{
-			Priority: &systemCritical,
+			PriorityClassName: scheduling.SystemClusterCritical,
+			Priority:          &systemCritical,
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{},
+				},
+			},
+		},
+	}
+
+	systemNodeCritical = scheduling.SystemCriticalPriority + 1000
+
+	nodeCritical = v1.Pod{
+		Spec: v1.PodSpec{
+			PriorityClassName: scheduling.SystemNodeCritical,
+			Priority:          &systemNodeCritical,
 			Containers: []v1.Container{
 				{
 					Resources: v1.ResourceRequirements{},
@@ -203,7 +218,13 @@ func TestGetContainerOOMScoreAdjust(t *testing.T) {
 			highOOMScoreAdj: 3,
 		},
 		{
-			pod:             &critical,
+			pod:             &clusterCritical,
+			memoryCapacity:  4000000000,
+			lowOOMScoreAdj:  1000,
+			highOOMScoreAdj: 1000,
+		},
+		{
+			pod:             &nodeCritical,
 			memoryCapacity:  4000000000,
 			lowOOMScoreAdj:  -997,
 			highOOMScoreAdj: -997,

@@ -98,12 +98,22 @@ type ConfigFlags struct {
 	Username         *string
 	Password         *string
 	Timeout          *string
+	// If non-nil, wrap config function can transform the Config
+	// before it is returned in ToRESTConfig function.
+	WrapConfigFn func(*rest.Config) *rest.Config
 
-	clientConfig clientcmd.ClientConfig
-	lock         sync.Mutex
-	// If set to true, will use persistent client config and
-	// propagate the config to the places that need it, rather than
-	// loading the config multiple times
+	clientConfig     clientcmd.ClientConfig
+	clientConfigLock sync.Mutex
+
+	restMapper     meta.RESTMapper
+	restMapperLock sync.Mutex
+
+	discoveryClient     discovery.CachedDiscoveryInterface
+	discoveryClientLock sync.Mutex
+
+	// If set to true, will use persistent client config, rest mapper, discovery client, and
+	// propagate them to the places that need them, rather than
+	// instantiating them multiple times.
 	usePersistentConfig bool
 	// Allows increasing burst used for discovery, this is useful
 	// in clusters with many registered resources
@@ -113,9 +123,17 @@ type ConfigFlags struct {
 // ToRESTConfig implements RESTClientGetter.
 // Returns a REST client configuration based on a provided path
 // to a .kubeconfig file, loading rules, and config flag overrides.
-// Expects the AddFlags method to have been called.
+// Expects the AddFlags method to have been called. If WrapConfigFn
+// is non-nil this function can transform config before return.
 func (f *ConfigFlags) ToRESTConfig() (*rest.Config, error) {
-	return f.ToRawKubeConfigLoader().ClientConfig()
+	c, err := f.ToRawKubeConfigLoader().ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	if f.WrapConfigFn != nil {
+		return f.WrapConfigFn(c), nil
+	}
+	return c, nil
 }
 
 // ToRawKubeConfigLoader binds config flag values to config overrides
@@ -205,8 +223,8 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 // toRawKubePersistentConfigLoader binds config flag values to config overrides
 // Returns a persistent clientConfig for propagation.
 func (f *ConfigFlags) toRawKubePersistentConfigLoader() clientcmd.ClientConfig {
-	f.lock.Lock()
-	defer f.lock.Unlock()
+	f.clientConfigLock.Lock()
+	defer f.clientConfigLock.Unlock()
 
 	if f.clientConfig == nil {
 		f.clientConfig = f.toRawKubeConfigLoader()
@@ -219,6 +237,27 @@ func (f *ConfigFlags) toRawKubePersistentConfigLoader() clientcmd.ClientConfig {
 // Expects the AddFlags method to have been called.
 // Returns a CachedDiscoveryInterface using a computed RESTConfig.
 func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	if f.usePersistentConfig {
+		return f.toPersistentDiscoveryClient()
+	}
+	return f.toDiscoveryClient()
+}
+
+func (f *ConfigFlags) toPersistentDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	f.discoveryClientLock.Lock()
+	defer f.discoveryClientLock.Unlock()
+
+	if f.discoveryClient == nil {
+		discoveryClient, err := f.toDiscoveryClient()
+		if err != nil {
+			return nil, err
+		}
+		f.discoveryClient = discoveryClient
+	}
+	return f.discoveryClient, nil
+}
+
+func (f *ConfigFlags) toDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return nil, err
@@ -244,6 +283,27 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 
 // ToRESTMapper returns a mapper.
 func (f *ConfigFlags) ToRESTMapper() (meta.RESTMapper, error) {
+	if f.usePersistentConfig {
+		return f.toPersistentRESTMapper()
+	}
+	return f.toRESTMapper()
+}
+
+func (f *ConfigFlags) toPersistentRESTMapper() (meta.RESTMapper, error) {
+	f.restMapperLock.Lock()
+	defer f.restMapperLock.Unlock()
+
+	if f.restMapper == nil {
+		restMapper, err := f.toRESTMapper()
+		if err != nil {
+			return nil, err
+		}
+		f.restMapper = restMapper
+	}
+	return f.restMapper, nil
+}
+
+func (f *ConfigFlags) toRESTMapper() (meta.RESTMapper, error) {
 	discoveryClient, err := f.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
@@ -274,7 +334,7 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 		flags.StringVar(f.BearerToken, flagBearerToken, *f.BearerToken, "Bearer token for authentication to the API server")
 	}
 	if f.Impersonate != nil {
-		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation")
+		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation. User could be a regular user or a service account in a namespace.")
 	}
 	if f.ImpersonateGroup != nil {
 		flags.StringArrayVar(f.ImpersonateGroup, flagImpersonateGroup, *f.ImpersonateGroup, "Group to impersonate for the operation, this flag can be repeated to specify multiple groups.")
@@ -313,7 +373,6 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Timeout != nil {
 		flags.StringVar(f.Timeout, flagTimeout, *f.Timeout, "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.")
 	}
-
 }
 
 // WithDeprecatedPasswordFlag enables the username and password config flags
@@ -366,7 +425,7 @@ func stringptr(val string) *string {
 }
 
 // overlyCautiousIllegalFileCharacters matches characters that *might* not be supported.  Windows is really restrictive, so this is really restrictive
-var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/\.)]`)
+var overlyCautiousIllegalFileCharacters = regexp.MustCompile(`[^(\w/.)]`)
 
 // computeDiscoverCacheDir takes the parentDir and the host and comes up with a "usually non-colliding" name.
 func computeDiscoverCacheDir(parentDir, host string) string {

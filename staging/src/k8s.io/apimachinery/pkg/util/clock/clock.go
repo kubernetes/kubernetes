@@ -34,6 +34,7 @@ type PassiveClock interface {
 type Clock interface {
 	PassiveClock
 	After(time.Duration) <-chan time.Time
+	AfterFunc(time.Duration, func()) Timer
 	NewTimer(time.Duration) Timer
 	Sleep(time.Duration)
 	NewTicker(time.Duration) Ticker
@@ -55,6 +56,13 @@ func (RealClock) Since(ts time.Time) time.Duration {
 // After is the same as time.After(d).
 func (RealClock) After(d time.Duration) <-chan time.Time {
 	return time.After(d)
+}
+
+// AfterFunc is the same as time.AfterFunc(d, f).
+func (RealClock) AfterFunc(d time.Duration, f func()) Timer {
+	return &realTimer{
+		timer: time.AfterFunc(d, f),
+	}
 }
 
 // NewTimer returns a new Timer.
@@ -95,6 +103,7 @@ type fakeClockWaiter struct {
 	stepInterval  time.Duration
 	skipIfBlocked bool
 	destChan      chan time.Time
+	afterFunc     func()
 }
 
 // NewFakePassiveClock returns a new FakePassiveClock.
@@ -143,6 +152,25 @@ func (f *FakeClock) After(d time.Duration) <-chan time.Time {
 		destChan:   ch,
 	})
 	return ch
+}
+
+// AfterFunc is the Fake version of time.AfterFunc(d, callback).
+func (f *FakeClock) AfterFunc(d time.Duration, cb func()) Timer {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	stopTime := f.time.Add(d)
+	ch := make(chan time.Time, 1) // Don't block!
+
+	timer := &fakeTimer{
+		fakeClock: f,
+		waiter: fakeClockWaiter{
+			targetTime: stopTime,
+			destChan:   ch,
+			afterFunc:  cb,
+		},
+	}
+	f.waiters = append(f.waiters, timer.waiter)
+	return timer
 }
 
 // NewTimer is the Fake version of time.NewTimer(d).
@@ -211,6 +239,10 @@ func (f *FakeClock) setTimeLocked(t time.Time) {
 				w.destChan <- t
 			}
 
+			if w.afterFunc != nil {
+				w.afterFunc()
+			}
+
 			if w.stepInterval > 0 {
 				for !w.targetTime.After(t) {
 					w.targetTime = w.targetTime.Add(w.stepInterval)
@@ -225,8 +257,8 @@ func (f *FakeClock) setTimeLocked(t time.Time) {
 	f.waiters = newWaiters
 }
 
-// HasWaiters returns true if After has been called on f but not yet satisfied (so you can
-// write race-free tests).
+// HasWaiters returns true if After or AfterFunc has been called on f but not yet satisfied
+// (so you can write race-free tests).
 func (f *FakeClock) HasWaiters() bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
@@ -259,6 +291,12 @@ func (i *IntervalClock) Since(ts time.Time) time.Duration {
 // TODO: make interval clock use FakeClock so this can be implemented.
 func (*IntervalClock) After(d time.Duration) <-chan time.Time {
 	panic("IntervalClock doesn't implement After")
+}
+
+// AfterFunc is currently unimplemented, will panic.
+// TODO: make interval clock use FakeClock so this can be implemented.
+func (*IntervalClock) AfterFunc(d time.Duration, cb func()) Timer {
+	panic("IntervalClock doesn't implement AfterFunc")
 }
 
 // NewTimer is currently unimplemented, will panic.

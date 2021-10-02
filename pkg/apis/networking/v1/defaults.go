@@ -20,6 +20,9 @@ import (
 	"k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -41,5 +44,14 @@ func SetDefaults_NetworkPolicy(obj *networkingv1.NetworkPolicy) {
 		if len(obj.Spec.Egress) != 0 {
 			obj.Spec.PolicyTypes = append(obj.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 		}
+	}
+}
+
+func SetDefaults_IngressClass(obj *networkingv1.IngressClass) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IngressClassNamespacedParams) {
+		return
+	}
+	if obj.Spec.Parameters != nil && obj.Spec.Parameters.Scope == nil {
+		obj.Spec.Parameters.Scope = utilpointer.StringPtr(networkingv1.IngressClassParametersReferenceScopeCluster)
 	}
 }

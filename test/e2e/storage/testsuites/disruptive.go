@@ -26,7 +26,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
@@ -170,7 +169,7 @@ func (s *disruptiveTestSuite) DefineTests(driver storageframework.TestDriver, pa
 						InlineVolumeSources: inlineSources,
 						SeLinuxLabel:        e2epv.SELinuxLabel,
 						NodeSelection:       l.config.ClientNodeSelection,
-						ImageID:             e2evolume.GetDefaultTestImageID(),
+						ImageID:             e2epod.GetDefaultTestImageID(),
 					}
 					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, &podConfig, f.Timeouts.PodStart)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")

@@ -14,7 +14,7 @@ import (
 // of registering them with the graphdriver, graph, and tagstore.
 func GetSharedBaseImages(ctx context.Context) (_ string, err error) {
 	title := "hcsshim::GetSharedBaseImages"
-	ctx, span := trace.StartSpan(ctx, title)
+	ctx, span := trace.StartSpan(ctx, title) //nolint:ineffassign,staticcheck
 	defer span.End()
 	defer func() { oc.SetSpanStatus(span, err) }()
 

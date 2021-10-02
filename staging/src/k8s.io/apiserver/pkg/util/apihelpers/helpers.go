@@ -19,7 +19,7 @@ package apihelpers
 import (
 	"sort"
 
-	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
+	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 )
 
 // SetFlowSchemaCondition sets conditions.

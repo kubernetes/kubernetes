@@ -895,7 +895,7 @@ Support for Windows Nodes is Graduating to Stable ([#116](https://github.com/kub
 - Support for Windows Server 2019 for worker nodes and containers
 - Support for out of tree networking with Azure-CNI, OVN-Kubernetes and Flannel
 - Improved support for pods, service types, workload controllers and metrics/quotas to closely match the capabilities offered for Linux containers
-kubernetes/enhancements: [#116](https://github.com/kubernetes/enhancements/issues/116) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/20190103-windows-node-support.md)]
+kubernetes/enhancements: [#116](https://github.com/kubernetes/enhancements/issues/116) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/116-windows-node-support/README.md)]
 
 Updated Plugin Mechanism for kubectl is Graduating to Stable ([#579](https://github.com/kubernetes/enhancements/issues/579))
 
@@ -908,26 +908,26 @@ Durable Local Storage Management is Now GA ([#121](https://github.com/kubernetes
 - Makes locally attached (non-network attached) storage available as a persistent volume source.
 - Allows users to take advantage of the typically cheaper and improved performance of persistent local storage
 kubernetes/kubernetes: [#73525](https://github.com/kubernetes/kubernetes/pull/73525), [#74391](https://github.com/kubernetes/kubernetes/pull/74391), [#74769](http://github.com/kubernetes/kubernetes/pull/74769)
-kubernetes/enhancements: [#121](https://github.com/kubernetes/enhancements/issues/121#issuecomment-457396290) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-storage/20190124-local-persistent-volumes.md)]
+kubernetes/enhancements: [#121](https://github.com/kubernetes/enhancements/issues/121#issuecomment-457396290) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-storage/121-local-persistent-volumes/README.md)]
 
 Pid Limiting is Graduating to Beta ([#757](https://github.com/kubernetes/enhancements/issues/757))
 
 - Prevents a pod from starving pid resource
 - Ability to isolate pid resources pod-to-pod and node-to-pod
 kubernetes/kubernetes: [#73651](https://github.com/kubernetes/kubernetes/pull/73651)
-kubernetes/enhancements: [#757](https://github.com/kubernetes/enhancements/issues/757) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20190129-pid-limiting.md)]
+kubernetes/enhancements: [#757](https://github.com/kubernetes/enhancements/issues/757) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/757-pid-limiting/README.md)]
 
 Pod Priority and Preemption in Kubernetes ([#564](https://github.com/kubernetes/enhancements/issues/564))
 
 - Pod priority and preemption enables Kubernetes scheduler to schedule more important Pods first and when cluster is out of resources, it removes less important pods to create room for more important ones. The importance is specified by priority.
 kubernetes/kubernetes: [#73498](https://github.com/kubernetes/kubernetes/pull/73498), [#73555](https://github.com/kubernetes/kubernetes/pull/73555), [#74465](https://github.com/kubernetes/kubernetes/pull/74465)
-kubernetes/enhancements: [#564](https://github.com/kubernetes/enhancements/issues/564)  [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-scheduling/20190131-pod-priority-preemption.md)]
+kubernetes/enhancements: [#564](https://github.com/kubernetes/enhancements/issues/564)  [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-scheduling/268-priority-preemption/README.md)]
 
 Pod Ready++ ([#580](https://github.com/kubernetes/enhancements/issues/580))
 
 - Introduces extension point for external feedback on pod readiness.
 kubernetes/kubernetes: [#74434](http://github.com/kubernetes/kubernetes/pull/74434),
-kubernetes/enhancements: [#580](https://github.com/kubernetes/enhancements/issues/580) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-network/0007-pod-ready%2B%2B.md)]
+kubernetes/enhancements: [#580](https://github.com/kubernetes/enhancements/issues/580) [[kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-network/580-pod-readiness-gates/README.md)]
 
 Kubeadm: Automate certificate copy between control planes in HA setups
 
@@ -940,7 +940,7 @@ Kubeadm: Expose the `kubeadm join` workflow as phases
 
 - The `kubeadm join` command can now be used in phases. Similar to the work that was done for `kubeadm init` in 1.13, in 1.14 the `join` phases can be now executed step-by-step/selectively using the `kubeadm join phase` sub-command. This makes it possible to further customize the workflow of joining nodes to the cluster.
 kubernetes/kubeadm: [#1204](https://github.com/kubernetes/kubeadm/issues/1204)
-kubernetes/enhancements: [kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/kubeadm/0029-20180918-kubeadm-phases-beta.md)
+kubernetes/enhancements: [kep](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cluster-lifecycle/kubeadm/2501-kubeadm-phases-to-beta/README.md)
 
 ## Known Issues
 

@@ -1,20 +1,21 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- mtaufen
-- stealthybox
-- luxas
-- sttts
-- lavalamp
+- sig-architecture-approvers
 reviewers:
-- luxas
-- sttts
-- stewart-yu
-- dims
-- dixudx
-- rosti
+- sig-architecture-approvers
 emeritus_approvers:
 - jbeda
+- lavalamp
+- luxas
+- mtaufen
+- stealthybox
+- sttts
+emeritus_reviewers:
+- dixudx
+- rosti
+- stewart-yu
 labels:
+- sig/architecture
 - sig/cluster-lifecycle
 - sig/api-machinery

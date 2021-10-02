@@ -95,7 +95,7 @@ func (cm *Chaosmonkey) Do() {
 	for _, sem := range sems {
 		// Wait for test to be ready.  We have to wait for ready *or done* because a test
 		// may panic before signaling that its ready, and we shouldn't block.  Since we
-		// defered sem.done() above, if a test panics, it's marked as done.
+		// deferred sem.done() above, if a test panics, it's marked as done.
 		sem.waitForReadyOrDone()
 	}
 

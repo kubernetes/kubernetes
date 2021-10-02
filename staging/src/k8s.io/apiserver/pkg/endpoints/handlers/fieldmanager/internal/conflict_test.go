@@ -96,6 +96,31 @@ conflicts with "foo" using v1 at 2001-02-03T04:05:06Z:
 				},
 			},
 		},
+		{
+			conflict: merge.Conflicts{
+				merge.Conflict{
+					Manager: `{"manager":"foo","operation":"Update","subresource":"scale","apiVersion":"v1","time":"2001-02-03T04:05:06Z"}`,
+					Path:    fieldpath.MakePathOrDie("spec", "replicas"),
+				},
+			},
+			expected: &errors.StatusError{
+				ErrStatus: metav1.Status{
+					Status: metav1.StatusFailure,
+					Code:   http.StatusConflict,
+					Reason: metav1.StatusReasonConflict,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{
+								Type:    metav1.CauseTypeFieldManagerConflict,
+								Message: `conflict with "foo" with subresource "scale" using v1 at 2001-02-03T04:05:06Z`,
+								Field:   ".spec.replicas",
+							},
+						},
+					},
+					Message: `Apply failed with 1 conflict: conflict with "foo" with subresource "scale" using v1 at 2001-02-03T04:05:06Z: .spec.replicas`,
+				},
+			},
+		},
 	}
 	for _, tc := range testCases {
 		actual := internal.NewConflictError(tc.conflict)

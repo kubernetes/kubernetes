@@ -25,7 +25,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -43,7 +42,6 @@ import (
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -108,9 +106,6 @@ var (
 	// This timeout covers two resync/retry periods, and should be added to wait timeouts to account for delays
 	// to the GC controller caused by API changes in other tests.
 	gcInformerResyncRetryTimeout = time.Minute
-
-	// CronJobGroupVersionResource unambiguously identifies a CronJob resource.
-	CronJobGroupVersionResource = schema.GroupVersionResource{Group: batchv1beta1.GroupName, Version: "v1beta1", Resource: "cronjobs"}
 )
 
 func getPodTemplateSpec(labels map[string]string) v1.PodTemplateSpec {
@@ -231,7 +226,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 				ginkgo.By(fmt.Sprintf("expected %d RCs, got %d RCs", num, len(rcs.Items)))
 			}
 		case "CronJobs":
-			cronJobs, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+			cronJobs, err := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, fmt.Errorf("failed to list cronjobs: %v", err)
 			}
@@ -259,7 +254,7 @@ func verifyRemainingObjects(f *framework.Framework, objects map[string]int) (boo
 func gatherMetrics(f *framework.Framework) {
 	ginkgo.By("Gathering metrics")
 	var summary framework.TestDataSummary
-	grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, false, false, true, false, false)
+	grabber, err := e2emetrics.NewMetricsGrabber(f.ClientSet, f.KubemarkExternalClusterClientSet, f.ClientConfig(), false, false, true, false, false, false)
 	if err != nil {
 		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
 	} else {
@@ -273,19 +268,19 @@ func gatherMetrics(f *framework.Framework) {
 	}
 }
 
-func newCronJob(name, schedule string) *batchv1beta1.CronJob {
+func newCronJob(name, schedule string) *batchv1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &batchv1beta1.CronJob{
+	return &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind: "CronJob",
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule: schedule,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
 					Parallelism: &parallelism,
 					Completions: &completions,
@@ -1158,11 +1153,10 @@ var _ = SIGDescribe("Garbage collector", func() {
 	})
 
 	ginkgo.It("should delete jobs and pods created by cronjob", func() {
-		e2eskipper.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResource, f.Namespace.Name)
 
 		ginkgo.By("Create the cronjob")
 		cronJob := newCronJob("simple", "*/1 * * * ?")
-		cronJob, err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Create(context.TODO(), cronJob, metav1.CreateOptions{})
+		cronJob, err := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).Create(context.TODO(), cronJob, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create cronjob: %+v, in namespace: %s", cronJob, f.Namespace.Name)
 
 		ginkgo.By("Wait for the CronJob to create new Job")
@@ -1178,7 +1172,7 @@ var _ = SIGDescribe("Garbage collector", func() {
 		}
 
 		ginkgo.By("Delete the cronjob")
-		if err := f.ClientSet.BatchV1beta1().CronJobs(f.Namespace.Name).Delete(context.TODO(), cronJob.Name, getBackgroundOptions()); err != nil {
+		if err := f.ClientSet.BatchV1().CronJobs(f.Namespace.Name).Delete(context.TODO(), cronJob.Name, getBackgroundOptions()); err != nil {
 			framework.Failf("Failed to delete the CronJob: %v", err)
 		}
 		ginkgo.By("Verify if cronjob does not leave jobs nor pods behind")

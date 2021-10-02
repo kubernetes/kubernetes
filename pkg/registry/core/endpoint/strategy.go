@@ -55,6 +55,11 @@ func (endpointsStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	return validation.ValidateEndpointsCreate(obj.(*api.Endpoints))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (endpointsStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (endpointsStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -67,6 +72,11 @@ func (endpointsStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (endpointsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateEndpointsUpdate(obj.(*api.Endpoints), old.(*api.Endpoints))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (endpointsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (endpointsStrategy) AllowUnconditionalUpdate() bool {

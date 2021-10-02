@@ -1,9 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - mml
   - roycaihw
-  - karan
+  - SergeyKanzhelev
 approvers:
   - dchen1107
   - yguo0905

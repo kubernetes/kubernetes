@@ -23,7 +23,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -50,6 +49,7 @@ import (
 const (
 	ApplyAnnotationsFlag = "save-config"
 	DefaultErrorExitCode = 1
+	DefaultChunkSize     = 500
 )
 
 type debugError interface {
@@ -434,6 +434,10 @@ func AddFieldManagerFlagVar(cmd *cobra.Command, p *string, defaultFieldManager s
 	cmd.Flags().StringVar(p, "field-manager", defaultFieldManager, "Name of the manager used to track field ownership.")
 }
 
+func AddContainerVarFlags(cmd *cobra.Command, p *string, containerName string) {
+	cmd.Flags().StringVarP(p, "container", "c", containerName, "Container name. If omitted, use the kubectl.kubernetes.io/default-container annotation for selecting the container to be attached or the first container in the pod will be chosen")
+}
+
 func AddServerSideApplyFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
 	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
@@ -451,12 +455,9 @@ func AddApplyAnnotationVarFlags(cmd *cobra.Command, applyAnnotation *bool) {
 	cmd.Flags().BoolVar(applyAnnotation, ApplyAnnotationsFlag, *applyAnnotation, "If true, the configuration of current object will be saved in its annotation. Otherwise, the annotation will be unchanged. This flag is useful when you want to perform kubectl apply on this object in the future.")
 }
 
-// AddGeneratorFlags adds flags common to resource generation commands
-// TODO: need to take a pass at other generator commands to use this set of flags
-func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
-	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
-	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
-	AddDryRunFlag(cmd)
+func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
+	cmd.Flags().Int64Var(value, "chunk-size", *value,
+		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 }
 
 type ValidateOptions struct {
@@ -545,30 +546,18 @@ const (
 
 func GetDryRunStrategy(cmd *cobra.Command) (DryRunStrategy, error) {
 	var dryRunFlag = GetFlagString(cmd, "dry-run")
-	b, err := strconv.ParseBool(dryRunFlag)
-	// The flag is not a boolean
-	if err != nil {
-		switch dryRunFlag {
-		case cmd.Flag("dry-run").NoOptDefVal:
-			klog.Warning(`--dry-run is deprecated and can be replaced with --dry-run=client.`)
-			return DryRunClient, nil
-		case "client":
-			return DryRunClient, nil
-		case "server":
-			return DryRunServer, nil
-		case "none":
-			return DryRunNone, nil
-		default:
-			return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
-		}
-	}
-	// The flag was a boolean
-	if b {
-		klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "client")
+	switch dryRunFlag {
+	case cmd.Flag("dry-run").NoOptDefVal:
+		return DryRunNone, errors.New(`--dry-run flag without a value was specified. A value must be set: "none", "server", or "client".`)
+	case "client":
 		return DryRunClient, nil
+	case "server":
+		return DryRunServer, nil
+	case "none":
+		return DryRunNone, nil
+	default:
+		return DryRunNone, fmt.Errorf(`Invalid dry-run value (%v). Must be "none", "server", or "client".`, dryRunFlag)
 	}
-	klog.Warningf(`--dry-run=%v is deprecated (boolean value) and can be replaced with --dry-run=%s.`, dryRunFlag, "none")
-	return DryRunNone, nil
 }
 
 // PrintFlagsWithDryRunStrategy sets a success message at print time for the dry run strategy

@@ -116,7 +116,7 @@ type testConfig struct {
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
 func getBaseConfig(nodes int, pods int) *testConfig {
-	destroyFunc, podInformer, clientset := mustSetupScheduler()
+	destroyFunc, podInformer, clientset, _ := mustSetupScheduler(nil)
 	return &testConfig{
 		clientset:   clientset,
 		destroyFunc: destroyFunc,

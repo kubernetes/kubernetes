@@ -19,6 +19,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"net/url"
 	"sync"
 	"time"
@@ -38,12 +39,18 @@ type ExpiryMetric interface {
 
 // LatencyMetric observes client latency partitioned by verb and url.
 type LatencyMetric interface {
-	Observe(verb string, u url.URL, latency time.Duration)
+	Observe(ctx context.Context, verb string, u url.URL, latency time.Duration)
 }
 
 // ResultMetric counts response codes partitioned by method and host.
 type ResultMetric interface {
-	Increment(code string, method string, host string)
+	Increment(ctx context.Context, code string, method string, host string)
+}
+
+// CallsMetric counts calls that take place for a specific exec plugin.
+type CallsMetric interface {
+	// Increment increments a counter per exitCode and callStatus.
+	Increment(exitCode int, callStatus string)
 }
 
 var (
@@ -57,6 +64,9 @@ var (
 	RateLimiterLatency LatencyMetric = noopLatency{}
 	// RequestResult is the result metric that rest clients will update.
 	RequestResult ResultMetric = noopResult{}
+	// ExecPluginCalls is the number of calls made to an exec plugin, partitioned by
+	// exit code and call status.
+	ExecPluginCalls CallsMetric = noopCalls{}
 )
 
 // RegisterOpts contains all the metrics to register. Metrics may be nil.
@@ -66,6 +76,7 @@ type RegisterOpts struct {
 	RequestLatency        LatencyMetric
 	RateLimiterLatency    LatencyMetric
 	RequestResult         ResultMetric
+	ExecPluginCalls       CallsMetric
 }
 
 // Register registers metrics for the rest client to use. This can
@@ -87,6 +98,9 @@ func Register(opts RegisterOpts) {
 		if opts.RequestResult != nil {
 			RequestResult = opts.RequestResult
 		}
+		if opts.ExecPluginCalls != nil {
+			ExecPluginCalls = opts.ExecPluginCalls
+		}
 	})
 }
 
@@ -100,8 +114,12 @@ func (noopExpiry) Set(*time.Time) {}
 
 type noopLatency struct{}
 
-func (noopLatency) Observe(string, url.URL, time.Duration) {}
+func (noopLatency) Observe(context.Context, string, url.URL, time.Duration) {}
 
 type noopResult struct{}
 
-func (noopResult) Increment(string, string, string) {}
+func (noopResult) Increment(context.Context, string, string, string) {}
+
+type noopCalls struct{}
+
+func (noopCalls) Increment(int, string) {}

@@ -1,3 +1,5 @@
+// +build windows
+
 // Package guid provides a GUID type. The backing structure for a GUID is
 // identical to that used by the golang.org/x/sys/windows GUID type.
 // There are two main binary encodings used for a GUID, the big-endian encoding,

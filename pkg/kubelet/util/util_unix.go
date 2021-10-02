@@ -1,3 +1,4 @@
+//go:build freebsd || linux || darwin
 // +build freebsd linux darwin
 
 /*
@@ -100,7 +101,7 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			klog.InfoS("Using this endpoint is deprecated, please consider using full URL format", "endpoint", endpoint, "URL", fallbackEndpoint)
 		}
 	}
 	return

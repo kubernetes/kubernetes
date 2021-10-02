@@ -44,7 +44,6 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 		CreateStrategy: secret.Strategy,
 		UpdateStrategy: secret.Strategy,
 		DeleteStrategy: secret.Strategy,
-		ExportStrategy: secret.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}

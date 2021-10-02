@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -162,7 +162,7 @@ func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
 		v1.ResourceName(driverKey): fmt.Sprintf("%d", util.DefaultMaxEBSVolumes),
 	}
 	var count int32 = util.DefaultMaxEBSVolumes
-	csiAllocatable := map[string]*storagev1beta1.VolumeNodeResources{
+	csiAllocatable := map[string]*storagev1.VolumeNodeResources{
 		testCSIDriver: {
 			Count: &count,
 		},
@@ -193,7 +193,7 @@ func BenchmarkSchedulingCSIPVs(b *testing.B) {
 		v1.ResourceName(driverKey): fmt.Sprintf("%d", util.DefaultMaxEBSVolumes),
 	}
 	var count int32 = util.DefaultMaxEBSVolumes
-	csiAllocatable := map[string]*storagev1beta1.VolumeNodeResources{
+	csiAllocatable := map[string]*storagev1.VolumeNodeResources{
 		testCSIDriver: {
 			Count: &count,
 		},
@@ -439,9 +439,10 @@ func benchmarkScheduling(numExistingPods, minPods int,
 	testPodStrategy testutils.TestPodCreateStrategy,
 	b *testing.B) {
 	if b.N < minPods {
+		//lint:ignore SA3001 Set a minimum for b.N to get more meaningful results
 		b.N = minPods
 	}
-	finalFunc, podInformer, clientset := mustSetupScheduler()
+	finalFunc, podInformer, clientset, _ := mustSetupScheduler(nil)
 	defer finalFunc()
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
@@ -498,7 +499,7 @@ func benchmarkScheduling(numExistingPods, minPods int,
 	b.StopTimer()
 }
 
-// makeBasePodWithSecrets creates a Pod object to be used as a template.
+// makeBasePodWithSecret creates a Pod object to be used as a template.
 // The pod uses a single Secrets volume.
 func makeBasePodWithSecret() *v1.Pod {
 	basePod := &v1.Pod{

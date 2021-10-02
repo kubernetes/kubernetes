@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+//go:generate mockgen -source=summary.go -destination=testing/mock_summary_provider.go -package=testing SummaryProvider
 package stats
 
 import (
@@ -54,7 +55,7 @@ func NewSummaryProvider(statsProvider Provider) SummaryProvider {
 	bootTime, err := util.GetBootTime()
 	if err != nil {
 		// bootTime will be zero if we encounter an error getting the boot time.
-		klog.Warningf("Error getting system boot time.  Node metrics will have an incorrect start time: %v", err)
+		klog.InfoS("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
 	}
 
 	return &summaryProviderImpl{

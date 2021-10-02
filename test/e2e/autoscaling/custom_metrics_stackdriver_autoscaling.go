@@ -22,6 +22,7 @@ import (
 	"time"
 
 	gcm "google.golang.org/api/monitoring/v3"
+	"google.golang.org/api/option"
 	appsv1 "k8s.io/api/apps/v1"
 	as "k8s.io/api/autoscaling/v2beta1"
 	v1 "k8s.io/api/core/v1"
@@ -233,6 +234,9 @@ func (tc *CustomMetricTestCase) Run() {
 
 	ctx := context.Background()
 	client, err := google.DefaultClient(ctx, gcm.CloudPlatformScope)
+	if err != nil {
+		framework.Failf("Failed to initialize gcm default client, %v", err)
+	}
 
 	// Hack for running tests locally, needed to authenticate in Stackdriver
 	// If this is your use case, create application default credentials:
@@ -247,7 +251,7 @@ func (tc *CustomMetricTestCase) Run() {
 		client := oauth2.NewClient(oauth2.NoContext, ts)
 	*/
 
-	gcmService, err := gcm.New(client)
+	gcmService, err := gcm.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		framework.Failf("Failed to create gcm service, %v", err)
 	}

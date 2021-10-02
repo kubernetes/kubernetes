@@ -203,6 +203,9 @@ type ActualStateOfWorldMounterUpdater interface {
 	// GetVolumeMountState returns mount state of the volume for the Pod
 	GetVolumeMountState(volumName v1.UniqueVolumeName, podName volumetypes.UniquePodName) VolumeMountState
 
+	// IsVolumeMountedElsewhere returns whether the supplied volume is mounted in a Pod other than the supplied one
+	IsVolumeMountedElsewhere(volumeName v1.UniqueVolumeName, podName volumetypes.UniquePodName) bool
+
 	// MarkForInUseExpansionError marks the volume to have in-use error during expansion.
 	// volume expansion must not be retried for this volume
 	MarkForInUseExpansionError(volumeName v1.UniqueVolumeName)

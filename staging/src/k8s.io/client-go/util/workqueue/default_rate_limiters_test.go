@@ -182,3 +182,24 @@ func TestMaxOfRateLimiter(t *testing.T) {
 	}
 
 }
+
+func TestWithMaxWaitRateLimiter(t *testing.T) {
+	limiter := NewWithMaxWaitRateLimiter(DefaultControllerRateLimiter(), 500*time.Second)
+	for i := 0; i < 100; i++ {
+		if e, a := 5*time.Millisecond, limiter.When(i); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+
+	for i := 100; i < 5100; i++ {
+		if e, a := 500*time.Second, limiter.When(i); e < a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+
+	for i := 5100; i < 5200; i++ {
+		if e, a := 500*time.Second, limiter.When(i); e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+	}
+}

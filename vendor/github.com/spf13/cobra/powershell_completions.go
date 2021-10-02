@@ -1,6 +1,3 @@
-// PowerShell completions are based on the amazing work from clap:
-// https://github.com/clap-rs/clap/blob/3294d18efe5f264d12c9035f404c7d189d4824e1/src/completions/powershell.rs
-//
 // The generated scripts require PowerShell v5.0+ (which comes Windows 10, but
 // can be downloaded separately for windows 7 or 8.1).
 
@@ -11,90 +8,278 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
-
-	"github.com/spf13/pflag"
 )
 
-var powerShellCompletionTemplate = `using namespace System.Management.Automation
-using namespace System.Management.Automation.Language
-Register-ArgumentCompleter -Native -CommandName '%s' -ScriptBlock {
-    param($wordToComplete, $commandAst, $cursorPosition)
-    $commandElements = $commandAst.CommandElements
-    $command = @(
-        '%s'
-        for ($i = 1; $i -lt $commandElements.Count; $i++) {
-            $element = $commandElements[$i]
-            if ($element -isnot [StringConstantExpressionAst] -or
-                $element.StringConstantType -ne [StringConstantType]::BareWord -or
-                $element.Value.StartsWith('-')) {
-                break
-            }
-            $element.Value
+func genPowerShellComp(buf io.StringWriter, name string, includeDesc bool) {
+	compCmd := ShellCompRequestCmd
+	if !includeDesc {
+		compCmd = ShellCompNoDescRequestCmd
+	}
+	WriteStringAndCheck(buf, fmt.Sprintf(`# powershell completion for %-36[1]s -*- shell-script -*-
+
+function __%[1]s_debug {
+    if ($env:BASH_COMP_DEBUG_FILE) {
+        "$args" | Out-File -Append -FilePath "$env:BASH_COMP_DEBUG_FILE"
+    }
+}
+
+filter __%[1]s_escapeStringWithSpecialChars {
+`+"    $_ -replace '\\s|#|@|\\$|;|,|''|\\{|\\}|\\(|\\)|\"|`|\\||<|>|&','`$&'"+`
+}
+
+Register-ArgumentCompleter -CommandName '%[1]s' -ScriptBlock {
+    param(
+            $WordToComplete,
+            $CommandAst,
+            $CursorPosition
+        )
+
+    # Get the current command line and convert into a string
+    $Command = $CommandAst.CommandElements
+    $Command = "$Command"
+
+    __%[1]s_debug ""
+    __%[1]s_debug "========= starting completion logic =========="
+    __%[1]s_debug "WordToComplete: $WordToComplete Command: $Command CursorPosition: $CursorPosition"
+
+    # The user could have moved the cursor backwards on the command-line.
+    # We need to trigger completion from the $CursorPosition location, so we need
+    # to truncate the command-line ($Command) up to the $CursorPosition location.
+    # Make sure the $Command is longer then the $CursorPosition before we truncate.
+    # This happens because the $Command does not include the last space.
+    if ($Command.Length -gt $CursorPosition) {
+        $Command=$Command.Substring(0,$CursorPosition)
+    }
+	__%[1]s_debug "Truncated command: $Command"
+
+    $ShellCompDirectiveError=%[3]d
+    $ShellCompDirectiveNoSpace=%[4]d
+    $ShellCompDirectiveNoFileComp=%[5]d
+    $ShellCompDirectiveFilterFileExt=%[6]d
+    $ShellCompDirectiveFilterDirs=%[7]d
+
+	# Prepare the command to request completions for the program.
+    # Split the command at the first space to separate the program and arguments.
+    $Program,$Arguments = $Command.Split(" ",2)
+    $RequestComp="$Program %[2]s $Arguments"
+    __%[1]s_debug "RequestComp: $RequestComp"
+
+    # we cannot use $WordToComplete because it
+    # has the wrong values if the cursor was moved
+    # so use the last argument
+    if ($WordToComplete -ne "" ) {
+        $WordToComplete = $Arguments.Split(" ")[-1]
+    }
+    __%[1]s_debug "New WordToComplete: $WordToComplete"
+
+
+    # Check for flag with equal sign
+    $IsEqualFlag = ($WordToComplete -Like "--*=*" )
+    if ( $IsEqualFlag ) {
+        __%[1]s_debug "Completing equal sign flag"
+        # Remove the flag part
+        $Flag,$WordToComplete = $WordToComplete.Split("=",2)
+    }
+
+    if ( $WordToComplete -eq "" -And ( -Not $IsEqualFlag )) {
+        # If the last parameter is complete (there is a space following it)
+        # We add an extra empty parameter so we can indicate this to the go method.
+        __%[1]s_debug "Adding extra empty parameter"
+`+"        # We need to use `\"`\" to pass an empty argument a \"\" or '' does not work!!!"+`
+`+"        $RequestComp=\"$RequestComp\" + ' `\"`\"'"+`
+    }
+
+    __%[1]s_debug "Calling $RequestComp"
+    #call the command store the output in $out and redirect stderr and stdout to null
+    # $Out is an array contains each line per element
+    Invoke-Expression -OutVariable out "$RequestComp" 2>&1 | Out-Null
+
+
+    # get directive from last line
+    [int]$Directive = $Out[-1].TrimStart(':')
+    if ($Directive -eq "") {
+        # There is no directive specified
+        $Directive = 0
+    }
+    __%[1]s_debug "The completion directive is: $Directive"
+
+    # remove directive (last element) from out
+    $Out = $Out | Where-Object { $_ -ne $Out[-1] }
+    __%[1]s_debug "The completions are: $Out"
+
+    if (($Directive -band $ShellCompDirectiveError) -ne 0 ) {
+        # Error code.  No completion.
+        __%[1]s_debug "Received error from custom completion go code"
+        return
+    }
+
+    $Longest = 0
+    $Values = $Out | ForEach-Object {
+        #Split the output in name and description
+`+"        $Name, $Description = $_.Split(\"`t\",2)"+`
+        __%[1]s_debug "Name: $Name Description: $Description"
+
+        # Look for the longest completion so that we can format things nicely
+        if ($Longest -lt $Name.Length) {
+            $Longest = $Name.Length
         }
-    ) -join ';'
-    $completions = @(switch ($command) {%s
-    })
-    $completions.Where{ $_.CompletionText -like "$wordToComplete*" } |
-        Sort-Object -Property ListItemText
-}`
 
-func generatePowerShellSubcommandCases(out io.Writer, cmd *Command, previousCommandName string) {
-	var cmdName string
-	if previousCommandName == "" {
-		cmdName = cmd.Name()
-	} else {
-		cmdName = fmt.Sprintf("%s;%s", previousCommandName, cmd.Name())
-	}
+        # Set the description to a one space string if there is none set.
+        # This is needed because the CompletionResult does not accept an empty string as argument
+        if (-Not $Description) {
+            $Description = " "
+        }
+        @{Name="$Name";Description="$Description"}
+    }
 
-	fmt.Fprintf(out, "\n        '%s' {", cmdName)
 
-	cmd.Flags().VisitAll(func(flag *pflag.Flag) {
-		if nonCompletableFlag(flag) {
-			return
-		}
-		usage := escapeStringForPowerShell(flag.Usage)
-		if len(flag.Shorthand) > 0 {
-			fmt.Fprintf(out, "\n            [CompletionResult]::new('-%s', '%s', [CompletionResultType]::ParameterName, '%s')", flag.Shorthand, flag.Shorthand, usage)
-		}
-		fmt.Fprintf(out, "\n            [CompletionResult]::new('--%s', '%s', [CompletionResultType]::ParameterName, '%s')", flag.Name, flag.Name, usage)
-	})
+    $Space = " "
+    if (($Directive -band $ShellCompDirectiveNoSpace) -ne 0 ) {
+        # remove the space here
+        __%[1]s_debug "ShellCompDirectiveNoSpace is called"
+        $Space = ""
+    }
 
-	for _, subCmd := range cmd.Commands() {
-		usage := escapeStringForPowerShell(subCmd.Short)
-		fmt.Fprintf(out, "\n            [CompletionResult]::new('%s', '%s', [CompletionResultType]::ParameterValue, '%s')", subCmd.Name(), subCmd.Name(), usage)
-	}
+    if ((($Directive -band $ShellCompDirectiveFilterFileExt) -ne 0 ) -or
+       (($Directive -band $ShellCompDirectiveFilterDirs) -ne 0 ))  {
+        __%[1]s_debug "ShellCompDirectiveFilterFileExt ShellCompDirectiveFilterDirs are not supported"
 
-	fmt.Fprint(out, "\n            break\n        }")
+        # return here to prevent the completion of the extensions
+        return
+    }
 
-	for _, subCmd := range cmd.Commands() {
-		generatePowerShellSubcommandCases(out, subCmd, cmdName)
-	}
+    $Values = $Values | Where-Object {
+        # filter the result
+        $_.Name -like "$WordToComplete*"
+
+        # Join the flag back if we have an equal sign flag
+        if ( $IsEqualFlag ) {
+            __%[1]s_debug "Join the equal sign flag back to the completion value"
+            $_.Name = $Flag + "=" + $_.Name
+        }
+    }
+
+    if (($Directive -band $ShellCompDirectiveNoFileComp) -ne 0 ) {
+        __%[1]s_debug "ShellCompDirectiveNoFileComp is called"
+
+        if ($Values.Length -eq 0) {
+            # Just print an empty string here so the
+            # shell does not start to complete paths.
+            # We cannot use CompletionResult here because
+            # it does not accept an empty string as argument.
+            ""
+            return
+        }
+    }
+
+    # Get the current mode
+    $Mode = (Get-PSReadLineKeyHandler | Where-Object {$_.Key -eq "Tab" }).Function
+    __%[1]s_debug "Mode: $Mode"
+
+    $Values | ForEach-Object {
+
+        # store temporary because switch will overwrite $_
+        $comp = $_
+
+        # PowerShell supports three different completion modes
+        # - TabCompleteNext (default windows style - on each key press the next option is displayed)
+        # - Complete (works like bash)
+        # - MenuComplete (works like zsh)
+        # You set the mode with Set-PSReadLineKeyHandler -Key Tab -Function <mode>
+
+        # CompletionResult Arguments:
+        # 1) CompletionText text to be used as the auto completion result
+        # 2) ListItemText   text to be displayed in the suggestion list
+        # 3) ResultType     type of completion result
+        # 4) ToolTip        text for the tooltip with details about the object
+
+        switch ($Mode) {
+
+            # bash like
+            "Complete" {
+
+                if ($Values.Length -eq 1) {
+                    __%[1]s_debug "Only one completion left"
+
+                    # insert space after value
+                    [System.Management.Automation.CompletionResult]::new($($comp.Name | __%[1]s_escapeStringWithSpecialChars) + $Space, "$($comp.Name)", 'ParameterValue', "$($comp.Description)")
+
+                } else {
+                    # Add the proper number of spaces to align the descriptions
+                    while($comp.Name.Length -lt $Longest) {
+                        $comp.Name = $comp.Name + " "
+                    }
+
+                    # Check for empty description and only add parentheses if needed
+                    if ($($comp.Description) -eq " " ) {
+                        $Description = ""
+                    } else {
+                        $Description = "  ($($comp.Description))"
+                    }
+
+                    [System.Management.Automation.CompletionResult]::new("$($comp.Name)$Description", "$($comp.Name)$Description", 'ParameterValue', "$($comp.Description)")
+                }
+             }
+
+            # zsh like
+            "MenuComplete" {
+                # insert space after value
+                # MenuComplete will automatically show the ToolTip of
+                # the highlighted value at the bottom of the suggestions.
+                [System.Management.Automation.CompletionResult]::new($($comp.Name | __%[1]s_escapeStringWithSpecialChars) + $Space, "$($comp.Name)", 'ParameterValue', "$($comp.Description)")
+            }
+
+            # TabCompleteNext and in case we get something unknown
+            Default {
+                # Like MenuComplete but we don't want to add a space here because
+                # the user need to press space anyway to get the completion.
+                # Description will not be shown because thats not possible with TabCompleteNext
+                [System.Management.Automation.CompletionResult]::new($($comp.Name | __%[1]s_escapeStringWithSpecialChars), "$($comp.Name)", 'ParameterValue', "$($comp.Description)")
+            }
+        }
+
+    }
+}
+`, name, compCmd,
+		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
 }
 
-func escapeStringForPowerShell(s string) string {
-	return strings.Replace(s, "'", "''", -1)
-}
-
-// GenPowerShellCompletion generates PowerShell completion file and writes to the passed writer.
-func (c *Command) GenPowerShellCompletion(w io.Writer) error {
+func (c *Command) genPowerShellCompletion(w io.Writer, includeDesc bool) error {
 	buf := new(bytes.Buffer)
-
-	var subCommandCases bytes.Buffer
-	generatePowerShellSubcommandCases(&subCommandCases, c, "")
-	fmt.Fprintf(buf, powerShellCompletionTemplate, c.Name(), c.Name(), subCommandCases.String())
-
+	genPowerShellComp(buf, c.Name(), includeDesc)
 	_, err := buf.WriteTo(w)
 	return err
 }
 
-// GenPowerShellCompletionFile generates PowerShell completion file.
-func (c *Command) GenPowerShellCompletionFile(filename string) error {
+func (c *Command) genPowerShellCompletionFile(filename string, includeDesc bool) error {
 	outFile, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
 	defer outFile.Close()
 
-	return c.GenPowerShellCompletion(outFile)
+	return c.genPowerShellCompletion(outFile, includeDesc)
+}
+
+// GenPowerShellCompletionFile generates powershell completion file without descriptions.
+func (c *Command) GenPowerShellCompletionFile(filename string) error {
+	return c.genPowerShellCompletionFile(filename, false)
+}
+
+// GenPowerShellCompletion generates powershell completion file without descriptions
+// and writes it to the passed writer.
+func (c *Command) GenPowerShellCompletion(w io.Writer) error {
+	return c.genPowerShellCompletion(w, false)
+}
+
+// GenPowerShellCompletionFileWithDesc generates powershell completion file with descriptions.
+func (c *Command) GenPowerShellCompletionFileWithDesc(filename string) error {
+	return c.genPowerShellCompletionFile(filename, true)
+}
+
+// GenPowerShellCompletionWithDesc generates powershell completion file with descriptions
+// and writes it to the passed writer.
+func (c *Command) GenPowerShellCompletionWithDesc(w io.Writer) error {
+	return c.genPowerShellCompletion(w, true)
 }

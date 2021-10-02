@@ -13,7 +13,6 @@ import (
 )
 
 var (
-	bufferPool *sync.Pool
 
 	// qualified package name, cached at first use
 	logrusPackage string
@@ -31,12 +30,6 @@ const (
 )
 
 func init() {
-	bufferPool = &sync.Pool{
-		New: func() interface{} {
-			return new(bytes.Buffer)
-		},
-	}
-
 	// start at the bottom of the stack before the package-name cache is primed
 	minimumCallerDepth = 1
 }
@@ -85,6 +78,14 @@ func NewEntry(logger *Logger) *Entry {
 	}
 }
 
+func (entry *Entry) Dup() *Entry {
+	data := make(Fields, len(entry.Data))
+	for k, v := range entry.Data {
+		data[k] = v
+	}
+	return &Entry{Logger: entry.Logger, Data: data, Time: entry.Time, Context: entry.Context, err: entry.err}
+}
+
 // Returns the bytes representation of this entry from the formatter.
 func (entry *Entry) Bytes() ([]byte, error) {
 	return entry.Logger.Formatter.Format(entry)
@@ -130,11 +131,9 @@ func (entry *Entry) WithFields(fields Fields) *Entry {
 	for k, v := range fields {
 		isErrField := false
 		if t := reflect.TypeOf(v); t != nil {
-			switch t.Kind() {
-			case reflect.Func:
+			switch {
+			case t.Kind() == reflect.Func, t.Kind() == reflect.Ptr && t.Elem().Kind() == reflect.Func:
 				isErrField = true
-			case reflect.Ptr:
-				isErrField = t.Elem().Kind() == reflect.Func
 			}
 		}
 		if isErrField {
@@ -219,65 +218,72 @@ func (entry Entry) HasCaller() (has bool) {
 		entry.Caller != nil
 }
 
-// This function is not declared with a pointer value because otherwise
-// race conditions will occur when using multiple goroutines
-func (entry Entry) log(level Level, msg string) {
+func (entry *Entry) log(level Level, msg string) {
 	var buffer *bytes.Buffer
 
-	// Default to now, but allow users to override if they want.
-	//
-	// We don't have to worry about polluting future calls to Entry#log()
-	// with this assignment because this function is declared with a
-	// non-pointer receiver.
-	if entry.Time.IsZero() {
-		entry.Time = time.Now()
+	newEntry := entry.Dup()
+
+	if newEntry.Time.IsZero() {
+		newEntry.Time = time.Now()
 	}
 
-	entry.Level = level
-	entry.Message = msg
-	entry.Logger.mu.Lock()
-	if entry.Logger.ReportCaller {
-		entry.Caller = getCaller()
+	newEntry.Level = level
+	newEntry.Message = msg
+
+	newEntry.Logger.mu.Lock()
+	reportCaller := newEntry.Logger.ReportCaller
+	newEntry.Logger.mu.Unlock()
+
+	if reportCaller {
+		newEntry.Caller = getCaller()
 	}
-	entry.Logger.mu.Unlock()
 
-	entry.fireHooks()
+	newEntry.fireHooks()
 
-	buffer = bufferPool.Get().(*bytes.Buffer)
+	buffer = getBuffer()
+	defer func() {
+		newEntry.Buffer = nil
+		putBuffer(buffer)
+	}()
 	buffer.Reset()
-	defer bufferPool.Put(buffer)
-	entry.Buffer = buffer
+	newEntry.Buffer = buffer
 
-	entry.write()
+	newEntry.write()
 
-	entry.Buffer = nil
+	newEntry.Buffer = nil
 
 	// To avoid Entry#log() returning a value that only would make sense for
 	// panic() to use in Entry#Panic(), we avoid the allocation by checking
 	// directly here.
 	if level <= PanicLevel {
-		panic(&entry)
+		panic(newEntry)
 	}
 }
 
 func (entry *Entry) fireHooks() {
+	var tmpHooks LevelHooks
 	entry.Logger.mu.Lock()
-	defer entry.Logger.mu.Unlock()
-	err := entry.Logger.Hooks.Fire(entry.Level, entry)
+	tmpHooks = make(LevelHooks, len(entry.Logger.Hooks))
+	for k, v := range entry.Logger.Hooks {
+		tmpHooks[k] = v
+	}
+	entry.Logger.mu.Unlock()
+
+	err := tmpHooks.Fire(entry.Level, entry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to fire hook: %v\n", err)
 	}
 }
 
 func (entry *Entry) write() {
-	entry.Logger.mu.Lock()
-	defer entry.Logger.mu.Unlock()
 	serialized, err := entry.Logger.Formatter.Format(entry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to obtain reader, %v\n", err)
 		return
 	}
-	if _, err = entry.Logger.Out.Write(serialized); err != nil {
+	entry.Logger.mu.Lock()
+	defer entry.Logger.mu.Unlock()
+	if _, err := entry.Logger.Out.Write(serialized); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to write to log, %v\n", err)
 	}
 }
@@ -323,7 +329,6 @@ func (entry *Entry) Fatal(args ...interface{}) {
 
 func (entry *Entry) Panic(args ...interface{}) {
 	entry.Log(PanicLevel, args...)
-	panic(fmt.Sprint(args...))
 }
 
 // Entry Printf family functions

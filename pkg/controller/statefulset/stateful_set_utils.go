@@ -204,6 +204,10 @@ func isRunningAndReady(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodRunning && podutil.IsPodReady(pod)
 }
 
+func isRunningAndAvailable(pod *v1.Pod, minReadySeconds int32) bool {
+	return podutil.IsPodAvailable(pod, minReadySeconds, metav1.Now())
+}
+
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *v1.Pod) bool {
 	return pod.Status.Phase != ""
@@ -286,12 +290,15 @@ func Match(ss *apps.StatefulSet, history *apps.ControllerRevision) (bool, error)
 // PodSpecTemplate. We can modify this later to encompass more state (or less) and remain compatible with previously
 // recorded patches.
 func getPatch(set *apps.StatefulSet) ([]byte, error) {
-	str, err := runtime.Encode(patchCodec, set)
+	data, err := runtime.Encode(patchCodec, set)
 	if err != nil {
 		return nil, err
 	}
 	var raw map[string]interface{}
-	json.Unmarshal([]byte(str), &raw)
+	err = json.Unmarshal(data, &raw)
+	if err != nil {
+		return nil, err
+	}
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
@@ -366,6 +373,7 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.ReadyReplicas != set.Status.ReadyReplicas ||
 		status.UpdatedReplicas != set.Status.UpdatedReplicas ||
 		status.CurrentRevision != set.Status.CurrentRevision ||
+		status.AvailableReplicas != set.Status.AvailableReplicas ||
 		status.UpdateRevision != set.Status.UpdateRevision
 }
 

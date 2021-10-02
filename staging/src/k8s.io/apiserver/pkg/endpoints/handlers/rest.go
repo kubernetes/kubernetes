@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -53,6 +52,9 @@ import (
 )
 
 const (
+	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.
+	// Everyone chooses 30.
+	requestTimeoutUpperBound = 34 * time.Second
 	// DuplicateOwnerReferencesWarningFormat is the warning that a client receives when a create/update request contains
 	// duplicate owner reference entries.
 	DuplicateOwnerReferencesWarningFormat = ".metadata.ownerReferences contains duplicate entries; API server dedups owner references in 1.20+, and may reject such requests as early as 1.24; please fix your requests; duplicate UID(s) observed: %v"
@@ -87,8 +89,14 @@ type RequestScope struct {
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
 
-	Resource    schema.GroupVersionResource
-	Kind        schema.GroupVersionKind
+	Resource schema.GroupVersionResource
+	Kind     schema.GroupVersionKind
+
+	// AcceptsGroupVersionDelegate is an optional delegate that can be queried about whether a given GVK
+	// can be accepted in create or update requests. If nil, only scope.Kind is accepted.
+	// Note that this does not enable multi-version support for reads from a single endpoint.
+	AcceptsGroupVersionDelegate rest.GroupVersionAcceptor
+
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
@@ -101,6 +109,17 @@ type RequestScope struct {
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+// AcceptsGroupVersion returns true if the specified GroupVersion is allowed
+// in create and update requests.
+func (scope *RequestScope) AcceptsGroupVersion(gv schema.GroupVersion) bool {
+	// If there's a custom acceptor, delegate to it. This is extremely rare.
+	if scope.AcceptsGroupVersionDelegate != nil {
+		return scope.AcceptsGroupVersionDelegate.AcceptsGroupVersion(gv)
+	}
+	// Fall back to only allowing the singular Kind. This is the typical behavior.
+	return gv == scope.Kind.GroupVersion()
 }
 
 func (scope *RequestScope) AllowsMediaTypeTransform(mimeType, mimeSubType string, gvk *schema.GroupVersionKind) bool {
@@ -220,60 +239,6 @@ func (r *responder) Object(statusCode int, obj runtime.Object) {
 
 func (r *responder) Error(err error) {
 	r.scope.err(err, r.w, r.req)
-}
-
-// resultFunc is a function that returns a rest result and can be run in a goroutine
-type resultFunc func() (runtime.Object, error)
-
-// finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object, err error) {
-	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
-	// when the select statement reads something other than the one the goroutine sends on.
-	ch := make(chan runtime.Object, 1)
-	errCh := make(chan error, 1)
-	panicCh := make(chan interface{}, 1)
-	go func() {
-		// panics don't cross goroutine boundaries, so we have to handle ourselves
-		defer func() {
-			panicReason := recover()
-			if panicReason != nil {
-				// do not wrap the sentinel ErrAbortHandler panic value
-				if panicReason != http.ErrAbortHandler {
-					// Same as stdlib http server code. Manually allocate stack
-					// trace buffer size to prevent excessively large logs
-					const size = 64 << 10
-					buf := make([]byte, size)
-					buf = buf[:goruntime.Stack(buf, false)]
-					panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
-				}
-				// Propagate to parent goroutine
-				panicCh <- panicReason
-			}
-		}()
-
-		if result, err := fn(); err != nil {
-			errCh <- err
-		} else {
-			ch <- result
-		}
-	}()
-
-	select {
-	case result = <-ch:
-		if status, ok := result.(*metav1.Status); ok {
-			if status.Status != metav1.StatusSuccess {
-				return nil, errors.FromObject(status)
-			}
-		}
-		return result, nil
-	case err = <-errCh:
-		return nil, err
-	case p := <-panicCh:
-		panic(p)
-	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", timeout), 0)
-	}
 }
 
 // transformDecodeError adds additional information into a bad-request api error when a decode fails.
@@ -429,7 +394,7 @@ func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Reques
 		return err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
-		klog.V(4).Infof("Unable to set self link on object: %v", err)
+		klog.V(4).InfoS("Unable to set self link on object", "error", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {
@@ -485,18 +450,6 @@ func limitedReadBody(req *http.Request, limit int64) ([]byte, error) {
 		return nil, errors.NewRequestEntityTooLargeError(fmt.Sprintf("limit is %d", limit))
 	}
 	return data, nil
-}
-
-func parseTimeout(str string) time.Duration {
-	if str != "" {
-		timeout, err := time.ParseDuration(str)
-		if err == nil {
-			return timeout
-		}
-		klog.Errorf("Failed to parse %q: %v", str, err)
-	}
-	// 34 chose as a number close to 30 that is likely to be unique enough to jump out at me the next time I see a timeout.  Everyone chooses 30.
-	return 34 * time.Second
 }
 
 func isDryRun(url *url.URL) bool {

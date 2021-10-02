@@ -28,6 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -58,21 +61,21 @@ var (
 
 // This test verifies that a Pod on each node in a cluster can talk to Pods on every other node without SNAT.
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
-var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
+var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet
 		pc := cs.CoreV1().Pods(f.Namespace.Name)
-		nc := cs.CoreV1().Nodes()
 
 		ginkgo.By("creating a test pod on each Node")
-		nodes, err := nc.List(context.TODO(), metav1.ListOptions{})
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
 
 		for _, node := range nodes.Items {
 			// target Pod at Node
-			testPod.Spec.NodeName = node.Name
+			nodeSelection := e2epod.NodeSelection{Name: node.Name}
+			e2epod.SetNodeSelection(&testPod.Spec, nodeSelection)
 			_, err = pc.Create(context.TODO(), &testPod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 		}

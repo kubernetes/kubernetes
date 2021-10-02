@@ -12,40 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM mcr.microsoft.com/windows/servercore:ltsc2019 as prep
+ARG SOURCE
 
-ENV PS_VERSION=6.2.7
-ADD https://github.com/PowerShell/PowerShell/releases/download/v$PS_VERSION/PowerShell-$PS_VERSION-win-x64.zip /PowerShell/powershell.zip
+# NOTE(claudiub): The src image is already based on nanoserver, but it seems that docker buildx
+# has an issue pulling cross-registry images, and we avoid that by pulling it ourselves.
+FROM --platform="windows/amd64" mcr.microsoft.com/windows/nanoserver:1809 as nanoserver
+FROM --platform="windows/amd64" $SOURCE as src
+FROM scratch
 
-RUN cd C:\PowerShell &\
-    tar.exe -xf powershell.zip &\
-    del powershell.zip &\
-    mklink powershell.exe pwsh.exe
+# NOTE(claudiub): We're basically forcing docker buildx to finish pulling the nanoserver image
+# before continuing with the rest of this Dockerfile.
+COPY --from=nanoserver /License.txt /License.txt
 
-FROM mcr.microsoft.com/windows/nanoserver:1809
-
-COPY --from=prep /PowerShell /PowerShell
-
-# set a fixed location for the Module analysis cache
-ENV LOCALAPPDATA="C:\Users\ContainerAdministrator\AppData\Local" \
-    PSModuleAnalysisCachePath="C:\Users\ContainerAdministrator\AppData\Local\Microsoft\Windows\PowerShell\docker\ModuleAnalysisCache" \
-    # Persist %PSCORE% ENV variable for user convenience
-    PSCORE="C:\PowerShell\pwsh.exe"
-
-# use downloaded powershell
-USER ContainerAdministrator
-RUN setx /M PATH "C:\Powershell\;%PATH%"
-
-# intialize powershell module cache
-RUN powershell \
-        -NoLogo \
-        -NoProfile \
-        -Command " \
-          $stopTime = (get-date).AddMinutes(15); \
-          $ErrorActionPreference = 'Stop' ; \
-          $ProgressPreference = 'SilentlyContinue' ; \
-          while(!(Test-Path -Path $env:PSModuleAnalysisCachePath)) {  \
-            Write-Host "'Waiting for $env:PSModuleAnalysisCachePath'" ; \
-            if((get-date) -gt $stopTime) { throw 'timout expired'} \
-            Start-Sleep -Seconds 6 ; \
-          }"
+COPY --from=src /PowerShell /PowerShell
+COPY --from=src /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache /Users/ContainerAdministrator/AppData/Local/Microsoft/Windows/PowerShell/docker/ModuleAnalysisCache

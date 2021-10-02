@@ -45,7 +45,7 @@ def get_gomod_dependencies(rootdir, components):
 def get_rules_dependencies(rules_file):
     import yaml
     with open(rules_file) as f:
-        data = yaml.load(f)
+        data = yaml.safe_load(f)
     return data
 
 

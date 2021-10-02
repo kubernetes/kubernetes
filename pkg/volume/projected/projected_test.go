@@ -777,7 +777,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		{
 			name:    "no default mode",
 			path:    "token",
-			wantErr: fmt.Errorf("No defaultMode used, not even the default value for it"),
+			wantErr: fmt.Errorf("no defaultMode used, not even the default value for it"),
 		},
 		{
 			name:        "fsUser != nil",
@@ -890,7 +890,7 @@ func TestCanSupport(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plugin.GetPluginName() != projectedPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
@@ -921,7 +921,7 @@ func TestPlugin(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -986,7 +986,7 @@ func TestInvalidPathProjected(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -1036,7 +1036,7 @@ func TestPluginReboot(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -1090,7 +1090,7 @@ func TestPluginOptional(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
@@ -1188,7 +1188,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(projectedPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}

@@ -41,7 +41,9 @@ const (
 //go:generate go run enumgen/gen.go
 type Cap int
 
-// POSIX-draft defined capabilities.
+// POSIX-draft defined capabilities and Linux extensions.
+//
+// Defined in https://github.com/torvalds/linux/blob/master/include/uapi/linux/capability.h
 const (
 	// In a system with the [_POSIX_CHOWN_RESTRICTED] option defined, this
 	// overrides the restriction of changing file ownership and group
@@ -187,6 +189,7 @@ const (
 	// arbitrary SCSI commands
 	// Allow setting encryption key on loopback filesystem
 	// Allow setting zone reclaim policy
+	// Allow everything under CAP_BPF and CAP_PERFMON for backward compatibility
 	CAP_SYS_ADMIN = Cap(21)
 
 	// Allow use of reboot()
@@ -211,6 +214,7 @@ const (
 	// Allow more than 64hz interrupts from the real-time clock
 	// Override max number of consoles on console allocation
 	// Override max number of keymaps
+	// Control memory reclaim behavior
 	CAP_SYS_RESOURCE = Cap(24)
 
 	// Allow manipulation of system clock
@@ -256,8 +260,45 @@ const (
 	// Allow preventing system suspends
 	CAP_BLOCK_SUSPEND = Cap(36)
 
-	// Allow reading audit messages from the kernel
+	// Allow reading the audit log via multicast netlink socket
 	CAP_AUDIT_READ = Cap(37)
+
+	// Allow system performance and observability privileged operations
+	// using perf_events, i915_perf and other kernel subsystems
+	CAP_PERFMON = Cap(38)
+
+	// CAP_BPF allows the following BPF operations:
+	// - Creating all types of BPF maps
+	// - Advanced verifier features
+	//   - Indirect variable access
+	//   - Bounded loops
+	//   - BPF to BPF function calls
+	//   - Scalar precision tracking
+	//   - Larger complexity limits
+	//   - Dead code elimination
+	//   - And potentially other features
+	// - Loading BPF Type Format (BTF) data
+	// - Retrieve xlated and JITed code of BPF programs
+	// - Use bpf_spin_lock() helper
+	//
+	// CAP_PERFMON relaxes the verifier checks further:
+	// - BPF progs can use of pointer-to-integer conversions
+	// - speculation attack hardening measures are bypassed
+	// - bpf_probe_read to read arbitrary kernel memory is allowed
+	// - bpf_trace_printk to print kernel memory is allowed
+	//
+	// CAP_SYS_ADMIN is required to use bpf_probe_write_user.
+	//
+	// CAP_SYS_ADMIN is required to iterate system wide loaded
+	// programs, maps, links, BTFs and convert their IDs to file descriptors.
+	//
+	// CAP_PERFMON and CAP_BPF are required to load tracing programs.
+	// CAP_NET_ADMIN and CAP_BPF are required to load networking programs.
+	CAP_BPF = Cap(39)
+
+	// Allow checkpoint/restore related operations.
+	// Introduced in kernel 5.9
+	CAP_CHECKPOINT_RESTORE = Cap(40)
 )
 
 var (

@@ -11,6 +11,9 @@
 },
 "spec":{
 "securityContext": {
+    {{runAsUser}}
+    {{runAsGroup}}
+    {{supplementalGroups}}
     "seccompProfile": {
         "type": "RuntimeDefault"
     }
@@ -21,6 +24,7 @@
 "containers":[
     {
     "name": "kube-apiserver",
+    {{containerSecurityContext}}
     "image": "{{pillar['kube_docker_registry']}}/kube-apiserver-amd64:{{pillar['kube-apiserver_docker_tag']}}",
     "resources": {
       "requests": {

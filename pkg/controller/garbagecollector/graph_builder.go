@@ -393,6 +393,11 @@ func (gb *GraphBuilder) addDependentToOwners(n *node, owners []metav1.OwnerRefer
 					klog.V(2).Infof("node %s references an owner %s with coordinates that do not match the observed identity", n.identity, ownerNode.identity)
 				}
 				hasPotentiallyInvalidOwnerReference = true
+			} else if !ownerIsNamespaced && ownerNode.identity.Namespace != n.identity.Namespace && !ownerNode.isObserved() {
+				// the ownerNode is cluster-scoped and virtual, and does not match the child node's namespace.
+				// the owner could be a missing instance of a namespaced type incorrectly referenced by a cluster-scoped child (issue #98040).
+				// enqueue this child to attemptToDelete to verify parent references.
+				hasPotentiallyInvalidOwnerReference = true
 			}
 		}
 	}

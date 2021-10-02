@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -74,7 +74,9 @@ const (
 	// AnnStorageProvisioner annotation is added to a PVC that is supposed to be dynamically
 	// provisioned. Its value is name of volume plugin that is supposed to provision
 	// a volume for this PVC.
-	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
+	// TODO: remove beta anno once deprecation period ends
+	AnnStorageProvisioner     = "volume.kubernetes.io/storage-provisioner"
+	AnnBetaStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 )
 
 // IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
@@ -89,7 +91,7 @@ func IsDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
 
 // IsDelayBindingMode checks if claim is in delay binding mode.
 func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelisters.StorageClassLister) (bool, error) {
-	className := v1helper.GetPersistentVolumeClaimClass(claim)
+	className := storagehelpers.GetPersistentVolumeClaimClass(claim)
 	if className == "" {
 		return false, nil
 	}
@@ -133,7 +135,7 @@ func GetBindVolumeToClaim(volume *v1.PersistentVolume, claim *v1.PersistentVolum
 
 		claimRef, err := reference.GetReference(scheme.Scheme, claim)
 		if err != nil {
-			return nil, false, fmt.Errorf("Unexpected error getting claim reference: %v", err)
+			return nil, false, fmt.Errorf("unexpected error getting claim reference: %w", err)
 		}
 		volumeClone.Spec.ClaimRef = claimRef
 		dirty = true
@@ -188,7 +190,7 @@ func FindMatchingVolume(
 	var smallestVolume *v1.PersistentVolume
 	var smallestVolumeQty resource.Quantity
 	requestedQty := claim.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
-	requestedClass := v1helper.GetPersistentVolumeClaimClass(claim)
+	requestedClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
@@ -275,7 +277,7 @@ func FindMatchingVolume(
 		} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 			continue
 		}
-		if v1helper.GetPersistentVolumeClass(volume) != requestedClass {
+		if storagehelpers.GetPersistentVolumeClass(volume) != requestedClass {
 			continue
 		}
 		if !nodeAffinityValid {

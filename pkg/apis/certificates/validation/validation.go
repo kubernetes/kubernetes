@@ -25,14 +25,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilcert "k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	certificatesv1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
@@ -139,8 +137,8 @@ func ValidateCertificateRequestName(name string, prefix bool) []string {
 	return nil
 }
 
-func ValidateCertificateSigningRequestCreate(csr *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, csr, nil)
+func ValidateCertificateSigningRequestCreate(csr *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(csr, nil)
 	return validateCertificateSigningRequest(csr, opts)
 }
 
@@ -204,6 +202,9 @@ func validateCertificateSigningRequest(csr *certificates.CertificateSigningReque
 		allErrs = append(allErrs, field.Invalid(specPath.Child("signerName"), csr.Spec.SignerName, "the legacy signerName is not allowed via this API version"))
 	} else {
 		allErrs = append(allErrs, ValidateCertificateSigningRequestSignerName(specPath.Child("signerName"), csr.Spec.SignerName)...)
+	}
+	if csr.Spec.ExpirationSeconds != nil && *csr.Spec.ExpirationSeconds < 600 {
+		allErrs = append(allErrs, field.Invalid(specPath.Child("expirationSeconds"), *csr.Spec.ExpirationSeconds, "may not specify a duration less than 600 seconds (10 minutes)"))
 	}
 	allErrs = append(allErrs, validateConditions(field.NewPath("status", "conditions"), csr, opts)...)
 
@@ -344,19 +345,19 @@ func ValidateCertificateSigningRequestSignerName(fldPath *field.Path, signerName
 	return el
 }
 
-func ValidateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, newCSR, oldCSR)
+func ValidateCertificateSigningRequestUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(newCSR, oldCSR)
 	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
 }
 
-func ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, newCSR, oldCSR)
+func ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingCertificate = true
 	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
 }
 
-func ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest, version schema.GroupVersion) field.ErrorList {
-	opts := getValidationOptions(version, newCSR, oldCSR)
+func ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR *certificates.CertificateSigningRequest) field.ErrorList {
+	opts := getValidationOptions(newCSR, oldCSR)
 	opts.allowSettingApprovalConditions = true
 	return validateCertificateSigningRequestUpdate(newCSR, oldCSR, opts)
 }
@@ -417,22 +418,17 @@ func findConditions(csr *certificates.CertificateSigningRequest, conditionType c
 // compatible with the specified version and existing CSR.
 // oldCSR may be nil if this is a create request.
 // validation options related to subresource-specific capabilities are set to false.
-func getValidationOptions(version schema.GroupVersion, newCSR, oldCSR *certificates.CertificateSigningRequest) certificateValidationOptions {
+func getValidationOptions(newCSR, oldCSR *certificates.CertificateSigningRequest) certificateValidationOptions {
 	return certificateValidationOptions{
-		allowResettingCertificate:    allowResettingCertificate(version),
+		allowResettingCertificate:    false,
 		allowBothApprovedAndDenied:   allowBothApprovedAndDenied(oldCSR),
-		allowLegacySignerName:        allowLegacySignerName(version, oldCSR),
-		allowDuplicateConditionTypes: allowDuplicateConditionTypes(version, oldCSR),
-		allowEmptyConditionType:      allowEmptyConditionType(version, oldCSR),
-		allowArbitraryCertificate:    allowArbitraryCertificate(version, newCSR, oldCSR),
-		allowDuplicateUsages:         allowDuplicateUsages(version, oldCSR),
-		allowUnknownUsages:           allowUnknownUsages(version, oldCSR),
+		allowLegacySignerName:        allowLegacySignerName(oldCSR),
+		allowDuplicateConditionTypes: allowDuplicateConditionTypes(oldCSR),
+		allowEmptyConditionType:      allowEmptyConditionType(oldCSR),
+		allowArbitraryCertificate:    allowArbitraryCertificate(newCSR, oldCSR),
+		allowDuplicateUsages:         allowDuplicateUsages(oldCSR),
+		allowUnknownUsages:           allowUnknownUsages(oldCSR),
 	}
-}
-
-func allowResettingCertificate(version schema.GroupVersion) bool {
-	// compatibility with v1beta1
-	return version == certificatesv1beta1.SchemeGroupVersion
 }
 
 func allowBothApprovedAndDenied(oldCSR *certificates.CertificateSigningRequest) bool {
@@ -452,10 +448,8 @@ func allowBothApprovedAndDenied(oldCSR *certificates.CertificateSigningRequest) 
 	return approved && denied
 }
 
-func allowLegacySignerName(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowLegacySignerName(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && oldCSR.Spec.SignerName == certificates.LegacyUnknownSignerName:
 		return true // compatibility with existing data
 	default:
@@ -463,10 +457,8 @@ func allowLegacySignerName(version schema.GroupVersion, oldCSR *certificates.Cer
 	}
 }
 
-func allowDuplicateConditionTypes(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowDuplicateConditionTypes(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasDuplicateConditionTypes(oldCSR):
 		return true // compatibility with existing data
 	default:
@@ -484,10 +476,8 @@ func hasDuplicateConditionTypes(csr *certificates.CertificateSigningRequest) boo
 	return false
 }
 
-func allowEmptyConditionType(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowEmptyConditionType(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasEmptyConditionType(oldCSR):
 		return true // compatibility with existing data
 	default:
@@ -503,10 +493,8 @@ func hasEmptyConditionType(csr *certificates.CertificateSigningRequest) bool {
 	return false
 }
 
-func allowArbitraryCertificate(version schema.GroupVersion, newCSR, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowArbitraryCertificate(newCSR, oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case newCSR != nil && oldCSR != nil && bytes.Equal(newCSR.Status.Certificate, oldCSR.Status.Certificate):
 		return true // tolerate updates that don't touch status.certificate
 	case oldCSR != nil && validateCertificate(oldCSR.Status.Certificate) != nil:
@@ -516,10 +504,8 @@ func allowArbitraryCertificate(version schema.GroupVersion, newCSR, oldCSR *cert
 	}
 }
 
-func allowUnknownUsages(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowUnknownUsages(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasUnknownUsage(oldCSR.Spec.Usages):
 		return true // compatibility with existing data
 	default:
@@ -536,10 +522,8 @@ func hasUnknownUsage(usages []certificates.KeyUsage) bool {
 	return false
 }
 
-func allowDuplicateUsages(version schema.GroupVersion, oldCSR *certificates.CertificateSigningRequest) bool {
+func allowDuplicateUsages(oldCSR *certificates.CertificateSigningRequest) bool {
 	switch {
-	case version == certificatesv1beta1.SchemeGroupVersion:
-		return true // compatibility with v1beta1
 	case oldCSR != nil && hasDuplicateUsage(oldCSR.Spec.Usages):
 		return true // compatibility with existing data
 	default:

@@ -18,6 +18,7 @@ package resource
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1791,5 +1792,14 @@ func TestUnstructured(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestStdinMultiUseError(t *testing.T) {
+	if got, want := newUnstructuredDefaultBuilder().Stdin().StdinInUse().Do().Err(), StdinMultiUseError; !errors.Is(got, want) {
+		t.Errorf("got: %q, want: %q", got, want)
+	}
+	if got, want := newUnstructuredDefaultBuilder().StdinInUse().Stdin().Do().Err(), StdinMultiUseError; !errors.Is(got, want) {
+		t.Errorf("got: %q, want: %q", got, want)
 	}
 }

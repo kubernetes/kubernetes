@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -20,9 +21,9 @@ package ipvs
 
 import (
 	"fmt"
-	"net"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	netutils "k8s.io/utils/net"
 
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -44,7 +45,7 @@ func (h *netlinkHandle) EnsureAddressBind(address, devName string) (exist bool, 
 	if err != nil {
 		return false, fmt.Errorf("error get interface: %s, err: %v", devName, err)
 	}
-	addr := net.ParseIP(address)
+	addr := netutils.ParseIPSloppy(address)
 	if addr == nil {
 		return false, fmt.Errorf("error parse ip address: %s", address)
 	}
@@ -64,7 +65,7 @@ func (h *netlinkHandle) UnbindAddress(address, devName string) error {
 	if err != nil {
 		return fmt.Errorf("error get interface: %s, err: %v", devName, err)
 	}
-	addr := net.ParseIP(address)
+	addr := netutils.ParseIPSloppy(address)
 	if addr == nil {
 		return fmt.Errorf("error parse ip address: %s", address)
 	}

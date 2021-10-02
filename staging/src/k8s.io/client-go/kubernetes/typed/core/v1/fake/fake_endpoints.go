@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	applyconfigurationscorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -122,6 +125,28 @@ func (c *FakeEndpoints) DeleteCollection(ctx context.Context, opts v1.DeleteOpti
 func (c *FakeEndpoints) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *corev1.Endpoints, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, name, pt, data, subresources...), &corev1.Endpoints{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*corev1.Endpoints), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied endpoints.
+func (c *FakeEndpoints) Apply(ctx context.Context, endpoints *applyconfigurationscorev1.EndpointsApplyConfiguration, opts v1.ApplyOptions) (result *corev1.Endpoints, err error) {
+	if endpoints == nil {
+		return nil, fmt.Errorf("endpoints provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(endpoints)
+	if err != nil {
+		return nil, err
+	}
+	name := endpoints.Name
+	if name == nil {
+		return nil, fmt.Errorf("endpoints.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(endpointsResource, c.ns, *name, types.ApplyPatchType, data), &corev1.Endpoints{})
 
 	if obj == nil {
 		return nil, err

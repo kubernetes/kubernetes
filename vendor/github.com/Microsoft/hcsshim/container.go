@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/Microsoft/hcsshim/internal/hcs"
+	"github.com/Microsoft/hcsshim/internal/hcs/schema1"
 	"github.com/Microsoft/hcsshim/internal/mergemaps"
-	"github.com/Microsoft/hcsshim/internal/schema1"
 )
 
 // ContainerProperties holds the properties for a container and the processes running in that container

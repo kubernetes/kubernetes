@@ -735,7 +735,7 @@ func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c c
 	if len(pvcNames) == 0 {
 		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0")
 	}
-	framework.Logf("Waiting up to %v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
+	framework.Logf("Waiting up to timeout=%v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		phaseFoundInAllClaims := true
 		for _, pvcName := range pvcNames {
@@ -864,4 +864,12 @@ func WaitForPVCFinalizer(ctx context.Context, cs clientset.Interface, name, name
 		err = fmt.Errorf("finalizer %s not added to pvc %s/%s", finalizer, namespace, name)
 	}
 	return err
+}
+
+// GetDefaultFSType returns the default fsType
+func GetDefaultFSType() string {
+	if framework.NodeOSDistroIs("windows") {
+		return "ntfs"
+	}
+	return "ext4"
 }

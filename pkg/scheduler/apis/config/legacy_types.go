@@ -130,6 +130,6 @@ type LabelPreference struct {
 // RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function.
 type RequestedToCapacityRatioArguments struct {
 	// Array of point defining priority function shape.
-	Shape     []UtilizationShapePoint `json:"shape"`
-	Resources []ResourceSpec          `json:"resources,omitempty"`
+	Shape     []UtilizationShapePoint
+	Resources []ResourceSpec
 }

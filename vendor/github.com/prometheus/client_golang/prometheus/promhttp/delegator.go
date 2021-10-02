@@ -83,8 +83,7 @@ type readerFromDelegator struct{ *responseWriterDelegator }
 type pusherDelegator struct{ *responseWriterDelegator }
 
 func (d closeNotifierDelegator) CloseNotify() <-chan bool {
-	//lint:ignore SA1019 http.CloseNotifier is deprecated but we don't want to
-	//remove support from client_golang yet.
+	//nolint:staticcheck // Ignore SA1019. http.CloseNotifier is deprecated but we keep it here to not break existing users.
 	return d.ResponseWriter.(http.CloseNotifier).CloseNotify()
 }
 func (d flusherDelegator) Flush() {
@@ -348,8 +347,7 @@ func newDelegator(w http.ResponseWriter, observeWriteHeaderFunc func(int)) deleg
 	}
 
 	id := 0
-	//lint:ignore SA1019 http.CloseNotifier is deprecated but we don't want to
-	//remove support from client_golang yet.
+	//nolint:staticcheck // Ignore SA1019. http.CloseNotifier is deprecated but we keep it here to not break existing users.
 	if _, ok := w.(http.CloseNotifier); ok {
 		id += closeNotifier
 	}

@@ -17,7 +17,6 @@ limitations under the License.
 package expose
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -168,7 +167,8 @@ func TestRunExposeService(t *testing.T) {
 					Type:     corev1.ServiceTypeLoadBalancer,
 				},
 			},
-			status: 200,
+			expected: "service/foo exposed (dry run)",
+			status:   200,
 		},
 		{
 			name: "expose-affinity-service",
@@ -200,7 +200,8 @@ func TestRunExposeService(t *testing.T) {
 					SessionAffinity: corev1.ServiceAffinityClientIP,
 				},
 			},
-			status: 200,
+			expected: "service/foo exposed (dry run)",
+			status:   200,
 		},
 		{
 			name: "expose-service-cluster-ip",
@@ -231,7 +232,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: "10.10.10.10",
 				},
 			},
-			expected: "service /foo exposed",
+			expected: "service/foo exposed (dry run)",
 			status:   200,
 		},
 		{
@@ -263,7 +264,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: corev1.ClusterIPNone,
 				},
 			},
-			expected: "service/foo exposed",
+			expected: "service/foo exposed (dry run)",
 			status:   200,
 		},
 		{
@@ -289,7 +290,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: corev1.ClusterIPNone,
 				},
 			},
-			expected: "service/foo exposed",
+			expected: "service/foo exposed (dry run)",
 			status:   200,
 		},
 		{
@@ -320,7 +321,8 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"func": "stream"},
 				},
 			},
-			status: 200,
+			expected: "service/foo exposed (dry run)",
+			status:   200,
 		},
 		{
 			name: "truncate-name",
@@ -396,7 +398,8 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"svc": "fromfoo"},
 				},
 			},
-			status: 200,
+			expected: "service/fromfoo exposed (dry run)",
+			status:   200,
 		},
 		{
 			name: "expose-multiprotocol-object",
@@ -466,7 +469,8 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"svc": "fromfoo"},
 				},
 			},
-			status: 200,
+			expected: "service/fromfoo exposed (dry run)",
+			status:   200,
 		},
 		{
 			name: "expose-service-from-service-no-selector-defined-sctp",
@@ -559,7 +563,7 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: "10.10.10.10",
 				},
 			},
-			expected: "service /foo exposed",
+			expected: "service/foo exposed (dry run)",
 			status:   200,
 		},
 		{
@@ -591,7 +595,39 @@ func TestRunExposeService(t *testing.T) {
 					ClusterIP: corev1.ClusterIPNone,
 				},
 			},
-			expected: "service/foo exposed",
+			expected: "service/foo exposed (dry run)",
+			status:   200,
+		},
+		{
+			name: "namespace-yaml",
+			args: []string{"service", "baz"},
+			ns:   "testns",
+			calls: map[string]string{
+				"GET":  "/namespaces/testns/services/baz",
+				"POST": "/namespaces/testns/services",
+			},
+			input: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "testns", ResourceVersion: "12"},
+				Spec: corev1.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "type": "LoadBalancer", "dry-run": "client", "output": "yaml"},
+			output: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: corev1.ServiceSpec{
+					Ports: []corev1.ServicePort{
+						{
+							Protocol:   corev1.ProtocolUDP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector: map[string]string{"func": "stream"},
+					Type:     corev1.ServiceTypeLoadBalancer,
+				},
+			},
+			expected: "namespace: testns",
 			status:   200,
 		},
 	}
@@ -629,8 +665,9 @@ func TestRunExposeService(t *testing.T) {
 			cmd.Run(cmd, test.args)
 
 			out := buf.String()
-			if _, ok := test.flags["dry-run"]; ok {
-				test.expected = fmt.Sprintf("service/%s exposed (dry run)", test.flags["name"])
+
+			if test.expected == "" {
+				t.Errorf("%s: Invalid test case. Specify expected result.\n", test.name)
 			}
 
 			if !strings.Contains(out, test.expected) {

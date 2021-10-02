@@ -68,7 +68,7 @@ const (
 
 var (
 	createAuthInfoLong = fmt.Sprintf(templates.LongDesc(i18n.T(`
-		Sets a user entry in kubeconfig
+		Set a user entry in kubeconfig.
 
 		Specifying a name that already exists will merge new fields on top of existing values.
 
@@ -85,7 +85,7 @@ var (
 
 	createAuthInfoExample = templates.Examples(`
 		# Set only the "client-key" field on the "cluster-admin"
-		# entry, without touching other values:
+		# entry, without touching other values
 		kubectl config set-credentials cluster-admin --client-key=~/.kube/admin.key
 
 		# Set basic auth for the "cluster-admin" entry
@@ -149,7 +149,7 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 			flagExecEnv,
 		),
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Sets a user entry in kubeconfig"),
+		Short:                 i18n.T("Set a user entry in kubeconfig"),
 		Long:                  createAuthInfoLong,
 		Example:               createAuthInfoExample,
 		Run: func(cmd *cobra.Command, args []string) {

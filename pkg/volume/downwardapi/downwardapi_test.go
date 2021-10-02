@@ -58,7 +58,7 @@ func TestCanSupport(t *testing.T) {
 
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plugin.GetPluginName() != downwardAPIPluginName {
 		t.Errorf("Wrong name: %s", plugin.GetPluginName())
@@ -229,7 +229,7 @@ func newDownwardAPITest(t *testing.T, name string, volumeFiles, podLabels, podAn
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, host)
 	plugin, err := pluginMgr.FindPluginByName(downwardAPIPluginName)
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 
 	volumeSpec := &v1.Volume{

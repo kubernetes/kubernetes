@@ -36,6 +36,13 @@ import (
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 )
 
+// ConvertabilityChecker indicates what versions a GroupKind is available in.
+type ConvertabilityChecker interface {
+	// VersionsForGroupKind indicates what versions are available to convert a group kind. This determines
+	// what our decoding abilities are.
+	VersionsForGroupKind(gk schema.GroupKind) []schema.GroupVersion
+}
+
 // APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful
 // It handles URLs of the form:
 // /${storage_key}[/${object_name}]
@@ -67,13 +74,14 @@ type APIGroupVersion struct {
 	Serializer     runtime.NegotiatedSerializer
 	ParameterCodec runtime.ParameterCodec
 
-	Typer           runtime.ObjectTyper
-	Creater         runtime.ObjectCreater
-	Convertor       runtime.ObjectConvertor
-	Defaulter       runtime.ObjectDefaulter
-	Linker          runtime.SelfLinker
-	UnsafeConvertor runtime.ObjectConvertor
-	TypeConverter   fieldmanager.TypeConverter
+	Typer                 runtime.ObjectTyper
+	Creater               runtime.ObjectCreater
+	Convertor             runtime.ObjectConvertor
+	ConvertabilityChecker ConvertabilityChecker
+	Defaulter             runtime.ObjectDefaulter
+	Linker                runtime.SelfLinker
+	UnsafeConvertor       runtime.ObjectConvertor
+	TypeConverter         fieldmanager.TypeConverter
 
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 

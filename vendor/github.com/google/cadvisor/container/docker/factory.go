@@ -347,23 +347,25 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics
 	var (
 		thinPoolWatcher *devicemapper.ThinPoolWatcher
 		thinPoolName    string
+		zfsWatcher      *zfs.ZfsWatcher
 	)
-	if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
-		thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
-		if err != nil {
-			klog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
+	if includedMetrics.Has(container.DiskUsageMetrics) {
+		if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
+			thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
+			if err != nil {
+				klog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
+			}
+
+			// Safe to ignore error - driver status should always be populated.
+			status, _ := StatusFromDockerInfo(*dockerInfo)
+			thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
 		}
 
-		// Safe to ignore error - driver status should always be populated.
-		status, _ := StatusFromDockerInfo(*dockerInfo)
-		thinPoolName = status.DriverStatus[dockerutil.DriverStatusPoolName]
-	}
-
-	var zfsWatcher *zfs.ZfsWatcher
-	if storageDriver(dockerInfo.Driver) == zfsStorageDriver {
-		zfsWatcher, err = startZfsWatcher(dockerInfo)
-		if err != nil {
-			klog.Errorf("zfs filesystem stats will not be reported: %v", err)
+		if storageDriver(dockerInfo.Driver) == zfsStorageDriver {
+			zfsWatcher, err = startZfsWatcher(dockerInfo)
+			if err != nil {
+				klog.Errorf("zfs filesystem stats will not be reported: %v", err)
+			}
 		}
 	}
 

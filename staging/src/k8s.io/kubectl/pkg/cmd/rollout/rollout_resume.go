@@ -30,6 +30,7 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -55,7 +56,7 @@ type ResumeOptions struct {
 
 var (
 	resumeLong = templates.LongDesc(i18n.T(`
-		Resume a paused resource
+		Resume a paused resource.
 
 		Paused resources will not be reconciled by a controller. By resuming a
 		resource, we allow it to be reconciled again.
@@ -86,12 +87,12 @@ func NewCmdRolloutResume(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		Short:                 i18n.T("Resume a paused resource"),
 		Long:                  resumeLong,
 		Example:               resumeExample,
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunResume())
 		},
-		ValidArgs: validArgs,
 	}
 
 	usage := "identifying the resource to get from a server."

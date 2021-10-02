@@ -136,22 +136,3 @@ func TestSnapshotAndRestore(t *testing.T) {
 		t.Errorf("expect offset %v allocated", offset)
 	}
 }
-
-func TestContiguousAllocation(t *testing.T) {
-	max := 10
-	m := NewContiguousAllocationMap(max, "test")
-
-	for i := 0; i < max; i++ {
-		next, ok, _ := m.AllocateNext()
-		if !ok {
-			t.Fatalf("unexpected error")
-		}
-		if next != i {
-			t.Fatalf("expect next to %d, but got %d", i, next)
-		}
-	}
-
-	if _, ok, _ := m.AllocateNext(); ok {
-		t.Errorf("unexpected success")
-	}
-}

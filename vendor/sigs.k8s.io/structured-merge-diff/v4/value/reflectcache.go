@@ -70,11 +70,11 @@ func (f *FieldCacheEntry) CanOmit(fieldVal reflect.Value) bool {
 	return f.isOmitEmpty && (safeIsNil(fieldVal) || isZero(fieldVal))
 }
 
-// GetUsing returns the field identified by this FieldCacheEntry from the provided struct.
+// GetFrom returns the field identified by this FieldCacheEntry from the provided struct.
 func (f *FieldCacheEntry) GetFrom(structVal reflect.Value) reflect.Value {
 	// field might be nested within 'inline' structs
 	for _, elem := range f.fieldPath {
-		structVal = structVal.FieldByIndex(elem)
+		structVal = dereference(structVal).FieldByIndex(elem)
 	}
 	return structVal
 }
@@ -150,7 +150,11 @@ func buildStructCacheEntry(t reflect.Type, infos map[string]*FieldCacheEntry, fi
 			continue
 		}
 		if isInline {
-			buildStructCacheEntry(field.Type, infos, append(fieldPath, field.Index))
+			e := field.Type
+			if field.Type.Kind() == reflect.Ptr {
+				e = field.Type.Elem()
+			}
+			buildStructCacheEntry(e, infos, append(fieldPath, field.Index))
 			continue
 		}
 		info := &FieldCacheEntry{JsonName: jsonName, isOmitEmpty: isOmitempty, fieldPath: append(fieldPath, field.Index), fieldType: field.Type}

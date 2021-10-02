@@ -105,16 +105,16 @@ func (stenographer *FakeStenographer) AnnounceCapturedOutput(output string) {
 	stenographer.registerCall("AnnounceCapturedOutput", output)
 }
 
-func (stenographer *FakeStenographer) AnnounceSuccesfulSpec(spec *types.SpecSummary) {
-	stenographer.registerCall("AnnounceSuccesfulSpec", spec)
+func (stenographer *FakeStenographer) AnnounceSuccessfulSpec(spec *types.SpecSummary) {
+	stenographer.registerCall("AnnounceSuccessfulSpec", spec)
 }
 
-func (stenographer *FakeStenographer) AnnounceSuccesfulSlowSpec(spec *types.SpecSummary, succinct bool) {
-	stenographer.registerCall("AnnounceSuccesfulSlowSpec", spec, succinct)
+func (stenographer *FakeStenographer) AnnounceSuccessfulSlowSpec(spec *types.SpecSummary, succinct bool) {
+	stenographer.registerCall("AnnounceSuccessfulSlowSpec", spec, succinct)
 }
 
-func (stenographer *FakeStenographer) AnnounceSuccesfulMeasurement(spec *types.SpecSummary, succinct bool) {
-	stenographer.registerCall("AnnounceSuccesfulMeasurement", spec, succinct)
+func (stenographer *FakeStenographer) AnnounceSuccessfulMeasurement(spec *types.SpecSummary, succinct bool) {
+	stenographer.registerCall("AnnounceSuccessfulMeasurement", spec, succinct)
 }
 
 func (stenographer *FakeStenographer) AnnouncePendingSpec(spec *types.SpecSummary, noisy bool) {

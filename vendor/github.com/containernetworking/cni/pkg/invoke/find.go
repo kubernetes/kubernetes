@@ -18,12 +18,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // FindInPath returns the full path of the plugin by searching in the provided path
 func FindInPath(plugin string, paths []string) (string, error) {
 	if plugin == "" {
 		return "", fmt.Errorf("no plugin name provided")
+	}
+
+	if strings.ContainsRune(plugin, os.PathSeparator) {
+		return "", fmt.Errorf("invalid plugin name: %s", plugin)
 	}
 
 	if len(paths) == 0 {

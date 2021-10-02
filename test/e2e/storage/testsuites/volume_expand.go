@@ -121,7 +121,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := v.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 	}
@@ -180,9 +180,9 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			podConfig := e2epod.Config{
 				NS:            f.Namespace.Name,
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+				SeLinuxLabel:  e2epod.GetLinuxLabel(),
 				NodeSelection: l.config.ClientNodeSelection,
-				ImageID:       e2evolume.GetDefaultTestImageID(),
+				ImageID:       e2epod.GetDefaultTestImageID(),
 			}
 			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, f.Timeouts.PodStart)
 			defer func() {
@@ -224,9 +224,9 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			podConfig = e2epod.Config{
 				NS:            f.Namespace.Name,
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+				SeLinuxLabel:  e2epod.GetLinuxLabel(),
 				NodeSelection: l.config.ClientNodeSelection,
-				ImageID:       e2evolume.GetDefaultTestImageID(),
+				ImageID:       e2epod.GetDefaultTestImageID(),
 			}
 			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, resizedPodStartupTimeout)
 			defer func() {
@@ -247,14 +247,18 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			init()
 			defer cleanup()
 
+			if !driver.GetDriverInfo().Capabilities[storageframework.CapOnlineExpansion] {
+				e2eskipper.Skipf("Driver %q does not support online volume expansion - skipping", driver.GetDriverInfo().Name)
+			}
+
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
 			podConfig := e2epod.Config{
 				NS:            f.Namespace.Name,
 				PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
-				SeLinuxLabel:  e2evolume.GetLinuxLabel(),
+				SeLinuxLabel:  e2epod.GetLinuxLabel(),
 				NodeSelection: l.config.ClientNodeSelection,
-				ImageID:       e2evolume.GetDefaultTestImageID(),
+				ImageID:       e2epod.GetDefaultTestImageID(),
 			}
 			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, &podConfig, f.Timeouts.PodStart)
 			defer func() {
@@ -352,9 +356,9 @@ func WaitForResizingCondition(pvc *v1.PersistentVolumeClaim, c clientset.Interfa
 }
 
 // WaitForControllerVolumeResize waits for the controller resize to be finished
-func WaitForControllerVolumeResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface, duration time.Duration) error {
+func WaitForControllerVolumeResize(pvc *v1.PersistentVolumeClaim, c clientset.Interface, timeout time.Duration) error {
 	pvName := pvc.Spec.VolumeName
-	waitErr := wait.PollImmediate(resizePollInterval, duration, func() (bool, error) {
+	waitErr := wait.PollImmediate(resizePollInterval, timeout, func() (bool, error) {
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 
 		pv, err := c.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})

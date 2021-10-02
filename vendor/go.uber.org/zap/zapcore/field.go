@@ -65,8 +65,11 @@ const (
 	Int8Type
 	// StringType indicates that the field carries a string.
 	StringType
-	// TimeType indicates that the field carries a time.Time.
+	// TimeType indicates that the field carries a time.Time that is
+	// representable by a UnixNano() stored as an int64.
 	TimeType
+	// TimeFullType indicates that the field carries a time.Time stored as-is.
+	TimeFullType
 	// Uint64Type indicates that the field carries a uint64.
 	Uint64Type
 	// Uint32Type indicates that the field carries a uint32.
@@ -89,6 +92,10 @@ const (
 	ErrorType
 	// SkipType indicates that the field is a no-op.
 	SkipType
+
+	// InlineMarshalerType indicates that the field carries an ObjectMarshaler
+	// that should be inlined.
+	InlineMarshalerType
 )
 
 // A Field is a marshaling operation used to add a key-value pair to a logger's
@@ -112,6 +119,8 @@ func (f Field) AddTo(enc ObjectEncoder) {
 		err = enc.AddArray(f.Key, f.Interface.(ArrayMarshaler))
 	case ObjectMarshalerType:
 		err = enc.AddObject(f.Key, f.Interface.(ObjectMarshaler))
+	case InlineMarshalerType:
+		err = f.Interface.(ObjectMarshaler).MarshalLogObject(enc)
 	case BinaryType:
 		enc.AddBinary(f.Key, f.Interface.([]byte))
 	case BoolType:
@@ -145,6 +154,8 @@ func (f Field) AddTo(enc ObjectEncoder) {
 			// Fall back to UTC if location is nil.
 			enc.AddTime(f.Key, time.Unix(0, f.Integer))
 		}
+	case TimeFullType:
+		enc.AddTime(f.Key, f.Interface.(time.Time))
 	case Uint64Type:
 		enc.AddUint64(f.Key, uint64(f.Integer))
 	case Uint32Type:
@@ -162,7 +173,7 @@ func (f Field) AddTo(enc ObjectEncoder) {
 	case StringerType:
 		err = encodeStringer(f.Key, f.Interface, enc)
 	case ErrorType:
-		encodeError(f.Key, f.Interface.(error), enc)
+		err = encodeError(f.Key, f.Interface.(error), enc)
 	case SkipType:
 		break
 	default:
@@ -200,13 +211,23 @@ func addFields(enc ObjectEncoder, fields []Field) {
 	}
 }
 
-func encodeStringer(key string, stringer interface{}, enc ObjectEncoder) (err error) {
+func encodeStringer(key string, stringer interface{}, enc ObjectEncoder) (retErr error) {
+	// Try to capture panics (from nil references or otherwise) when calling
+	// the String() method, similar to https://golang.org/src/fmt/print.go#L540
 	defer func() {
-		if v := recover(); v != nil {
-			err = fmt.Errorf("PANIC=%v", v)
+		if err := recover(); err != nil {
+			// If it's a nil pointer, just say "<nil>". The likeliest causes are a
+			// Stringer that fails to guard against nil or a nil pointer for a
+			// value receiver, and in either case, "<nil>" is a nice result.
+			if v := reflect.ValueOf(stringer); v.Kind() == reflect.Ptr && v.IsNil() {
+				enc.AddString(key, "<nil>")
+				return
+			}
+
+			retErr = fmt.Errorf("PANIC=%v", err)
 		}
 	}()
 
 	enc.AddString(key, stringer.(fmt.Stringer).String())
-	return
+	return nil
 }

@@ -25,6 +25,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -55,6 +57,7 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestConvertFieldLabel(t *testing.T) {
@@ -467,7 +470,7 @@ func testHandlerConversion(t *testing.T, enableWatchCache bool) {
 	etcdOptions := options.NewEtcdOptions(storageConfig)
 	etcdOptions.StorageConfig.Codec = unstructured.UnstructuredJSONScheme
 	restOptionsGetter := generic.RESTOptions{
-		StorageConfig:           &etcdOptions.StorageConfig,
+		StorageConfig:           etcdOptions.StorageConfig.ForResource(schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}),
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: true,
 		DeleteCollectionWorkers: 1,
@@ -754,4 +757,101 @@ func Test_defaultDeprecationWarning(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildOpenAPIModelsForApply(t *testing.T) {
+	// This is a list of validation that we expect to work.
+	tests := []apiextensionsv1.CustomResourceValidation{
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type:       "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{"num": {Type: "integer", Description: "v1beta1 num field"}},
+			},
+		},
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type:         "",
+				XIntOrString: true,
+			},
+		},
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"oneOf": {
+						OneOf: []apiextensionsv1.JSONSchemaProps{
+							{Type: "boolean"},
+							{Type: "string"},
+						},
+					},
+				},
+			},
+		},
+		{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Type: "object",
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
+					"nullable": {
+						Type:     "integer",
+						Nullable: true,
+					},
+				},
+			},
+		},
+	}
+
+	staticSpec, err := getOpenAPISpecFromFile()
+	if err != nil {
+		t.Fatalf("Failed to load openapi spec: %v", err)
+	}
+
+	crd := apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: "example.stable.example.com", UID: types.UID("12345")},
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "stable.example.com",
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
+				Plural: "examples", Singular: "example", Kind: "Example", ShortNames: []string{"ex"}, ListKind: "ExampleList", Categories: []string{"all"},
+			},
+			Conversion:            &apiextensionsv1.CustomResourceConversion{Strategy: apiextensionsv1.NoneConverter},
+			Scope:                 apiextensionsv1.ClusterScoped,
+			PreserveUnknownFields: false,
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name: "v1beta1", Served: true, Storage: true,
+					Subresources: &apiextensionsv1.CustomResourceSubresources{Status: &apiextensionsv1.CustomResourceSubresourceStatus{}},
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		crd.Spec.Versions[0].Schema = &test
+		models, err := buildOpenAPIModelsForApply(staticSpec, &crd)
+		if err != nil {
+			t.Fatalf("failed to convert to apply model: %v", err)
+		}
+		if models == nil {
+			t.Fatalf("%d: failed to convert to apply model: nil", i)
+		}
+	}
+}
+
+func getOpenAPISpecFromFile() (*spec.Swagger, error) {
+	path := filepath.Join("testdata", "swagger.json")
+	_, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	byteSpec, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	staticSpec := &spec.Swagger{}
+
+	err = yaml.Unmarshal(byteSpec, staticSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	return staticSpec, nil
 }

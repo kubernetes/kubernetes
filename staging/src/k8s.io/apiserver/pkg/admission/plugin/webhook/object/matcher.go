@@ -36,7 +36,7 @@ func matchObject(obj runtime.Object, selector labels.Selector) bool {
 	}
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		klog.V(5).Infof("cannot access metadata of %v: %v", obj, err)
+		klog.V(5).InfoS("Accessing metadata failed", "object", obj, "err", err)
 		return false
 	}
 	return selector.Matches(labels.Set(accessor.GetLabels()))

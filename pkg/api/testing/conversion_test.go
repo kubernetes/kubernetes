@@ -21,12 +21,13 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -83,7 +84,7 @@ func BenchmarkNodeConversion(b *testing.B) {
 	}
 	b.StopTimer()
 	if !apiequality.Semantic.DeepDerivative(node, *result) {
-		b.Fatalf("Incorrect conversion: %s", diff.ObjectDiff(node, *result))
+		b.Fatalf("Incorrect conversion: %s", cmp.Diff(node, *result))
 	}
 }
 

@@ -1,3 +1,4 @@
+//go:build go1.8
 // +build go1.8
 
 /*
@@ -37,11 +38,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
+	netutils "k8s.io/utils/net"
 )
 
 func TestGetClientIP(t *testing.T) {
 	ipString := "10.0.0.1"
-	ip := net.ParseIP(ipString)
+	ip := netutils.ParseIPSloppy(ipString)
 	invalidIPString := "invalidIPString"
 	testCases := []struct {
 		Request    http.Request
@@ -1106,4 +1108,22 @@ func TestPingTimeoutSeconds(t *testing.T) {
 		t.Errorf("expected %d, got %d", e, a)
 	}
 	reset()
+}
+
+func Benchmark_ParseQuotedString(b *testing.B) {
+	str := `"The quick brown" fox jumps over the lazy dog`
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		quoted, remainder, err := parseQuotedString(str)
+		if err != nil {
+			b.Errorf("Unexpected error %s", err)
+		}
+		if quoted != "The quick brown" {
+			b.Errorf("Unexpected quoted string %s", quoted)
+		}
+		if remainder != "fox jumps over the lazy dog" {
+			b.Errorf("Unexpected remainder string %s", quoted)
+		}
+	}
 }

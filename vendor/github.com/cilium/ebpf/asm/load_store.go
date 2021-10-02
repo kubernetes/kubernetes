@@ -111,7 +111,7 @@ func LoadMapPtr(dst Register, fd int) Instruction {
 		OpCode:   LoadImmOp(DWord),
 		Dst:      dst,
 		Src:      PseudoMapFD,
-		Constant: int64(fd),
+		Constant: int64(uint32(fd)),
 	}
 }
 

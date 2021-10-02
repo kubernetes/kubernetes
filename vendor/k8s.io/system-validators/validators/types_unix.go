@@ -57,6 +57,8 @@ var DefaultSysSpec = SysSpec{
 			{Name: "BLK_DEV_DM", Description: "Required for devicemapper."},
 			{Name: "CFS_BANDWIDTH", Description: "Required for CPU quota."},
 			{Name: "CGROUP_HUGETLB", Description: "Required for hugetlb cgroup."},
+			{Name: "SECCOMP", Description: "Required for seccomp."},
+			{Name: "SECCOMP_FILTER", Description: "Required for seccomp mode 2."},
 		},
 		Forbidden: []KernelConfig{},
 	},
@@ -70,7 +72,7 @@ var DefaultSysSpec = SysSpec{
 	CgroupsV2Optional: []string{"hugetlb"},
 	RuntimeSpec: RuntimeSpec{
 		DockerSpec: &DockerSpec{
-			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`, `19\.03\..*`},
+			Version:     []string{`1\.1[1-3]\..*`, `17\.0[3,6,9]\..*`, `18\.0[6,9]\..*`, `19\.03\..*`, `20\.10\..*`},
 			GraphDriver: []string{"aufs", "overlay", "overlay2", "devicemapper", "zfs"},
 		},
 	},

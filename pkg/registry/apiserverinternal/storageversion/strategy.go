@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // storageVersionStrategy implements verification logic for StorageVersion.
@@ -40,6 +41,18 @@ var Strategy = storageVersionStrategy{legacyscheme.Scheme, names.SimpleNameGener
 // NamespaceScoped returns false because all StorageVersion's need to be cluster scoped
 func (storageVersionStrategy) NamespaceScoped() bool {
 	return false
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (storageVersionStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"internal.apiserver.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of an StorageVersion before creation.
@@ -60,6 +73,11 @@ func (storageVersionStrategy) Validate(ctx context.Context, obj runtime.Object) 
 	return validation.ValidateStorageVersion(sv)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (storageVersionStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (storageVersionStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -77,6 +95,11 @@ func (storageVersionStrategy) ValidateUpdate(ctx context.Context, obj, old runti
 	return validationErrorList
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (storageVersionStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 // AllowUnconditionalUpdate is the default update policy for storageVersion objects. Status update should
 // only be allowed if version match.
 func (storageVersionStrategy) AllowUnconditionalUpdate() bool {
@@ -90,6 +113,19 @@ type storageVersionStatusStrategy struct {
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = storageVersionStatusStrategy{Strategy}
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (storageVersionStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"internal.apiserver.k8s.io/v1alpha1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
+
 func (storageVersionStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newSV := obj.(*apiserverinternal.StorageVersion)
 	oldSV := old.(*apiserverinternal.StorageVersion)
@@ -100,4 +136,9 @@ func (storageVersionStatusStrategy) PrepareForUpdate(ctx context.Context, obj, o
 
 func (storageVersionStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateStorageVersionStatusUpdate(obj.(*apiserverinternal.StorageVersion), old.(*apiserverinternal.StorageVersion))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (storageVersionStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

@@ -3,14 +3,13 @@
 package fs
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/pkg/errors"
@@ -45,8 +44,8 @@ type subsystem interface {
 	GetStats(path string, stats *cgroups.Stats) error
 	// Creates and joins the cgroup represented by 'cgroupData'.
 	Apply(path string, c *cgroupData) error
-	// Set the cgroup represented by cgroup.
-	Set(path string, cgroup *configs.Cgroup) error
+	// Set sets the cgroup resources.
+	Set(path string, r *configs.Resources) error
 }
 
 type manager struct {
@@ -65,8 +64,10 @@ func NewManager(cg *configs.Cgroup, paths map[string]string, rootless bool) cgro
 }
 
 // The absolute path to the root of the cgroup hierarchies.
-var cgroupRootLock sync.Mutex
-var cgroupRoot string
+var (
+	cgroupRootLock sync.Mutex
+	cgroupRoot     string
+)
 
 const defaultCgroupRoot = "/sys/fs/cgroup"
 
@@ -133,45 +134,18 @@ func getCgroupRoot() (string, error) {
 		return cgroupRoot, nil
 	}
 
-	// slow path: parse mountinfo, find the first mount where fs=cgroup
-	// (e.g. "/sys/fs/cgroup/memory"), use its parent.
-	f, err := os.Open("/proc/self/mountinfo")
+	// slow path: parse mountinfo
+	mi, err := cgroups.GetCgroupMounts(false)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
-
-	var root string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		text := scanner.Text()
-		fields := strings.Split(text, " ")
-		// Safe as mountinfo encodes mountpoints with spaces as \040.
-		index := strings.Index(text, " - ")
-		postSeparatorFields := strings.Fields(text[index+3:])
-		numPostFields := len(postSeparatorFields)
-
-		// This is an error as we can't detect if the mount is for "cgroup"
-		if numPostFields == 0 {
-			return "", fmt.Errorf("mountinfo: found no fields post '-' in %q", text)
-		}
-
-		if postSeparatorFields[0] == "cgroup" {
-			// Check that the mount is properly formatted.
-			if numPostFields < 3 {
-				return "", fmt.Errorf("Error found less than 3 fields post '-' in %q", text)
-			}
-
-			root = filepath.Dir(fields[4])
-			break
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-	if root == "" {
+	if len(mi) < 1 {
 		return "", errors.New("no cgroup mount found in mountinfo")
 	}
+
+	// Get the first cgroup mount (e.g. "/sys/fs/cgroup/memory"),
+	// use its parent directory.
+	root := filepath.Dir(mi[0].Mountpoint)
 
 	if _, err := os.Stat(root); err != nil {
 		return "", err
@@ -218,26 +192,29 @@ func (m *manager) Apply(pid int) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var c = m.cgroups
-
-	d, err := getCgroupData(m.cgroups, pid)
-	if err != nil {
-		return err
+	c := m.cgroups
+	if c.Resources.Unified != nil {
+		return cgroups.ErrV1NoUnified
 	}
 
 	m.paths = make(map[string]string)
 	if c.Paths != nil {
+		cgMap, err := cgroups.ParseCgroupFile("/proc/self/cgroup")
+		if err != nil {
+			return err
+		}
 		for name, path := range c.Paths {
-			_, err := d.path(name)
-			if err != nil {
-				if cgroups.IsNotFound(err) {
-					continue
-				}
-				return err
+			// XXX(kolyshkin@): why this check is needed?
+			if _, ok := cgMap[name]; ok {
+				m.paths[name] = path
 			}
-			m.paths[name] = path
 		}
 		return cgroups.EnterPid(m.paths, pid)
+	}
+
+	d, err := getCgroupData(m.cgroups, pid)
+	if err != nil {
+		return err
 	}
 
 	for _, sys := range subsystems {
@@ -274,11 +251,7 @@ func (m *manager) Destroy() error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := cgroups.RemovePaths(m.paths); err != nil {
-		return err
-	}
-	m.paths = make(map[string]string)
-	return nil
+	return cgroups.RemovePaths(m.paths)
 }
 
 func (m *manager) Path(subsys string) string {
@@ -303,8 +276,8 @@ func (m *manager) GetStats() (*cgroups.Stats, error) {
 	return stats, nil
 }
 
-func (m *manager) Set(container *configs.Config) error {
-	if container.Cgroups == nil {
+func (m *manager) Set(r *configs.Resources) error {
+	if r == nil {
 		return nil
 	}
 
@@ -313,16 +286,19 @@ func (m *manager) Set(container *configs.Config) error {
 	if m.cgroups != nil && m.cgroups.Paths != nil {
 		return nil
 	}
+	if r.Unified != nil {
+		return cgroups.ErrV1NoUnified
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, sys := range subsystems {
 		path := m.paths[sys.Name()]
-		if err := sys.Set(path, container.Cgroups); err != nil {
+		if err := sys.Set(path, r); err != nil {
 			if m.rootless && sys.Name() == "devices" {
 				continue
 			}
-			// When m.Rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
+			// When m.rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
 			// However, errors from other subsystems are not ignored.
 			// see @test "runc create (rootless + limits + no cgrouppath + no permission) fails with informative error"
 			if path == "" {
@@ -348,7 +324,7 @@ func (m *manager) Freeze(state configs.FreezerState) error {
 	prevState := m.cgroups.Resources.Freezer
 	m.cgroups.Resources.Freezer = state
 	freezer := &FreezerGroup{}
-	if err := freezer.Set(path, m.cgroups); err != nil {
+	if err := freezer.Set(path, m.cgroups.Resources); err != nil {
 		m.cgroups.Resources.Freezer = prevState
 		return err
 	}
@@ -419,20 +395,10 @@ func join(path string, pid int) error {
 	if path == "" {
 		return nil
 	}
-	if err := os.MkdirAll(path, 0755); err != nil {
+	if err := os.MkdirAll(path, 0o755); err != nil {
 		return err
 	}
 	return cgroups.WriteCgroupProc(path, pid)
-}
-
-func removePath(p string, err error) error {
-	if err != nil {
-		return err
-	}
-	if p != "" {
-		return os.RemoveAll(p)
-	}
-	return nil
 }
 
 func (m *manager) GetPaths() map[string]string {
@@ -457,4 +423,18 @@ func (m *manager) GetFreezerState() (configs.FreezerState, error) {
 
 func (m *manager) Exists() bool {
 	return cgroups.PathExists(m.Path("devices"))
+}
+
+func OOMKillCount(path string) (uint64, error) {
+	return fscommon.GetValueByKey(path, "memory.oom_control", "oom_kill")
+}
+
+func (m *manager) OOMKillCount() (uint64, error) {
+	c, err := OOMKillCount(m.Path("memory"))
+	// Ignore ENOENT when rootless as it couldn't create cgroup.
+	if err != nil && m.rootless && os.IsNotExist(err) {
+		err = nil
+	}
+
+	return c, err
 }

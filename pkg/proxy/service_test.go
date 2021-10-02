@@ -17,24 +17,25 @@ limitations under the License.
 package proxy
 
 import (
-	"net"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	netutils "k8s.io/utils/net"
 )
 
 const testHostname = "test-hostname"
 
 func makeTestServiceInfo(clusterIP string, port int, protocol string, healthcheckNodePort int, svcInfoFuncs ...func(*BaseServiceInfo)) *BaseServiceInfo {
 	info := &BaseServiceInfo{
-		clusterIP: net.ParseIP(clusterIP),
+		clusterIP: netutils.ParseIPSloppy(clusterIP),
 		port:      port,
 		protocol:  v1.Protocol(protocol),
 	}
@@ -511,12 +512,21 @@ type FakeProxier struct {
 	hostname         string
 }
 
-func newFakeProxier(ipFamily v1.IPFamily) *FakeProxier {
+func newFakeProxier(ipFamily v1.IPFamily, t time.Time) *FakeProxier {
 	return &FakeProxier{
-		serviceMap:       make(ServiceMap),
-		serviceChanges:   NewServiceChangeTracker(nil, ipFamily, nil, nil),
-		endpointsMap:     make(EndpointsMap),
-		endpointsChanges: NewEndpointChangeTracker(testHostname, nil, ipFamily, nil, false, nil),
+		serviceMap:     make(ServiceMap),
+		serviceChanges: NewServiceChangeTracker(nil, ipFamily, nil, nil),
+		endpointsMap:   make(EndpointsMap),
+		endpointsChanges: &EndpointChangeTracker{
+			hostname:                  testHostname,
+			items:                     make(map[types.NamespacedName]*endpointsChange),
+			makeEndpointInfo:          nil,
+			ipFamily:                  ipFamily,
+			recorder:                  nil,
+			lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
+			trackerStartTime:          t,
+			processEndpointsMapChange: nil,
+		},
 	}
 }
 
@@ -538,8 +548,8 @@ func (fake *FakeProxier) deleteService(service *v1.Service) {
 	fake.serviceChanges.Update(service, nil)
 }
 
-func TestUpdateServiceMapHeadless(t *testing.T) {
-	fp := newFakeProxier(v1.IPv4Protocol)
+func TestServiceMapUpdateHeadless(t *testing.T) {
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	makeServiceMap(fp,
 		makeTestService("ns2", "headless", func(svc *v1.Service) {
@@ -554,7 +564,7 @@ func TestUpdateServiceMapHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %d", len(fp.serviceMap))
 	}
@@ -570,7 +580,7 @@ func TestUpdateServiceMapHeadless(t *testing.T) {
 }
 
 func TestUpdateServiceTypeExternalName(t *testing.T) {
-	fp := newFakeProxier(v1.IPv4Protocol)
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	makeServiceMap(fp,
 		makeTestService("ns2", "external-name", func(svc *v1.Service) {
@@ -581,7 +591,7 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", fp.serviceMap)
 	}
@@ -595,7 +605,7 @@ func TestUpdateServiceTypeExternalName(t *testing.T) {
 }
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
-	fp := newFakeProxier(v1.IPv4Protocol)
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	services := []*v1.Service{
 		makeTestService("ns2", "cluster-ip", func(svc *v1.Service) {
@@ -641,7 +651,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	for i := range services {
 		fp.addService(services[i])
 	}
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 8 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -674,7 +684,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	fp.deleteService(services[2])
 	fp.deleteService(services[3])
 
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", fp.serviceMap)
 	}
@@ -698,7 +708,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 }
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
-	fp := newFakeProxier(v1.IPv4Protocol)
+	fp := newFakeProxier(v1.IPv4Protocol, time.Time{})
 
 	servicev1 := makeTestService("ns1", "svc1", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -723,7 +733,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	fp.addService(servicev1)
 
-	result := UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -737,7 +747,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// Change service to load-balancer
 	fp.updateService(servicev1, servicev2)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -751,7 +761,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
 	fp.updateService(servicev2, servicev2)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -764,7 +774,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// And back to ClusterIP
 	fp.updateService(servicev2, servicev1)
-	result = UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}

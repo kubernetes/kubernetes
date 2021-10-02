@@ -37,7 +37,6 @@ rules:
       - k8s.io/kubernetes/pkg/controller/service
       - k8s.io/kubernetes/pkg/controller/util/node
       - k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util
-      - k8s.io/kubernetes/pkg/controller/volume/scheduling
       - k8s.io/kubernetes/pkg/credentialprovider
       - k8s.io/kubernetes/pkg/credentialprovider/aws
       - k8s.io/kubernetes/pkg/credentialprovider/azure

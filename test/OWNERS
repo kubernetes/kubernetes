@@ -6,17 +6,19 @@ reviewers:
   - johnSchnake
   - SataQiu
   - tanjunchen
-  - dims
 approvers:
   - alejandrox1
   - andrewsykim
+  - aojea
   - BenTheElder
   - bowei # for test/e2e/{dns*,network}.go
   - caseydavenport # for test/e2e/{dns*,network}.go
   - cblecker
+  - dims
   - MrHohn
   - deads2k
   - enisoc
+  - enj
   - janetkuo
   - liggitt
   - mikedanese
@@ -32,9 +34,7 @@ approvers:
   - sttts
   - timothysc
 emeritus_approvers:
-  - enj
   - eparis
-  - erictune
   - foxish
   - gmarek
   - krousey

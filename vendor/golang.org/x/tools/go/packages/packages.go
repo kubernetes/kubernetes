@@ -144,6 +144,12 @@ type Config struct {
 	// the build system's query tool.
 	BuildFlags []string
 
+	// modFile will be used for -modfile in go command invocations.
+	modFile string
+
+	// modFlag will be used for -modfile in go command invocations.
+	modFlag string
+
 	// Fset provides source position information for syntax trees and types.
 	// If Fset is nil, Load will use a new fileset, but preserve Fset's value.
 	Fset *token.FileSet
@@ -289,6 +295,11 @@ type Package struct {
 	// including assembly, C, C++, Fortran, Objective-C, SWIG, and so on.
 	OtherFiles []string
 
+	// IgnoredFiles lists source files that are not part of the package
+	// using the current build configuration but that might be part of
+	// the package using other build configurations.
+	IgnoredFiles []string
+
 	// ExportFile is the absolute path to a file containing type
 	// information for the package as provided by the build system.
 	ExportFile string
@@ -328,6 +339,9 @@ type Package struct {
 	// forTest is the package under test, if any.
 	forTest string
 
+	// depsErrors is the DepsErrors field from the go list response, if any.
+	depsErrors []*packagesinternal.PackageError
+
 	// module is the module information for the package if it exists.
 	Module *Module
 }
@@ -355,11 +369,20 @@ func init() {
 	packagesinternal.GetForTest = func(p interface{}) string {
 		return p.(*Package).forTest
 	}
+	packagesinternal.GetDepsErrors = func(p interface{}) []*packagesinternal.PackageError {
+		return p.(*Package).depsErrors
+	}
 	packagesinternal.GetGoCmdRunner = func(config interface{}) *gocommand.Runner {
 		return config.(*Config).gocmdRunner
 	}
 	packagesinternal.SetGoCmdRunner = func(config interface{}, runner *gocommand.Runner) {
 		config.(*Config).gocmdRunner = runner
+	}
+	packagesinternal.SetModFile = func(config interface{}, value string) {
+		config.(*Config).modFile = value
+	}
+	packagesinternal.SetModFlag = func(config interface{}, value string) {
+		config.(*Config).modFlag = value
 	}
 	packagesinternal.TypecheckCgo = int(typecheckCgo)
 }
@@ -404,6 +427,7 @@ type flatPackage struct {
 	GoFiles         []string          `json:",omitempty"`
 	CompiledGoFiles []string          `json:",omitempty"`
 	OtherFiles      []string          `json:",omitempty"`
+	IgnoredFiles    []string          `json:",omitempty"`
 	ExportFile      string            `json:",omitempty"`
 	Imports         map[string]string `json:",omitempty"`
 }
@@ -426,6 +450,7 @@ func (p *Package) MarshalJSON() ([]byte, error) {
 		GoFiles:         p.GoFiles,
 		CompiledGoFiles: p.CompiledGoFiles,
 		OtherFiles:      p.OtherFiles,
+		IgnoredFiles:    p.IgnoredFiles,
 		ExportFile:      p.ExportFile,
 	}
 	if len(p.Imports) > 0 {
@@ -712,7 +737,8 @@ func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
 		result[i] = lpkg.Package
 	}
 	for i := range ld.pkgs {
-		// Clear all unrequested fields, for extra de-Hyrum-ization.
+		// Clear all unrequested fields,
+		// to catch programs that use more than they request.
 		if ld.requestedMode&NeedName == 0 {
 			ld.pkgs[i].Name = ""
 			ld.pkgs[i].PkgPath = ""
@@ -720,6 +746,7 @@ func (ld *loader) refine(roots []string, list ...*Package) ([]*Package, error) {
 		if ld.requestedMode&NeedFiles == 0 {
 			ld.pkgs[i].GoFiles = nil
 			ld.pkgs[i].OtherFiles = nil
+			ld.pkgs[i].IgnoredFiles = nil
 		}
 		if ld.requestedMode&NeedCompiledGoFiles == 0 {
 			ld.pkgs[i].CompiledGoFiles = nil

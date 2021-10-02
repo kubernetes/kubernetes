@@ -7,7 +7,7 @@ type BuiltinFunc int32
 
 // eBPF built-in functions
 //
-// You can renegerate this list using the following gawk script:
+// You can regenerate this list using the following gawk script:
 //
 //    /FN\(.+\),/ {
 //      match($1, /\((.+)\)/, r)
@@ -132,6 +132,58 @@ const (
 	FnSkStorageDelete
 	FnSendSignal
 	FnTcpGenSyncookie
+	FnSkbOutput
+	FnProbeReadUser
+	FnProbeReadKernel
+	FnProbeReadUserStr
+	FnProbeReadKernelStr
+	FnTcpSendAck
+	FnSendSignalThread
+	FnJiffies64
+	FnReadBranchRecords
+	FnGetNsCurrentPidTgid
+	FnXdpOutput
+	FnGetNetnsCookie
+	FnGetCurrentAncestorCgroupId
+	FnSkAssign
+	FnKtimeGetBootNs
+	FnSeqPrintf
+	FnSeqWrite
+	FnSkCgroupId
+	FnSkAncestorCgroupId
+	FnRingbufOutput
+	FnRingbufReserve
+	FnRingbufSubmit
+	FnRingbufDiscard
+	FnRingbufQuery
+	FnCsumLevel
+	FnSkcToTcp6Sock
+	FnSkcToTcpSock
+	FnSkcToTcpTimewaitSock
+	FnSkcToTcpRequestSock
+	FnSkcToUdp6Sock
+	FnGetTaskStack
+	FnLoadHdrOpt
+	FnStoreHdrOpt
+	FnReserveHdrOpt
+	FnInodeStorageGet
+	FnInodeStorageDelete
+	FnDPath
+	FnCopyFromUser
+	FnSnprintfBtf
+	FnSeqPrintfBtf
+	FnSkbCgroupClassid
+	FnRedirectNeigh
+	FnPerCpuPtr
+	FnThisCpuPtr
+	FnRedirectPeer
+	FnTaskStorageGet
+	FnTaskStorageDelete
+	FnGetCurrentTaskBtf
+	FnBprmOptsSet
+	FnKtimeGetCoarseNs
+	FnImaInodeHash
+	FnSockFromFile
 )
 
 // Call emits a function call.

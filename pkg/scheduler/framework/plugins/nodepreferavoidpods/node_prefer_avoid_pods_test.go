@@ -144,7 +144,7 @@ func TestNodePreferAvoidPods(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
+			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
 			p, _ := New(nil, fh)
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {

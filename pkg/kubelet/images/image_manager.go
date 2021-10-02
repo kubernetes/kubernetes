@@ -90,7 +90,7 @@ func (m *imageManager) EnsureImageExists(pod *v1.Pod, container *v1.Container, p
 	logPrefix := fmt.Sprintf("%s/%s/%s", pod.Namespace, pod.Name, container.Image)
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
-		klog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+		klog.ErrorS(err, "Couldn't make a ref to pod", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 
 	// If the image contains no tag or digest, a default tag should be applied.

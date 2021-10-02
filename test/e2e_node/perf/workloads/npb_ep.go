@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 // npbEPWorkload defines a workload to run the Embarrassingly Parallel (EP) workload
@@ -43,7 +44,7 @@ func (w npbEPWorkload) PodSpec() v1.PodSpec {
 	var containers []v1.Container
 	ctn := v1.Container{
 		Name:  fmt.Sprintf("%s-ctn", w.Name()),
-		Image: "gcr.io/kubernetes-e2e-test-images/node-perf/npb-ep:1.0",
+		Image: imageutils.GetE2EImage(imageutils.NodePerfNpbEp),
 		Resources: v1.ResourceRequirements{
 			Requests: v1.ResourceList{
 				v1.ResourceName(v1.ResourceCPU):    resource.MustParse("15000m"),

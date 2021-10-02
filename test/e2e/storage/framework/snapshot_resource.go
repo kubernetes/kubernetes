@@ -45,7 +45,7 @@ type SnapshotResource struct {
 // CreateSnapshot creates a VolumeSnapshotClass with given SnapshotDeletionPolicy and a VolumeSnapshot
 // from the VolumeSnapshotClass using a dynamic client.
 // Returns the unstructured VolumeSnapshotClass and VolumeSnapshot objects.
-func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext) (*unstructured.Unstructured, *unstructured.Unstructured) {
+func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) (*unstructured.Unstructured, *unstructured.Unstructured) {
 	defer ginkgo.GinkgoRecover()
 	var err error
 	if pattern.SnapshotType != DynamicCreatedSnapshot && pattern.SnapshotType != PreprovisionedCreatedSnapshot {
@@ -55,7 +55,7 @@ func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, patt
 	dc := config.Framework.DynamicClient
 
 	ginkgo.By("creating a SnapshotClass")
-	sclass := sDriver.GetSnapshotClass(config)
+	sclass := sDriver.GetSnapshotClass(config, parameters)
 	if sclass == nil {
 		framework.Failf("Failed to get snapshot class based on test config")
 	}
@@ -79,13 +79,13 @@ func CreateSnapshot(sDriver SnapshottableTestDriver, config *PerTestConfig, patt
 
 // CreateSnapshotResource creates a snapshot resource for the current test. It knows how to deal with
 // different test pattern snapshot provisioning and deletion policy
-func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext) *SnapshotResource {
+func CreateSnapshotResource(sDriver SnapshottableTestDriver, config *PerTestConfig, pattern TestPattern, pvcName string, pvcNamespace string, timeouts *framework.TimeoutContext, parameters map[string]string) *SnapshotResource {
 	var err error
 	r := SnapshotResource{
 		Config:  config,
 		Pattern: pattern,
 	}
-	r.Vsclass, r.Vs = CreateSnapshot(sDriver, config, pattern, pvcName, pvcNamespace, timeouts)
+	r.Vsclass, r.Vs = CreateSnapshot(sDriver, config, pattern, pvcName, pvcNamespace, timeouts, parameters)
 
 	dc := r.Config.Framework.DynamicClient
 

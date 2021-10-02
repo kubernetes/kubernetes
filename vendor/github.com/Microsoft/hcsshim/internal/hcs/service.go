@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 
-	hcsschema "github.com/Microsoft/hcsshim/internal/schema2"
+	hcsschema "github.com/Microsoft/hcsshim/internal/hcs/schema2"
 	"github.com/Microsoft/hcsshim/internal/vmcompute"
 )
 
 // GetServiceProperties returns properties of the host compute service.
 func GetServiceProperties(ctx context.Context, q hcsschema.PropertyQuery) (*hcsschema.ServiceProperties, error) {
-	operation := "hcsshim::GetServiceProperties"
+	operation := "hcs::GetServiceProperties"
 
 	queryb, err := json.Marshal(q)
 	if err != nil {
@@ -34,7 +34,7 @@ func GetServiceProperties(ctx context.Context, q hcsschema.PropertyQuery) (*hcss
 
 // ModifyServiceSettings modifies settings of the host compute service.
 func ModifyServiceSettings(ctx context.Context, settings hcsschema.ModificationRequest) error {
-	operation := "hcsshim::ModifyServiceSettings"
+	operation := "hcs::ModifyServiceSettings"
 
 	settingsJSON, err := json.Marshal(settings)
 	if err != nil {

@@ -85,6 +85,7 @@ func (fakeConn) SetWriteDeadline(t time.Time) error { return nil }
 
 type SimpleBackendHandler struct {
 	requestURL     url.URL
+	requestHost    string
 	requestHeader  http.Header
 	requestBody    []byte
 	requestMethod  string
@@ -95,6 +96,7 @@ type SimpleBackendHandler struct {
 
 func (s *SimpleBackendHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.requestURL = *req.URL
+	s.requestHost = req.Host
 	s.requestHeader = req.Header
 	s.requestMethod = req.Method
 	var err error
@@ -161,7 +163,9 @@ func TestServeHTTP(t *testing.T) {
 		expectedRespHeader    map[string]string
 		notExpectedRespHeader []string
 		upgradeRequired       bool
+		appendLocationPath    bool
 		expectError           func(err error) bool
+		useLocationHost       bool
 	}{
 		{
 			name:         "root path, simple get",
@@ -222,6 +226,48 @@ func TestServeHTTP(t *testing.T) {
 				"Access-Control-Allow-Methods",
 			},
 		},
+		{
+			name:            "use location host",
+			method:          "GET",
+			requestPath:     "/some/path",
+			expectedPath:    "/some/path",
+			useLocationHost: true,
+		},
+		{
+			name:            "use location host - invalid upgrade",
+			method:          "GET",
+			upgradeRequired: true,
+			requestHeader: map[string]string{
+				httpstream.HeaderConnection: httpstream.HeaderUpgrade,
+			},
+			expectError: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "invalid upgrade response: status code 200")
+			},
+			requestPath:     "/some/path",
+			expectedPath:    "/some/path",
+			useLocationHost: true,
+		},
+		{
+			name:               "append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base/base",
+			appendLocationPath: true,
+		},
+		{
+			name:               "append server path to request path with ending slash",
+			method:             "GET",
+			requestPath:        "/base/",
+			expectedPath:       "/base/base/",
+			appendLocationPath: true,
+		},
+		{
+			name:               "don't append server path to request path",
+			method:             "GET",
+			requestPath:        "/base",
+			expectedPath:       "/base",
+			appendLocationPath: false,
+		},
 	}
 
 	for i, test := range tests {
@@ -244,6 +290,8 @@ func TestServeHTTP(t *testing.T) {
 			backendURL, _ := url.Parse(backendServer.URL)
 			backendURL.Path = test.requestPath
 			proxyHandler := NewUpgradeAwareHandler(backendURL, nil, false, test.upgradeRequired, responder)
+			proxyHandler.UseLocationHost = test.useLocationHost
+			proxyHandler.AppendLocationPath = test.appendLocationPath
 			proxyServer := httptest.NewServer(proxyHandler)
 			defer proxyServer.Close()
 			proxyURL, _ := url.Parse(proxyServer.URL)
@@ -272,6 +320,13 @@ func TestServeHTTP(t *testing.T) {
 			res, err := client.Do(req)
 			if err != nil {
 				t.Errorf("Error from proxy request: %v", err)
+			}
+
+			// Host
+			if test.useLocationHost && backendHandler.requestHost != backendURL.Host {
+				t.Errorf("Unexpected request host: %s", backendHandler.requestHost)
+			} else if !test.useLocationHost && backendHandler.requestHost == backendURL.Host {
+				t.Errorf("Unexpected request host: %s", backendHandler.requestHost)
 			}
 
 			if test.expectError != nil {

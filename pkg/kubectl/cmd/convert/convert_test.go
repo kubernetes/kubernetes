@@ -90,6 +90,16 @@ func TestConvertObject(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:          "v1beta1 Ingress to extensions Ingress",
+			file:          "../../../../test/fixtures/pkg/kubectl/cmd/convert/v1beta1ingress.yaml",
+			outputVersion: "extensions/v1beta1",
+			fields: []checkField{
+				{
+					expected: "apiVersion: extensions/v1beta1",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testcases {

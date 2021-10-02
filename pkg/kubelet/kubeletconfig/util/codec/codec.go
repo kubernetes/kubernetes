@@ -19,7 +19,6 @@ package codec
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 
 	// ensure the core apis are installed
@@ -95,7 +94,7 @@ func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []b
 		// decoder, which has only v1beta1 registered, and log a warning.
 		// The lenient path is to be dropped when support for v1beta1 is dropped.
 		if !runtime.IsStrictDecodingError(err) {
-			return nil, errors.Wrap(err, "failed to decode")
+			return nil, fmt.Errorf("failed to decode: %w", err)
 		}
 
 		var lenientErr error
@@ -115,7 +114,7 @@ func DecodeKubeletConfiguration(kubeletCodecs *serializer.CodecFactory, data []b
 			return nil, fmt.Errorf("failed lenient decoding: %v", err)
 		}
 		// Continue with the v1beta1 object that was decoded leniently, but emit a warning.
-		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
+		klog.InfoS("Using lenient decoding as strict decoding failed", "err", err)
 	}
 
 	internalKC, ok := obj.(*kubeletconfig.KubeletConfiguration)

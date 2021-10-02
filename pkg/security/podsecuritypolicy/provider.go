@@ -140,15 +140,12 @@ func (s *simpleProvider) mutateContainer(pod *api.Pod, container *api.Container)
 		sc.SetRunAsUser(uid)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
-		if sc.RunAsGroup() == nil {
-			gid, err := s.strategies.RunAsGroupStrategy.GenerateSingle(pod)
-			if err != nil {
-				return err
-			}
-			sc.SetRunAsGroup(gid)
+	if sc.RunAsGroup() == nil {
+		gid, err := s.strategies.RunAsGroupStrategy.GenerateSingle(pod)
+		if err != nil {
+			return err
 		}
-
+		sc.SetRunAsGroup(gid)
 	}
 
 	if sc.SELinuxOptions() == nil {
@@ -337,14 +334,12 @@ func (s *simpleProvider) validateContainer(pod *api.Pod, container *api.Containe
 
 	scPath := containerPath.Child("securityContext")
 	allErrs = append(allErrs, s.strategies.RunAsUserStrategy.Validate(scPath, pod, container, sc.RunAsNonRoot(), sc.RunAsUser())...)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
-		var runAsGroups []int64
-		if sc.RunAsGroup() != nil {
-			runAsGroups = []int64{*sc.RunAsGroup()}
-		}
-		allErrs = append(allErrs, s.strategies.RunAsGroupStrategy.Validate(scPath, pod, runAsGroups)...)
+	var runAsGroups []int64
+	if sc.RunAsGroup() != nil {
+		runAsGroups = []int64{*sc.RunAsGroup()}
 	}
+	allErrs = append(allErrs, s.strategies.RunAsGroupStrategy.Validate(scPath, pod, runAsGroups)...)
+
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(scPath.Child("seLinuxOptions"), pod, container, sc.SELinuxOptions())...)
 	allErrs = append(allErrs, s.strategies.AppArmorStrategy.Validate(pod, container)...)
 	allErrs = append(allErrs, s.strategies.SeccompStrategy.ValidateContainer(pod, container)...)

@@ -39,10 +39,10 @@ import (
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 var (
@@ -244,12 +244,25 @@ func TestCacheKey(t *testing.T) {
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
 	}
 
+	// c7 should be the same as c6, except c7 has stdin marked as unavailable
+	c7 := &api.ExecConfig{
+		Command: "foo-bar",
+		Args:    []string{"1", "2"},
+		Env: []api.ExecEnvVar{
+			{Name: "3", Value: "4"},
+			{Name: "5", Value: "6"},
+		},
+		APIVersion:       "client.authentication.k8s.io/v1alpha1",
+		StdinUnavailable: true,
+	}
+
 	key1 := cacheKey(c1, c1c)
 	key2 := cacheKey(c2, c2c)
 	key3 := cacheKey(c3, c3c)
 	key4 := cacheKey(c4, c4c)
 	key5 := cacheKey(c5, c5c)
 	key6 := cacheKey(c6, nil)
+	key7 := cacheKey(c7, nil)
 	if key1 != key2 {
 		t.Error("key1 and key2 didn't match")
 	}
@@ -267,6 +280,9 @@ func TestCacheKey(t *testing.T) {
 	}
 	if key6 == key4 {
 		t.Error("key6 and key4 matched")
+	}
+	if key6 == key7 {
+		t.Error("key6 and key7 matched")
 	}
 }
 
@@ -290,23 +306,25 @@ func compJSON(t *testing.T, got, want []byte) {
 
 func TestRefreshCreds(t *testing.T) {
 	tests := []struct {
-		name          string
-		config        api.ExecConfig
-		exitCode      int
-		cluster       *clientauthentication.Cluster
-		output        string
-		interactive   bool
-		response      *clientauthentication.Response
-		wantInput     string
-		wantCreds     credentials
-		wantExpiry    time.Time
-		wantErr       bool
-		wantErrSubstr string
+		name             string
+		config           api.ExecConfig
+		stdinUnavailable bool
+		exitCode         int
+		cluster          *clientauthentication.Cluster
+		output           string
+		isTerminal       bool
+		response         *clientauthentication.Response
+		wantInput        string
+		wantCreds        credentials
+		wantExpiry       time.Time
+		wantErr          bool
+		wantErrSubstr    string
 	}{
 		{
 			name: "basic-request",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -325,9 +343,10 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "interactive",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
-			interactive: true,
+			isTerminal: true,
 			wantInput: `{
 				"kind":"ExecCredential",
 				"apiVersion":"client.authentication.k8s.io/v1alpha1",
@@ -347,7 +366,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "response",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			response: &clientauthentication.Response{
 				Header: map[string][]string{
@@ -381,7 +401,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "expiry",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -402,7 +423,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "no-group-version",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -420,7 +442,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "no-status",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -436,7 +459,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "no-creds",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -453,7 +477,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "TLS credentials",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -473,7 +498,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "bad TLS credentials",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -493,7 +519,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "cert but no key",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind":"ExecCredential",
@@ -512,12 +539,207 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "beta-basic-request",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind": "ExecCredential",
 				"apiVersion": "client.authentication.k8s.io/v1beta1",
-				"spec": {}
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-basic-request-with-never-interactive-mode",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.NeverExecInteractiveMode,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-basic-request-with-never-interactive-mode-and-stdin-unavailable",
+			config: api.ExecConfig{
+				APIVersion:       "client.authentication.k8s.io/v1beta1",
+				InteractiveMode:  api.NeverExecInteractiveMode,
+				StdinUnavailable: true,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-basic-request-with-if-available-interactive-mode",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-basic-request-with-if-available-interactive-mode-and-stdin-unavailable",
+			config: api.ExecConfig{
+				APIVersion:       "client.authentication.k8s.io/v1beta1",
+				InteractiveMode:  api.IfAvailableExecInteractiveMode,
+				StdinUnavailable: true,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-basic-request-with-if-available-interactive-mode-and-terminal",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			isTerminal: true,
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"interactive": true
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-basic-request-with-if-available-interactive-mode-and-terminal-and-stdin-unavailable",
+			config: api.ExecConfig{
+				APIVersion:       "client.authentication.k8s.io/v1beta1",
+				InteractiveMode:  api.IfAvailableExecInteractiveMode,
+				StdinUnavailable: true,
+			},
+			isTerminal: true,
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "beta-basic-request-with-always-interactive-mode",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.AlwaysExecInteractiveMode,
+			},
+			wantErr:       true,
+			wantErrSubstr: "exec plugin cannot support interactive mode: standard input is not a terminal",
+		},
+		{
+			name: "beta-basic-request-with-always-interactive-mode-and-terminal-and-stdin-unavailable",
+			config: api.ExecConfig{
+				APIVersion:       "client.authentication.k8s.io/v1beta1",
+				InteractiveMode:  api.AlwaysExecInteractiveMode,
+				StdinUnavailable: true,
+			},
+			isTerminal:    true,
+			wantErr:       true,
+			wantErrSubstr: "exec plugin cannot support interactive mode: standard input is unavailable",
+		},
+		{
+			name: "beta-basic-request-with-always-interactive-mode-and-terminal-and-stdin-unavailable-with-message",
+			config: api.ExecConfig{
+				APIVersion:              "client.authentication.k8s.io/v1beta1",
+				InteractiveMode:         api.AlwaysExecInteractiveMode,
+				StdinUnavailable:        true,
+				StdinUnavailableMessage: "some message",
+			},
+			isTerminal:    true,
+			wantErr:       true,
+			wantErrSubstr: "exec plugin cannot support interactive mode: standard input is unavailable: some message",
+		},
+		{
+			name: "beta-basic-request-with-always-interactive-mode-and-terminal",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.AlwaysExecInteractiveMode,
+			},
+			isTerminal: true,
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1beta1",
+				"spec": {
+					"interactive": true
+				}
 			}`,
 			output: `{
 				"kind": "ExecCredential",
@@ -531,12 +753,15 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "beta-expiry",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantInput: `{
 				"kind": "ExecCredential",
 				"apiVersion": "client.authentication.k8s.io/v1beta1",
-				"spec": {}
+				"spec": {
+					"interactive": false
+				}
 			}`,
 			output: `{
 				"kind": "ExecCredential",
@@ -552,7 +777,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "beta-no-group-version",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			output: `{
 				"kind": "ExecCredential",
@@ -565,7 +791,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "beta-no-status",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			output: `{
 				"kind": "ExecCredential",
@@ -576,7 +803,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "beta-no-token",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			output: `{
 				"kind": "ExecCredential",
@@ -588,9 +816,10 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "unknown-binary",
 			config: api.ExecConfig{
-				APIVersion:  "client.authentication.k8s.io/v1beta1",
-				Command:     "does not exist",
-				InstallHint: "some install hint",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				Command:         "does not exist",
+				InstallHint:     "some install hint",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			wantErr:       true,
 			wantErrSubstr: "some install hint",
@@ -598,7 +827,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "binary-fails",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			exitCode:      73,
 			wantErr:       true,
@@ -607,7 +837,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "alpha-with-cluster-is-ignored",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1alpha1",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			cluster: &clientauthentication.Cluster{
 				Server:                   "foo",
@@ -657,6 +888,7 @@ func TestRefreshCreds(t *testing.T) {
 			config: api.ExecConfig{
 				APIVersion:         "client.authentication.k8s.io/v1beta1",
 				ProvideClusterInfo: true,
+				InteractiveMode:    api.IfAvailableExecInteractiveMode,
 			},
 			cluster: &clientauthentication.Cluster{
 				Server:                   "foo",
@@ -693,7 +925,8 @@ func TestRefreshCreds(t *testing.T) {
 								"audience": "snorlax"
 							}
 						}
-					}
+					},
+					"interactive": false
 				}
 			}`,
 			output: `{
@@ -708,7 +941,8 @@ func TestRefreshCreds(t *testing.T) {
 		{
 			name: "beta-with-cluster-and-without-provide-cluster-info-is-not-serialized",
 			config: api.ExecConfig{
-				APIVersion: "client.authentication.k8s.io/v1beta1",
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			},
 			cluster: &clientauthentication.Cluster{
 				Server:                   "foo",
@@ -733,7 +967,9 @@ func TestRefreshCreds(t *testing.T) {
 			wantInput: `{
 				"kind":"ExecCredential",
 				"apiVersion":"client.authentication.k8s.io/v1beta1",
-				"spec": {}
+				"spec": {
+					"interactive": false
+				}
 			}`,
 			output: `{
 				"kind": "ExecCredential",
@@ -743,6 +979,36 @@ func TestRefreshCreds(t *testing.T) {
 				}
 			}`,
 			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "v1-basic-request",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			wantInput: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"spec": {
+					"interactive": false
+				}
+			}`,
+			output: `{
+				"kind": "ExecCredential",
+				"apiVersion": "client.authentication.k8s.io/v1",
+				"status": {
+					"token": "foo-bar"
+				}
+			}`,
+			wantCreds: credentials{token: "foo-bar"},
+		},
+		{
+			name: "v1-with-missing-interactive-mode",
+			config: api.ExecConfig{
+				APIVersion: "client.authentication.k8s.io/v1",
+			},
+			wantErr:       true,
+			wantErrSubstr: `exec plugin cannot support interactive mode: unknown interactiveMode: ""`,
 		},
 	}
 
@@ -762,14 +1028,13 @@ func TestRefreshCreds(t *testing.T) {
 				})
 			}
 
-			a, err := newAuthenticator(newCache(), &c, test.cluster)
+			a, err := newAuthenticator(newCache(), func(_ int) bool { return test.isTerminal }, &c, test.cluster)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			stderr := &bytes.Buffer{}
 			a.stderr = stderr
-			a.interactive = test.interactive
 			a.environ = func() []string { return nil }
 
 			if err := a.refreshCredsLocked(test.response); err != nil {
@@ -837,10 +1102,11 @@ func TestRoundTripper(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(handler))
 
 	c := api.ExecConfig{
-		Command:    "./testdata/test-plugin.sh",
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
+		Command:         "./testdata/test-plugin.sh",
+		APIVersion:      "client.authentication.k8s.io/v1alpha1",
+		InteractiveMode: api.IfAvailableExecInteractiveMode,
 	}
-	a, err := newAuthenticator(newCache(), &c, nil)
+	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -922,24 +1188,47 @@ func TestRoundTripper(t *testing.T) {
 	get(t, http.StatusOK)
 }
 
-func TestTokenPresentCancelsExecAction(t *testing.T) {
-	a, err := newAuthenticator(newCache(), &api.ExecConfig{
-		Command:    "./testdata/test-plugin.sh",
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
-	}, nil)
-	if err != nil {
-		t.Fatal(err)
+func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
+	tests := []struct {
+		name               string
+		setTransportConfig func(*transport.Config)
+	}{
+		{
+			name: "bearer token",
+			setTransportConfig: func(config *transport.Config) {
+				config.BearerToken = "token1f"
+			},
+		},
+		{
+			name: "basic auth",
+			setTransportConfig: func(config *transport.Config) {
+				config.Username = "marshmallow"
+				config.Password = "zelda"
+			},
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &api.ExecConfig{
+				Command:    "./testdata/test-plugin.sh",
+				APIVersion: "client.authentication.k8s.io/v1alpha1",
+			}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
-	// transport config, in which case it takes precedence
-	cert := func() (*tls.Certificate, error) {
-		return nil, nil
-	}
-	tc := &transport.Config{BearerToken: "token1", TLS: transport.TLSConfig{Insecure: true, GetCert: cert}}
+			// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
+			// transport config, in which case it takes precedence
+			cert := func() (*tls.Certificate, error) {
+				return nil, nil
+			}
+			tc := &transport.Config{TLS: transport.TLSConfig{Insecure: true, GetCert: cert}}
+			test.setTransportConfig(tc)
 
-	if err := a.UpdateTransportConfig(tc); err != nil {
-		t.Error("Expected presence of bearer token in config to cancel exec action")
+			if err := a.UpdateTransportConfig(tc); err != nil {
+				t.Error("Expected presence of bearer token in config to cancel exec action")
+			}
+		})
 	}
 }
 
@@ -962,9 +1251,10 @@ func TestTLSCredentials(t *testing.T) {
 	server.StartTLS()
 	defer server.Close()
 
-	a, err := newAuthenticator(newCache(), &api.ExecConfig{
-		Command:    "./testdata/test-plugin.sh",
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
+	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &api.ExecConfig{
+		Command:         "./testdata/test-plugin.sh",
+		APIVersion:      "client.authentication.k8s.io/v1alpha1",
+		InteractiveMode: api.IfAvailableExecInteractiveMode,
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -1055,7 +1345,7 @@ func TestConcurrentUpdateTransportConfig(t *testing.T) {
 		Command:    "./testdata/test-plugin.sh",
 		APIVersion: "client.authentication.k8s.io/v1alpha1",
 	}
-	a, err := newAuthenticator(newCache(), &c, nil)
+	a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1118,11 +1408,12 @@ func TestInstallHintRateLimit(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := api.ExecConfig{
-				Command:     "does not exist",
-				APIVersion:  "client.authentication.k8s.io/v1alpha1",
-				InstallHint: "some install hint",
+				Command:         "does not exist",
+				APIVersion:      "client.authentication.k8s.io/v1alpha1",
+				InstallHint:     "some install hint",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
 			}
-			a, err := newAuthenticator(newCache(), &c, nil)
+			a, err := newAuthenticator(newCache(), func(_ int) bool { return false }, &c, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1130,7 +1421,7 @@ func TestInstallHintRateLimit(t *testing.T) {
 			a.sometimes.threshold = test.threshold
 			a.sometimes.interval = test.interval
 
-			clock := clock.NewFakeClock(time.Now())
+			clock := testingclock.NewFakeClock(time.Now())
 			a.sometimes.clock = clock
 
 			count := 0

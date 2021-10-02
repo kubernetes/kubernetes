@@ -214,9 +214,9 @@ func (util *portworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	}
 
 	vol := vols[0]
-	tBytes, ok := newSize.AsInt64()
-	if !ok {
-		return fmt.Errorf("quantity %v is too great, overflows int64", newSize)
+	tBytes, err := volumehelpers.RoundUpToB(newSize)
+	if err != nil {
+		return err
 	}
 	newSizeInBytes := uint64(tBytes)
 	if vol.Spec.Size >= newSizeInBytes {
@@ -360,7 +360,7 @@ func lookupPXAPIPortFromService(svc *v1.Service) int32 {
 func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		err := fmt.Errorf("Failed to get kubeclient when creating portworx client")
+		err := fmt.Errorf("failed to get kubeclient when creating portworx client")
 		klog.Errorf(err.Error())
 		return nil, err
 	}
@@ -373,7 +373,7 @@ func getPortworxService(host volume.VolumeHost) (*v1.Service, error) {
 	}
 
 	if svc == nil {
-		err = fmt.Errorf("Service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
+		err = fmt.Errorf("service: %v not found. Consult Portworx docs to deploy it", pxServiceName)
 		klog.Errorf(err.Error())
 		return nil, err
 	}

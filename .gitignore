@@ -113,7 +113,7 @@ zz_generated_*_test.go
 !staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 !staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
 # low-change blueprint in code-generator to notice changes
-!staging/src/k8s.io/code-generator/_examples/apiserver/openapi/zz_generated.openapi.go
+!staging/src/k8s.io/code-generator/examples/apiserver/openapi/zz_generated.openapi.go
 # low-change sample-apiserver spec to be compilable when published
 !staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go
 

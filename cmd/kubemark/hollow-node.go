@@ -20,26 +20,28 @@ import (
 	"errors"
 	goflag "flag"
 	"fmt"
-	"math/rand"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
+	"k8s.io/component-base/cli"
 	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	fakesysctl "k8s.io/component-helpers/node/utils/sysctl/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -49,7 +51,6 @@ import (
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
-	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	fakeexec "k8s.io/utils/exec/testing"
 )
@@ -67,6 +68,9 @@ type hollowNodeConfig struct {
 	ProxierMinSyncPeriod time.Duration
 	NodeLabels           map[string]string
 	RegisterWithTaints   []core.Taint
+	MaxPods              int
+	ExtendedResources    map[string]string
+	UseHostImageService  bool
 }
 
 const (
@@ -92,6 +96,10 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	bindableNodeLabels := cliflag.ConfigurationMap(c.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "Additional node labels")
 	fs.Var(utiltaints.NewTaintsVar(&c.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
+	fs.IntVar(&c.MaxPods, "max-pods", maxPods, "Number of pods that can run on this Kubelet.")
+	bindableExtendedResources := cliflag.ConfigurationMap(c.ExtendedResources)
+	fs.Var(&bindableExtendedResources, "extended-resources", "Register the node with extended resources (comma separated \"<name>=<quantity>\")")
+	fs.BoolVar(&c.UseHostImageService, "use-host-image-service", true, "Set to true if the hollow-kubelet should use the host image service. If set to false the fake image service will be used")
 }
 
 func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
@@ -114,7 +122,7 @@ func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOp
 		NodeName:            c.NodeName,
 		KubeletPort:         c.KubeletPort,
 		KubeletReadOnlyPort: c.KubeletReadOnlyPort,
-		MaxPods:             maxPods,
+		MaxPods:             c.MaxPods,
 		PodsPerCore:         podsPerCore,
 		NodeLabels:          c.NodeLabels,
 		RegisterWithTaints:  c.RegisterWithTaints,
@@ -122,28 +130,16 @@ func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOp
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	command := newHollowNodeCommand()
-
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// cliflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	// cliflag.InitFlags()
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }
 
 // newControllerManagerCommand creates a *cobra.Command object with default parameters
 func newHollowNodeCommand() *cobra.Command {
 	s := &hollowNodeConfig{
-		NodeLabels: make(map[string]string),
+		NodeLabels:        make(map[string]string),
+		ExtendedResources: make(map[string]string),
 	}
 
 	cmd := &cobra.Command{
@@ -151,7 +147,7 @@ func newHollowNodeCommand() *cobra.Command {
 		Long: "kubemark",
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			run(s)
+			run(cmd, s)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -162,14 +158,18 @@ func newHollowNodeCommand() *cobra.Command {
 			return nil
 		},
 	}
-	s.addFlags(cmd.Flags())
+
+	fs := cmd.Flags()
+	fs.AddGoFlagSet(goflag.CommandLine) // for flags like --docker-only
+	s.addFlags(fs)
 
 	return cmd
 }
 
-func run(config *hollowNodeConfig) {
-	// To help debugging, immediately log version
+func run(cmd *cobra.Command, config *hollowNodeConfig) {
+	// To help debugging, immediately log version and print flags.
 	klog.Infof("Version: %+v", version.Get())
+	cliflag.PrintFlags(cmd.Flags())
 
 	if !knownMorphs.Has(config.Morph) {
 		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
@@ -206,7 +206,18 @@ func run(config *hollowNodeConfig) {
 		cadvisorInterface := &cadvisortest.Fake{
 			NodeName: config.NodeName,
 		}
-		containerManager := cm.NewStubContainerManager()
+
+		var containerManager cm.ContainerManager
+		if config.ExtendedResources != nil {
+			extendedResources := v1.ResourceList{}
+			for k, v := range config.ExtendedResources {
+				extendedResources[v1.ResourceName(k)] = resource.MustParse(v)
+			}
+
+			containerManager = cm.NewStubContainerManagerWithDevicePluginResource(extendedResources)
+		} else {
+			containerManager = cm.NewStubContainerManager()
+		}
 
 		endpoint, err := fakeremote.GenerateEndpoint()
 		if err != nil {
@@ -222,12 +233,20 @@ func run(config *hollowNodeConfig) {
 			klog.Fatalf("Failed to init runtime service %v.", err)
 		}
 
+		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
+		if config.UseHostImageService {
+			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
+			if err != nil {
+				klog.Fatalf("Failed to init image service %v.", err)
+			}
+		}
+
 		hollowKubelet := kubemark.NewHollowKubelet(
 			f, c,
 			client,
 			heartbeatClient,
 			cadvisorInterface,
-			fakeRemoteRuntime.ImageService,
+			imageService,
 			runtimeService,
 			containerManager,
 		)
@@ -244,8 +263,8 @@ func run(config *hollowNodeConfig) {
 		execer := &fakeexec.FakeExec{
 			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
 		}
-		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
+		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, "kube-proxy")
 
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,

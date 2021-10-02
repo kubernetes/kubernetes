@@ -49,7 +49,7 @@ var archs = map[string]string{
 // Attempting to convert a string that is not a valid operator results in an
 // error.
 func ConvertStringToOperator(in string) (configs.Operator, error) {
-	if op, ok := operators[in]; ok == true {
+	if op, ok := operators[in]; ok {
 		return op, nil
 	}
 	return 0, fmt.Errorf("string %s is not a valid operator for seccomp", in)
@@ -62,7 +62,7 @@ func ConvertStringToOperator(in string) (configs.Operator, error) {
 // Attempting to convert a string that is not a valid action results in an
 // error.
 func ConvertStringToAction(in string) (configs.Action, error) {
-	if act, ok := actions[in]; ok == true {
+	if act, ok := actions[in]; ok {
 		return act, nil
 	}
 	return 0, fmt.Errorf("string %s is not a valid action for seccomp", in)
@@ -70,7 +70,7 @@ func ConvertStringToAction(in string) (configs.Action, error) {
 
 // ConvertStringToArch converts a string into a Seccomp comparison arch.
 func ConvertStringToArch(in string) (string, error) {
-	if arch, ok := archs[in]; ok == true {
+	if arch, ok := archs[in]; ok {
 		return arch, nil
 	}
 	return "", fmt.Errorf("string %s is not a valid arch for seccomp", in)

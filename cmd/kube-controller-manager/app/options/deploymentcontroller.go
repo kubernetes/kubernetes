@@ -35,6 +35,7 @@ func (o *DeploymentControllerOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.Int32Var(&o.ConcurrentDeploymentSyncs, "concurrent-deployment-syncs", o.ConcurrentDeploymentSyncs, "The number of deployment objects that are allowed to sync concurrently. Larger number = more responsive deployments, but more CPU (and network) load")
 	fs.DurationVar(&o.DeploymentControllerSyncPeriod.Duration, "deployment-controller-sync-period", o.DeploymentControllerSyncPeriod.Duration, "Period for syncing the deployments.")
+	fs.MarkDeprecated("deployment-controller-sync-period", "This flag is currently no-op and will be removed in v1.24.")
 }
 
 // ApplyTo fills up DeploymentController config with options.

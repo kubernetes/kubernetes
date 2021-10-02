@@ -9,10 +9,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	exec "golang.org/x/sys/execabs"
 	"io"
 	"os"
-	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,11 +24,24 @@ import (
 // An Runner will run go command invocations and serialize
 // them if it sees a concurrency error.
 type Runner struct {
-	// LoadMu guards packages.Load calls and associated state.
-	loadMu sync.Mutex
-	// locked is true when we hold the mutex and have incremented.
-	locked         bool
-	serializeLoads int
+	// once guards the runner initialization.
+	once sync.Once
+
+	// inFlight tracks available workers.
+	inFlight chan struct{}
+
+	// serialized guards the ability to run a go command serially,
+	// to avoid deadlocks when claiming workers.
+	serialized chan struct{}
+}
+
+const maxInFlight = 10
+
+func (runner *Runner) initialize() {
+	runner.once.Do(func() {
+		runner.inFlight = make(chan struct{}, maxInFlight)
+		runner.serialized = make(chan struct{}, 1)
+	})
 }
 
 // 1.13: go: updates to go.mod needed, but contents have changed
@@ -37,7 +51,7 @@ var modConcurrencyError = regexp.MustCompile(`go:.*go.mod.*contents have changed
 // Run is a convenience wrapper around RunRaw.
 // It returns only stdout and a "friendly" error.
 func (runner *Runner) Run(ctx context.Context, inv Invocation) (*bytes.Buffer, error) {
-	stdout, _, friendly, _ := runner.runRaw(ctx, inv)
+	stdout, _, friendly, _ := runner.RunRaw(ctx, inv)
 	return stdout, friendly
 }
 
@@ -51,57 +65,65 @@ func (runner *Runner) RunPiped(ctx context.Context, inv Invocation, stdout, stde
 // RunRaw runs the invocation, serializing requests only if they fight over
 // go.mod changes.
 func (runner *Runner) RunRaw(ctx context.Context, inv Invocation) (*bytes.Buffer, *bytes.Buffer, error, error) {
-	return runner.runRaw(ctx, inv)
+	// Make sure the runner is always initialized.
+	runner.initialize()
+
+	// First, try to run the go command concurrently.
+	stdout, stderr, friendlyErr, err := runner.runConcurrent(ctx, inv)
+
+	// If we encounter a load concurrency error, we need to retry serially.
+	if friendlyErr == nil || !modConcurrencyError.MatchString(friendlyErr.Error()) {
+		return stdout, stderr, friendlyErr, err
+	}
+	event.Error(ctx, "Load concurrency error, will retry serially", err)
+
+	// Run serially by calling runPiped.
+	stdout.Reset()
+	stderr.Reset()
+	friendlyErr, err = runner.runPiped(ctx, inv, stdout, stderr)
+	return stdout, stderr, friendlyErr, err
+}
+
+func (runner *Runner) runConcurrent(ctx context.Context, inv Invocation) (*bytes.Buffer, *bytes.Buffer, error, error) {
+	// Wait for 1 worker to become available.
+	select {
+	case <-ctx.Done():
+		return nil, nil, nil, ctx.Err()
+	case runner.inFlight <- struct{}{}:
+		defer func() { <-runner.inFlight }()
+	}
+
+	stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+	friendlyErr, err := inv.runWithFriendlyError(ctx, stdout, stderr)
+	return stdout, stderr, friendlyErr, err
 }
 
 func (runner *Runner) runPiped(ctx context.Context, inv Invocation, stdout, stderr io.Writer) (error, error) {
-	runner.loadMu.Lock()
-	runner.serializeLoads++
-	runner.locked = true
+	// Make sure the runner is always initialized.
+	runner.initialize()
 
-	defer func() {
-		runner.locked = false
-		runner.serializeLoads--
-		runner.loadMu.Unlock()
-	}()
+	// Acquire the serialization lock. This avoids deadlocks between two
+	// runPiped commands.
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case runner.serialized <- struct{}{}:
+		defer func() { <-runner.serialized }()
+	}
+
+	// Wait for all in-progress go commands to return before proceeding,
+	// to avoid load concurrency errors.
+	for i := 0; i < maxInFlight; i++ {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case runner.inFlight <- struct{}{}:
+			// Make sure we always "return" any workers we took.
+			defer func() { <-runner.inFlight }()
+		}
+	}
 
 	return inv.runWithFriendlyError(ctx, stdout, stderr)
-}
-
-func (runner *Runner) runRaw(ctx context.Context, inv Invocation) (*bytes.Buffer, *bytes.Buffer, error, error) {
-	// We want to run invocations concurrently as much as possible. However,
-	// if go.mod updates are needed, only one can make them and the others will
-	// fail. We need to retry in those cases, but we don't want to thrash so
-	// badly we never recover. To avoid that, once we've seen one concurrency
-	// error, start serializing everything until the backlog has cleared out.
-	runner.loadMu.Lock()
-	if runner.serializeLoads == 0 {
-		runner.loadMu.Unlock()
-	} else {
-		runner.locked = true
-		runner.serializeLoads++
-	}
-	defer func() {
-		if runner.locked {
-			runner.locked = false
-			runner.serializeLoads--
-			runner.loadMu.Unlock()
-		}
-	}()
-
-	for {
-		stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
-		friendlyErr, err := inv.runWithFriendlyError(ctx, stdout, stderr)
-		if friendlyErr == nil || !modConcurrencyError.MatchString(friendlyErr.Error()) {
-			return stdout, stderr, friendlyErr, err
-		}
-		event.Error(ctx, "Load concurrency error, will retry serially", err)
-		if !runner.locked {
-			runner.loadMu.Lock()
-			runner.serializeLoads++
-			runner.locked = true
-		}
-	}
 }
 
 // An Invocation represents a call to the go command.
@@ -109,6 +131,12 @@ type Invocation struct {
 	Verb       string
 	Args       []string
 	BuildFlags []string
+	ModFlag    string
+	ModFile    string
+	Overlay    string
+	// If CleanEnv is set, the invocation will run only with the environment
+	// in Env, not starting with os.Environ.
+	CleanEnv   bool
 	Env        []string
 	WorkingDir string
 	Logf       func(format string, args ...interface{})
@@ -137,17 +165,41 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 	}
 
 	goArgs := []string{i.Verb}
+
+	appendModFile := func() {
+		if i.ModFile != "" {
+			goArgs = append(goArgs, "-modfile="+i.ModFile)
+		}
+	}
+	appendModFlag := func() {
+		if i.ModFlag != "" {
+			goArgs = append(goArgs, "-mod="+i.ModFlag)
+		}
+	}
+	appendOverlayFlag := func() {
+		if i.Overlay != "" {
+			goArgs = append(goArgs, "-overlay="+i.Overlay)
+		}
+	}
+
 	switch i.Verb {
-	case "mod":
-		// mod needs the sub-verb before build flags.
-		goArgs = append(goArgs, i.Args[0])
-		goArgs = append(goArgs, i.BuildFlags...)
-		goArgs = append(goArgs, i.Args[1:]...)
-	case "env":
-		// env doesn't take build flags.
+	case "env", "version":
 		goArgs = append(goArgs, i.Args...)
-	default:
+	case "mod":
+		// mod needs the sub-verb before flags.
+		goArgs = append(goArgs, i.Args[0])
+		appendModFile()
+		goArgs = append(goArgs, i.Args[1:]...)
+	case "get":
 		goArgs = append(goArgs, i.BuildFlags...)
+		appendModFile()
+		goArgs = append(goArgs, i.Args...)
+
+	default: // notably list and build.
+		goArgs = append(goArgs, i.BuildFlags...)
+		appendModFile()
+		appendModFlag()
+		appendOverlayFlag()
 		goArgs = append(goArgs, i.Args...)
 	}
 	cmd := exec.Command("go", goArgs...)
@@ -159,12 +211,14 @@ func (i *Invocation) run(ctx context.Context, stdout, stderr io.Writer) error {
 	// The Go stdlib has a special feature where if the cwd and the PWD are the
 	// same node then it trusts the PWD, so by setting it in the env for the child
 	// process we fix up all the paths returned by the go command.
-	cmd.Env = append(os.Environ(), i.Env...)
+	if !i.CleanEnv {
+		cmd.Env = os.Environ()
+	}
+	cmd.Env = append(cmd.Env, i.Env...)
 	if i.WorkingDir != "" {
 		cmd.Env = append(cmd.Env, "PWD="+i.WorkingDir)
 		cmd.Dir = i.WorkingDir
 	}
-
 	defer func(start time.Time) { log("%s for %v", time.Since(start), cmdDebugStr(cmd)) }(time.Now())
 
 	return runCmdContext(ctx, cmd)
@@ -201,10 +255,19 @@ func runCmdContext(ctx context.Context, cmd *exec.Cmd) error {
 func cmdDebugStr(cmd *exec.Cmd) string {
 	env := make(map[string]string)
 	for _, kv := range cmd.Env {
-		split := strings.Split(kv, "=")
+		split := strings.SplitN(kv, "=", 2)
 		k, v := split[0], split[1]
 		env[k] = v
 	}
 
-	return fmt.Sprintf("GOROOT=%v GOPATH=%v GO111MODULE=%v GOPROXY=%v PWD=%v go %v", env["GOROOT"], env["GOPATH"], env["GO111MODULE"], env["GOPROXY"], env["PWD"], cmd.Args)
+	var args []string
+	for _, arg := range cmd.Args {
+		quoted := strconv.Quote(arg)
+		if quoted[1:len(quoted)-1] != arg || strings.Contains(arg, " ") {
+			args = append(args, quoted)
+		} else {
+			args = append(args, arg)
+		}
+	}
+	return fmt.Sprintf("GOROOT=%v GOPATH=%v GO111MODULE=%v GOPROXY=%v PWD=%v %v", env["GOROOT"], env["GOPATH"], env["GO111MODULE"], env["GOPROXY"], env["PWD"], strings.Join(args, " "))
 }

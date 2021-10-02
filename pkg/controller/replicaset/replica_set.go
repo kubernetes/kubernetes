@@ -38,7 +38,6 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -56,10 +55,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/replicaset/metrics"
 	"k8s.io/utils/integer"
 )
 
@@ -113,6 +114,9 @@ func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInf
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	if err := metrics.Register(legacyregistry.Register); err != nil {
+		klog.ErrorS(err, "unable to register metrics")
+	}
 	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
@@ -566,9 +570,9 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		// after one of its pods fails.  Conveniently, this also prevents the
 		// event spam that those failures would generate.
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
-			err := rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
+			err := rsc.podControl.CreatePods(rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
 			if err != nil {
-				if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+				if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 					// if the namespace is being terminated, we don't have to do
 					// anything because any creation will fail
 					return nil
@@ -654,7 +658,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		klog.V(4).Infof("%v %v has been deleted", rsc.Kind, key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
@@ -803,8 +807,29 @@ func getPodsToDelete(filteredPods, relatedPods []*v1.Pod, diff int) []*v1.Pod {
 	if diff < len(filteredPods) {
 		podsWithRanks := getPodsRankedByRelatedPodsOnSameNode(filteredPods, relatedPods)
 		sort.Sort(podsWithRanks)
+		reportSortingDeletionAgeRatioMetric(filteredPods, diff)
 	}
 	return filteredPods[:diff]
+}
+
+func reportSortingDeletionAgeRatioMetric(filteredPods []*v1.Pod, diff int) {
+	now := time.Now()
+	youngestTime := time.Time{}
+	// first we need to check all of the ready pods to get the youngest, as they may not necessarily be sorted by timestamp alone
+	for _, pod := range filteredPods {
+		if pod.CreationTimestamp.Time.After(youngestTime) && podutil.IsPodReady(pod) {
+			youngestTime = pod.CreationTimestamp.Time
+		}
+	}
+
+	// for each pod chosen for deletion, report the ratio of its age to the youngest pod's age
+	for _, pod := range filteredPods[:diff] {
+		if !podutil.IsPodReady(pod) {
+			continue
+		}
+		ratio := float64(now.Sub(pod.CreationTimestamp.Time).Milliseconds() / now.Sub(youngestTime).Milliseconds())
+		metrics.SortingDeletionAgeRatio.Observe(ratio)
+	}
 }
 
 // getPodsRankedByRelatedPodsOnSameNode returns an ActivePodsWithRanks value
@@ -822,7 +847,7 @@ func getPodsRankedByRelatedPodsOnSameNode(podsToRank, relatedPods []*v1.Pod) con
 	for i, pod := range podsToRank {
 		ranks[i] = podsOnNode[pod.Spec.NodeName]
 	}
-	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks}
+	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks, Now: metav1.Now()}
 }
 
 func getPodKeys(pods []*v1.Pod) []string {

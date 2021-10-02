@@ -76,15 +76,11 @@ func (n ContextBasedNaming) Name(req *http.Request) (namespace, name string, err
 	if !ok {
 		return "", "", fmt.Errorf("missing requestInfo")
 	}
-	ns, err := n.Namespace(req)
-	if err != nil {
-		return "", "", err
-	}
 
 	if len(requestInfo.Name) == 0 {
 		return "", "", errEmptyName
 	}
-	return ns, requestInfo.Name, nil
+	return requestInfo.Namespace, requestInfo.Name, nil
 }
 
 // fastURLPathEncode encodes the provided path as a URL path

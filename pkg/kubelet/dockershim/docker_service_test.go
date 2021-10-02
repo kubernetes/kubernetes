@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -29,7 +30,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/util/clock"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -37,13 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
+	testingclock "k8s.io/utils/clock/testing"
 )
-
-// newTestNetworkPlugin returns a mock plugin that implements network.NetworkPlugin
-func newTestNetworkPlugin(t *testing.T) *nettest.MockNetworkPlugin {
-	ctrl := gomock.NewController(t)
-	return nettest.NewMockNetworkPlugin(ctrl)
-}
 
 type mockCheckpointManager struct {
 	checkpoint map[string]*PodSandboxCheckpoint
@@ -79,8 +74,8 @@ func newMockCheckpointManager() checkpointmanager.CheckpointManager {
 	return &mockCheckpointManager{checkpoint: make(map[string]*PodSandboxCheckpoint)}
 }
 
-func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {
-	fakeClock := clock.NewFakeClock(time.Time{})
+func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *testingclock.FakeClock) {
+	fakeClock := testingclock.NewFakeClock(time.Time{})
 	c := libdocker.NewFakeDockerClient().WithClock(fakeClock).WithVersion("1.11.2", "1.23").WithRandSource(rand.NewSource(0))
 	pm := network.NewPluginManager(&network.NoopNetworkPlugin{})
 	ckm := newMockCheckpointManager()
@@ -93,7 +88,7 @@ func newTestDockerService() (*dockerService, *libdocker.FakeDockerClient, *clock
 	}, c, fakeClock
 }
 
-func newTestDockerServiceWithVersionCache() (*dockerService, *libdocker.FakeDockerClient, *clock.FakeClock) {
+func newTestDockerServiceWithVersionCache() (*dockerService, *libdocker.FakeDockerClient, *testingclock.FakeClock) {
 	ds, c, fakeClock := newTestDockerService()
 	ds.versionCache = cache.NewObjectCache(
 		func() (interface{}, error) {
@@ -138,9 +133,10 @@ func TestStatus(t *testing.T) {
 	}, statusResp.Status)
 
 	// Should not report ready status is network plugin returns error.
-	mockPlugin := newTestNetworkPlugin(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mockPlugin := nettest.NewMockNetworkPlugin(ctrl)
 	ds.network = network.NewPluginManager(mockPlugin)
-	defer mockPlugin.Finish()
 	mockPlugin.EXPECT().Status().Return(errors.New("network error"))
 	statusResp, err = ds.Status(getTestCTX(), &runtimeapi.StatusRequest{})
 	assert.NoError(t, err)

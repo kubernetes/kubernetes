@@ -263,8 +263,8 @@ func (c *CRDFinalizer) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting CRDFinalizer")
-	defer klog.Infof("Shutting down CRDFinalizer")
+	klog.Info("Starting CRDFinalizer")
+	defer klog.Info("Shutting down CRDFinalizer")
 
 	if !cache.WaitForCacheSync(stopCh, c.crdSynced) {
 		return

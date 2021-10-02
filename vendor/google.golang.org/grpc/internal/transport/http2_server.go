@@ -26,6 +26,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"net/http"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -34,12 +35,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+	"google.golang.org/grpc/internal/grpcutil"
 
-	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/grpclog"
-	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcrand"
 	"google.golang.org/grpc/keepalive"
@@ -57,9 +56,6 @@ var (
 	// ErrHeaderListSizeLimitViolation indicates that the header list size is larger
 	// than the limit set by peer.
 	ErrHeaderListSizeLimitViolation = errors.New("transport: trying to send header list size larger than the limit set by peer")
-	// statusRawProto is a function to get to the raw status proto wrapped in a
-	// status.Status without a proto.Clone().
-	statusRawProto = internal.StatusRawProto.(func(*status.Status) *spb.Status)
 )
 
 // serverConnectionCounter counts the number of connections a server has seen
@@ -294,7 +290,9 @@ func newHTTP2Server(conn net.Conn, config *ServerConfig) (_ ServerTransport, err
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		if err := t.loopy.run(); err != nil {
-			errorf("transport: loopyWriter.run returning. Err: %v", err)
+			if logger.V(logLevel) {
+				logger.Errorf("transport: loopyWriter.run returning. Err: %v", err)
+			}
 		}
 		t.conn.Close()
 		close(t.writerDone)
@@ -309,12 +307,12 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 	state := &decodeState{
 		serverSide: true,
 	}
-	if err := state.decodeHeader(frame); err != nil {
-		if se, ok := status.FromError(err); ok {
+	if h2code, err := state.decodeHeader(frame); err != nil {
+		if _, ok := status.FromError(err); ok {
 			t.controlBuf.put(&cleanupStream{
 				streamID: streamID,
 				rst:      true,
-				rstCode:  statusCodeConvTab[se.Code()],
+				rstCode:  h2code,
 				onWrite:  func() {},
 			})
 		}
@@ -358,24 +356,6 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 	if state.data.statsTrace != nil {
 		s.ctx = stats.SetIncomingTrace(s.ctx, state.data.statsTrace)
 	}
-	if t.inTapHandle != nil {
-		var err error
-		info := &tap.Info{
-			FullMethodName: state.data.method,
-		}
-		s.ctx, err = t.inTapHandle(s.ctx, info)
-		if err != nil {
-			warningf("transport: http2Server.operateHeaders got an error from InTapHandle: %v", err)
-			t.controlBuf.put(&cleanupStream{
-				streamID: s.id,
-				rst:      true,
-				rstCode:  http2.ErrCodeRefusedStream,
-				onWrite:  func() {},
-			})
-			s.cancel()
-			return false
-		}
-	}
 	t.mu.Lock()
 	if t.state != reachable {
 		t.mu.Unlock()
@@ -396,11 +376,46 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 	if streamID%2 != 1 || streamID <= t.maxStreamID {
 		t.mu.Unlock()
 		// illegal gRPC stream id.
-		errorf("transport: http2Server.HandleStreams received an illegal stream id: %v", streamID)
+		if logger.V(logLevel) {
+			logger.Errorf("transport: http2Server.HandleStreams received an illegal stream id: %v", streamID)
+		}
 		s.cancel()
 		return true
 	}
 	t.maxStreamID = streamID
+	if state.data.httpMethod != http.MethodPost {
+		t.mu.Unlock()
+		if logger.V(logLevel) {
+			logger.Warningf("transport: http2Server.operateHeaders parsed a :method field: %v which should be POST", state.data.httpMethod)
+		}
+		t.controlBuf.put(&cleanupStream{
+			streamID: streamID,
+			rst:      true,
+			rstCode:  http2.ErrCodeProtocol,
+			onWrite:  func() {},
+		})
+		s.cancel()
+		return false
+	}
+	if t.inTapHandle != nil {
+		var err error
+		if s.ctx, err = t.inTapHandle(s.ctx, &tap.Info{FullMethodName: state.data.method}); err != nil {
+			t.mu.Unlock()
+			if logger.V(logLevel) {
+				logger.Infof("transport: http2Server.operateHeaders got an error from InTapHandle: %v", err)
+			}
+			stat, ok := status.FromError(err)
+			if !ok {
+				stat = status.New(codes.PermissionDenied, err.Error())
+			}
+			t.controlBuf.put(&earlyAbortStream{
+				streamID:       s.id,
+				contentSubtype: s.contentSubtype,
+				status:         stat,
+			})
+			return false
+		}
+	}
 	t.activeStreams[streamID] = s
 	if len(t.activeStreams) == 1 {
 		t.idle = time.Time{}
@@ -459,7 +474,9 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
 		if err != nil {
 			if se, ok := err.(http2.StreamError); ok {
-				warningf("transport: http2Server.HandleStreams encountered http2.StreamError: %v", se)
+				if logger.V(logLevel) {
+					logger.Warningf("transport: http2Server.HandleStreams encountered http2.StreamError: %v", se)
+				}
 				t.mu.Lock()
 				s := t.activeStreams[se.StreamID]
 				t.mu.Unlock()
@@ -479,7 +496,9 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				t.Close()
 				return
 			}
-			warningf("transport: http2Server.HandleStreams failed to read frame: %v", err)
+			if logger.V(logLevel) {
+				logger.Warningf("transport: http2Server.HandleStreams failed to read frame: %v", err)
+			}
 			t.Close()
 			return
 		}
@@ -502,7 +521,9 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		case *http2.GoAwayFrame:
 			// TODO: Handle GoAway from the client appropriately.
 		default:
-			errorf("transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
+			if logger.V(logLevel) {
+				logger.Errorf("transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
+			}
 		}
 	}
 }
@@ -602,6 +623,10 @@ func (t *http2Server) handleData(f *http2.DataFrame) {
 	// Select the right stream to dispatch.
 	s, ok := t.getStream(f)
 	if !ok {
+		return
+	}
+	if s.getState() == streamReadDone {
+		t.closeStream(s, true, http2.ErrCodeStreamClosed, false)
 		return
 	}
 	if size > 0 {
@@ -724,7 +749,9 @@ func (t *http2Server) handlePing(f *http2.PingFrame) {
 
 	if t.pingStrikes > maxPingStrikes {
 		// Send goaway and close the connection.
-		errorf("transport: Got too many pings from the client, closing the connection.")
+		if logger.V(logLevel) {
+			logger.Errorf("transport: Got too many pings from the client, closing the connection.")
+		}
 		t.controlBuf.put(&goAway{code: http2.ErrCodeEnhanceYourCalm, debugData: []byte("too_many_pings"), closeConn: true})
 	}
 }
@@ -757,7 +784,9 @@ func (t *http2Server) checkForHeaderListSize(it interface{}) bool {
 	var sz int64
 	for _, f := range hdrFrame.hf {
 		if sz += int64(f.Size()); sz > int64(*t.maxSendHeaderListSize) {
-			errorf("header list size to send violates the maximum size (%d bytes) set by client", *t.maxSendHeaderListSize)
+			if logger.V(logLevel) {
+				logger.Errorf("header list size to send violates the maximum size (%d bytes) set by client", *t.maxSendHeaderListSize)
+			}
 			return false
 		}
 	}
@@ -794,7 +823,7 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 	// first and create a slice of that exact size.
 	headerFields := make([]hpack.HeaderField, 0, 2) // at least :status, content-type will be there if none else.
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":status", Value: "200"})
-	headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: contentType(s.contentSubtype)})
+	headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: grpcutil.ContentType(s.contentSubtype)})
 	if s.sendCompress != "" {
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-encoding", Value: s.sendCompress})
 	}
@@ -813,10 +842,11 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 		return ErrHeaderListSizeLimitViolation
 	}
 	if t.stats != nil {
-		// Note: WireLength is not set in outHeader.
-		// TODO(mmukhi): Revisit this later, if needed.
+		// Note: Headers are compressed with hpack after this call returns.
+		// No WireLength field is set here.
 		outHeader := &stats.OutHeader{
-			Header: s.header.Copy(),
+			Header:      s.header.Copy(),
+			Compression: s.sendCompress,
 		}
 		t.stats.HandleRPC(s.Context(), outHeader)
 	}
@@ -843,17 +873,17 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 			}
 		} else { // Send a trailer only response.
 			headerFields = append(headerFields, hpack.HeaderField{Name: ":status", Value: "200"})
-			headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: contentType(s.contentSubtype)})
+			headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: grpcutil.ContentType(s.contentSubtype)})
 		}
 	}
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-status", Value: strconv.Itoa(int(st.Code()))})
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-message", Value: encodeGrpcMessage(st.Message())})
 
-	if p := statusRawProto(st); p != nil && len(p.Details) > 0 {
+	if p := st.Proto(); p != nil && len(p.Details) > 0 {
 		stBytes, err := proto.Marshal(p)
 		if err != nil {
 			// TODO: return error instead, when callers are able to handle it.
-			grpclog.Errorf("transport: failed to marshal rpc status: %v, error: %v", p, err)
+			logger.Errorf("transport: failed to marshal rpc status: %v, error: %v", p, err)
 		} else {
 			headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-status-details-bin", Value: encodeBinHeader(stBytes)})
 		}
@@ -880,6 +910,8 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	rst := s.getState() == streamActive
 	t.finishStream(s, rst, http2.ErrCodeNo, trailingHeader, true)
 	if t.stats != nil {
+		// Note: The trailer fields are compressed with hpack after this call returns.
+		// No WireLength field is set here.
 		t.stats.HandleRPC(s.Context(), &stats.OutTrailer{
 			Trailer: s.trailer.Copy(),
 		})
@@ -911,13 +943,6 @@ func (t *http2Server) Write(s *Stream, hdr []byte, data []byte, opts *Options) e
 			return ContextErr(s.ctx.Err())
 		}
 	}
-	// Add some data to header frame so that we can equally distribute bytes across frames.
-	emptyLen := http2MaxFrameLen - len(hdr)
-	if emptyLen > len(data) {
-		emptyLen = len(data)
-	}
-	hdr = append(hdr, data[:emptyLen]...)
-	data = data[emptyLen:]
 	df := &dataFrame{
 		streamID:    s.id,
 		h:           hdr,
@@ -989,7 +1014,9 @@ func (t *http2Server) keepalive() {
 			select {
 			case <-ageTimer.C:
 				// Close the connection after grace period.
-				infof("transport: closing server transport due to maximum connection age.")
+				if logger.V(logLevel) {
+					logger.Infof("transport: closing server transport due to maximum connection age.")
+				}
 				t.Close()
 			case <-t.done:
 			}
@@ -1006,7 +1033,9 @@ func (t *http2Server) keepalive() {
 				continue
 			}
 			if outstandingPing && kpTimeoutLeft <= 0 {
-				infof("transport: closing server transport due to idleness.")
+				if logger.V(logLevel) {
+					logger.Infof("transport: closing server transport due to idleness.")
+				}
 				t.Close()
 				return
 			}

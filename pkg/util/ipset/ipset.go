@@ -19,13 +19,13 @@ package ipset
 import (
 	"bytes"
 	"fmt"
-	"net"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 )
 
 // Interface is an injectable interface for running ipset commands.  Implementations must be goroutine-safe.
@@ -183,7 +183,7 @@ func (e *Entry) Validate(set *IPSet) bool {
 		}
 
 		// IP2 can not be empty for `hash:ip,port,ip` type ip set
-		if net.ParseIP(e.IP2) == nil {
+		if netutils.ParseIPSloppy(e.IP2) == nil {
 			klog.Errorf("Error parsing entry %v second ip address %v for ipset %v", e, e.IP2, set)
 			return false
 		}
@@ -194,7 +194,7 @@ func (e *Entry) Validate(set *IPSet) bool {
 		}
 
 		// Net can not be empty for `hash:ip,port,net` type ip set
-		if _, ipNet, err := net.ParseCIDR(e.Net); ipNet == nil {
+		if _, ipNet, err := netutils.ParseCIDRSloppy(e.Net); ipNet == nil {
 			klog.Errorf("Error parsing entry %v ip net %v for ipset %v, error: %v", e, e.Net, set, err)
 			return false
 		}
@@ -250,7 +250,7 @@ func (e *Entry) checkIPandProtocol(set *IPSet) bool {
 		return false
 	}
 
-	if net.ParseIP(e.IP) == nil {
+	if netutils.ParseIPSloppy(e.IP) == nil {
 		klog.Errorf("Error parsing entry %v ip address %v for ipset %v", e, e.IP, set)
 		return false
 	}

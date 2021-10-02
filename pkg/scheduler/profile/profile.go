@@ -37,8 +37,8 @@ type RecorderFactory func(string) events.EventRecorder
 func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
 	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
-	opts = append(opts, frameworkruntime.WithEventRecorder(recorder), frameworkruntime.WithProfileName(cfg.SchedulerName))
-	fwk, err := frameworkruntime.NewFramework(r, cfg.Plugins, cfg.PluginConfig, opts...)
+	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
+	fwk, err := frameworkruntime.NewFramework(r, &cfg, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
 	if v.m[cfg.SchedulerName] != nil {
 		return fmt.Errorf("duplicate profile with scheduler name %q", cfg.SchedulerName)
 	}
-	if cfg.Plugins.QueueSort == nil || len(cfg.Plugins.QueueSort.Enabled) != 1 {
+	if len(cfg.Plugins.QueueSort.Enabled) != 1 {
 		return fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", cfg.SchedulerName)
 	}
 	queueSort := cfg.Plugins.QueueSort.Enabled[0].Name

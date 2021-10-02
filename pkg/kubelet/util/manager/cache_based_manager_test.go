@@ -30,13 +30,14 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/utils/clock"
+	testingclock "k8s.io/utils/clock/testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -149,7 +150,7 @@ func TestSecretStoreDeletingSecret(t *testing.T) {
 
 func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, 0)
 
 	for i := 0; i < 10; i++ {
@@ -176,7 +177,7 @@ func TestSecretStoreGetAlwaysRefresh(t *testing.T) {
 
 func TestSecretStoreGetNeverRefresh(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 
 	for i := 0; i < 10; i++ {
@@ -206,7 +207,7 @@ func TestCustomTTL(t *testing.T) {
 	}
 
 	fakeClient := &fake.Clientset{}
-	fakeClock := clock.NewFakeClock(time.Time{})
+	fakeClock := testingclock.NewFakeClock(time.Time{})
 	store := newSecretStore(fakeClient, fakeClock, customTTL, time.Minute)
 
 	store.AddReference("ns", "name")
@@ -377,7 +378,7 @@ func podWithSecrets(ns, podName string, toAttach secretsToAttach) *v1.Pod {
 
 func TestCacheInvalidation(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
 
@@ -432,7 +433,7 @@ func TestCacheInvalidation(t *testing.T) {
 
 func TestRegisterIdempotence(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
 
@@ -467,7 +468,7 @@ func TestRegisterIdempotence(t *testing.T) {
 
 func TestCacheRefcounts(t *testing.T) {
 	fakeClient := &fake.Clientset{}
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := testingclock.NewFakeClock(time.Now())
 	store := newSecretStore(fakeClient, fakeClock, noObjectTTL, time.Minute)
 	manager := newCacheBasedSecretManager(store)
 

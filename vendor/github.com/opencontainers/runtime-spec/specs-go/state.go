@@ -5,17 +5,17 @@ type ContainerState string
 
 const (
 	// StateCreating indicates that the container is being created
-	StateCreating ContainerState  = "creating"
+	StateCreating ContainerState = "creating"
 
 	// StateCreated indicates that the runtime has finished the create operation
-	StateCreated ContainerState  = "created"
+	StateCreated ContainerState = "created"
 
 	// StateRunning indicates that the container process has executed the
 	// user-specified program but has not exited
-	StateRunning ContainerState  = "running"
+	StateRunning ContainerState = "running"
 
 	// StateStopped indicates that the container process has exited
-	StateStopped ContainerState  = "stopped"
+	StateStopped ContainerState = "stopped"
 )
 
 // State holds information about the runtime state of the container.
@@ -32,4 +32,25 @@ type State struct {
 	Bundle string `json:"bundle"`
 	// Annotations are key values associated with the container.
 	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+const (
+	// SeccompFdName is the name of the seccomp notify file descriptor.
+	SeccompFdName string = "seccompFd"
+)
+
+// ContainerProcessState holds information about the state of a container process.
+type ContainerProcessState struct {
+	// Version is the version of the specification that is supported.
+	Version string `json:"ociVersion"`
+	// Fds is a string array containing the names of the file descriptors passed.
+	// The index of the name in this array corresponds to index of the file
+	// descriptor in the `SCM_RIGHTS` array.
+	Fds []string `json:"fds"`
+	// Pid is the process ID as seen by the runtime.
+	Pid int `json:"pid"`
+	// Opaque metadata.
+	Metadata string `json:"metadata,omitempty"`
+	// State of the container.
+	State State `json:"state"`
 }

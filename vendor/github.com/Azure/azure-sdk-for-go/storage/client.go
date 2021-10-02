@@ -1,19 +1,8 @@
 // Package storage provides clients for Microsoft Azure Storage Services.
 package storage
 
-// Copyright 2017 Microsoft Corporation
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
 
 import (
 	"bufio"
@@ -85,6 +74,7 @@ const (
 
 var (
 	validStorageAccount     = regexp.MustCompile("^[0-9a-z]{3,24}$")
+	validCosmosAccount      = regexp.MustCompile("^[0-9a-z-]{3,44}$")
 	defaultValidStatusCodes = []int{
 		http.StatusRequestTimeout,      // 408
 		http.StatusInternalServerError, // 500
@@ -117,7 +107,7 @@ func (ds *DefaultSender) Send(c *Client, req *http.Request) (resp *http.Response
 			return resp, err
 		}
 		resp, err = c.HTTPClient.Do(rr.Request())
-		if err != nil || !autorest.ResponseHasStatusCode(resp, ds.ValidStatusCodes...) {
+		if err == nil && !autorest.ResponseHasStatusCode(resp, ds.ValidStatusCodes...) {
 			return resp, err
 		}
 		drainRespBody(resp)
@@ -173,6 +163,23 @@ type AzureStorageServiceError struct {
 	RequestID                 string
 	Date                      string
 	APIVersion                string
+}
+
+// AzureTablesServiceError contains fields of the error response from
+// Azure Table Storage Service REST API in Atom format.
+// See https://msdn.microsoft.com/en-us/library/azure/dd179382.aspx
+type AzureTablesServiceError struct {
+	Code       string `xml:"code"`
+	Message    string `xml:"message"`
+	StatusCode int
+	RequestID  string
+	Date       string
+	APIVersion string
+}
+
+func (e AzureTablesServiceError) Error() string {
+	return fmt.Sprintf("storage: service returned error: StatusCode=%d, ErrorCode=%s, ErrorMessage=%s, RequestInitiated=%s, RequestId=%s, API Version=%s",
+		e.StatusCode, e.Code, e.Message, e.Date, e.RequestID, e.APIVersion)
 }
 
 type odataErrorMessage struct {
@@ -309,10 +316,36 @@ func NewClient(accountName, accountKey, serviceBaseURL, apiVersion string, useHT
 		return c, fmt.Errorf("azure: malformed storage account key: %v", err)
 	}
 
-	c = Client{
+	return newClient(accountName, key, serviceBaseURL, apiVersion, useHTTPS)
+}
+
+// NewCosmosClient constructs a Client for Azure CosmosDB. This should be used if the caller wants
+// to specify whether to use HTTPS, a specific REST API version or a custom
+// cosmos endpoint than Azure Public Cloud.
+func NewCosmosClient(accountName, accountKey, serviceBaseURL, apiVersion string, useHTTPS bool) (Client, error) {
+	var c Client
+	if !IsValidCosmosAccount(accountName) {
+		return c, fmt.Errorf("azure: account name is not valid: The name can contain only lowercase letters, numbers and the '-' character, and must be between 3 and 44 characters: %v", accountName)
+	} else if accountKey == "" {
+		return c, fmt.Errorf("azure: account key required")
+	} else if serviceBaseURL == "" {
+		return c, fmt.Errorf("azure: base storage service url required")
+	}
+
+	key, err := base64.StdEncoding.DecodeString(accountKey)
+	if err != nil {
+		return c, fmt.Errorf("azure: malformed cosmos account key: %v", err)
+	}
+
+	return newClient(accountName, key, serviceBaseURL, apiVersion, useHTTPS)
+}
+
+// newClient constructs a Client with given parameters.
+func newClient(accountName string, accountKey []byte, serviceBaseURL, apiVersion string, useHTTPS bool) (Client, error) {
+	c := Client{
 		HTTPClient:       http.DefaultClient,
 		accountName:      accountName,
-		accountKey:       key,
+		accountKey:       accountKey,
 		useHTTPS:         useHTTPS,
 		baseURL:          serviceBaseURL,
 		apiVersion:       apiVersion,
@@ -332,6 +365,12 @@ func NewClient(accountName, accountKey, serviceBaseURL, apiVersion string, useHT
 // See https://docs.microsoft.com/en-us/azure/storage/storage-create-storage-account
 func IsValidStorageAccount(account string) bool {
 	return validStorageAccount.MatchString(account)
+}
+
+// IsValidCosmosAccount checks if the Cosmos account name is valid.
+// See https://docs.microsoft.com/en-us/azure/cosmos-db/how-to-manage-database-account
+func IsValidCosmosAccount(account string) bool {
+	return validCosmosAccount.MatchString(account)
 }
 
 // NewAccountSASClient contructs a client that uses accountSAS authorization
@@ -795,8 +834,21 @@ func (c Client) execInternalJSONCommon(verb, url string, headers map[string]stri
 			err = serviceErrFromStatusCode(resp.StatusCode, resp.Status, requestID, date, version)
 			return respToRet, req, resp, err
 		}
-		// try unmarshal as odata.error json
-		err = json.Unmarshal(respBody, &respToRet.odata)
+		// response contains storage service error object, unmarshal
+		if resp.Header.Get("Content-Type") == "application/xml" {
+			storageErr := AzureTablesServiceError{
+				StatusCode: resp.StatusCode,
+				RequestID:  requestID,
+				Date:       date,
+				APIVersion: version,
+			}
+			if err := xml.Unmarshal(respBody, &storageErr); err != nil {
+				storageErr.Message = fmt.Sprintf("Response body could no be unmarshaled: %v. Body: %v.", err, string(respBody))
+			}
+			err = storageErr
+		} else {
+			err = json.Unmarshal(respBody, &respToRet.odata)
+		}
 	}
 
 	return respToRet, req, resp, err
@@ -901,8 +953,10 @@ func readAndCloseBody(body io.ReadCloser) ([]byte, error) {
 
 // reads the response body then closes it
 func drainRespBody(resp *http.Response) {
-	io.Copy(ioutil.Discard, resp.Body)
-	resp.Body.Close()
+	if resp != nil {
+		io.Copy(ioutil.Discard, resp.Body)
+		resp.Body.Close()
+	}
 }
 
 func serviceErrFromXML(body []byte, storageErr *AzureStorageServiceError) error {

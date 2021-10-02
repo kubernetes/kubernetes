@@ -18,7 +18,6 @@ package filters
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -34,37 +33,33 @@ import (
 )
 
 // WithTimeoutForNonLongRunningRequests times out non-long-running requests after the time given by timeout.
-func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apirequest.LongRunningRequestCheck, timeout time.Duration) http.Handler {
+func WithTimeoutForNonLongRunningRequests(handler http.Handler, longRunning apirequest.LongRunningRequestCheck) http.Handler {
 	if longRunning == nil {
 		return handler
 	}
-	timeoutFunc := func(req *http.Request) (*http.Request, <-chan time.Time, func(), *apierrors.StatusError) {
+	timeoutFunc := func(req *http.Request) (*http.Request, bool, func(), *apierrors.StatusError) {
 		// TODO unify this with apiserver.MaxInFlightLimit
 		ctx := req.Context()
 
 		requestInfo, ok := apirequest.RequestInfoFrom(ctx)
 		if !ok {
 			// if this happens, the handler chain isn't setup correctly because there is no request info
-			return req, time.After(timeout), func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
+			return req, false, func() {}, apierrors.NewInternalError(fmt.Errorf("no request info found for request during timeout"))
 		}
 
 		if longRunning(req, requestInfo) {
-			return req, nil, nil, nil
+			return req, true, nil, nil
 		}
-
-		ctx, cancel := context.WithCancel(ctx)
-		req = req.WithContext(ctx)
 
 		postTimeoutFn := func() {
-			cancel()
 			metrics.RecordRequestTermination(req, requestInfo, metrics.APIServerComponent, http.StatusGatewayTimeout)
 		}
-		return req, time.After(timeout), postTimeoutFn, apierrors.NewTimeoutError(fmt.Sprintf("request did not complete within %s", timeout), 0)
+		return req, false, postTimeoutFn, apierrors.NewTimeoutError("request did not complete within the allotted timeout", 0)
 	}
 	return WithTimeout(handler, timeoutFunc)
 }
 
-type timeoutFunc = func(*http.Request) (req *http.Request, timeout <-chan time.Time, postTimeoutFunc func(), err *apierrors.StatusError)
+type timeoutFunc = func(*http.Request) (req *http.Request, longRunning bool, postTimeoutFunc func(), err *apierrors.StatusError)
 
 // WithTimeout returns an http.Handler that runs h with a timeout
 // determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
@@ -85,11 +80,13 @@ type timeoutHandler struct {
 }
 
 func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	r, after, postTimeoutFn, err := t.timeout(r)
-	if after == nil {
+	r, longRunning, postTimeoutFn, err := t.timeout(r)
+	if longRunning {
 		t.handler.ServeHTTP(w, r)
 		return
 	}
+
+	timeoutCh := r.Context().Done()
 
 	// resultCh is used as both errCh and stopCh
 	resultCh := make(chan interface{})
@@ -117,21 +114,25 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		return
-	case <-after:
+	case <-timeoutCh:
 		defer func() {
 			// resultCh needs to have a reader, since the function doing
 			// the work needs to send to it. This is defer'd to ensure it runs
 			// ever if the post timeout work itself panics.
 			go func() {
+				timedOutAt := time.Now()
 				res := <-resultCh
+
+				status := metrics.PostTimeoutHandlerOK
 				if res != nil {
-					switch t := res.(type) {
-					case error:
-						utilruntime.HandleError(t)
-					default:
-						utilruntime.HandleError(fmt.Errorf("%v", res))
-					}
+					// a non nil res indicates that there was a panic.
+					status = metrics.PostTimeoutHandlerPanic
 				}
+
+				metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceTimeoutHandler, status)
+				err := fmt.Errorf("post-timeout activity - time-elapsed: %s, %v %q result: %v",
+					time.Since(timedOutAt), r.Method, r.URL.Path, res)
+				utilruntime.HandleError(err)
 			}()
 		}()
 

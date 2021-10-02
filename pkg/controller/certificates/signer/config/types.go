@@ -38,8 +38,8 @@ type CSRSigningControllerConfiguration struct {
 	// legacyUnknownSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/legacy-unknown
 	LegacyUnknownSignerConfiguration CSRSigningConfiguration
 
-	// clusterSigningDuration is the length of duration signed certificates
-	// will be given.
+	// clusterSigningDuration is the max length of duration signed certificates will be given.
+	// Individual CSRs may request shorter certs by setting spec.expirationSeconds.
 	ClusterSigningDuration metav1.Duration
 }
 

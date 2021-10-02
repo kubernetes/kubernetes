@@ -57,6 +57,10 @@ type InterPodAffinityArgs struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NodeLabelArgs holds arguments used to configure the NodeLabel plugin.
+//
+// This plugin has been deprecated and is only configurable through the
+// scheduler policy API and the v1beta1 component config API. It is recommended
+// to use the NodeAffinity plugin instead.
 type NodeLabelArgs struct {
 	metav1.TypeMeta
 
@@ -84,6 +88,9 @@ type NodeResourcesFitArgs struct {
 	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
 	// A resource group name can't contain '/'.
 	IgnoredResourceGroups []string
+
+	// ScoringStrategy selects the node resource scoring strategy.
+	ScoringStrategy *ScoringStrategy
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -134,7 +141,7 @@ type RequestedToCapacityRatioArgs struct {
 	Shape []UtilizationShapePoint
 	// Resources to be considered when scoring.
 	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
+	// Weights should be larger than 0.
 	Resources []ResourceSpec
 }
 
@@ -162,6 +169,17 @@ type NodeResourcesMostAllocatedArgs struct {
 	Resources []ResourceSpec
 }
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// NodeResourcesBalancedAllocationArgs holds arguments used to configure NodeResourcesBalancedAllocation plugin.
+type NodeResourcesBalancedAllocationArgs struct {
+	metav1.TypeMeta
+
+	// Resources to be considered when scoring.
+	// The default resource set includes "cpu" and "memory", only valid weight is 1.
+	Resources []ResourceSpec
+}
+
 // UtilizationShapePoint represents a single point of a priority function shape.
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
@@ -180,7 +198,12 @@ type ResourceSpec struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ServiceAffinityArgs holds arguments used to configure the ServiceAffinity plugin.
+// ServiceAffinityArgs holds arguments used to configure the ServiceAffinity
+// plugin.
+//
+// This plugin has been deprecated and is only configurable through the
+// scheduler policy API and the v1beta1 component config API. It is recommended
+// to use the InterPodAffinity plugin instead.
 type ServiceAffinityArgs struct {
 	metav1.TypeMeta
 
@@ -202,6 +225,21 @@ type VolumeBindingArgs struct {
 	// Value must be non-negative integer. The value zero indicates no waiting.
 	// If this value is nil, the default value will be used.
 	BindTimeoutSeconds int64
+
+	// Shape specifies the points defining the score function shape, which is
+	// used to score nodes based on the utilization of statically provisioned
+	// PVs. The utilization is calculated by dividing the total requested
+	// storage of the pod by the total capacity of feasible PVs on each node.
+	// Each point contains utilization (ranges from 0 to 100) and its
+	// associated score (ranges from 0 to 10). You can turn the priority by
+	// specifying different scores for different utilization numbers.
+	// The default shape points are:
+	// 1) 0 for 0 utilization
+	// 2) 10 for 100 utilization
+	// All points must be sorted in increasing order by utilization.
+	// +featureGate=VolumeCapacityPriority
+	// +optional
+	Shape []UtilizationShapePoint
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -217,4 +255,38 @@ type NodeAffinityArgs struct {
 	// When AddedAffinity is used, some Pods with affinity requirements that match
 	// a specific Node (such as Daemonset Pods) might remain unschedulable.
 	AddedAffinity *v1.NodeAffinity
+}
+
+// ScoringStrategyType the type of scoring strategy used in NodeResourcesFit plugin.
+type ScoringStrategyType string
+
+const (
+	// LeastAllocated strategy prioritizes nodes with least allcoated resources.
+	LeastAllocated ScoringStrategyType = "LeastAllocated"
+	// MostAllocated strategy prioritizes nodes with most allcoated resources.
+	MostAllocated ScoringStrategyType = "MostAllocated"
+	// RequestedToCapacityRatio strategy allows specifying a custom shape function
+	// to score nodes based on the request to capacity ratio.
+	RequestedToCapacityRatio ScoringStrategyType = "RequestedToCapacityRatio"
+)
+
+// ScoringStrategy define ScoringStrategyType for node resource plugin
+type ScoringStrategy struct {
+	// Type selects which strategy to run.
+	Type ScoringStrategyType
+
+	// Resources to consider when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	// Weight defaults to 1 if not specified or explicitly set to 0.
+	Resources []ResourceSpec
+
+	// Arguments specific to RequestedToCapacityRatio strategy.
+	RequestedToCapacityRatio *RequestedToCapacityRatioParam
+}
+
+// RequestedToCapacityRatioParam define RequestedToCapacityRatio parameters
+type RequestedToCapacityRatioParam struct {
+	// Shape is a list of points defining the scoring function shape.
+	Shape []UtilizationShapePoint
 }

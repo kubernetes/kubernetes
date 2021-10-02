@@ -42,23 +42,24 @@ var (
 )
 
 const (
-	legacyGroup         = ""
-	appsGroup           = "apps"
-	authenticationGroup = "authentication.k8s.io"
-	authorizationGroup  = "authorization.k8s.io"
-	autoscalingGroup    = "autoscaling"
-	batchGroup          = "batch"
-	certificatesGroup   = "certificates.k8s.io"
-	coordinationGroup   = "coordination.k8s.io"
-	discoveryGroup      = "discovery.k8s.io"
-	extensionsGroup     = "extensions"
-	policyGroup         = "policy"
-	rbacGroup           = "rbac.authorization.k8s.io"
-	storageGroup        = "storage.k8s.io"
-	resMetricsGroup     = "metrics.k8s.io"
-	customMetricsGroup  = "custom.metrics.k8s.io"
-	networkingGroup     = "networking.k8s.io"
-	eventsGroup         = "events.k8s.io"
+	legacyGroup            = ""
+	appsGroup              = "apps"
+	authenticationGroup    = "authentication.k8s.io"
+	authorizationGroup     = "authorization.k8s.io"
+	autoscalingGroup       = "autoscaling"
+	batchGroup             = "batch"
+	certificatesGroup      = "certificates.k8s.io"
+	coordinationGroup      = "coordination.k8s.io"
+	discoveryGroup         = "discovery.k8s.io"
+	extensionsGroup        = "extensions"
+	policyGroup            = "policy"
+	rbacGroup              = "rbac.authorization.k8s.io"
+	storageGroup           = "storage.k8s.io"
+	resMetricsGroup        = "metrics.k8s.io"
+	customMetricsGroup     = "custom.metrics.k8s.io"
+	networkingGroup        = "networking.k8s.io"
+	eventsGroup            = "events.k8s.io"
+	internalAPIServerGroup = "internal.apiserver.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -284,7 +285,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("pods", "pods/attach", "pods/proxy", "pods/exec", "pods/portforward").RuleOrDie(),
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
+					"services", "services/proxy", "persistentvolumeclaims", "configmaps", "secrets", "events").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
@@ -318,6 +319,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
 				// indicator of which namespaces you have access to.
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+
+				rbacv1helpers.NewRule(Read...).Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
 					"controllerrevisions",
@@ -493,18 +496,16 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-		// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
-		roles = append(roles, rbacv1.ClusterRole{
-			ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get").URLs(
-					"/.well-known/openid-configuration",
-					"/openid/v1/jwks",
-				).RuleOrDie(),
-			},
-		})
-	}
+	// Add the cluster role for reading the ServiceAccountIssuerDiscovery endpoints
+	roles = append(roles, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "system:service-account-issuer-discovery"},
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get").URLs(
+				"/.well-known/openid-configuration",
+				"/openid/v1/jwks",
+			).RuleOrDie(),
+		},
+	})
 
 	// node-proxier role is used by kube-proxy.
 	nodeProxierRules := []rbacv1.PolicyRule{
@@ -513,9 +514,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 		eventsRule(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
-	}
+	nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
 	roles = append(roles, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
 		Rules:      nodeProxierRules,
@@ -548,6 +547,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		rbacv1helpers.NewRule("create").Groups(authorizationGroup).Resources("subjectaccessreviews").RuleOrDie(),
 		// Needed for volume limits
 		rbacv1helpers.NewRule(Read...).Groups(storageGroup).Resources("csinodes").RuleOrDie(),
+		// Needed for namespaceSelector feature in pod affinity
+		rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		kubeSchedulerRules = append(kubeSchedulerRules,
@@ -589,19 +590,17 @@ func ClusterRoleBindings() []rbacv1.ClusterRoleBinding {
 		},
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-		// Allow all in-cluster workloads (via their service accounts) to read the OIDC discovery endpoints.
-		// Users with certain forms of write access (create pods, create secrets, create service accounts, etc)
-		// can gain access to a service account identity which would allow them to access this information.
-		// This includes the issuer URL, which is already present in the SA token JWT.  Similarly, SAs can
-		// already gain this same info via introspection of their own token.  Since this discovery endpoint
-		// points to what issued all service account tokens, it seems fitting for SAs to have this access.
-		// Defer to the cluster admin with regard to binding directly to all authenticated and/or
-		// unauthenticated users.
-		rolebindings = append(rolebindings,
-			rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie(),
-		)
-	}
+	// Allow all in-cluster workloads (via their service accounts) to read the OIDC discovery endpoints.
+	// Users with certain forms of write access (create pods, create secrets, create service accounts, etc)
+	// can gain access to a service account identity which would allow them to access this information.
+	// This includes the issuer URL, which is already present in the SA token JWT.  Similarly, SAs can
+	// already gain this same info via introspection of their own token.  Since this discovery endpoint
+	// points to what issued all service account tokens, it seems fitting for SAs to have this access.
+	// Defer to the cluster admin with regard to binding directly to all authenticated and/or
+	// unauthenticated users.
+	rolebindings = append(rolebindings,
+		rbacv1helpers.NewClusterBinding("system:service-account-issuer-discovery").Groups(serviceaccount.AllServiceAccountsGroup).BindingOrDie(),
+	)
 
 	addClusterRoleBindingLabel(rolebindings)
 

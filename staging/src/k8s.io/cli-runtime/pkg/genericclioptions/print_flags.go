@@ -27,6 +27,8 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 )
 
+// NoCompatiblePrinterError is a struct that contains error information.
+// It will be constructed when a invalid printing format is provided
 type NoCompatiblePrinterError struct {
 	OutputFormat   *string
 	AllowedFormats []string
@@ -43,6 +45,8 @@ func (e NoCompatiblePrinterError) Error() string {
 	return fmt.Sprintf("unable to match a printer suitable for the output format %q, allowed formats are: %s", output, strings.Join(e.AllowedFormats, ","))
 }
 
+// IsNoCompatiblePrinterError returns true if it is a not a compatible printer
+// otherwise it will return false
 func IsNoCompatiblePrinterError(err error) bool {
 	if err == nil {
 		return false
@@ -69,10 +73,12 @@ type PrintFlags struct {
 	OutputFlagSpecified func() bool
 }
 
+// Complete sets NamePrintFlags operation flag from sucessTemplate
 func (f *PrintFlags) Complete(successTemplate string) error {
 	return f.NamePrintFlags.Complete(successTemplate)
 }
 
+// AllowedFormats returns slice of string of allowed JSONYaml/Name/Template printing format
 func (f *PrintFlags) AllowedFormats() []string {
 	ret := []string{}
 	ret = append(ret, f.JSONYamlPrintFlags.AllowedFormats()...)
@@ -81,6 +87,10 @@ func (f *PrintFlags) AllowedFormats() []string {
 	return ret
 }
 
+// ToPrinter returns a printer capable of
+// handling --output or --template printing.
+// Returns false if the specified outputFormat does not match a supported format.
+// Supported format types can be found in pkg/printers/printers.go
 func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	outputFormat := ""
 	if f.OutputFormat != nil {
@@ -118,6 +128,8 @@ func (f *PrintFlags) ToPrinter() (printers.ResourcePrinter, error) {
 	return nil, NoCompatiblePrinterError{OutputFormat: f.OutputFormat, AllowedFormats: f.AllowedFormats()}
 }
 
+// AddFlags receives a *cobra.Command reference and binds
+// flags related to JSON/Yaml/Name/Template printing to it
 func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.JSONYamlPrintFlags.AddFlags(cmd)
 	f.NamePrintFlags.AddFlags(cmd)
@@ -145,6 +157,7 @@ func (f *PrintFlags) WithTypeSetter(scheme *runtime.Scheme) *PrintFlags {
 	return f
 }
 
+// NewPrintFlags returns a default *PrintFlags
 func NewPrintFlags(operation string) *PrintFlags {
 	outputFormat := ""
 

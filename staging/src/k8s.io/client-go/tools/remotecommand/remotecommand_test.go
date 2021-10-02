@@ -208,7 +208,8 @@ func createHTTPStreams(w http.ResponseWriter, req *http.Request, opts *StreamOpt
 	}
 
 	// wait for stream
-	replyChan := make(chan struct{}, 1)
+	replyChan := make(chan struct{}, 4)
+	defer close(replyChan)
 	receivedStreams := 0
 	expectedStreams := 1
 	if opts.Stdout != nil {

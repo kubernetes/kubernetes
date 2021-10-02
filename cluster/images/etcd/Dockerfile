@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE as builder
+ARG BASEIMAGE
+ARG RUNNERIMAGE
+
+FROM ${BASEIMAGE} as builder
 
 # This image needs bash for running "migrate-if-needed.sh". Instead of a full debian image
 # we use just the bash-static and we wrap bash-static into a distroless image instead of
@@ -23,7 +26,7 @@ RUN apt-get update -y \
 
 RUN cp /bin/bash-static /sh
 
-FROM RUNNERIMAGE
+FROM ${RUNNERIMAGE}
 WORKDIR /
 
 COPY --from=builder /sh /bin/

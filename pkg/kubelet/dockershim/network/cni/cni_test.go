@@ -1,3 +1,4 @@
+//go:build linux && !dockerless
 // +build linux,!dockerless
 
 /*
@@ -174,6 +175,15 @@ func TestCNIPlugin(t *testing.T) {
 	podIP := "10.0.0.2"
 	podIPOutput := fmt.Sprintf("4: eth0    inet %s/24 scope global dynamic eth0\\       valid_lft forever preferred_lft forever", podIP)
 	fakeCmds := []fakeexec.FakeCommandAction{
+		func(cmd string, args ...string) exec.Cmd {
+			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
+				CombinedOutputScript: []fakeexec.FakeAction{
+					func() ([]byte, []byte, error) {
+						return []byte(podIPOutput), nil, nil
+					},
+				},
+			}, cmd, args...)
+		},
 		func(cmd string, args ...string) exec.Cmd {
 			return fakeexec.InitFakeCmd(&fakeexec.FakeCmd{
 				CombinedOutputScript: []fakeexec.FakeAction{

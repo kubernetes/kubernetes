@@ -22,6 +22,7 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -31,10 +32,10 @@ var (
 		Edit a resource from the default editor.
 
 		The edit command allows you to directly edit any API resource you can retrieve via the
-		command line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
+		command-line tools. It will open the editor defined by your KUBE_EDITOR, or EDITOR
 		environment variables, or fall back to 'vi' for Linux or 'notepad' for Windows.
 		You can edit multiple objects, although changes are applied one at a time. The command
-		accepts filenames as well as command line arguments, although the files you point to must
+		accepts file names as well as command-line arguments, although the files you point to must
 		be previously saved versions of resources.
 
 		Editing is done with the API version used to fetch the resource.
@@ -52,16 +53,16 @@ var (
 		saved copy to include the latest resource version.`))
 
 	editExample = templates.Examples(i18n.T(`
-		# Edit the service named 'docker-registry':
+		# Edit the service named 'docker-registry'
 		kubectl edit svc/docker-registry
 
 		# Use an alternative editor
 		KUBE_EDITOR="nano" kubectl edit svc/docker-registry
 
-		# Edit the job 'myjob' in JSON using the v1 API format:
+		# Edit the job 'myjob' in JSON using the v1 API format
 		kubectl edit job.v1.batch/myjob -o json
 
-		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation:
+		# Edit the deployment 'mydeployment' in YAML and save the modified config in its annotation
 		kubectl edit deployment/mydeployment -o yaml --save-config`))
 )
 
@@ -76,6 +77,7 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Edit a resource on the server"),
 		Long:                  editLong,
 		Example:               editExample,
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
 			cmdutil.CheckErr(o.Run())

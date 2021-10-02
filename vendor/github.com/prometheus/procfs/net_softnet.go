@@ -51,7 +51,7 @@ func (fs FS) NetSoftnetStat() ([]SoftnetStat, error) {
 
 	entries, err := parseSoftnet(bytes.NewReader(b))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse /proc/net/softnet_stat: %v", err)
+		return nil, fmt.Errorf("failed to parse /proc/net/softnet_stat: %w", err)
 	}
 
 	return entries, nil

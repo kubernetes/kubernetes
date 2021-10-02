@@ -29,6 +29,8 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1beta1";
 
+// DEPRECATED - This group version of Event is deprecated by audit.k8s.io/v1/Event. See the release notes for
+// more information.
 // Event captures all the information that can be included in an API audit log.
 message Event {
   // ObjectMeta is included for interoperability with API infrastructure.
@@ -183,6 +185,8 @@ message ObjectReference {
   optional string subresource = 8;
 }
 
+// DEPRECATED - This group version of Policy is deprecated by audit.k8s.io/v1/Policy. See the release notes for
+// more information.
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 message Policy {

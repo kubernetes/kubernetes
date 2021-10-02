@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: restrictedvolumes4
+spec:
+  containers:
+  - image: k8s.gcr.io/pause
+    name: container1
+    securityContext:
+      allowPrivilegeEscalation: false
+  initContainers:
+  - image: k8s.gcr.io/pause
+    name: initcontainer1
+    securityContext:
+      allowPrivilegeEscalation: false
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  volumes:
+  - iscsi:
+      iqn: iqn.2001-04.com.example:storage.kube.sys1.xyz
+      lun: 0
+      targetPortal: test
+    name: volume1

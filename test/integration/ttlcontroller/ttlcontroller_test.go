@@ -134,7 +134,7 @@ func waitForNodesWithTTLAnnotation(t *testing.T, nodeLister listers.NodeLister, 
 
 // Test whether ttlcontroller sets correct ttl annotations.
 func TestTTLAnnotations(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(nil)
+	_, server, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	testClient, informers := createClientAndInformers(t, server)

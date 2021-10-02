@@ -22,10 +22,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/robfig/cron"
+	"github.com/robfig/cron/v3"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,18 +33,17 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	batchv1informers "k8s.io/client-go/informers/batch/v1"
-	batchv1beta1informers "k8s.io/client-go/informers/batch/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	covev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
-	batchv1beta1listers "k8s.io/client-go/listers/batch/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/cronjob/metrics"
 )
 
 var (
@@ -62,7 +60,7 @@ type ControllerV2 struct {
 	cronJobControl cjControlInterface
 
 	jobLister     batchv1listers.JobLister
-	cronJobLister batchv1beta1listers.CronJobLister
+	cronJobLister batchv1listers.CronJobLister
 
 	jobListerSynced     cache.InformerSynced
 	cronJobListerSynced cache.InformerSynced
@@ -72,7 +70,7 @@ type ControllerV2 struct {
 }
 
 // NewControllerV2 creates and initializes a new Controller.
-func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1beta1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
+func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer batchv1informers.CronJobInformer, kubeClient clientset.Interface) (*ControllerV2, error) {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 	eventBroadcaster.StartRecordingToSink(&covev1client.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -114,6 +112,8 @@ func NewControllerV2(jobInformer batchv1informers.JobInformer, cronJobsInformer 
 		},
 	})
 
+	metrics.Register()
+
 	return jm, nil
 }
 
@@ -122,8 +122,8 @@ func (jm *ControllerV2) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer jm.queue.ShutDown()
 
-	klog.Infof("Starting cronjob controller v2")
-	defer klog.Infof("Shutting down cronjob controller v2")
+	klog.InfoS("Starting cronjob controller v2")
+	defer klog.InfoS("Shutting down cronjob controller v2")
 
 	if !cache.WaitForNamedCacheSync("cronjob", stopCh, jm.jobListerSynced, jm.cronJobListerSynced) {
 		return
@@ -169,8 +169,8 @@ func (jm *ControllerV2) sync(cronJobKey string) (*time.Duration, error) {
 	cronJob, err := jm.cronJobLister.CronJobs(ns).Get(name)
 	switch {
 	case errors.IsNotFound(err):
-		// may be cronjob is deleted, dont need to requeue this key
-		klog.V(4).InfoS("cronjob not found, may be it is deleted", "cronjob", klog.KRef(ns, name), "err", err)
+		// may be cronjob is deleted, don't need to requeue this key
+		klog.V(4).InfoS("CronJob not found, may be it is deleted", "cronjob", klog.KRef(ns, name), "err", err)
 		return nil, nil
 	case err != nil:
 		// for other transient apiserver error requeue with exponential backoff
@@ -184,18 +184,18 @@ func (jm *ControllerV2) sync(cronJobKey string) (*time.Duration, error) {
 
 	cronJobCopy, requeueAfter, err := jm.syncCronJob(cronJob, jobsToBeReconciled)
 	if err != nil {
-		klog.V(2).InfoS("error reconciling cronjob", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "err", err)
+		klog.V(2).InfoS("Error reconciling cronjob", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "err", err)
 		return nil, err
 	}
 
 	err = jm.cleanupFinishedJobs(cronJobCopy, jobsToBeReconciled)
 	if err != nil {
-		klog.V(2).InfoS("error cleaning up jobs", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "resourceVersion", cronJob.GetResourceVersion(), "err", err)
+		klog.V(2).InfoS("Error cleaning up jobs", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "resourceVersion", cronJob.GetResourceVersion(), "err", err)
 		return nil, err
 	}
 
 	if requeueAfter != nil {
-		klog.V(4).InfoS("re-queuing cronjob", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "requeueAfter", requeueAfter)
+		klog.V(4).InfoS("Re-queuing cronjob", "cronjob", klog.KRef(cronJob.GetNamespace(), cronJob.GetName()), "requeueAfter", requeueAfter)
 		return requeueAfter, nil
 	}
 	// this marks the key done, currently only happens when the cronjob is suspended or spec has invalid schedule format
@@ -205,7 +205,7 @@ func (jm *ControllerV2) sync(cronJobKey string) (*time.Duration, error) {
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *batchv1beta1.CronJob {
+func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *batchv1.CronJob {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != controllerKind.Kind {
@@ -223,7 +223,7 @@ func (jm *ControllerV2) resolveControllerRef(namespace string, controllerRef *me
 	return cronJob
 }
 
-func (jm *ControllerV2) getJobsToBeReconciled(cronJob *batchv1beta1.CronJob) ([]*batchv1.Job, error) {
+func (jm *ControllerV2) getJobsToBeReconciled(cronJob *batchv1.CronJob) ([]*batchv1.Job, error) {
 	var jobSelector labels.Selector
 	if len(cronJob.Spec.JobTemplate.Labels) == 0 {
 		jobSelector = labels.Everything()
@@ -356,8 +356,8 @@ func (jm *ControllerV2) enqueueControllerAfter(obj interface{}, t time.Duration)
 // updateCronJob re-queues the CronJob for next scheduled time if there is a
 // change in spec.schedule otherwise it re-queues it now
 func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
-	oldCJ, okOld := old.(*batchv1beta1.CronJob)
-	newCJ, okNew := curr.(*batchv1beta1.CronJob)
+	oldCJ, okOld := old.(*batchv1.CronJob)
+	newCJ, okNew := curr.(*batchv1.CronJob)
 
 	if !okOld || !okNew {
 		// typecasting of one failed, handle this better, may be log entry
@@ -372,7 +372,7 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 		if err != nil {
 			// this is likely a user error in defining the spec value
 			// we should log the error and not reconcile this cronjob until an update to spec
-			klog.V(2).InfoS("unparseable schedule for cronjob", "cronjob", klog.KRef(newCJ.GetNamespace(), newCJ.GetName()), "schedule", newCJ.Spec.Schedule, "err", err)
+			klog.V(2).InfoS("Unparseable schedule for cronjob", "cronjob", klog.KRef(newCJ.GetNamespace(), newCJ.GetName()), "schedule", newCJ.Spec.Schedule, "err", err)
 			jm.recorder.Eventf(newCJ, corev1.EventTypeWarning, "UnParseableCronJobSchedule", "unparseable schedule for cronjob: %s", newCJ.Spec.Schedule)
 			return
 		}
@@ -397,8 +397,8 @@ func (jm *ControllerV2) updateCronJob(old interface{}, curr interface{}) {
 // It returns a copy of the CronJob that is to be used by other functions
 // that mutates the object
 func (jm *ControllerV2) syncCronJob(
-	cj *batchv1beta1.CronJob,
-	js []*batchv1.Job) (*batchv1beta1.CronJob, *time.Duration, error) {
+	cj *batchv1.CronJob,
+	js []*batchv1.Job) (*batchv1.CronJob, *time.Duration, error) {
 
 	cj = cj.DeepCopy()
 	now := jm.now()
@@ -425,6 +425,14 @@ func (jm *ControllerV2) syncCronJob(
 			_, status := getFinishedStatus(j)
 			deleteFromActiveList(cj, j.ObjectMeta.UID)
 			jm.recorder.Eventf(cj, corev1.EventTypeNormal, "SawCompletedJob", "Saw completed job: %s, status: %v", j.Name, status)
+		} else if IsJobFinished(j) {
+			// a job does not have to be in active list, as long as it is finished, we will process the timestamp
+			if cj.Status.LastSuccessfulTime == nil {
+				cj.Status.LastSuccessfulTime = j.Status.CompletionTime
+			}
+			if j.Status.CompletionTime != nil && j.Status.CompletionTime.After(cj.Status.LastSuccessfulTime.Time) {
+				cj.Status.LastSuccessfulTime = j.Status.CompletionTime
+			}
 		}
 	}
 
@@ -473,12 +481,19 @@ func (jm *ControllerV2) syncCronJob(
 	if err != nil {
 		// this is likely a user error in defining the spec value
 		// we should log the error and not reconcile this cronjob until an update to spec
-		klog.V(2).InfoS("unparseable schedule", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", cj.Spec.Schedule, "err", err)
+		klog.V(2).InfoS("Unparseable schedule", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", cj.Spec.Schedule, "err", err)
 		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "UnparseableSchedule", "unparseable schedule: %s : %s", cj.Spec.Schedule, err)
 		return cj, nil, nil
 	}
-	times := getUnmetScheduleTimes(*cj, now, sched, jm.recorder)
-	if len(times) == 0 {
+	scheduledTime, err := getNextScheduleTime(*cj, now, sched, jm.recorder)
+	if err != nil {
+		// this is likely a user error in defining the spec value
+		// we should log the error and not reconcile this cronjob until an update to spec
+		klog.V(2).InfoS("invalid schedule", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", cj.Spec.Schedule, "err", err)
+		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "InvalidSchedule", "invalid schedule schedule: %s : %s", cj.Spec.Schedule, err)
+		return cj, nil, nil
+	}
+	if scheduledTime == nil {
 		// no unmet start time, return cj,.
 		// The only time this should happen is if queue is filled after restart.
 		// Otherwise, the queue is always suppose to trigger sync function at the time of
@@ -488,14 +503,13 @@ func (jm *ControllerV2) syncCronJob(
 		return cj, t, nil
 	}
 
-	scheduledTime := times[len(times)-1]
 	tooLate := false
 	if cj.Spec.StartingDeadlineSeconds != nil {
 		tooLate = scheduledTime.Add(time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds)).Before(now)
 	}
 	if tooLate {
 		klog.V(4).InfoS("Missed starting window", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
-		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.Format(time.RFC1123Z))
+		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.UTC().Format(time.RFC1123Z))
 
 		// TODO: Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
 		// the miss every cycle.  In order to avoid sending multiple events, and to avoid processing
@@ -509,14 +523,14 @@ func (jm *ControllerV2) syncCronJob(
 	}
 	if isJobInActiveList(&batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      getJobName(cj, scheduledTime),
+			Name:      getJobName(cj, *scheduledTime),
 			Namespace: cj.Namespace,
-		}}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: scheduledTime}) {
+		}}, cj.Status.Active) || cj.Status.LastScheduleTime.Equal(&metav1.Time{Time: *scheduledTime}) {
 		klog.V(4).InfoS("Not starting job because the scheduled time is already processed", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "schedule", scheduledTime)
 		t := nextScheduledTimeDuration(sched, now)
 		return cj, t, nil
 	}
-	if cj.Spec.ConcurrencyPolicy == batchv1beta1.ForbidConcurrent && len(cj.Status.Active) > 0 {
+	if cj.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent && len(cj.Status.Active) > 0 {
 		// Regardless which source of information we use for the set of active jobs,
 		// there is some risk that we won't see an active job when there is one.
 		// (because we haven't seen the status update to the SJ or the created pod).
@@ -531,7 +545,7 @@ func (jm *ControllerV2) syncCronJob(
 		t := nextScheduledTimeDuration(sched, now)
 		return cj, t, nil
 	}
-	if cj.Spec.ConcurrencyPolicy == batchv1beta1.ReplaceConcurrent {
+	if cj.Spec.ConcurrencyPolicy == batchv1.ReplaceConcurrent {
 		for _, j := range cj.Status.Active {
 			klog.V(4).InfoS("Deleting job that was still running at next scheduled start time", "job", klog.KRef(j.Namespace, j.Name))
 
@@ -546,7 +560,7 @@ func (jm *ControllerV2) syncCronJob(
 		}
 	}
 
-	jobReq, err := getJobFromTemplate2(cj, scheduledTime)
+	jobReq, err := getJobFromTemplate2(cj, *scheduledTime)
 	if err != nil {
 		klog.ErrorS(err, "Unable to make Job from template", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 		return cj, nil, err
@@ -555,12 +569,16 @@ func (jm *ControllerV2) syncCronJob(
 	switch {
 	case errors.HasStatusCause(err, corev1.NamespaceTerminatingCause):
 	case errors.IsAlreadyExists(err):
+		// If the job is created by other actor, assume  it has updated the cronjob status accordingly
 		klog.InfoS("Job already exists", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "job", klog.KRef(jobReq.GetNamespace(), jobReq.GetName()))
+		return cj, nil, err
 	case err != nil:
 		// default error handling
 		jm.recorder.Eventf(cj, corev1.EventTypeWarning, "FailedCreate", "Error creating job: %v", err)
 		return cj, nil, err
 	}
+
+	metrics.CronJobCreationSkew.Observe(jobResp.ObjectMeta.GetCreationTimestamp().Sub(*scheduledTime).Seconds())
 	klog.V(4).InfoS("Created Job", "job", klog.KRef(jobResp.GetNamespace(), jobResp.GetName()), "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 	jm.recorder.Eventf(cj, corev1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
 
@@ -581,7 +599,7 @@ func (jm *ControllerV2) syncCronJob(
 		return cj, nil, fmt.Errorf("unable to make object reference for job for %s", klog.KRef(cj.GetNamespace(), cj.GetName()))
 	}
 	cj.Status.Active = append(cj.Status.Active, *jobRef)
-	cj.Status.LastScheduleTime = &metav1.Time{Time: scheduledTime}
+	cj.Status.LastScheduleTime = &metav1.Time{Time: *scheduledTime}
 	if _, err := jm.cronJobControl.UpdateStatus(cj); err != nil {
 		klog.InfoS("Unable to update status", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "resourceVersion", cj.ResourceVersion, "err", err)
 		return cj, nil, fmt.Errorf("unable to update status for %s (rv = %s): %v", klog.KRef(cj.GetNamespace(), cj.GetName()), cj.ResourceVersion, err)
@@ -591,7 +609,7 @@ func (jm *ControllerV2) syncCronJob(
 	return cj, t, nil
 }
 
-func getJobName(cj *batchv1beta1.CronJob, scheduledTime time.Time) string {
+func getJobName(cj *batchv1.CronJob, scheduledTime time.Time) string {
 	return fmt.Sprintf("%s-%d", cj.Name, getTimeHashInMinutes(scheduledTime))
 }
 
@@ -606,7 +624,7 @@ func nextScheduledTimeDuration(sched cron.Schedule, now time.Time) *time.Duratio
 }
 
 // cleanupFinishedJobs cleanups finished jobs created by a CronJob
-func (jm *ControllerV2) cleanupFinishedJobs(cj *batchv1beta1.CronJob, js []*batchv1.Job) error {
+func (jm *ControllerV2) cleanupFinishedJobs(cj *batchv1.CronJob, js []*batchv1.Job) error {
 	// If neither limits are active, there is no need to do anything.
 	if cj.Spec.FailedJobsHistoryLimit == nil && cj.Spec.SuccessfulJobsHistoryLimit == nil {
 		return nil
@@ -651,18 +669,17 @@ func (jm *ControllerV2) getFinishedStatus(j *batchv1.Job) (bool, batchv1.JobCond
 }
 
 // removeOldestJobs removes the oldest jobs from a list of jobs
-func (jm *ControllerV2) removeOldestJobs(cj *batchv1beta1.CronJob, js []*batchv1.Job, maxJobs int32) {
+func (jm *ControllerV2) removeOldestJobs(cj *batchv1.CronJob, js []*batchv1.Job, maxJobs int32) {
 	numToDelete := len(js) - int(maxJobs)
 	if numToDelete <= 0 {
 		return
 	}
 
-	nameForLog := fmt.Sprintf("%s/%s", cj.Namespace, cj.Name)
-	klog.V(4).Infof("Cleaning up %d/%d jobs from %s", numToDelete, len(js), nameForLog)
+	klog.V(4).InfoS("Cleaning up jobs from CronJob list", "deletejobnum", numToDelete, "jobnum", len(js), "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 
 	sort.Sort(byJobStartTimeStar(js))
 	for i := 0; i < numToDelete; i++ {
-		klog.V(4).Infof("Removing job %s from %s", js[i].Name, nameForLog)
+		klog.V(4).InfoS("Removing job from CronJob list", "job", js[i].Name, "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()))
 		deleteJob(cj, js[i], jm.jobControl, jm.recorder)
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	pref "google.golang.org/protobuf/reflect/protoreflect"
+	preg "google.golang.org/protobuf/reflect/protoregistry"
 )
 
 // MessageInfo provides protobuf related functionality for a given Go type
@@ -109,22 +110,29 @@ func (mi *MessageInfo) getPointer(m pref.Message) (p pointer, ok bool) {
 type (
 	SizeCache       = int32
 	WeakFields      = map[int32]protoreflect.ProtoMessage
-	UnknownFields   = []byte
+	UnknownFields   = unknownFieldsA // TODO: switch to unknownFieldsB
+	unknownFieldsA  = []byte
+	unknownFieldsB  = *[]byte
 	ExtensionFields = map[int32]ExtensionField
 )
 
 var (
 	sizecacheType       = reflect.TypeOf(SizeCache(0))
 	weakFieldsType      = reflect.TypeOf(WeakFields(nil))
-	unknownFieldsType   = reflect.TypeOf(UnknownFields(nil))
+	unknownFieldsAType  = reflect.TypeOf(unknownFieldsA(nil))
+	unknownFieldsBType  = reflect.TypeOf(unknownFieldsB(nil))
 	extensionFieldsType = reflect.TypeOf(ExtensionFields(nil))
 )
 
 type structInfo struct {
 	sizecacheOffset offset
+	sizecacheType   reflect.Type
 	weakOffset      offset
+	weakType        reflect.Type
 	unknownOffset   offset
+	unknownType     reflect.Type
 	extensionOffset offset
+	extensionType   reflect.Type
 
 	fieldsByNumber        map[pref.FieldNumber]reflect.StructField
 	oneofsByName          map[pref.Name]reflect.StructField
@@ -151,18 +159,22 @@ fieldLoop:
 		case genid.SizeCache_goname, genid.SizeCacheA_goname:
 			if f.Type == sizecacheType {
 				si.sizecacheOffset = offsetOf(f, mi.Exporter)
+				si.sizecacheType = f.Type
 			}
 		case genid.WeakFields_goname, genid.WeakFieldsA_goname:
 			if f.Type == weakFieldsType {
 				si.weakOffset = offsetOf(f, mi.Exporter)
+				si.weakType = f.Type
 			}
 		case genid.UnknownFields_goname, genid.UnknownFieldsA_goname:
-			if f.Type == unknownFieldsType {
+			if f.Type == unknownFieldsAType || f.Type == unknownFieldsBType {
 				si.unknownOffset = offsetOf(f, mi.Exporter)
+				si.unknownType = f.Type
 			}
 		case genid.ExtensionFields_goname, genid.ExtensionFieldsA_goname, genid.ExtensionFieldsB_goname:
 			if f.Type == extensionFieldsType {
 				si.extensionOffset = offsetOf(f, mi.Exporter)
+				si.extensionType = f.Type
 			}
 		default:
 			for _, s := range strings.Split(f.Tag.Get("protobuf"), ",") {
@@ -212,4 +224,53 @@ func (mi *MessageInfo) New() protoreflect.Message {
 func (mi *MessageInfo) Zero() protoreflect.Message {
 	return mi.MessageOf(reflect.Zero(mi.GoReflectType).Interface())
 }
-func (mi *MessageInfo) Descriptor() protoreflect.MessageDescriptor { return mi.Desc }
+func (mi *MessageInfo) Descriptor() protoreflect.MessageDescriptor {
+	return mi.Desc
+}
+func (mi *MessageInfo) Enum(i int) protoreflect.EnumType {
+	mi.init()
+	fd := mi.Desc.Fields().Get(i)
+	return Export{}.EnumTypeOf(mi.fieldTypes[fd.Number()])
+}
+func (mi *MessageInfo) Message(i int) protoreflect.MessageType {
+	mi.init()
+	fd := mi.Desc.Fields().Get(i)
+	switch {
+	case fd.IsWeak():
+		mt, _ := preg.GlobalTypes.FindMessageByName(fd.Message().FullName())
+		return mt
+	case fd.IsMap():
+		return mapEntryType{fd.Message(), mi.fieldTypes[fd.Number()]}
+	default:
+		return Export{}.MessageTypeOf(mi.fieldTypes[fd.Number()])
+	}
+}
+
+type mapEntryType struct {
+	desc    protoreflect.MessageDescriptor
+	valType interface{} // zero value of enum or message type
+}
+
+func (mt mapEntryType) New() protoreflect.Message {
+	return nil
+}
+func (mt mapEntryType) Zero() protoreflect.Message {
+	return nil
+}
+func (mt mapEntryType) Descriptor() protoreflect.MessageDescriptor {
+	return mt.desc
+}
+func (mt mapEntryType) Enum(i int) protoreflect.EnumType {
+	fd := mt.desc.Fields().Get(i)
+	if fd.Enum() == nil {
+		return nil
+	}
+	return Export{}.EnumTypeOf(mt.valType)
+}
+func (mt mapEntryType) Message(i int) protoreflect.MessageType {
+	fd := mt.desc.Fields().Get(i)
+	if fd.Message() == nil {
+		return nil
+	}
+	return Export{}.MessageTypeOf(mt.valType)
+}

@@ -94,10 +94,10 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 		// Convert errors into failures to catch timeouts.
 		return probe.Failure, err.Error(), nil
 	}
+	if headers == nil {
+		headers = http.Header{}
+	}
 	if _, ok := headers["User-Agent"]; !ok {
-		if headers == nil {
-			headers = http.Header{}
-		}
 		// explicitly set User-Agent so it's not set to default Go value
 		v := version.Get()
 		headers.Set("User-Agent", fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor))

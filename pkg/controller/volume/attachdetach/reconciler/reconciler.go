@@ -332,7 +332,7 @@ func (rc *reconciler) reportMultiAttachError(volumeToAttach cache.VolumeToAttach
 		// Log detailed message to system admin
 		nodeList := strings.Join(otherNodesStr, ", ")
 		detailedMsg := volumeToAttach.GenerateMsgDetailed("Multi-Attach error", fmt.Sprintf("Volume is already exclusively attached to node %s and can't be attached to another", nodeList))
-		klog.Warningf(detailedMsg)
+		klog.Warning(detailedMsg)
 		return
 	}
 

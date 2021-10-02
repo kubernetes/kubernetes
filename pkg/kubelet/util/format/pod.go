@@ -18,14 +18,12 @@ package format
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 )
-
-type podHandler func(*v1.Pod) string
 
 // Pod returns a string representing a pod in a consistent human readable format,
 // with pod UID as part of the string.
@@ -57,22 +55,13 @@ func PodWithDeletionTimestamp(pod *v1.Pod) string {
 	return Pod(pod) + deletionTimestamp
 }
 
-// Pods returns a string representation a list of pods in a human
-// readable format.
-func Pods(pods []*v1.Pod) string {
-	return aggregatePods(pods, Pod)
-}
-
-// PodsWithDeletionTimestamps is the same as Pods. In addition, it prints the
-// deletion timestamps of the pods if they are not nil.
-func PodsWithDeletionTimestamps(pods []*v1.Pod) string {
-	return aggregatePods(pods, PodWithDeletionTimestamp)
-}
-
-func aggregatePods(pods []*v1.Pod, handler podHandler) string {
-	podStrings := make([]string, 0, len(pods))
-	for _, pod := range pods {
-		podStrings = append(podStrings, handler(pod))
+// Pods returns a list of pods as ObjectRef
+func Pods(pods []*v1.Pod) []klog.ObjectRef {
+	podKObjs := make([]klog.ObjectRef, 0, len(pods))
+	for _, p := range pods {
+		if p != nil {
+			podKObjs = append(podKObjs, klog.KObj(p))
+		}
 	}
-	return strings.Join(podStrings, ", ")
+	return podKObjs
 }

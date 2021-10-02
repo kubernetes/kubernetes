@@ -57,10 +57,10 @@ var (
 		You can use --output jsonpath={...} to extract specific values using a jsonpath expression.`))
 
 	viewExample = templates.Examples(`
-		# Show merged kubeconfig settings.
+		# Show merged kubeconfig settings
 		kubectl config view
 
-		# Show merged kubeconfig settings and raw certificate data.
+		# Show merged kubeconfig settings and raw certificate data
 		kubectl config view --raw
 
 		# Get the password for the e2e user
@@ -68,7 +68,7 @@ var (
 )
 
 // NewCmdConfigView returns a Command instance for 'config view' sub command
-func NewCmdConfigView(f cmdutil.Factory, streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigView(streams genericclioptions.IOStreams, ConfigAccess clientcmd.ConfigAccess) *cobra.Command {
 	o := &ViewOptions{
 		PrintFlags:   genericclioptions.NewPrintFlags("").WithTypeSetter(scheme.Scheme).WithDefaultOutput("yaml"),
 		ConfigAccess: ConfigAccess,

@@ -103,7 +103,7 @@ func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
 }
 
 const (
-	specPackagePath          = "github.com/go-openapi/spec"
+	specPackagePath          = "k8s.io/kube-openapi/pkg/validation/spec"
 	openAPICommonPackagePath = "k8s.io/kube-openapi/pkg/common"
 )
 
@@ -548,7 +548,7 @@ func mustEnforceDefault(t *types.Type, omitEmpty bool) (interface{}, error) {
 }
 
 func (g openAPITypeWriter) generateDefault(comments []string, t *types.Type, omitEmpty bool) error {
-	t = resolveAliasType(t)
+	t = resolveAliasAndEmbeddedType(t)
 	def, err := defaultFromComments(comments)
 	if err != nil {
 		return err
@@ -674,12 +674,17 @@ func (g openAPITypeWriter) generateReferenceProperty(t *types.Type) {
 	g.Do("Ref: ref(\"$.$\"),\n", t.Name.String())
 }
 
-func resolveAliasType(t *types.Type) *types.Type {
+func resolveAliasAndEmbeddedType(t *types.Type) *types.Type {
 	var prev *types.Type
 	for prev != t {
 		prev = t
 		if t.Kind == types.Alias {
 			t = t.Underlying
+		}
+		if t.Kind == types.Struct {
+			if len(t.Members) == 1 && t.Members[0].Embedded {
+				t = t.Members[0].Type
+			}
 		}
 	}
 	return t

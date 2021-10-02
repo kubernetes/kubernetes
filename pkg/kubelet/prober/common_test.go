@@ -111,6 +111,7 @@ func newTestManager() *manager {
 		status.NewManager(&fake.Clientset{}, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		results.NewManager(),
 		results.NewManager(),
+		results.NewManager(),
 		nil, // runner
 		&record.FakeRecorder{},
 	).(*manager)

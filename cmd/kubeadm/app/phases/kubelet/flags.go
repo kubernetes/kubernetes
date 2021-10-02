@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 
 	"k8s.io/klog/v2"
+
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/images"
@@ -79,12 +80,15 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 	if opts.nodeRegOpts.CRISocket == constants.DefaultDockerCRISocket {
 		// These flags should only be set when running docker
 		kubeletFlags["network-plugin"] = "cni"
-		if opts.pauseImage != "" {
-			kubeletFlags["pod-infra-container-image"] = opts.pauseImage
-		}
 	} else {
 		kubeletFlags["container-runtime"] = "remote"
 		kubeletFlags["container-runtime-endpoint"] = opts.nodeRegOpts.CRISocket
+	}
+
+	// This flag passes the pod infra container image (e.g. "pause" image) to the kubelet
+	// and prevents its garbage collection
+	if opts.pauseImage != "" {
+		kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 	}
 
 	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {

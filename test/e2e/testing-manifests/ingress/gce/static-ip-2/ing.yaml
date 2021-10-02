@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: static-ip
@@ -11,6 +11,9 @@ spec:
     http:
       paths:
       - path: /foo
+        pathType: "ImplementationSpecific"
         backend:
-          serviceName: echoheaders-https
-          servicePort: 80
+          service:
+            name: echoheaders-https
+            port:
+              number: 80

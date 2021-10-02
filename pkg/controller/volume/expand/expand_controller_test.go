@@ -23,7 +23,8 @@ import (
 	"regexp"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/awsebs"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -57,30 +59,42 @@ func TestSyncHandler(t *testing.T) {
 	}{
 		{
 			name:     "when pvc has no PV binding",
-			pvc:      getFakePersistentVolumeClaim("no-pv-pvc", "", ""),
+			pvc:      getFakePersistentVolumeClaim("no-pv-pvc", "", "1Gi", "1Gi", ""),
 			pvcKey:   "default/no-pv-pvc",
 			hasError: true,
 		},
 		{
 			name:               "when pvc and pv has everything for in-tree plugin",
-			pv:                 getFakePersistentVolume("vol-3", csitranslationplugins.AWSEBSInTreePluginName, "good-pvc-vol-3"),
-			pvc:                getFakePersistentVolumeClaim("good-pvc", "vol-3", "good-pvc-vol-3"),
+			pv:                 getFakePersistentVolume("vol-3", csitranslationplugins.AWSEBSInTreePluginName, "1Gi", "good-pvc-vol-3"),
+			pvc:                getFakePersistentVolumeClaim("good-pvc", "vol-3", "1Gi", "2Gi", "good-pvc-vol-3"),
 			pvcKey:             "default/good-pvc",
 			expansionCalled:    true,
 			expectedAnnotation: map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSInTreePluginName},
 		},
 		{
+			name: "if pv has pre-resize capacity annotation, generate expand operation should not be called",
+			pv: func() *v1.PersistentVolume {
+				pv := getFakePersistentVolume("vol-4", csitranslationplugins.AWSEBSInTreePluginName, "2Gi", "good-pvc-vol-4")
+				pv.ObjectMeta.Annotations = make(map[string]string)
+				pv.ObjectMeta.Annotations[util.AnnPreResizeCapacity] = "1Gi"
+				return pv
+			}(),
+			pvc:             getFakePersistentVolumeClaim("good-pvc", "vol-4", "2Gi", "2Gi", "good-pvc-vol-4"),
+			pvcKey:          "default/good-pvc",
+			expansionCalled: false,
+		},
+		{
 			name:                "when csi migration is enabled for a in-tree plugin",
 			csiMigrationEnabled: true,
-			pv:                  getFakePersistentVolume("vol-4", csitranslationplugins.AWSEBSInTreePluginName, "csi-pvc-vol-4"),
-			pvc:                 getFakePersistentVolumeClaim("csi-pvc", "vol-4", "csi-pvc-vol-4"),
+			pv:                  getFakePersistentVolume("vol-4", csitranslationplugins.AWSEBSInTreePluginName, "1Gi", "csi-pvc-vol-5"),
+			pvc:                 getFakePersistentVolumeClaim("csi-pvc", "vol-4", "1Gi", "2Gi", "csi-pvc-vol-5"),
 			pvcKey:              "default/csi-pvc",
 			expectedAnnotation:  map[string]string{volumetypes.VolumeResizerKey: csitranslationplugins.AWSEBSDriverName},
 		},
 		{
 			name:            "for csi plugin without migration path",
-			pv:              getFakePersistentVolume("vol-5", "com.csi.ceph", "ceph-csi-pvc-vol-5"),
-			pvc:             getFakePersistentVolumeClaim("ceph-csi-pvc", "vol-5", "ceph-csi-pvc-vol-5"),
+			pv:              getFakePersistentVolume("vol-5", "com.csi.ceph", "1Gi", "ceph-csi-pvc-vol-6"),
+			pvc:             getFakePersistentVolumeClaim("ceph-csi-pvc", "vol-5", "1Gi", "2Gi", "ceph-csi-pvc-vol-6"),
 			pvcKey:          "default/ceph-csi-pvc",
 			expansionCalled: false,
 			hasError:        false,
@@ -105,7 +119,7 @@ func TestSyncHandler(t *testing.T) {
 		allPlugins := []volume.VolumePlugin{}
 		allPlugins = append(allPlugins, awsebs.ProbeVolumePlugins()...)
 		translator := csitrans.New()
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator), nil)
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, nil, allPlugins, translator, csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate), nil)
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
@@ -121,9 +135,9 @@ func TestSyncHandler(t *testing.T) {
 		var expController *expandController
 		expController, _ = expc.(*expandController)
 		var expansionCalled bool
-		expController.operationGenerator = operationexecutor.NewFakeOGCounter(func() (error, error) {
+		expController.operationGenerator = operationexecutor.NewFakeOGCounter(func() volumetypes.OperationContext {
 			expansionCalled = true
-			return nil, nil
+			return volumetypes.NewOperationContext(nil, nil, false)
 		})
 
 		if test.pv != nil {
@@ -177,13 +191,16 @@ func applyPVCPatch(originalPVC *v1.PersistentVolumeClaim, patch []byte) (*v1.Per
 	return updatedPVC, nil
 }
 
-func getFakePersistentVolume(volumeName, pluginName string, pvcUID types.UID) *v1.PersistentVolume {
+func getFakePersistentVolume(volumeName, pluginName string, size string, pvcUID types.UID) *v1.PersistentVolume {
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{},
 			ClaimRef: &v1.ObjectReference{
 				Namespace: "default",
+			},
+			Capacity: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceStorage: resource.MustParse(size),
 			},
 		},
 	}
@@ -205,10 +222,21 @@ func getFakePersistentVolume(volumeName, pluginName string, pvcUID types.UID) *v
 	return pv
 }
 
-func getFakePersistentVolumeClaim(pvcName, volumeName string, uid types.UID) *v1.PersistentVolumeClaim {
+func getFakePersistentVolumeClaim(pvcName, volumeName, statusSize, requestSize string, uid types.UID) *v1.PersistentVolumeClaim {
 	pvc := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: "default", UID: uid},
-		Spec:       v1.PersistentVolumeClaimSpec{},
+		Spec: v1.PersistentVolumeClaimSpec{
+			Resources: v1.ResourceRequirements{
+				Requests: map[v1.ResourceName]resource.Quantity{
+					v1.ResourceStorage: resource.MustParse(requestSize),
+				},
+			},
+		},
+		Status: v1.PersistentVolumeClaimStatus{
+			Capacity: map[v1.ResourceName]resource.Quantity{
+				v1.ResourceStorage: resource.MustParse(statusSize),
+			},
+		},
 	}
 	if volumeName != "" {
 		pvc.Spec.VolumeName = volumeName

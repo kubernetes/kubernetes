@@ -57,11 +57,6 @@ var exceptionMetrics = []string{
 	"get_token_count",
 	"get_token_fail_count",
 	"node_collector_evictions_number",
-
-	// k8s.io/kubernetes/pkg/kubelet/server/stats
-	// The two metrics have been deprecated and will be removed in release v1.20+.
-	"container_cpu_usage_seconds_total", // non-counter metrics should not have "_total" suffix
-	"node_cpu_usage_seconds_total",      // non-counter metrics should not have "_total" suffix
 }
 
 // A Problem is an issue detected by a Linter.

@@ -108,8 +108,8 @@ kube::version::get_version_vars() {
 
       # If KUBE_GIT_VERSION is not a valid Semantic Version, then refuse to build.
       if ! [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-          echo "KUBE_GIT_VERSION should be a valid Semantic Version. Current value: ${KUBE_GIT_VERSION}"
-          echo "Please see more details here: https://semver.org"
+          kube::log::error "KUBE_GIT_VERSION should be a valid Semantic Version. Current value: ${KUBE_GIT_VERSION}"
+          kube::log::error "Please see more details here: https://semver.org"
           exit 1
       fi
     fi
@@ -159,6 +159,8 @@ kube::version::ldflags() {
     ldflags+=(
       "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
       "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/component-base/version.${key}=${val}'"
+      "-X 'k8s.io/client-go/pkg/version.${key}=${val}'"
+      "-X 'k8s.io/component-base/version.${key}=${val}'"
     )
   }
 

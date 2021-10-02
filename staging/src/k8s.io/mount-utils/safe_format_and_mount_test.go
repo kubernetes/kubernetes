@@ -181,7 +181,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			fstype:      "xfs",
 			execScripts: []ExecArgs{
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 2}},
-				{"mkfs.xfs", []string{"/dev/foo"}, "", nil},
+				{"mkfs.xfs", []string{"-f", "/dev/foo"}, "", nil},
 			},
 		},
 		{
@@ -198,7 +198,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			mountErrs:   []error{fmt.Errorf("unknown filesystem type '(null)'"), nil},
 			execScripts: []ExecArgs{
 				{"blkid", []string{"-p", "-s", "TYPE", "-s", "PTTYPE", "-o", "export", "/dev/foo"}, "", &testingexec.FakeExitError{Status: 4}},
-				{"mkfs.xfs", []string{"/dev/foo"}, "", nil},
+				{"mkfs.xfs", []string{"-f", "/dev/foo"}, "", nil},
 			},
 			expErrorType: GetDiskFormatFailed,
 		},

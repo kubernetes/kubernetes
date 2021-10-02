@@ -135,7 +135,7 @@ func (t *volumesTestSuite) DefineTests(driver storageframework.TestDriver, patte
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
-		l.migrationCheck = newMigrationOpCheck(f.ClientSet, dInfo.InTreePluginName)
+		l.migrationCheck = newMigrationOpCheck(f.ClientSet, f.ClientConfig(), dInfo.InTreePluginName)
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		if l.resource.VolSource == nil {
@@ -231,7 +231,7 @@ func testScriptInPod(
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("exec-container-%s", suffix),
-					Image:   e2evolume.GetTestImage(imageutils.Nginx),
+					Image:   e2epod.GetTestImage(imageutils.Nginx),
 					Command: command,
 					VolumeMounts: []v1.VolumeMount{
 						{

@@ -24,7 +24,9 @@ import (
 	"time"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
+	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -50,6 +52,7 @@ const (
 	dynamicRequestSizeCustomMetric  = 10
 	port                            = 80
 	targetPort                      = 8080
+	sidecarTargetPort               = 8081
 	timeoutRC                       = 120 * time.Second
 	startServiceTimeout             = time.Minute
 	startServiceInterval            = 5 * time.Second
@@ -102,12 +105,41 @@ type ResourceConsumer struct {
 	requestSizeInMillicores  int
 	requestSizeInMegabytes   int
 	requestSizeCustomMetric  int
+	sidecarStatus            SidecarStatusType
+	sidecarType              SidecarWorkloadType
 }
 
 // NewDynamicResourceConsumer is a wrapper to create a new dynamic ResourceConsumer
-func NewDynamicResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
+func NewDynamicResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, enableSidecar SidecarStatusType, sidecarType SidecarWorkloadType) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
-		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, scaleClient, nil, nil)
+		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, scaleClient, nil, nil, enableSidecar, sidecarType)
+}
+
+// getSidecarContainer returns sidecar container
+func getSidecarContainer(name string, cpuLimit, memLimit int64) v1.Container {
+	container := v1.Container{
+		Name:    name + "-sidecar",
+		Image:   resourceConsumerImage,
+		Command: []string{"/consumer", "-port=8081"},
+		Ports:   []v1.ContainerPort{{ContainerPort: 80}},
+	}
+
+	if cpuLimit > 0 || memLimit > 0 {
+		container.Resources.Limits = v1.ResourceList{}
+		container.Resources.Requests = v1.ResourceList{}
+	}
+
+	if cpuLimit > 0 {
+		container.Resources.Limits[v1.ResourceCPU] = *resource.NewMilliQuantity(cpuLimit, resource.DecimalSI)
+		container.Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(cpuLimit, resource.DecimalSI)
+	}
+
+	if memLimit > 0 {
+		container.Resources.Limits[v1.ResourceMemory] = *resource.NewQuantity(memLimit*1024*1024, resource.DecimalSI)
+		container.Resources.Requests[v1.ResourceMemory] = *resource.NewQuantity(memLimit*1024*1024, resource.DecimalSI)
+	}
+
+	return container
 }
 
 /*
@@ -118,17 +150,32 @@ memLimit argument is in megabytes, memLimit is a maximum amount of memory that c
 cpuLimit argument is in millicores, cpuLimit is a maximum amount of cpu that can be consumed by a single pod
 */
 func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, consumptionTimeInSeconds, requestSizeInMillicores,
-	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, podAnnotations, serviceAnnotations map[string]string) *ResourceConsumer {
+	requestSizeInMegabytes int, requestSizeCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter, podAnnotations, serviceAnnotations map[string]string, sidecarStatus SidecarStatusType, sidecarType SidecarWorkloadType) *ResourceConsumer {
 	if podAnnotations == nil {
 		podAnnotations = make(map[string]string)
 	}
 	if serviceAnnotations == nil {
 		serviceAnnotations = make(map[string]string)
 	}
-	runServiceAndWorkloadForResourceConsumer(clientset, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations)
+
+	var additionalContainers []v1.Container
+
+	if sidecarStatus == Enable {
+		sidecarContainer := getSidecarContainer(name, cpuLimit, memLimit)
+		additionalContainers = append(additionalContainers, sidecarContainer)
+	}
+
+	runServiceAndWorkloadForResourceConsumer(clientset, nsName, name, kind, replicas, cpuLimit, memLimit, podAnnotations, serviceAnnotations, additionalContainers)
+	controllerName := name + "-ctrl"
+	// If sidecar is enabled and busy, run service and consumer for sidecar
+	if sidecarStatus == Enable && sidecarType == Busy {
+		runServiceAndSidecarForResourceConsumer(clientset, nsName, name, kind, replicas, serviceAnnotations)
+		controllerName = name + "-sidecar-ctrl"
+	}
+
 	rc := &ResourceConsumer{
 		name:                     name,
-		controllerName:           name + "-ctrl",
+		controllerName:           controllerName,
 		kind:                     kind,
 		nsName:                   nsName,
 		clientSet:                clientset,
@@ -144,6 +191,8 @@ func newResourceConsumer(name, nsName string, kind schema.GroupVersionKind, repl
 		requestSizeInMillicores:  requestSizeInMillicores,
 		requestSizeInMegabytes:   requestSizeInMegabytes,
 		requestSizeCustomMetric:  requestSizeCustomMetric,
+		sidecarType:              sidecarType,
+		sidecarStatus:            sidecarStatus,
 	}
 
 	go rc.makeConsumeCPURequests()
@@ -418,41 +467,82 @@ func (rc *ResourceConsumer) CleanUp() {
 	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(rc.clientSet, kind, rc.nsName, rc.name))
 	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name, metav1.DeleteOptions{}))
 	framework.ExpectNoError(e2eresource.DeleteResourceAndWaitForGC(rc.clientSet, schema.GroupKind{Kind: "ReplicationController"}, rc.nsName, rc.controllerName))
-	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.controllerName, metav1.DeleteOptions{}))
+	framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name+"-ctrl", metav1.DeleteOptions{}))
+	// Cleanup sidecar related resources
+	if rc.sidecarStatus == Enable && rc.sidecarType == Busy {
+		framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name+"-sidecar", metav1.DeleteOptions{}))
+		framework.ExpectNoError(rc.clientSet.CoreV1().Services(rc.nsName).Delete(context.TODO(), rc.name+"-sidecar-ctrl", metav1.DeleteOptions{}))
+	}
 }
 
-func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string) {
-	ginkgo.By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
-	_, err := c.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
+func createService(c clientset.Interface, name, ns string, annotations, selectors map[string]string, port int32, targetPort int) (*v1.Service, error) {
+	return c.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        name,
-			Annotations: serviceAnnotations,
+			Annotations: annotations,
 		},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
 				Port:       port,
 				TargetPort: intstr.FromInt(targetPort),
 			}},
-
-			Selector: map[string]string{
-				"name": name,
-			},
+			Selector: selectors,
 		},
 	}, metav1.CreateOptions{})
+}
+
+// runServiceAndSidecarForResourceConsumer creates service and runs resource consumer for sidecar container
+func runServiceAndSidecarForResourceConsumer(c clientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, serviceAnnotations map[string]string) {
+	ginkgo.By(fmt.Sprintf("Running consuming RC sidecar %s via %s with %v replicas", name, kind, replicas))
+
+	sidecarName := name + "-sidecar"
+	serviceSelectors := map[string]string{
+		"name": name,
+	}
+	_, err := createService(c, sidecarName, ns, serviceAnnotations, serviceSelectors, port, sidecarTargetPort)
+	framework.ExpectNoError(err)
+
+	ginkgo.By(fmt.Sprintf("Running controller for sidecar"))
+	controllerName := sidecarName + "-ctrl"
+	_, err = createService(c, controllerName, ns, map[string]string{}, map[string]string{"name": controllerName}, port, targetPort)
+	framework.ExpectNoError(err)
+
+	dnsClusterFirst := v1.DNSClusterFirst
+	controllerRcConfig := testutils.RCConfig{
+		Client:    c,
+		Image:     imageutils.GetE2EImage(imageutils.Agnhost),
+		Name:      controllerName,
+		Namespace: ns,
+		Timeout:   timeoutRC,
+		Replicas:  1,
+		Command:   []string{"/agnhost", "resource-consumer-controller", "--consumer-service-name=" + sidecarName, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
+		DNSPolicy: &dnsClusterFirst,
+	}
+
+	framework.ExpectNoError(e2erc.RunRC(controllerRcConfig))
+	// Wait for endpoints to propagate for the controller service.
+	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
+		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
+}
+
+func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name string, kind schema.GroupVersionKind, replicas int, cpuLimitMillis, memLimitMb int64, podAnnotations, serviceAnnotations map[string]string, additionalContainers []v1.Container) {
+	ginkgo.By(fmt.Sprintf("Running consuming RC %s via %s with %v replicas", name, kind, replicas))
+	_, err := createService(c, name, ns, serviceAnnotations, map[string]string{"name": name}, port, targetPort)
 	framework.ExpectNoError(err)
 
 	rcConfig := testutils.RCConfig{
-		Client:      c,
-		Image:       resourceConsumerImage,
-		Name:        name,
-		Namespace:   ns,
-		Timeout:     timeoutRC,
-		Replicas:    replicas,
-		CpuRequest:  cpuLimitMillis,
-		CpuLimit:    cpuLimitMillis,
-		MemRequest:  memLimitMb * 1024 * 1024, // MemLimit is in bytes
-		MemLimit:    memLimitMb * 1024 * 1024,
-		Annotations: podAnnotations,
+		Client:               c,
+		Image:                resourceConsumerImage,
+		Name:                 name,
+		Namespace:            ns,
+		Timeout:              timeoutRC,
+		Replicas:             replicas,
+		CpuRequest:           cpuLimitMillis,
+		CpuLimit:             cpuLimitMillis,
+		MemRequest:           memLimitMb * 1024 * 1024, // MemLimit is in bytes
+		MemLimit:             memLimitMb * 1024 * 1024,
+		Annotations:          podAnnotations,
+		AdditionalContainers: additionalContainers,
 	}
 
 	switch kind {
@@ -478,21 +568,7 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 
 	ginkgo.By(fmt.Sprintf("Running controller"))
 	controllerName := name + "-ctrl"
-	_, err = c.CoreV1().Services(ns).Create(context.TODO(), &v1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: controllerName,
-		},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{
-				Port:       port,
-				TargetPort: intstr.FromInt(targetPort),
-			}},
-
-			Selector: map[string]string{
-				"name": controllerName,
-			},
-		},
-	}, metav1.CreateOptions{})
+	_, err = createService(c, controllerName, ns, map[string]string{}, map[string]string{"name": controllerName}, port, targetPort)
 	framework.ExpectNoError(err)
 
 	dnsClusterFirst := v1.DNSClusterFirst
@@ -506,8 +582,8 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		Command:   []string{"/agnhost", "resource-consumer-controller", "--consumer-service-name=" + name, "--consumer-service-namespace=" + ns, "--consumer-port=80"},
 		DNSPolicy: &dnsClusterFirst,
 	}
-	framework.ExpectNoError(e2erc.RunRC(controllerRcConfig))
 
+	framework.ExpectNoError(e2erc.RunRC(controllerRcConfig))
 	// Wait for endpoints to propagate for the controller service.
 	framework.ExpectNoError(framework.WaitForServiceEndpointsNum(
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
@@ -549,3 +625,60 @@ func runReplicaSet(config testutils.ReplicaSetConfig) error {
 	config.ContainerDumpFunc = e2ekubectl.LogFailedContainers
 	return testutils.RunReplicaSet(config)
 }
+
+// CreateContainerResourceCPUHorizontalPodAutoscaler create a horizontal pod autoscaler with container resource target
+// for consuming resources.
+func CreateContainerResourceCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv2beta2.HorizontalPodAutoscaler {
+	hpa := &autoscalingv2beta2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rc.name,
+			Namespace: rc.nsName,
+		},
+		Spec: autoscalingv2beta2.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscalingv2beta2.CrossVersionObjectReference{
+				APIVersion: rc.kind.GroupVersion().String(),
+				Kind:       rc.kind.Kind,
+				Name:       rc.name,
+			},
+			MinReplicas: &minReplicas,
+			MaxReplicas: maxRepl,
+			Metrics: []autoscalingv2beta2.MetricSpec{
+				{
+					Type: "ContainerResource",
+					ContainerResource: &autoscalingv2beta2.ContainerResourceMetricSource{
+						Name:      "cpu",
+						Container: rc.name,
+						Target: autoscalingv2beta2.MetricTarget{
+							Type:               "Utilization",
+							AverageUtilization: &cpu,
+						},
+					},
+				},
+			},
+		},
+	}
+	hpa, errHPA := rc.clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(rc.nsName).Create(context.TODO(), hpa, metav1.CreateOptions{})
+	framework.ExpectNoError(errHPA)
+	return hpa
+}
+
+// DeleteContainerResourceHPA delete the horizontalPodAutoscaler for consuming resources.
+func DeleteContainerResourceHPA(rc *ResourceConsumer, autoscalerName string) {
+	rc.clientSet.AutoscalingV2beta2().HorizontalPodAutoscalers(rc.nsName).Delete(context.TODO(), autoscalerName, metav1.DeleteOptions{})
+}
+
+//SidecarStatusType type for sidecar status
+type SidecarStatusType bool
+
+const (
+	Enable  SidecarStatusType = true
+	Disable SidecarStatusType = false
+)
+
+//SidecarWorkloadType type of the sidecar
+type SidecarWorkloadType string
+
+const (
+	Busy SidecarWorkloadType = "Busy"
+	Idle SidecarWorkloadType = "Idle"
+)

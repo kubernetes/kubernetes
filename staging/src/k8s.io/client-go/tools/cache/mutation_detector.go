@@ -99,7 +99,7 @@ func (d *defaultCacheMutationDetector) Run(stopCh <-chan struct{}) {
 	for {
 		if d.lastRotated.IsZero() {
 			d.lastRotated = time.Now()
-		} else if time.Now().Sub(d.lastRotated) > d.retainDuration {
+		} else if time.Since(d.lastRotated) > d.retainDuration {
 			d.retainedCachedObjs = d.cachedObjs
 			d.cachedObjs = nil
 			d.lastRotated = time.Now()

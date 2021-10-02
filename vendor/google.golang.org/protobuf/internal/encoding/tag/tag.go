@@ -104,7 +104,7 @@ func Unmarshal(tag string, goType reflect.Type, evs pref.EnumValueDescriptors) p
 		case strings.HasPrefix(s, "json="):
 			jsonName := s[len("json="):]
 			if jsonName != strs.JSONCamelCase(string(f.L0.FullName.Name())) {
-				f.L1.JSONName.Init(jsonName)
+				f.L1.StringName.InitJSON(jsonName)
 			}
 		case s == "packed":
 			f.L1.HasPacked = true

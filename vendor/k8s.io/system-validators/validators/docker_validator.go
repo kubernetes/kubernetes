@@ -17,6 +17,7 @@ limitations under the License.
 package system
 
 import (
+	"bytes"
 	"encoding/json"
 	"os/exec"
 	"regexp"
@@ -49,7 +50,7 @@ func (d *DockerValidator) Name() string {
 
 const (
 	dockerConfigPrefix           = "DOCKER_"
-	latestValidatedDockerVersion = "19.03"
+	latestValidatedDockerVersion = "20.10"
 )
 
 // Validate is part of the system.Validator interface.
@@ -63,16 +64,27 @@ func (d *DockerValidator) Validate(spec SysSpec) ([]error, []error) {
 
 	// Run 'docker info' with a JSON output and unmarshal it into a dockerInfo object
 	info := dockerInfo{}
-	out, err := exec.Command("docker", "info", "--format", "{{json .}}").CombinedOutput()
+	cmd := exec.Command("docker", "info", "--format", "{{json .}}")
+
+	// Stderr can contain warnings despite docker info success.
+	var outb, errb bytes.Buffer
+	cmd.Stdout = &outb
+	cmd.Stderr = &errb
+	err := cmd.Run()
 	if err != nil {
-		return nil, []error{errors.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nerror: %v`, string(out), err)}
+		return nil, []error{errors.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nstderr: %s\nerror: %v`, outb.String(), errb.String(), err)}
 	}
-	if err := d.unmarshalDockerInfo(out, &info); err != nil {
+	if err := d.unmarshalDockerInfo(outb.Bytes(), &info); err != nil {
 		return nil, []error{err}
 	}
 
 	// validate the resulted docker info object against the spec
-	return d.validateDockerInfo(spec.RuntimeSpec.DockerSpec, info)
+	warnings, errs := d.validateDockerInfo(spec.RuntimeSpec.DockerSpec, info)
+
+	if len(errb.String()) > 0 {
+		warnings = append(warnings, errors.Errorf(`the command "docker info --format '{{json.}}'" succeeded with potential warnings\noutput: %s`, errb.String()))
+	}
+	return warnings, errs
 }
 
 func (d *DockerValidator) unmarshalDockerInfo(b []byte, info *dockerInfo) error {

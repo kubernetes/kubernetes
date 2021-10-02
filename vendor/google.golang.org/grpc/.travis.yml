@@ -2,22 +2,22 @@ language: go
 
 matrix:
   include:
-  - go: 1.13.x
+  - go: 1.14.x
     env: VET=1 GO111MODULE=on
-  - go: 1.13.x
+  - go: 1.14.x
     env: RACE=1 GO111MODULE=on
-  - go: 1.13.x
+  - go: 1.14.x
     env: RUN386=1
-  - go: 1.13.x
+  - go: 1.14.x
     env: GRPC_GO_RETRY=on
-  - go: 1.13.x
+  - go: 1.14.x
     env: TESTEXTRAS=1
+  - go: 1.13.x
+    env: GO111MODULE=on
   - go: 1.12.x
     env: GO111MODULE=on
-  - go: 1.11.x
+  - go: 1.11.x  # Keep until interop tests no longer require Go1.11
     env: GO111MODULE=on
-  - go: 1.9.x
-    env: GAE=1
 
 go_import_path: google.golang.org/grpc
 
@@ -35,7 +35,7 @@ install:
 
 script:
   - set -e
-  - if [[ -n "${TESTEXTRAS}" ]]; then examples/examples_test.sh; interop/interop_test.sh; make testsubmodule; exit 0; fi
+  - if [[ -n "${TESTEXTRAS}" ]]; then examples/examples_test.sh; security/advancedtls/examples/examples_test.sh; interop/interop_test.sh; make testsubmodule; exit 0; fi
   - if [[ -n "${VET}" ]]; then ./vet.sh; fi
   - if [[ -n "${GAE}" ]]; then make testappengine; exit 0; fi
   - if [[ -n "${RACE}" ]]; then make testrace; exit 0; fi

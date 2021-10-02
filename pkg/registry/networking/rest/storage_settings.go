@@ -18,7 +18,6 @@ package rest
 
 import (
 	networkingapiv1 "k8s.io/api/networking/v1"
-	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
@@ -45,14 +44,6 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 		}
 	}
 
-	if apiResourceConfigSource.VersionEnabled(networkingapiv1beta1.SchemeGroupVersion) {
-		if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
-			return genericapiserver.APIGroupInfo{}, false, err
-		} else {
-			apiGroupInfo.VersionedResourcesStorageMap[networkingapiv1beta1.SchemeGroupVersion.Version] = storageMap
-		}
-	}
-
 	return apiGroupInfo, true, nil
 }
 
@@ -65,26 +56,6 @@ func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.API
 	}
 	storage["networkpolicies"] = networkPolicyStorage
 
-	// ingresses
-	ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["ingresses"] = ingressStorage
-	storage["ingresses/status"] = ingressStatusStorage
-
-	// ingressclasses
-	ingressClassStorage, err := ingressclassstore.NewREST(restOptionsGetter)
-	if err != nil {
-		return storage, err
-	}
-	storage["ingressclasses"] = ingressClassStorage
-
-	return storage, nil
-}
-
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
-	storage := map[string]rest.Storage{}
 	// ingresses
 	ingressStorage, ingressStatusStorage, err := ingressstore.NewREST(restOptionsGetter)
 	if err != nil {

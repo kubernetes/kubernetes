@@ -26,7 +26,7 @@ import (
 
 var (
 	setLong = templates.LongDesc(i18n.T(`
-		Configure application resources
+		Configure application resources.
 
 		These commands help you make changes to existing application resources.`))
 )

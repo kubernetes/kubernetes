@@ -177,7 +177,6 @@ function complete-login {
 # Generate values to fill the hollow-node configuration templates.
 # Exported variables:
 #   KUBECTL - The name or path to the kubernetes client binary.
-#   TEST_CLUSTER_API_CONTENT_TYPE - Defines the content-type of the requests used by the Kubemark components.
 function generate-values {
 	echo "Generating values"
 	master-config
@@ -185,8 +184,6 @@ function generate-values {
 	export KUBECTL
 	KUBEMARK_DIRECTORY="${KUBE_ROOT}/test/kubemark"
 	RESOURCE_DIRECTORY="${KUBEMARK_DIRECTORY}/resources"
-	TEST_CLUSTER_API_CONTENT_TYPE="bluemix" #Determine correct usage of this
-	export TEST_CLUSTER_API_CONTENT_TYPE
 	CONFIGPATH=${KUBECONFIG%/*}
 	KUBELET_CERT_BASE64="${KUBELET_CERT_BASE64:-$(base64 "${CONFIGPATH}/admin.pem" | tr -d '\r\n')}"
 	KUBELET_KEY_BASE64="${KUBELET_KEY_BASE64:-$(base64 "${CONFIGPATH}/admin-key.pem" | tr -d '\r\n')}"

@@ -104,7 +104,7 @@ func InitNFSDriver() storageframework.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
-			SupportedMountOption: sets.NewString("proto=tcp", "relatime"),
+			SupportedMountOption: sets.NewString("relatime"),
 			RequiredMountOption:  sets.NewString("vers=4.1"),
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence: true,
@@ -1243,7 +1243,7 @@ func InitGcePdDriver() storageframework.TestDriver {
 			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
+			TopologyKeys:         []string{v1.LabelTopologyZone},
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence:         true,
 				storageframework.CapFsGroup:             true,
@@ -1251,6 +1251,7 @@ func InitGcePdDriver() storageframework.TestDriver {
 				storageframework.CapExec:                true,
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
+				storageframework.CapOnlineExpansion:     true,
 				storageframework.CapNodeExpansion:       true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
@@ -1299,7 +1300,7 @@ func (g *gcePdDriver) GetDriverInfo() *storageframework.DriverInfo {
 
 func (g *gcePdDriver) SkipUnsupportedTest(pattern storageframework.TestPattern) {
 	e2eskipper.SkipUnlessProviderIs("gce", "gke")
-	if pattern.FeatureTag == "[sig-windows]" {
+	if pattern.FeatureTag == "[Feature:Windows]" {
 		e2eskipper.SkipUnlessNodeOSDistroIs("windows")
 	}
 }
@@ -1416,6 +1417,7 @@ func InitVSphereDriver() storageframework.TestDriver {
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext4",
+				"ntfs",
 			),
 			TopologyKeys: []string{v1.LabelFailureDomainBetaZone},
 			Capabilities: map[storageframework.Capability]bool{
@@ -1682,7 +1684,7 @@ func InitAwsDriver() storageframework.TestDriver {
 				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
-			TopologyKeys:         []string{v1.LabelFailureDomainBetaZone},
+			TopologyKeys:         []string{v1.LabelTopologyZone},
 			Capabilities: map[storageframework.Capability]bool{
 				storageframework.CapPersistence:         true,
 				storageframework.CapFsGroup:             true,
@@ -1691,6 +1693,7 @@ func InitAwsDriver() storageframework.TestDriver {
 				storageframework.CapMultiPODs:           true,
 				storageframework.CapControllerExpansion: true,
 				storageframework.CapNodeExpansion:       true,
+				storageframework.CapOnlineExpansion:     true,
 				// AWS supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				storageframework.CapVolumeLimits: false,
@@ -1774,7 +1777,7 @@ func (a *awsDriver) CreateVolume(config *storageframework.PerTestConfig, volType
 		// so pods should be also scheduled there.
 		config.ClientNodeSelection = e2epod.NodeSelection{
 			Selector: map[string]string{
-				v1.LabelFailureDomainBetaZone: zone,
+				v1.LabelTopologyZone: zone,
 			},
 		}
 	}

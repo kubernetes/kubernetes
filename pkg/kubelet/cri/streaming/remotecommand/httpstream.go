@@ -54,7 +54,7 @@ func NewOptions(req *http.Request) (*Options, error) {
 	stderr := req.FormValue(api.ExecStderrParam) == "1"
 	if tty && stderr {
 		// TODO: make this an error before we reach this method
-		klog.V(4).Infof("Access to exec with tty and stderr is not supported, bypassing stderr")
+		klog.V(4).InfoS("Access to exec with tty and stderr is not supported, bypassing stderr")
 		stderr = false
 	}
 
@@ -155,7 +155,7 @@ func createHTTPStreamStreams(req *http.Request, w http.ResponseWriter, opts *Opt
 	case remotecommandconsts.StreamProtocolV2Name:
 		handler = &v2ProtocolHandler{}
 	case "":
-		klog.V(4).Infof("Client did not request protocol negotiation. Falling back to %q", remotecommandconsts.StreamProtocolV1Name)
+		klog.V(4).InfoS("Client did not request protocol negotiation. Falling back", "protocol", remotecommandconsts.StreamProtocolV1Name)
 		fallthrough
 	case remotecommandconsts.StreamProtocolV1Name:
 		handler = &v1ProtocolHandler{}

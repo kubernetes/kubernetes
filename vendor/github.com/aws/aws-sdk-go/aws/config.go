@@ -438,13 +438,6 @@ func (c *Config) WithDisableEndpointHostPrefix(t bool) *Config {
 	return c
 }
 
-// MergeIn merges the passed in configs into the existing config object.
-func (c *Config) MergeIn(cfgs ...*Config) {
-	for _, other := range cfgs {
-		mergeInConfig(c, other)
-	}
-}
-
 // WithSTSRegionalEndpoint will set whether or not to use regional endpoint flag
 // when resolving the endpoint for a service
 func (c *Config) WithSTSRegionalEndpoint(sre endpoints.STSRegionalEndpoint) *Config {
@@ -457,6 +450,27 @@ func (c *Config) WithSTSRegionalEndpoint(sre endpoints.STSRegionalEndpoint) *Con
 func (c *Config) WithS3UsEast1RegionalEndpoint(sre endpoints.S3UsEast1RegionalEndpoint) *Config {
 	c.S3UsEast1RegionalEndpoint = sre
 	return c
+}
+
+// WithLowerCaseHeaderMaps sets a config LowerCaseHeaderMaps value
+// returning a Config pointer for chaining.
+func (c *Config) WithLowerCaseHeaderMaps(t bool) *Config {
+	c.LowerCaseHeaderMaps = &t
+	return c
+}
+
+// WithDisableRestProtocolURICleaning sets a config DisableRestProtocolURICleaning value
+// returning a Config pointer for chaining.
+func (c *Config) WithDisableRestProtocolURICleaning(t bool) *Config {
+	c.DisableRestProtocolURICleaning = &t
+	return c
+}
+
+// MergeIn merges the passed in configs into the existing config object.
+func (c *Config) MergeIn(cfgs ...*Config) {
+	for _, other := range cfgs {
+		mergeInConfig(c, other)
+	}
 }
 
 func mergeInConfig(dst *Config, other *Config) {
@@ -570,6 +584,10 @@ func mergeInConfig(dst *Config, other *Config) {
 
 	if other.S3UsEast1RegionalEndpoint != endpoints.UnsetS3UsEast1Endpoint {
 		dst.S3UsEast1RegionalEndpoint = other.S3UsEast1RegionalEndpoint
+	}
+
+	if other.LowerCaseHeaderMaps != nil {
+		dst.LowerCaseHeaderMaps = other.LowerCaseHeaderMaps
 	}
 }
 

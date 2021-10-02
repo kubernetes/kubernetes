@@ -44,8 +44,9 @@ func TestCronJobStrategy(t *testing.T) {
 	}
 	cronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "mycronjob",
-			Namespace: metav1.NamespaceDefault,
+			Name:       "mycronjob",
+			Namespace:  metav1.NamespaceDefault,
+			Generation: 999,
 		},
 		Spec: batch.CronJobSpec{
 			Schedule:          "* * * * ?",
@@ -62,11 +63,23 @@ func TestCronJobStrategy(t *testing.T) {
 	if len(cronJob.Status.Active) != 0 {
 		t.Errorf("CronJob does not allow setting status on create")
 	}
+	if cronJob.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", cronJob.Generation)
+	}
 	errs := Strategy.Validate(ctx, cronJob)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	now := metav1.Now()
+
+	// ensure we do not change generation for non-spec updates
+	updatedLabelCronJob := cronJob.DeepCopy()
+	updatedLabelCronJob.Labels = map[string]string{"a": "true"}
+	Strategy.PrepareForUpdate(ctx, updatedLabelCronJob, cronJob)
+	if updatedLabelCronJob.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", updatedLabelCronJob.Generation)
+	}
+
 	updatedCronJob := &batch.CronJob{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.CronJobSpec{
@@ -82,6 +95,9 @@ func TestCronJobStrategy(t *testing.T) {
 	if updatedCronJob.Status.Active != nil {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
+	if updatedCronJob.Generation != 2 {
+		t.Errorf("expected Generation=2, got %d", updatedCronJob.Generation)
+	}
 	errs = Strategy.ValidateUpdate(ctx, updatedCronJob, cronJob)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
@@ -96,13 +112,9 @@ func TestCronJobStrategy(t *testing.T) {
 
 	var (
 		v1beta1Ctx      = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v1beta1", Resource: "cronjobs"})
-		v2alpha1Ctx     = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v2alpha1", Resource: "cronjobs"})
 		otherVersionCtx = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v100", Resource: "cronjobs"})
 	)
 	if got, want := gcds.DefaultGarbageCollectionPolicy(v1beta1Ctx), rest.OrphanDependents; got != want {
-		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
-	}
-	if got, want := gcds.DefaultGarbageCollectionPolicy(v2alpha1Ctx), rest.OrphanDependents; got != want {
 		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
 	}
 	if got, want := gcds.DefaultGarbageCollectionPolicy(otherVersionCtx), rest.DeleteDependents; got != want {

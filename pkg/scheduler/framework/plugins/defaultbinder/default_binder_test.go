@@ -66,7 +66,7 @@ func TestDefaultBinder(t *testing.T) {
 				return true, gotBinding, nil
 			})
 
-			fh, err := frameworkruntime.NewFramework(nil, nil, nil, frameworkruntime.WithClientSet(client))
+			fh, err := frameworkruntime.NewFramework(nil, nil, frameworkruntime.WithClientSet(client))
 			if err != nil {
 				t.Fatal(err)
 			}

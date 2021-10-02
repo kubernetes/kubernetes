@@ -193,12 +193,22 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 
 	checkJSONWebSignatureHasKeyID(t, ecdsaToken, ecdsaKeyID)
 
-	// Generate signer with same keys as RSA signer but different issuer
+	// Generate signer with same keys as RSA signer but different unrecognized issuer
 	badIssuerGenerator, err := serviceaccount.JWTTokenGenerator("foo", getPrivateKey(rsaPrivateKey))
 	if err != nil {
 		t.Fatalf("error making generator: %v", err)
 	}
 	badIssuerToken, err := badIssuerGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret))
+	if err != nil {
+		t.Fatalf("error generating token: %v", err)
+	}
+
+	// Generate signer with same keys as RSA signer but different recognized issuer
+	differentIssuerGenerator, err := serviceaccount.JWTTokenGenerator("bar", getPrivateKey(rsaPrivateKey))
+	if err != nil {
+		t.Fatalf("error making generator: %v", err)
+	}
+	differentIssuerToken, err := differentIssuerGenerator.GenerateToken(serviceaccount.LegacyClaims(*serviceAccount, *rsaSecret))
 	if err != nil {
 		t.Fatalf("error generating token: %v", err)
 	}
@@ -251,6 +261,16 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 			Keys:        []interface{}{getPublicKey(rsaPublicKey)},
 			ExpectedErr: false,
 			ExpectedOK:  false,
+		},
+		"valid key, different issuer (rsa)": {
+			Token:            differentIssuerToken,
+			Client:           nil,
+			Keys:             []interface{}{getPublicKey(rsaPublicKey)},
+			ExpectedErr:      false,
+			ExpectedOK:       true,
+			ExpectedUserName: expectedUserName,
+			ExpectedUserUID:  expectedUserUID,
+			ExpectedGroups:   []string{"system:serviceaccounts", "system:serviceaccounts:test"},
 		},
 		"valid key (ecdsa)": {
 			Token:            ecdsaToken,
@@ -322,7 +342,7 @@ func TestTokenGenerateAndValidate(t *testing.T) {
 				return tc.Client.CoreV1().Pods(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			})),
 		)
-		authn := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
+		authn := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer, "bar"}, tc.Keys, auds, serviceaccount.NewLegacyValidator(tc.Client != nil, getter))
 
 		// An invalid, non-JWT token should always fail
 		ctx := authenticator.WithAudiences(context.Background(), auds)

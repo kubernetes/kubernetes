@@ -200,18 +200,18 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 	for i, expected := range expectedEvents {
 		if len(gotEvents) <= i {
 			t.Errorf("Event %q not emitted", expected)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 			continue
 		}
 		received := gotEvents[i]
 		if !strings.HasPrefix(received, expected) {
 			t.Errorf("Unexpected event received, expected %q, got %q", expected, received)
-			err = fmt.Errorf("Events do not match")
+			err = fmt.Errorf("events do not match")
 		}
 	}
 	for i := len(expectedEvents); i < len(gotEvents); i++ {
 		t.Errorf("Unexpected event received: %q", gotEvents[i])
-		err = fmt.Errorf("Events do not match")
+		err = fmt.Errorf("events do not match")
 	}
 	return err
 }
@@ -401,7 +401,7 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase v1.Persisten
 		claim.Annotations = make(map[string]string)
 		for _, a := range annotations {
 			switch a {
-			case pvutil.AnnStorageProvisioner:
+			case pvutil.AnnBetaStorageProvisioner, pvutil.AnnStorageProvisioner:
 				claim.Annotations[a] = mockPluginName
 			default:
 				claim.Annotations[a] = "yes"
@@ -439,6 +439,15 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 		claims[0].Annotations = map[string]string{name: value}
 	} else {
 		claims[0].Annotations[name] = value
+	}
+	return claims
+}
+
+func claimWithDataSource(name, kind, apiGroup string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.DataSource = &v1.TypedLocalObjectReference{
+		Name:     name,
+		Kind:     kind,
+		APIGroup: &apiGroup,
 	}
 	return claims
 }
@@ -514,6 +523,7 @@ var (
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
 	classWait                    string = "wait"
+	classCSI                     string = "csi"
 
 	modeWait = storage.VolumeBindingWaitForFirstConsumer
 )
@@ -713,7 +723,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 //    of volumes/claims with expected claims/volumes and report differences.
 // Some limit of calls in enforced to prevent endless loops.
 func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, defaultStorageClass string) {
-	for _, test := range tests {
+	run := func(t *testing.T, test controllerTest) {
 		klog.V(4).Infof("starting multisync test %q", test.name)
 
 		// Initialize the controller
@@ -821,6 +831,13 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 		}
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 		klog.V(4).Infof("test %q finished after %d iterations", test.name, counter)
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			run(t, test)
+		})
 	}
 }
 

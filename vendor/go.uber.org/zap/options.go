@@ -20,7 +20,11 @@
 
 package zap
 
-import "go.uber.org/zap/zapcore"
+import (
+	"fmt"
+
+	"go.uber.org/zap/zapcore"
+)
 
 // An Option configures a Logger.
 type Option interface {
@@ -82,11 +86,18 @@ func Development() Option {
 	})
 }
 
-// AddCaller configures the Logger to annotate each message with the filename
-// and line number of zap's caller.
+// AddCaller configures the Logger to annotate each message with the filename,
+// line number, and function name of zap's caller. See also WithCaller.
 func AddCaller() Option {
+	return WithCaller(true)
+}
+
+// WithCaller configures the Logger to annotate each message with the filename,
+// line number, and function name of zap's caller, or not, depending on the
+// value of enabled. This is a generalized form of AddCaller.
+func WithCaller(enabled bool) Option {
 	return optionFunc(func(log *Logger) {
-		log.addCaller = true
+		log.addCaller = enabled
 	})
 }
 
@@ -105,5 +116,33 @@ func AddCallerSkip(skip int) Option {
 func AddStacktrace(lvl zapcore.LevelEnabler) Option {
 	return optionFunc(func(log *Logger) {
 		log.addStack = lvl
+	})
+}
+
+// IncreaseLevel increase the level of the logger. It has no effect if
+// the passed in level tries to decrease the level of the logger.
+func IncreaseLevel(lvl zapcore.LevelEnabler) Option {
+	return optionFunc(func(log *Logger) {
+		core, err := zapcore.NewIncreaseLevelCore(log.core, lvl)
+		if err != nil {
+			fmt.Fprintf(log.errorOutput, "failed to IncreaseLevel: %v\n", err)
+		} else {
+			log.core = core
+		}
+	})
+}
+
+// OnFatal sets the action to take on fatal logs.
+func OnFatal(action zapcore.CheckWriteAction) Option {
+	return optionFunc(func(log *Logger) {
+		log.onFatal = action
+	})
+}
+
+// WithClock specifies the clock used by the logger to determine the current
+// time for logged entries. Defaults to the system clock with time.Now.
+func WithClock(clock zapcore.Clock) Option {
+	return optionFunc(func(log *Logger) {
+		log.clock = clock
 	})
 }

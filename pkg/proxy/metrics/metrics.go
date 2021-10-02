@@ -126,6 +126,17 @@ var (
 		},
 	)
 
+	// IptablesRulesTotal is the number of iptables rules that the iptables proxy installs.
+	IptablesRulesTotal = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_total",
+			Help:           "Number of proxy iptables rules programmed",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"table"},
+	)
+
 	// SyncProxyRulesLastQueuedTimestamp is the last time a proxy sync was
 	// requested. If this is much larger than
 	// kubeproxy_sync_proxy_rules_last_timestamp_seconds, then something is hung.
@@ -151,6 +162,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(EndpointChangesTotal)
 		legacyregistry.MustRegister(ServiceChangesPending)
 		legacyregistry.MustRegister(ServiceChangesTotal)
+		legacyregistry.MustRegister(IptablesRulesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 	})

@@ -23,7 +23,8 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog/v2"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
@@ -91,9 +92,9 @@ func AddCRISocketFlag(flagSet *pflag.FlagSet, criSocket *string) {
 
 // DefaultInitConfiguration return default InitConfiguration. Avoid running the CRI auto-detection
 // code as we don't need it.
-func DefaultInitConfiguration() *kubeadmapiv1beta2.InitConfiguration {
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+func DefaultInitConfiguration() *kubeadmapiv1.InitConfiguration {
+	initCfg := &kubeadmapiv1.InitConfiguration{
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			CRISocket: kubeadmconstants.UnknownCRISocket, // avoid CRI detection
 		},
 	}

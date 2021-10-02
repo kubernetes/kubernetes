@@ -41,6 +41,15 @@ sh ./mds.sh
 # Prepare a RBD volume "foo" (only with layering feature, the others may
 # require newer clients).
 # NOTE: we need Ceph kernel modules on the host that runs the client!
+# As the default pool `rbd` might not be created on arm64 platform for ceph deployment,
+# should create it if it does not exist.
+arch=$(uname -m)
+if [[ ${arch} = 'aarch64' || ${arch} = 'arm64' ]]; then
+    if [[ $(ceph osd lspools) = "" ]]; then
+        ceph osd pool create rbd 8
+        rbd pool init rbd
+    fi
+fi
 rbd import --image-feature layering block foo
 
 # Prepare a cephfs volume

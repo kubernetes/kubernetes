@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -201,7 +200,7 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	}
 	if err != nil {
 		if deployment == nil {
-			return errors.Wrapf(err, "error creating new replica set for deployment %q ", deploymentName)
+			return fmt.Errorf("error creating new replica set for deployment %q: %w", deploymentName, err)
 		}
 		deploymentImage := ""
 		if len(deployment.Spec.Template.Spec.Containers) > 0 {

@@ -56,3 +56,14 @@ func (clientConfigFn ClientConfigFunc) unstructuredClientForGroupVersion(gv sche
 
 	return rest.RESTClientFor(cfg)
 }
+
+func (clientConfigFn ClientConfigFunc) withStdinUnavailable(stdinUnavailable bool) ClientConfigFunc {
+	return func() (*rest.Config, error) {
+		cfg, err := clientConfigFn()
+		if stdinUnavailable && cfg != nil && cfg.ExecProvider != nil {
+			cfg.ExecProvider.StdinUnavailable = stdinUnavailable
+			cfg.ExecProvider.StdinUnavailableMessage = "used by stdin resource manifest reader"
+		}
+		return cfg, err
+	}
+}

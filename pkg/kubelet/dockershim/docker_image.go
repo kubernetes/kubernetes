@@ -1,3 +1,4 @@
+//go:build !dockerless
 // +build !dockerless
 
 /*
@@ -54,7 +55,7 @@ func (ds *dockerService) ListImages(_ context.Context, r *runtimeapi.ListImagesR
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {
-			klog.V(5).Infof("Failed to convert docker API image %+v to runtime API image: %v", i, err)
+			klog.V(5).InfoS("Failed to convert docker API image to runtime API image", "image", i, "err", err)
 			continue
 		}
 		result = append(result, apiImage)

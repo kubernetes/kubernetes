@@ -54,7 +54,7 @@ type Evaluator interface {
 	Matches(resourceQuota *corev1.ResourceQuota, item runtime.Object) (bool, error)
 	// MatchingScopes takes the input specified list of scopes and input object and returns the set of scopes that matches input object.
 	MatchingScopes(item runtime.Object, scopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error)
-	// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes. It returns the scopes which are in limited scopes but dont have a corresponding covering quota scope
+	// UncoveredQuotaScopes takes the input matched scopes which are limited by configuration and the matched quota scopes. It returns the scopes which are in limited scopes but don't have a corresponding covering quota scope
 	UncoveredQuotaScopes(limitedScopes []corev1.ScopedResourceSelectorRequirement, matchedQuotaScopes []corev1.ScopedResourceSelectorRequirement) ([]corev1.ScopedResourceSelectorRequirement, error)
 	// MatchingResources takes the input specified list of resources and returns the set of resources evaluator matches.
 	MatchingResources(input []corev1.ResourceName) []corev1.ResourceName

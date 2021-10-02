@@ -38,7 +38,7 @@ run_kubectl_local_proxy_tests() {
   # Make sure the in-development api is accessible by default
   start-proxy
   check-curl-proxy-code /apis 200
-  check-curl-proxy-code /apis/extensions/ 200
+  check-curl-proxy-code /apis/apps/ 200
   stop-proxy
 
   # Custom paths let you see everything.

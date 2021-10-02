@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -21,7 +22,9 @@ package e2enode
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os/exec"
+	"strings"
 	"time"
 
 	"k8s.io/api/core/v1"
@@ -59,7 +62,7 @@ func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (r
 	return runningPods
 }
 
-var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:ContainerRuntimeRestart]", func() {
+var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:ContainerRuntimeRestart]", func() {
 	const (
 		// Saturate the node. It's not necessary that all these pods enter
 		// Running/Ready, because we don't know the number of cores in the
@@ -80,6 +83,14 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 	ginkgo.Context("Container Runtime", func() {
 		ginkgo.Context("Network", func() {
 			ginkgo.It("should recover from ip leak", func() {
+				if framework.TestContext.ContainerRuntime == "docker" {
+					bytes, err := ioutil.ReadFile("/etc/os-release")
+					if err != nil {
+						if strings.Contains(string(bytes), "ubuntu") {
+							ginkgo.Skip("Test fails with in-tree docker + ubuntu. Skipping test.")
+						}
+					}
+				}
 
 				pods := newTestPods(podCount, false, imageutils.GetPauseImageName(), "restart-container-runtime-test")
 				ginkgo.By(fmt.Sprintf("Trying to create %d pods on node", len(pods)))
@@ -112,7 +123,7 @@ var _ = framework.KubeDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeatur
 						}
 						return nil
 					}, 1*time.Minute, 2*time.Second).Should(gomega.BeNil())
-					if stdout, err := exec.Command("sudo", "kill", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
+					if stdout, err := exec.Command("sudo", "kill", "-SIGKILL", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
 						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
 					}
 					// Assume that container runtime will be restarted by systemd/supervisord etc.

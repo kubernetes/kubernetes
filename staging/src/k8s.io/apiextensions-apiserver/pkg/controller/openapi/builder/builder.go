@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/emicklei/go-restful"
-	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/autoscaling/v1"
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
@@ -45,6 +44,7 @@ import (
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/util"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (
@@ -103,14 +103,15 @@ func BuildSwagger(crd *apiextensionsv1.CustomResourceDefinition, version string,
 				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
 					schema = ss
 
+					// This adds ValueValidation fields (anyOf, allOf) which may be stripped below if opts.StripValueValidation is true
+					schema = schema.Unfold()
+
 					if opts.StripValueValidation {
 						schema = schema.StripValueValidations()
 					}
 					if opts.StripNullable {
 						schema = schema.StripNullable()
 					}
-
-					schema = schema.Unfold()
 				}
 			}
 		}
@@ -362,7 +363,7 @@ func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool, 
 		if v2 {
 			schema = openapiv2.ToStructuralOpenAPIV2(schema)
 		}
-		ret = schema.ToGoOpenAPI()
+		ret = schema.ToKubeOpenAPI()
 		ret.SetProperty("metadata", *spec.RefSchema(objectMetaSchemaRef).
 			WithDescription(swaggerPartialObjectMetadataDescriptions["metadata"]))
 		addTypeMetaProperties(ret)

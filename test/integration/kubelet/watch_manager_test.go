@@ -33,6 +33,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 	"k8s.io/kubernetes/test/integration/framework"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestWatchBasedManager(t *testing.T) {
@@ -61,7 +62,8 @@ func TestWatchBasedManager(t *testing.T) {
 	// We want all watches to be up and running to stress test it.
 	// So don't treat any secret as immutable here.
 	isImmutable := func(_ runtime.Object) bool { return false }
-	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"})
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	store := manager.NewObjectCache(listObj, watchObj, newObj, isImmutable, schema.GroupResource{Group: "v1", Resource: "secrets"}, fakeClock, time.Minute)
 
 	// create 1000 secrets in parallel
 	t.Log(time.Now(), "creating 1000 secrets")

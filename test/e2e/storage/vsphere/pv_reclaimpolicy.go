@@ -50,7 +50,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	utils.SIGDescribe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
+	ginkgo.Describe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("vsphere")
 			Bootstrap(f)

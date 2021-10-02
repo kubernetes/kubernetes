@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -83,6 +84,11 @@ func (h *Histogram) initializeDeprecatedMetric() {
 	h.initializeMetric()
 }
 
+// WithContext allows the normal Histogram metric to pass in context. The context is no-op now.
+func (h *Histogram) WithContext(ctx context.Context) ObserverMetric {
+	return h.ObserverMetric
+}
+
 // HistogramVec is the internal representation of our wrapping struct around prometheus
 // histogramVecs.
 type HistogramVec struct {
@@ -98,13 +104,20 @@ type HistogramVec struct {
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	opts.StabilityLevel.setDefaults()
 
+	fqName := BuildFQName(opts.Namespace, opts.Subsystem, opts.Name)
+	allowListLock.RLock()
+	if allowList, ok := labelValueAllowLists[fqName]; ok {
+		opts.LabelValueAllowLists = allowList
+	}
+	allowListLock.RUnlock()
+
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
 		originalLabels: labels,
 		lazyMetric:     lazyMetric{},
 	}
-	v.lazyInit(v, BuildFQName(opts.Namespace, opts.Subsystem, opts.Name))
+	v.lazyInit(v, fqName)
 	return v
 }
 
@@ -139,6 +152,9 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainToAllowedList(v.originalLabels, lvs)
+	}
 	return v.HistogramVec.WithLabelValues(lvs...)
 }
 
@@ -149,6 +165,9 @@ func (v *HistogramVec) WithLabelValues(lvs ...string) ObserverMetric {
 func (v *HistogramVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
+	}
+	if v.LabelValueAllowLists != nil {
+		v.LabelValueAllowLists.ConstrainLabelMap(labels)
 	}
 	return v.HistogramVec.With(labels)
 }
@@ -174,4 +193,28 @@ func (v *HistogramVec) Reset() {
 	}
 
 	v.HistogramVec.Reset()
+}
+
+// WithContext returns wrapped HistogramVec with context
+func (v *HistogramVec) WithContext(ctx context.Context) *HistogramVecWithContext {
+	return &HistogramVecWithContext{
+		ctx:          ctx,
+		HistogramVec: *v,
+	}
+}
+
+// HistogramVecWithContext is the wrapper of HistogramVec with context.
+type HistogramVecWithContext struct {
+	HistogramVec
+	ctx context.Context
+}
+
+// WithLabelValues is the wrapper of HistogramVec.WithLabelValues.
+func (vc *HistogramVecWithContext) WithLabelValues(lvs ...string) ObserverMetric {
+	return vc.HistogramVec.WithLabelValues(lvs...)
+}
+
+// With is the wrapper of HistogramVec.With.
+func (vc *HistogramVecWithContext) With(labels map[string]string) ObserverMetric {
+	return vc.HistogramVec.With(labels)
 }

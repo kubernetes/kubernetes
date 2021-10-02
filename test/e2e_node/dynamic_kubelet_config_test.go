@@ -70,7 +70,7 @@ type nodeConfigTestCase struct {
 }
 
 // This test is marked [Disruptive] because the Kubelet restarts several times during this test.
-var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Serial][Disruptive]", func() {
+var _ = SIGDescribe("[Feature:DynamicKubeletConfig][NodeFeature:DynamicKubeletConfig][Serial][Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 	var beforeNode *v1.Node
 	var beforeConfigMap *v1.ConfigMap
@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			restore.run(f, setConfigSourceFunc, false, 0)
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: state transitions:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: state transitions:", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "correct" configmap off of the configuration from before the test
@@ -301,7 +301,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			})
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: recover to last-known-good ConfigMap:", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test
@@ -365,7 +365,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 			})
 		})
 
-		ginkgo.Context("update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: recover to last-known-good ConfigMap.KubeletConfigKey:", func() {
 			ginkgo.It(itDescription, func() {
 				const badConfigKey = "bad"
 				var err error
@@ -420,7 +420,7 @@ var _ = framework.KubeDescribe("[Feature:DynamicKubeletConfig][NodeFeature:Dynam
 		})
 
 		// previously, we missed a panic because we were not exercising this path
-		ginkgo.Context("update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
+		ginkgo.Context("[Slow] update Node.Spec.ConfigSource: non-nil last-known-good to a new non-nil last-known-good", func() {
 			ginkgo.It(itDescription, func() {
 				var err error
 				// we base the "lkg" configmap off of the configuration from before the test

@@ -60,7 +60,7 @@ func SetDefaults_CSIDriver(obj *storagev1beta1.CSIDriver) {
 	if len(obj.Spec.VolumeLifecycleModes) == 0 && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		obj.Spec.VolumeLifecycleModes = append(obj.Spec.VolumeLifecycleModes, storagev1beta1.VolumeLifecyclePersistent)
 	}
-	if obj.Spec.RequiresRepublish == nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
+	if obj.Spec.RequiresRepublish == nil {
 		obj.Spec.RequiresRepublish = new(bool)
 		*(obj.Spec.RequiresRepublish) = false
 	}

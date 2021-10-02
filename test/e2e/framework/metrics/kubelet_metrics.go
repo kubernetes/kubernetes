@@ -139,7 +139,7 @@ func getKubeletMetricsFromNode(c clientset.Interface, nodeName string) (KubeletM
 	if c == nil {
 		return GrabKubeletMetricsWithoutProxy(nodeName, "/metrics")
 	}
-	grabber, err := NewMetricsGrabber(c, nil, true, false, false, false, false)
+	grabber, err := NewMetricsGrabber(c, nil, nil, true, false, false, false, false, false)
 	if err != nil {
 		return KubeletMetrics{}, err
 	}

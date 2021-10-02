@@ -228,8 +228,8 @@ const (
 type HTTPIngressPath struct {
 	// Path is matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path" part of a URL
-	// as defined by RFC 3986. Paths must begin with a '/'. When unspecified,
-	// all paths from incoming requests are matched.
+	// as defined by RFC 3986. Paths must begin with a '/' and must be present
+	// when using PathType with value "Exact" or "Prefix".
 	// +optional
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 
@@ -311,7 +311,42 @@ type IngressClassSpec struct {
 	// configuration for the controller. This is optional if the controller does
 	// not require extra parameters.
 	// +optional
-	Parameters *v1.TypedLocalObjectReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
+	Parameters *IngressClassParametersReference `json:"parameters,omitempty" protobuf:"bytes,2,opt,name=parameters"`
+}
+
+const (
+	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// referenced Parameters resource is namespace-scoped.
+	IngressClassParametersReferenceScopeNamespace = "Namespace"
+	// IngressClassParametersReferenceScopeNamespace indicates that the
+	// referenced Parameters resource is cluster-scoped.
+	IngressClassParametersReferenceScopeCluster = "Cluster"
+)
+
+// IngressClassParametersReference identifies an API object. This can be used
+// to specify a cluster or namespace-scoped resource.
+type IngressClassParametersReference struct {
+	// APIGroup is the group for the resource being referenced. If APIGroup is
+	// not specified, the specified Kind must be in the core API group. For any
+	// other third-party types, APIGroup is required.
+	// +optional
+	APIGroup *string `json:"apiGroup,omitempty" protobuf:"bytes,1,opt,name=aPIGroup"`
+	// Kind is the type of resource being referenced.
+	Kind string `json:"kind" protobuf:"bytes,2,opt,name=kind"`
+	// Name is the name of resource being referenced.
+	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
+	// Scope represents if this refers to a cluster or namespace scoped resource.
+	// This may be set to "Cluster" (default) or "Namespace".
+	// Field can be enabled with IngressClassNamespacedParams feature gate.
+	// +optional
+	// +featureGate=IngressClassNamespacedParams
+	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
+	// Namespace is the namespace of the resource being referenced. This field is
+	// required when scope is set to "Namespace" and must be unset when scope is set to
+	// "Cluster".
+	// +optional
+	// +featureGate=IngressClassNamespacedParams
+	Namespace *string `json:"namespace,omitempty" protobuf:"bytes,5,opt,name=namespace"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

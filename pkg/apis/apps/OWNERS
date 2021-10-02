@@ -1,21 +1,8 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+# approval on api packages bubbles to api-approvers
 reviewers:
-- thockin
-- lavalamp
-- smarterclayton
-- deads2k
-- caesarxuchao
-- pmorie
-- sttts
-- saad-ali
-- ncdc
-- dims
-- errordeveloper
-- mml
-- m1093782566
-- mbohlool
-- kevin-wangzefeng
-- jianhuiz
+- sig-apps-api-reviewers
+- sig-apps-api-approvers
 labels:
 - sig/apps

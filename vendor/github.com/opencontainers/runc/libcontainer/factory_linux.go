@@ -148,11 +148,11 @@ func RootlessCgroupfs(l *LinuxFactory) error {
 // containers that use the Intel RDT "resource control" filesystem to
 // create and manage Intel RDT resources (e.g., L3 cache, memory bandwidth).
 func IntelRdtFs(l *LinuxFactory) error {
-	l.NewIntelRdtManager = func(config *configs.Config, id string, path string) intelrdt.Manager {
-		return &intelrdt.IntelRdtManager{
-			Config: config,
-			Id:     id,
-			Path:   path,
+	if !intelrdt.IsCATEnabled() && !intelrdt.IsMBAEnabled() {
+		l.NewIntelRdtManager = nil
+	} else {
+		l.NewIntelRdtManager = func(config *configs.Config, id string, path string) intelrdt.Manager {
+			return intelrdt.NewManager(config, id, path)
 		}
 	}
 	return nil
@@ -185,7 +185,7 @@ func CriuPath(criupath string) func(*LinuxFactory) error {
 // configures the factory with the provided option funcs.
 func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
 	if root != "" {
-		if err := os.MkdirAll(root, 0700); err != nil {
+		if err := os.MkdirAll(root, 0o700); err != nil {
 			return nil, newGenericError(err, SystemError)
 		}
 	}
@@ -196,7 +196,11 @@ func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {
 		Validator: validate.New(),
 		CriuPath:  "criu",
 	}
-	Cgroupfs(l)
+
+	if err := Cgroupfs(l); err != nil {
+		return nil, err
+	}
+
 	for _, opt := range options {
 		if opt == nil {
 			continue
@@ -225,7 +229,7 @@ type LinuxFactory struct {
 	// containers.
 	CriuPath string
 
-	// New{u,g}uidmapPath is the path to the binaries used for mapping with
+	// New{u,g}idmapPath is the path to the binaries used for mapping with
 	// rootless containers.
 	NewuidmapPath string
 	NewgidmapPath string
@@ -259,7 +263,7 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 	} else if !os.IsNotExist(err) {
 		return nil, newGenericError(err, SystemError)
 	}
-	if err := os.MkdirAll(containerRoot, 0711); err != nil {
+	if err := os.MkdirAll(containerRoot, 0o711); err != nil {
 		return nil, newGenericError(err, SystemError)
 	}
 	if err := os.Chown(containerRoot, unix.Geteuid(), unix.Getegid()); err != nil {
@@ -276,7 +280,7 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 		newgidmapPath: l.NewgidmapPath,
 		cgroupManager: l.NewCgroupsManager(config.Cgroups, nil),
 	}
-	if intelrdt.IsCatEnabled() || intelrdt.IsMbaEnabled() {
+	if l.NewIntelRdtManager != nil {
 		c.intelRdtManager = l.NewIntelRdtManager(config, id, "")
 	}
 	c.state = &stoppedState{c: c}
@@ -287,7 +291,7 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 	if l.Root == "" {
 		return nil, newGenericError(fmt.Errorf("invalid root"), ConfigInvalid)
 	}
-	//when load, we need to check id is valid or not.
+	// when load, we need to check id is valid or not.
 	if err := l.validateID(id); err != nil {
 		return nil, err
 	}
@@ -318,12 +322,12 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 		root:                 containerRoot,
 		created:              state.Created,
 	}
+	if l.NewIntelRdtManager != nil {
+		c.intelRdtManager = l.NewIntelRdtManager(&state.Config, id, state.IntelRdtPath)
+	}
 	c.state = &loadedState{c: c}
 	if err := c.refreshState(); err != nil {
 		return nil, err
-	}
-	if intelrdt.IsCatEnabled() || intelrdt.IsMbaEnabled() {
-		c.intelRdtManager = l.NewIntelRdtManager(&state.Config, id, state.IntelRdtPath)
 	}
 	return c, nil
 }
@@ -335,41 +339,40 @@ func (l *LinuxFactory) Type() string {
 // StartInitialization loads a container by opening the pipe fd from the parent to read the configuration and state
 // This is a low level implementation detail of the reexec and should not be consumed externally
 func (l *LinuxFactory) StartInitialization() (err error) {
-	var (
-		pipefd, fifofd int
-		consoleSocket  *os.File
-		envInitPipe    = os.Getenv("_LIBCONTAINER_INITPIPE")
-		envFifoFd      = os.Getenv("_LIBCONTAINER_FIFOFD")
-		envConsole     = os.Getenv("_LIBCONTAINER_CONSOLE")
-	)
-
 	// Get the INITPIPE.
-	pipefd, err = strconv.Atoi(envInitPipe)
+	envInitPipe := os.Getenv("_LIBCONTAINER_INITPIPE")
+	pipefd, err := strconv.Atoi(envInitPipe)
 	if err != nil {
 		return fmt.Errorf("unable to convert _LIBCONTAINER_INITPIPE=%s to int: %s", envInitPipe, err)
 	}
-
-	var (
-		pipe = os.NewFile(uintptr(pipefd), "pipe")
-		it   = initType(os.Getenv("_LIBCONTAINER_INITTYPE"))
-	)
+	pipe := os.NewFile(uintptr(pipefd), "pipe")
 	defer pipe.Close()
 
 	// Only init processes have FIFOFD.
-	fifofd = -1
+	fifofd := -1
+	envInitType := os.Getenv("_LIBCONTAINER_INITTYPE")
+	it := initType(envInitType)
 	if it == initStandard {
+		envFifoFd := os.Getenv("_LIBCONTAINER_FIFOFD")
 		if fifofd, err = strconv.Atoi(envFifoFd); err != nil {
 			return fmt.Errorf("unable to convert _LIBCONTAINER_FIFOFD=%s to int: %s", envFifoFd, err)
 		}
 	}
 
-	if envConsole != "" {
+	var consoleSocket *os.File
+	if envConsole := os.Getenv("_LIBCONTAINER_CONSOLE"); envConsole != "" {
 		console, err := strconv.Atoi(envConsole)
 		if err != nil {
 			return fmt.Errorf("unable to convert _LIBCONTAINER_CONSOLE=%s to int: %s", envConsole, err)
 		}
 		consoleSocket = os.NewFile(uintptr(console), "console-socket")
 		defer consoleSocket.Close()
+	}
+
+	logPipeFdStr := os.Getenv("_LIBCONTAINER_LOGPIPE")
+	logPipeFd, err := strconv.Atoi(logPipeFdStr)
+	if err != nil {
+		return fmt.Errorf("unable to convert _LIBCONTAINER_LOGPIPE=%s to int: %s", logPipeFdStr, err)
 	}
 
 	// clear the current process's environment to clean any libcontainer
@@ -394,7 +397,7 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 		}
 	}()
 
-	i, err := newContainerInit(it, pipe, consoleSocket, fifofd)
+	i, err := newContainerInit(it, pipe, consoleSocket, fifofd, logPipeFd)
 	if err != nil {
 		return err
 	}

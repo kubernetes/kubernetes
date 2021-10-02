@@ -17,6 +17,7 @@ limitations under the License.
 package path
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -46,7 +47,7 @@ func NewAuthorizer(alwaysAllowPaths []string) (authorizer.Authorizer, error) {
 		}
 	}
 
-	return authorizer.AuthorizerFunc(func(a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 		if a.IsResourceRequest() {
 			return authorizer.DecisionNoOpinion, "", nil
 		}

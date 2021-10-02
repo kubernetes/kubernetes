@@ -37,11 +37,11 @@ const (
 	volumeIDTemplate = "%s#%s#%s#%s"
 	// Parameter names defined in azure file CSI driver, refer to
 	// https://github.com/kubernetes-sigs/azurefile-csi-driver/blob/master/docs/driver-parameters.md
-	azureFileShareName = "shareName"
-
-	secretNameTemplate     = "azure-storage-account-%s-secret"
-	defaultSecretNamespace = "default"
-
+	shareNameField          = "sharename"
+	secretNameField         = "secretname"
+	secretNamespaceField    = "secretnamespace"
+	secretNameTemplate      = "azure-storage-account-%s-secret"
+	defaultSecretNamespace  = "default"
 	resourceGroupAnnotation = "kubernetes.io/azure-file-resource-group"
 )
 
@@ -65,7 +65,7 @@ func (t *azureFileCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AzureFile set from in-tree
 // and converts the AzureFile source to a CSIPersistentVolumeSource
-func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureFile == nil {
 		return nil, fmt.Errorf("volume is nil or Azure File not defined on volume")
 	}
@@ -75,6 +75,11 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	if err != nil {
 		klog.Warningf("getStorageAccountName(%s) returned with error: %v", azureSource.SecretName, err)
 		accountName = azureSource.SecretName
+	}
+
+	secretNamespace := defaultSecretNamespace
+	if podNamespace != "" {
+		secretNamespace = podNamespace
 	}
 
 	var (
@@ -90,10 +95,10 @@ func (t *azureFileCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 						Driver:           AzureFileDriverName,
 						VolumeHandle:     fmt.Sprintf(volumeIDTemplate, "", accountName, azureSource.ShareName, ""),
 						ReadOnly:         azureSource.ReadOnly,
-						VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
+						VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
 						NodeStageSecretRef: &v1.SecretReference{
 							Name:      azureSource.SecretName,
-							Namespace: defaultSecretNamespace,
+							Namespace: secretNamespace,
 						},
 					},
 				},
@@ -135,7 +140,7 @@ func (t *azureFileCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 				Namespace: defaultSecretNamespace,
 			},
 			ReadOnly:         azureSource.ReadOnly,
-			VolumeAttributes: map[string]string{azureFileShareName: azureSource.ShareName},
+			VolumeAttributes: map[string]string{shareNameField: azureSource.ShareName},
 			VolumeHandle:     volumeID,
 		}
 	)
@@ -163,31 +168,48 @@ func (t *azureFileCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 		ReadOnly: csiSource.ReadOnly,
 	}
 
+	for k, v := range csiSource.VolumeAttributes {
+		switch strings.ToLower(k) {
+		case shareNameField:
+			azureSource.ShareName = v
+		case secretNameField:
+			azureSource.SecretName = v
+		case secretNamespaceField:
+			ns := v
+			azureSource.SecretNamespace = &ns
+		}
+	}
+
 	resourceGroup := ""
 	if csiSource.NodeStageSecretRef != nil && csiSource.NodeStageSecretRef.Name != "" {
 		azureSource.SecretName = csiSource.NodeStageSecretRef.Name
 		azureSource.SecretNamespace = &csiSource.NodeStageSecretRef.Namespace
-		if csiSource.VolumeAttributes != nil {
-			if shareName, ok := csiSource.VolumeAttributes[azureFileShareName]; ok {
-				azureSource.ShareName = shareName
-			}
-		}
-	} else {
+	}
+	if azureSource.ShareName == "" || azureSource.SecretName == "" {
 		rg, storageAccount, fileShareName, _, err := getFileShareInfo(csiSource.VolumeHandle)
 		if err != nil {
 			return nil, err
 		}
-		azureSource.ShareName = fileShareName
-		azureSource.SecretName = fmt.Sprintf(secretNameTemplate, storageAccount)
+		if azureSource.ShareName == "" {
+			azureSource.ShareName = fileShareName
+		}
+		if azureSource.SecretName == "" {
+			azureSource.SecretName = fmt.Sprintf(secretNameTemplate, storageAccount)
+		}
 		resourceGroup = rg
+	}
+
+	if azureSource.SecretNamespace == nil {
+		ns := defaultSecretNamespace
+		azureSource.SecretNamespace = &ns
 	}
 
 	pv.Spec.CSI = nil
 	pv.Spec.AzureFile = azureSource
+	if pv.ObjectMeta.Annotations == nil {
+		pv.ObjectMeta.Annotations = map[string]string{}
+	}
 	if resourceGroup != "" {
-		if pv.ObjectMeta.Annotations == nil {
-			pv.ObjectMeta.Annotations = map[string]string{}
-		}
 		pv.ObjectMeta.Annotations[resourceGroupAnnotation] = resourceGroup
 	}
 

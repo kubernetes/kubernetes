@@ -230,6 +230,85 @@ func TestRunAccessList(t *testing.T) {
 	})
 }
 
+func TestRunResourceFor(t *testing.T) {
+	tests := []struct {
+		name        string
+		o           *CanIOptions
+		resourceArg string
+
+		expectGVR      schema.GroupVersionResource
+		expectedErrOut string
+	}{
+		{
+			name:        "any resources",
+			o:           &CanIOptions{},
+			resourceArg: "*",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "*",
+			},
+		},
+		{
+			name:        "server-supported standard resources without group",
+			o:           &CanIOptions{},
+			resourceArg: "pods",
+			expectGVR: schema.GroupVersionResource{
+				Version:  "v1",
+				Resource: "pods",
+			},
+		},
+		{
+			name:        "server-supported standard resources with group",
+			o:           &CanIOptions{},
+			resourceArg: "jobs",
+			expectGVR: schema.GroupVersionResource{
+				Group:    "batch",
+				Version:  "v1",
+				Resource: "jobs",
+			},
+		},
+		{
+			name:        "server-supported nonstandard resources",
+			o:           &CanIOptions{},
+			resourceArg: "users",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "users",
+			},
+		},
+		{
+			name:        "invalid resources",
+			o:           &CanIOptions{},
+			resourceArg: "invalid",
+			expectGVR: schema.GroupVersionResource{
+				Resource: "invalid",
+			},
+			expectedErrOut: "Warning: the server doesn't have a resource type 'invalid'\n",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
+			defer tf.Cleanup()
+
+			ioStreams, _, _, buf := genericclioptions.NewTestIOStreams()
+			test.o.IOStreams = ioStreams
+
+			restMapper, err := tf.ToRESTMapper()
+			if err != nil {
+				t.Errorf("got unexpected error when do tf.ToRESTMapper(): %v", err)
+				return
+			}
+			gvr := test.o.resourceFor(restMapper, test.resourceArg)
+			if gvr != test.expectGVR {
+				t.Errorf("expected %v\n but got %v\n", test.expectGVR, gvr)
+			}
+			if buf.String() != test.expectedErrOut {
+				t.Errorf("expected %v\n but got %v\n", test.expectedErrOut, buf.String())
+			}
+		})
+	}
+}
+
 func getSelfSubjectRulesReview() *authorizationv1.SelfSubjectRulesReview {
 	return &authorizationv1.SelfSubjectRulesReview{
 		Status: authorizationv1.SubjectRulesReviewStatus{

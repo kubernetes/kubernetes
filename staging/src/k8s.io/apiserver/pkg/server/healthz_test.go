@@ -20,13 +20,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestDelayedHealthCheck(t *testing.T) {
 	t.Run("test that liveness check returns true until the delay has elapsed", func(t *testing.T) {
 		t0 := time.Unix(0, 0)
-		c := clock.NewFakeClock(t0)
+		c := testingclock.NewFakeClock(t0)
 		doneCh := make(chan struct{})
 
 		healthCheck := delayedHealthCheck(postStartHookHealthz{"test", doneCh}, c, time.Duration(10)*time.Second)
@@ -52,7 +52,7 @@ func TestDelayedHealthCheck(t *testing.T) {
 	})
 	t.Run("test that liveness check does not toggle false even if done channel is closed early", func(t *testing.T) {
 		t0 := time.Unix(0, 0)
-		c := clock.NewFakeClock(t0)
+		c := testingclock.NewFakeClock(t0)
 
 		doneCh := make(chan struct{})
 

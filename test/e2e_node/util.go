@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -70,6 +71,8 @@ const (
 	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
 	defaultPodResourcesTimeout = 10 * time.Second
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
+	kubeletReadOnlyPort        = "10255"
+	kubeletHealthCheckURL      = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
 
 func getNodeSummary() (*stats.Summary, error) {
@@ -394,8 +397,14 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 }
 
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func findRunningKubletServiceName() string {
-	stdout, err := exec.Command("sudo", "systemctl", "list-units", "*kubelet*", "--state=running").CombinedOutput()
+func findKubletServiceName(running bool) string {
+	cmdLine := []string{
+		"systemctl", "list-units", "*kubelet*",
+	}
+	if running {
+		cmdLine = append(cmdLine, "--state=running")
+	}
+	stdout, err := exec.Command("sudo", cmdLine...).CombinedOutput()
 	framework.ExpectNoError(err)
 	regex := regexp.MustCompile("(kubelet-\\w+)")
 	matches := regex.FindStringSubmatch(string(stdout))
@@ -406,7 +415,7 @@ func findRunningKubletServiceName() string {
 }
 
 func restartKubelet() {
-	kubeletServiceName := findRunningKubletServiceName()
+	kubeletServiceName := findKubletServiceName(false)
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
@@ -417,13 +426,40 @@ func restartKubelet() {
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
 func stopKubelet() func() {
-	kubeletServiceName := findRunningKubletServiceName()
-	stdout, err := exec.Command("sudo", "systemctl", "kill", kubeletServiceName).CombinedOutput()
+	kubeletServiceName := findKubletServiceName(true)
+
+	// reset the kubelet service start-limit-hit
+	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
+	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %v", err, stdout)
+
+	stdout, err = exec.Command("sudo", "systemctl", "kill", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to stop kubelet with systemctl: %v, %v", err, stdout)
+
 	return func() {
 		stdout, err := exec.Command("sudo", "systemctl", "start", kubeletServiceName).CombinedOutput()
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 	}
+}
+
+func kubeletHealthCheck(url string) bool {
+	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	insecureHTTPClient := &http.Client{
+		Transport: insecureTransport,
+	}
+
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
+	resp, err := insecureHTTPClient.Do(req)
+	if err != nil {
+		klog.Warningf("Health check on %q failed, error=%v", url, err)
+	} else if resp.StatusCode != http.StatusOK {
+		klog.Warningf("Health check on %q failed, status=%d", url, resp.StatusCode)
+	}
+	return err == nil && resp.StatusCode == http.StatusOK
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {

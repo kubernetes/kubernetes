@@ -31,10 +31,12 @@ func TestAPIEndpointFromString(t *testing.T) {
 		{apiEndpoint: "1.2.3.4:-1", expectedErr: true},
 		{apiEndpoint: "1.2.::1234", expectedErr: true},
 		{apiEndpoint: "1.2.3.4:65536", expectedErr: true},
+		{apiEndpoint: "1.2.3.456:1234", expectedErr: true},
 		{apiEndpoint: "[::1]:1234", expectedEndpoint: APIEndpoint{AdvertiseAddress: "::1", BindPort: 1234}},
 		{apiEndpoint: "[::1]:-1", expectedErr: true},
 		{apiEndpoint: "[::1]:65536", expectedErr: true},
 		{apiEndpoint: "[::1:1234", expectedErr: true},
+		{apiEndpoint: "[::g]:1234", expectedErr: true},
 	}
 	for _, rt := range tests {
 		t.Run(rt.apiEndpoint, func(t *testing.T) {

@@ -43,6 +43,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 
@@ -77,6 +78,9 @@ type GarbageCollector struct {
 
 	workerLock sync.RWMutex
 }
+
+var _ controller.Interface = (*GarbageCollector)(nil)
+var _ controller.Debuggable = (*GarbageCollector)(nil)
 
 // NewGarbageCollector creates a new GarbageCollector.
 func NewGarbageCollector(
@@ -725,4 +729,8 @@ func GetDeletableResources(discoveryClient discovery.ServerResourcesInterface) m
 	}
 
 	return deletableGroupVersionResources
+}
+
+func (gc *GarbageCollector) Name() string {
+	return "garbagecollector"
 }

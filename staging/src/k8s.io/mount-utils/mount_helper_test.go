@@ -53,6 +53,12 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
 			},
 		},
+		"path-not-exist": {
+			prepare: func(base string) (MountPoint, error, error) {
+				path := filepath.Join(base, testMount)
+				return MountPoint{Device: "/dev/sdb", Path: path}, nil, nil
+			},
+		},
 		"mount-corrupted": {
 			prepare: func(base string) (MountPoint, error, error) {
 				path := filepath.Join(base, testMount)

@@ -20,37 +20,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
-	"k8s.io/api/core/v1"
+	"github.com/golang/mock/gomock"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	podresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
+	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
 )
-
-type mockProvider struct {
-	mock.Mock
-}
-
-func (m *mockProvider) GetPods() []*v1.Pod {
-	args := m.Called()
-	return args.Get(0).([]*v1.Pod)
-}
-
-func (m *mockProvider) GetDevices(podUID, containerName string) []*podresourcesv1.ContainerDevices {
-	args := m.Called(podUID, containerName)
-	return args.Get(0).([]*podresourcesv1.ContainerDevices)
-}
-
-func (m *mockProvider) GetCPUs(podUID, containerName string) []int64 {
-	args := m.Called(podUID, containerName)
-	return args.Get(0).([]int64)
-}
-
-func (m *mockProvider) UpdateAllocatedDevices() {
-	m.Called()
-}
 
 func TestListPodResourcesV1alpha1(t *testing.T) {
 	podName := "pod-name"
@@ -64,6 +41,9 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 			DeviceIds:    []string{"dev0", "dev1"},
 		},
 	}
+
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
 
 	for _, tc := range []struct {
 		desc             string
@@ -147,11 +127,14 @@ func TestListPodResourcesV1alpha1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			m := new(mockProvider)
-			m.On("GetPods").Return(tc.pods)
-			m.On("GetDevices", string(podUID), containerName).Return(tc.devices)
-			m.On("UpdateAllocatedDevices").Return()
-			server := NewV1alpha1PodResourcesServer(m, m)
+			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(mockCtrl)
+			mockPodsProvider := podresourcetest.NewMockPodsProvider(mockCtrl)
+
+			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).AnyTimes()
+			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).AnyTimes()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices().Return().AnyTimes()
+
+			server := NewV1alpha1PodResourcesServer(mockPodsProvider, mockDevicesProvider)
 			resp, err := server.List(context.TODO(), &v1alpha1.ListPodResourcesRequest{})
 			if err != nil {
 				t.Errorf("want err = %v, got %q", nil, err)

@@ -27,8 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -36,28 +40,31 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/utils/pointer"
 )
 
 // This file tests the scheduler priority functions.
 func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *testutils.TestContext {
-	prof := schedulerconfig.KubeSchedulerProfile{
-		SchedulerName: v1.DefaultSchedulerName,
-		Plugins: &schedulerconfig.Plugins{
-			Score: &schedulerconfig.PluginSet{
-				Enabled: []schedulerconfig.Plugin{
-					{Name: scorePluginName, Weight: 1},
-				},
-				Disabled: []schedulerconfig.Plugin{
-					{Name: "*"},
+	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
+		Profiles: []v1beta2.KubeSchedulerProfile{{
+			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
+			Plugins: &v1beta2.Plugins{
+				Score: v1beta2.PluginSet{
+					Enabled: []v1beta2.Plugin{
+						{Name: scorePluginName, Weight: pointer.Int32Ptr(1)},
+					},
+					Disabled: []v1beta2.Plugin{
+						{Name: "*"},
+					},
 				},
 			},
-		},
-	}
+		}},
+	})
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
-		testutils.InitTestMaster(t, strings.ToLower(scorePluginName), nil),
+		testutils.InitTestAPIServer(t, strings.ToLower(scorePluginName), nil),
 		nil,
-		scheduler.WithProfiles(prof),
+		scheduler.WithProfiles(cfg.Profiles...),
 	)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
@@ -119,79 +126,115 @@ func TestNodeAffinity(t *testing.T) {
 // TestPodAffinity verifies that scheduler's pod affinity priority function
 // works correctly.
 func TestPodAffinity(t *testing.T) {
-	testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
-	defer testutils.CleanupTest(t, testCtx)
-	// Add a few nodes.
-	topologyKey := "node-topologykey"
-	topologyValue := "topologyvalue"
-	nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Add a pod with a label and wait for it to schedule.
 	labelKey := "service"
 	labelValue := "S1"
-	_, err = runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
-		Name:      "attractor-pod",
-		Namespace: testCtx.NS.Name,
-		Labels:    map[string]string{labelKey: labelValue},
-	}))
-	if err != nil {
-		t.Fatalf("Error running the attractor pod: %v", err)
-	}
-	// Add a few more nodes without the topology label.
-	_, err = createAndWaitForNodesInCache(testCtx, "other-node", st.MakeNode(), 5)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Add a new pod with affinity to the attractor pod.
-	podName := "pod-with-podaffinity"
-	pod, err := runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
-		Name:      podName,
-		Namespace: testCtx.NS.Name,
-		Affinity: &v1.Affinity{
-			PodAffinity: &v1.PodAffinity{
-				PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
-					{
-						PodAffinityTerm: v1.PodAffinityTerm{
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpIn,
-										Values:   []string{labelValue, "S3"},
+	topologyKey := "node-topologykey"
+	topologyValue := "topologyvalue"
+	tests := []struct {
+		name      string
+		podConfig *pausePodConfig
+	}{
+		{
+			name: "pod affinity",
+			podConfig: &pausePodConfig{
+				Name:      "pod1",
+				Namespace: "ns1",
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: v1.PodAffinityTerm{
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      labelKey,
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{labelValue, "S3"},
+											},
+										},
 									},
-									{
-										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpNotIn,
-										Values:   []string{"S2"},
-									}, {
-										Key:      labelKey,
-										Operator: metav1.LabelSelectorOpExists,
-									},
+									TopologyKey: topologyKey,
 								},
+								Weight: 50,
 							},
-							TopologyKey: topologyKey,
-							Namespaces:  []string{testCtx.NS.Name},
 						},
-						Weight: 50,
 					},
 				},
 			},
 		},
-	}))
-	if err != nil {
-		t.Fatalf("Error running pause pod: %v", err)
+		{
+			name: "pod affinity with namespace selector",
+			podConfig: &pausePodConfig{
+				Name:      "pod1",
+				Namespace: "ns2",
+				Affinity: &v1.Affinity{
+					PodAffinity: &v1.PodAffinity{
+						PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
+							{
+								PodAffinityTerm: v1.PodAffinityTerm{
+									NamespaceSelector: &metav1.LabelSelector{}, // all namespaces
+									LabelSelector: &metav1.LabelSelector{
+										MatchExpressions: []metav1.LabelSelectorRequirement{
+											{
+												Key:      labelKey,
+												Operator: metav1.LabelSelectorOpIn,
+												Values:   []string{labelValue, "S3"},
+											},
+										},
+									},
+									TopologyKey: topologyKey,
+								},
+								Weight: 50,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
-	// The new pod must be scheduled on one of the nodes with the same topology
-	// key-value as the attractor pod.
-	for _, node := range nodesInTopology {
-		if node.Name == pod.Spec.NodeName {
-			t.Logf("Pod %v got successfully scheduled on node %v.", podName, pod.Spec.NodeName)
-			return
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, true)()
+			testCtx := initTestSchedulerForPriorityTest(t, interpodaffinity.Name)
+			defer testutils.CleanupTest(t, testCtx)
+			// Add a few nodes.
+			nodesInTopology, err := createAndWaitForNodesInCache(testCtx, "in-topology", st.MakeNode().Label(topologyKey, topologyValue), 5)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := createNamespacesWithLabels(testCtx.ClientSet, []string{"ns1", "ns2"}, map[string]string{"team": "team1"}); err != nil {
+				t.Fatal(err)
+			}
+			// Add a pod with a label and wait for it to schedule.
+			_, err = runPausePod(testCtx.ClientSet, initPausePod(&pausePodConfig{
+				Name:      "attractor-pod",
+				Namespace: "ns1",
+				Labels:    map[string]string{labelKey: labelValue},
+			}))
+			if err != nil {
+				t.Fatalf("Error running the attractor pod: %v", err)
+			}
+			// Add a few more nodes without the topology label.
+			_, err = createAndWaitForNodesInCache(testCtx, "other-node", st.MakeNode(), 5)
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Add a new pod with affinity to the attractor pod.
+			pod, err := runPausePod(testCtx.ClientSet, initPausePod(tt.podConfig))
+			if err != nil {
+				t.Fatalf("Error running pause pod: %v", err)
+			}
+			// The new pod must be scheduled on one of the nodes with the same topology
+			// key-value as the attractor pod.
+			for _, node := range nodesInTopology {
+				if node.Name == pod.Spec.NodeName {
+					t.Logf("Pod %v got successfully scheduled on node %v.", tt.podConfig.Name, pod.Spec.NodeName)
+					return
+				}
+			}
+			t.Errorf("Pod %v got scheduled on an unexpected node: %v.", tt.podConfig.Name, pod.Spec.NodeName)
+		})
 	}
-	t.Errorf("Pod %v got scheduled on an unexpected node: %v.", podName, pod.Spec.NodeName)
 }
 
 // TestImageLocality verifies that the scheduler's image locality priority function

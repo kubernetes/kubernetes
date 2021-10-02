@@ -1,3 +1,4 @@
+//go:build !providerless
 // +build !providerless
 
 /*
@@ -62,7 +63,7 @@ func TestGetVolumeName_PersistentVolume(t *testing.T) {
 
 // One testcase for TestAttachDetach table test below
 type testcase struct {
-	name aws.KubernetesVolumeID
+	name string
 	// For fake AWS:
 	attach attachCall
 	detach detachCall
@@ -79,8 +80,8 @@ func TestAttachDetach(t *testing.T) {
 	diskName := aws.KubernetesVolumeID("disk")
 	nodeName := types.NodeName("instance")
 	spec := createVolSpec(diskName, false)
-	attachError := errors.New("Fake attach error")
-	detachError := errors.New("Fake detach error")
+	attachError := errors.New("fake attach error")
+	detachError := errors.New("fake detach error")
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -128,15 +129,16 @@ func TestAttachDetach(t *testing.T) {
 	}
 
 	for _, testcase := range tests {
-		testcase.t = t
-		device, err := testcase.test(&testcase)
-		if err != testcase.expectedError {
-			t.Errorf("%s failed: expected err=%q, got %q", testcase.name, testcase.expectedError.Error(), err.Error())
-		}
-		if device != testcase.expectedDevice {
-			t.Errorf("%s failed: expected device=%q, got %q", testcase.name, testcase.expectedDevice, device)
-		}
-		t.Logf("Test %q succeeded", testcase.name)
+		t.Run(testcase.name, func(t *testing.T) {
+			testcase.t = t
+			device, err := testcase.test(&testcase)
+			if err != testcase.expectedError {
+				t.Errorf("failed: expected err=%q, got %q", testcase.expectedError.Error(), err.Error())
+			}
+			if device != testcase.expectedDevice {
+				t.Errorf("failed: expected device=%q, got %q", testcase.expectedDevice, device)
+			}
+		})
 	}
 }
 
@@ -219,12 +221,12 @@ func (testcase *testcase) AttachDisk(diskName aws.KubernetesVolumeID, nodeName t
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return "", errors.New("Unexpected AttachDisk call: wrong diskName")
+		return "", errors.New("unexpected AttachDisk call: wrong diskName")
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return "", errors.New("Unexpected AttachDisk call: wrong nodeName")
+		return "", errors.New("unexpected AttachDisk call: wrong nodeName")
 	}
 
 	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
@@ -244,12 +246,12 @@ func (testcase *testcase) DetachDisk(diskName aws.KubernetesVolumeID, nodeName t
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return "", errors.New("Unexpected DetachDisk call: wrong diskName")
+		return "", errors.New("unexpected DetachDisk call: wrong diskName")
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return "", errors.New("Unexpected DetachDisk call: wrong nodeName")
+		return "", errors.New("unexpected DetachDisk call: wrong nodeName")
 	}
 
 	klog.V(4).Infof("DetachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceName, expected.ret)
@@ -263,28 +265,28 @@ func (testcase *testcase) DiskIsAttached(diskName aws.KubernetesVolumeID, nodeNa
 }
 
 func (testcase *testcase) DisksAreAttached(nodeDisks map[types.NodeName][]aws.KubernetesVolumeID) (map[types.NodeName]map[aws.KubernetesVolumeID]bool, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (testcase *testcase) CreateDisk(volumeOptions *aws.VolumeOptions) (volumeName aws.KubernetesVolumeID, err error) {
-	return "", errors.New("Not implemented")
+	return "", errors.New("not implemented")
 }
 
 func (testcase *testcase) DeleteDisk(volumeName aws.KubernetesVolumeID) (bool, error) {
-	return false, errors.New("Not implemented")
+	return false, errors.New("not implemented")
 }
 
 func (testcase *testcase) GetVolumeLabels(volumeName aws.KubernetesVolumeID) (map[string]string, error) {
-	return map[string]string{}, errors.New("Not implemented")
+	return map[string]string{}, errors.New("not implemented")
 }
 
 func (testcase *testcase) GetDiskPath(volumeName aws.KubernetesVolumeID) (string, error) {
-	return "", errors.New("Not implemented")
+	return "", errors.New("not implemented")
 }
 
 func (testcase *testcase) ResizeDisk(
 	volumeName aws.KubernetesVolumeID,
 	oldSize resource.Quantity,
 	newSize resource.Quantity) (resource.Quantity, error) {
-	return oldSize, errors.New("Not implemented")
+	return oldSize, errors.New("not implemented")
 }

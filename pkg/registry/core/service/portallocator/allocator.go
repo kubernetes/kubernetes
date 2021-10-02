@@ -34,8 +34,6 @@ type Interface interface {
 	AllocateNext() (int, error)
 	Release(int) error
 	ForEach(func(int))
-
-	// For testing
 	Has(int) bool
 }
 
@@ -62,8 +60,8 @@ type PortAllocator struct {
 // PortAllocator implements Interface and Snapshottable
 var _ Interface = &PortAllocator{}
 
-// NewPortAllocatorCustom creates a PortAllocator over a net.PortRange, calling allocatorFactory to construct the backing store.
-func NewPortAllocatorCustom(pr net.PortRange, allocatorFactory allocator.AllocatorFactory) (*PortAllocator, error) {
+// New creates a PortAllocator over a net.PortRange, calling allocatorFactory to construct the backing store.
+func New(pr net.PortRange, allocatorFactory allocator.AllocatorFactory) (*PortAllocator, error) {
 	max := pr.Size
 	rangeSpec := pr.String()
 
@@ -75,9 +73,9 @@ func NewPortAllocatorCustom(pr net.PortRange, allocatorFactory allocator.Allocat
 	return a, err
 }
 
-// Helper that wraps NewPortAllocatorCustom, for creating a range backed by an in-memory store.
-func NewPortAllocator(pr net.PortRange) (*PortAllocator, error) {
-	return NewPortAllocatorCustom(pr, func(max int, rangeSpec string) (allocator.Interface, error) {
+// NewInMemory creates an in-memory allocator.
+func NewInMemory(pr net.PortRange) (*PortAllocator, error) {
+	return New(pr, func(max int, rangeSpec string) (allocator.Interface, error) {
 		return allocator.NewAllocationMap(max, rangeSpec), nil
 	})
 }
@@ -88,7 +86,7 @@ func NewFromSnapshot(snap *api.RangeAllocation) (*PortAllocator, error) {
 	if err != nil {
 		return nil, err
 	}
-	r, err := NewPortAllocator(*pr)
+	r, err := NewInMemory(*pr)
 	if err != nil {
 		return nil, err
 	}

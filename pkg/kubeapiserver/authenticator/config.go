@@ -20,8 +20,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-openapi/spec"
-
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -39,6 +37,7 @@ import (
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/oidc"
 	"k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
@@ -63,7 +62,7 @@ type Config struct {
 	OIDCRequiredClaims          map[string]string
 	ServiceAccountKeyFiles      []string
 	ServiceAccountLookup        bool
-	ServiceAccountIssuer        string
+	ServiceAccountIssuers       []string
 	APIAudiences                authenticator.Audiences
 	WebhookTokenAuthnConfigFile string
 	WebhookTokenAuthnVersion    string
@@ -131,8 +130,8 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
-	if config.ServiceAccountIssuer != "" {
-		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuer, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
+	if len(config.ServiceAccountIssuers) > 0 {
+		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuers, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -151,10 +150,20 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
+		// TODO(enj): wire up the Notifier and ControllerRunner bits when OIDC supports CA reload
+		var oidcCAContent oidc.CAContentProvider
+		if len(config.OIDCCAFile) != 0 {
+			var oidcCAErr error
+			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", config.OIDCCAFile)
+			if oidcCAErr != nil {
+				return nil, nil, oidcCAErr
+			}
+		}
+
 		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(oidc.Options{
 			IssuerURL:            config.OIDCIssuerURL,
 			ClientID:             config.OIDCClientID,
-			CAFile:               config.OIDCCAFile,
+			CAContentProvider:    oidcCAContent,
 			UsernameClaim:        config.OIDCUsernameClaim,
 			UsernamePrefix:       config.OIDCUsernamePrefix,
 			GroupsClaim:          config.OIDCGroupsClaim,
@@ -266,12 +275,12 @@ func newLegacyServiceAccountAuthenticator(keyfiles []string, lookup bool, apiAud
 		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, allPublicKeys, apiAudiences, serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter))
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, allPublicKeys, apiAudiences, serviceaccount.NewLegacyValidator(lookup, serviceAccountGetter))
 	return tokenAuthenticator, nil
 }
 
 // newServiceAccountAuthenticator returns an authenticator.Token or an error
-func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
+func newServiceAccountAuthenticator(issuers []string, keyfiles []string, apiAudiences authenticator.Audiences, serviceAccountGetter serviceaccount.ServiceAccountTokenGetter) (authenticator.Token, error) {
 	allPublicKeys := []interface{}{}
 	for _, keyfile := range keyfiles {
 		publicKeys, err := keyutil.PublicKeysFromFile(keyfile)
@@ -281,7 +290,7 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 		allPublicKeys = append(allPublicKeys, publicKeys...)
 	}
 
-	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(iss, allPublicKeys, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter))
+	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(issuers, allPublicKeys, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter))
 	return tokenAuthenticator, nil
 }
 

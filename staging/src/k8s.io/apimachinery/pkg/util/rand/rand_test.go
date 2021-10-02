@@ -28,7 +28,7 @@ const (
 )
 
 func TestString(t *testing.T) {
-	valid := "0123456789abcdefghijklmnopqrstuvwxyz"
+	valid := "bcdfghjklmnpqrstvwxz2456789"
 	for _, l := range []int{0, 1, 2, 10, 123} {
 		s := String(l)
 		if len(s) != l {

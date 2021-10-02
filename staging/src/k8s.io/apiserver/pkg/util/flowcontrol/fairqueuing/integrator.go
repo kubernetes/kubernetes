@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
+	"k8s.io/utils/clock"
 )
 
 // Integrator computes the moments of some variable X over time as

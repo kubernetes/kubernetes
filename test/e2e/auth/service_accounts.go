@@ -673,13 +673,23 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		}
 	})
 
-	ginkgo.It("should support OIDC discovery of service account issuer [Feature:ServiceAccountIssuerDiscovery]", func() {
+	/*
+	   Release: v1.21
+	   Testname: OIDC Discovery (ServiceAccountIssuerDiscovery)
+	   Description: Ensure kube-apiserver serves correct OIDC discovery
+	   endpoints by deploying a Pod that verifies its own
+	   token against these endpoints.
+	*/
+	framework.ConformanceIt("ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer", func() {
+
 		// Allow the test pod access to the OIDC discovery non-resource URLs.
 		// The role should have already been automatically created as part of the
-		// bootstrap policy, but not the role binding.
+		// RBAC bootstrap policy, but not the role binding. If RBAC is disabled,
+		// we skip creating the binding. We also make sure we clean up the
+		// binding after the test.
 		const clusterRoleName = "system:service-account-issuer-discovery"
 		crbName := fmt.Sprintf("%s-%s", f.Namespace.Name, clusterRoleName)
-		if _, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(
+		if crb, err := f.ClientSet.RbacV1().ClusterRoleBindings().Create(
 			context.TODO(),
 			&rbacv1.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -699,8 +709,16 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 					Kind:     "ClusterRole",
 				},
 			},
-			metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
-			framework.Failf("Unexpected err creating ClusterRoleBinding %s: %v", crbName, err)
+			metav1.CreateOptions{}); err != nil {
+			// Tolerate RBAC not being enabled
+			framework.Logf("error granting ClusterRoleBinding %s: %v", crbName, err)
+		} else {
+			defer func() {
+				framework.ExpectNoError(
+					f.ClientSet.RbacV1().ClusterRoleBindings().Delete(
+						context.TODO(),
+						crb.Name, metav1.DeleteOptions{}))
+			}()
 		}
 
 		// Create the pod with tokens.
@@ -717,7 +735,6 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
 					Args: []string{
 						"test-service-account-issuer-discovery",
-						"--in-cluster-discovery",
 						"--token-path", path.Join(tokenPath, tokenName),
 						"--audience", audience,
 					},
@@ -857,7 +874,15 @@ var _ = SIGDescribe("ServiceAccounts", func() {
 		framework.ExpectEqual(eventFound, true, "failed to find %v event", watch.Deleted)
 	})
 
-	ginkgo.It("should guarantee kube-root-ca.crt exist in any namespace", func() {
+	/*
+		Release: v1.21
+		Testname: RootCA ConfigMap test
+		Description: Ensure every namespace exist a ConfigMap for root ca cert.
+			1. Created automatically
+			2. Recreated if deleted
+			3. Reconciled if modified
+	*/
+	framework.ConformanceIt("should guarantee kube-root-ca.crt exist in any namespace", func() {
 		const rootCAConfigMapName = "kube-root-ca.crt"
 
 		framework.ExpectNoError(wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {

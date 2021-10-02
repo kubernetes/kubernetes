@@ -19,6 +19,13 @@ type Marshaler interface {
 	ContentType() string
 }
 
+// Marshalers that implement contentTypeMarshaler will have their ContentTypeFromMessage method called
+// to set the Content-Type header on the response
+type contentTypeMarshaler interface {
+	// ContentTypeFromMessage returns the Content-Type this marshaler produces from the provided message
+	ContentTypeFromMessage(v interface{}) string
+}
+
 // Decoder decodes a byte sequence
 type Decoder interface {
 	Decode(v interface{}) error
@@ -43,6 +50,6 @@ func (f EncoderFunc) Encode(v interface{}) error { return f(v) }
 
 // Delimited defines the streaming delimiter.
 type Delimited interface {
-	// Delimiter returns the record seperator for the stream.
+	// Delimiter returns the record separator for the stream.
 	Delimiter() []byte
 }

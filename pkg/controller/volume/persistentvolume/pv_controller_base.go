@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -103,7 +104,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	// Prober is nil because PV is not aware of Flexvolume.
 	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, nil /* prober */, controller); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
 	}
 
 	p.VolumeInformer.Informer().AddEventHandler(
@@ -137,12 +138,12 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
 	if err := common.AddPodPVCIndexerIfNotPresent(controller.podIndexer); err != nil {
-		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
+		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
-	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 
 	controller.filteredDialOptions = p.FilteredDialOptions
 
@@ -330,7 +331,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v
 	// when no modifications are required this function could sometimes return a
 	// copy of the volume and sometimes return a ref to the original
 	claimClone := claim.DeepCopy()
-	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
 	if !modified {
 		return claimClone, nil
 	}
@@ -347,7 +348,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v
 
 func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	volumeClone := volume.DeepCopy()
-	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, pvutil.AnnDynamicallyProvisioned)
+	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, false)
 	if !modified {
 		return volumeClone, nil
 	}
@@ -364,12 +365,14 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume 
 }
 
 // updateMigrationAnnotations takes an Annotations map and checks for a
-// provisioner name using the provisionerKey. It will then add a
-// "volume.beta.kubernetes.io/migrated-to" annotation if migration with the CSI
-// driver name for that provisioner is "on" based on feature flags, it will also
-// remove the annotation is migration is "off" for that provisioner in rollback
+// provisioner name depending if the annotation came from a PVC or not.
+// It will then add a "pv.kubernetes.io/migrated-to" annotation if migration with
+// the CSI driver name for that provisioner is "on" based on feature flags, it will also
+// remove the annotation if migration is "off" for that provisioner in rollback
 // scenarios. Returns true if the annotations map was modified and false otherwise.
-func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, provisionerKey string) bool {
+// Parameters:
+// - claim: true means the ann came from a PVC, false means the ann came from a PV
+func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINameTranslator, ann map[string]string, claim bool) bool {
 	var csiDriverName string
 	var err error
 
@@ -378,10 +381,24 @@ func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINam
 		// this is migrated - no change
 		return false
 	}
+	var provisionerKey string
+	if claim {
+		provisionerKey = pvutil.AnnStorageProvisioner
+	} else {
+		provisionerKey = pvutil.AnnDynamicallyProvisioned
+	}
 	provisioner, ok := ann[provisionerKey]
 	if !ok {
-		// Volume not dynamically provisioned. Ignore
-		return false
+		if claim {
+			// Also check beta AnnStorageProvisioner annontation to make sure
+			provisioner, ok = ann[pvutil.AnnBetaStorageProvisioner]
+			if !ok {
+				return false
+			}
+		} else {
+			// Volume not dynamically provisioned. Ignore
+			return false
+		}
 	}
 
 	migratedToDriver := ann[pvutil.AnnMigratedTo]
@@ -546,7 +563,7 @@ func (ctrl *PersistentVolumeController) resync() {
 }
 
 // setClaimProvisioner saves
-// claim.Annotations[pvutil.AnnStorageProvisioner] = class.Provisioner
+// claim.Annotations["volume.kubernetes.io/storage-provisioner"] = class.Provisioner
 func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, provisionerName string) (*v1.PersistentVolumeClaim, error) {
 	if val, ok := claim.Annotations[pvutil.AnnStorageProvisioner]; ok && val == provisionerName {
 		// annotation is already set, nothing to do
@@ -556,8 +573,10 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	// The volume from method args can be pointing to watcher cache. We must not
 	// modify these, therefore create a copy.
 	claimClone := claim.DeepCopy()
+	// TODO: remove the beta storage provisioner anno after the deprecation period
+	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnBetaStorageProvisioner, provisionerName)
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
-	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
+	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, true)
 	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
@@ -594,11 +613,11 @@ func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
 func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bool, error) {
 	objName, err := controller.KeyFunc(obj)
 	if err != nil {
-		return false, fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return false, fmt.Errorf("couldn't get key for object %+v: %w", obj, err)
 	}
 	oldObj, found, err := store.Get(obj)
 	if err != nil {
-		return false, fmt.Errorf("Error finding %s %q in controller cache: %v", className, objName, err)
+		return false, fmt.Errorf("error finding %s %q in controller cache: %w", className, objName, err)
 	}
 
 	objAccessor, err := meta.Accessor(obj)
@@ -610,7 +629,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 		// This is a new object
 		klog.V(4).Infof("storeObjectUpdate: adding %s %q, version %s", className, objName, objAccessor.GetResourceVersion())
 		if err = store.Add(obj); err != nil {
-			return false, fmt.Errorf("Error adding %s %q to controller cache: %v", className, objName, err)
+			return false, fmt.Errorf("error adding %s %q to controller cache: %w", className, objName, err)
 		}
 		return true, nil
 	}
@@ -622,11 +641,11 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 
 	objResourceVersion, err := strconv.ParseInt(objAccessor.GetResourceVersion(), 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("Error parsing ResourceVersion %q of %s %q: %s", objAccessor.GetResourceVersion(), className, objName, err)
+		return false, fmt.Errorf("error parsing ResourceVersion %q of %s %q: %s", objAccessor.GetResourceVersion(), className, objName, err)
 	}
 	oldObjResourceVersion, err := strconv.ParseInt(oldObjAccessor.GetResourceVersion(), 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("Error parsing old ResourceVersion %q of %s %q: %s", oldObjAccessor.GetResourceVersion(), className, objName, err)
+		return false, fmt.Errorf("error parsing old ResourceVersion %q of %s %q: %s", oldObjAccessor.GetResourceVersion(), className, objName, err)
 	}
 
 	// Throw away only older version, let the same version pass - we do want to
@@ -638,7 +657,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 
 	klog.V(4).Infof("storeObjectUpdate updating %s %q with version %s", className, objName, objAccessor.GetResourceVersion())
 	if err = store.Update(obj); err != nil {
-		return false, fmt.Errorf("Error updating %s %q in controller cache: %v", className, objName, err)
+		return false, fmt.Errorf("error updating %s %q in controller cache: %w", className, objName, err)
 	}
 	return true, nil
 }

@@ -35,6 +35,7 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	netutils "k8s.io/utils/net"
 )
 
 // NewKubeletServerCertificateManager creates a certificate manager for the kubelet when retrieving a server certificate
@@ -141,7 +142,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		},
 		func() float64 {
 			if c := m.Current(); c != nil && c.Leaf != nil {
-				return math.Trunc(c.Leaf.NotAfter.Sub(time.Now()).Seconds())
+				return math.Trunc(time.Until(c.Leaf.NotAfter).Seconds())
 			}
 			return math.Inf(1)
 		},
@@ -159,13 +160,13 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 
 		switch address.Type {
 		case v1.NodeHostName:
-			if ip := net.ParseIP(address.Address); ip != nil {
+			if ip := netutils.ParseIPSloppy(address.Address); ip != nil {
 				seenIPs[address.Address] = true
 			} else {
 				seenDNSNames[address.Address] = true
 			}
 		case v1.NodeExternalIP, v1.NodeInternalIP:
-			if ip := net.ParseIP(address.Address); ip != nil {
+			if ip := netutils.ParseIPSloppy(address.Address); ip != nil {
 				seenIPs[address.Address] = true
 			}
 		case v1.NodeExternalDNS, v1.NodeInternalDNS:
@@ -177,7 +178,7 @@ func addressesToHostnamesAndIPs(addresses []v1.NodeAddress) (dnsNames []string, 
 		dnsNames = append(dnsNames, dnsName)
 	}
 	for ip := range seenIPs {
-		ips = append(ips, net.ParseIP(ip))
+		ips = append(ips, netutils.ParseIPSloppy(ip))
 	}
 
 	// return in stable order

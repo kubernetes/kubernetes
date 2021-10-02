@@ -24,12 +24,12 @@ import (
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/record/util"
 	"k8s.io/client-go/tools/reference"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 type recorderImpl struct {
@@ -48,9 +48,13 @@ func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.O
 		klog.Errorf("Could not construct reference to: '%#v' due to: '%v'. Will not report event: '%v' '%v' '%v'", regarding, err, eventtype, reason, message)
 		return
 	}
-	refRelated, err := reference.GetReference(recorder.scheme, related)
-	if err != nil {
-		klog.V(9).Infof("Could not construct reference to: '%#v' due to: '%v'.", related, err)
+
+	var refRelated *v1.ObjectReference
+	if related != nil {
+		refRelated, err = reference.GetReference(recorder.scheme, related)
+		if err != nil {
+			klog.V(9).Infof("Could not construct reference to: '%#v' due to: '%v'.", related, err)
+		}
 	}
 	if !util.ValidateEventType(eventtype) {
 		klog.Errorf("Unsupported event type: '%v'", eventtype)

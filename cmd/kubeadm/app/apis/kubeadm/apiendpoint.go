@@ -20,6 +20,8 @@ import (
 	"net"
 	"strconv"
 
+	netutils "k8s.io/utils/net"
+
 	"github.com/pkg/errors"
 )
 
@@ -28,6 +30,9 @@ func APIEndpointFromString(apiEndpoint string) (APIEndpoint, error) {
 	apiEndpointHost, apiEndpointPortStr, err := net.SplitHostPort(apiEndpoint)
 	if err != nil {
 		return APIEndpoint{}, errors.Wrapf(err, "invalid advertise address endpoint: %s", apiEndpoint)
+	}
+	if netutils.ParseIPSloppy(apiEndpointHost) == nil {
+		return APIEndpoint{}, errors.Errorf("invalid API endpoint IP: %s", apiEndpointHost)
 	}
 	apiEndpointPort, err := net.LookupPort("tcp", apiEndpointPortStr)
 	if err != nil {

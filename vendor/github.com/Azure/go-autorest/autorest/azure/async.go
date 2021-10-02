@@ -42,6 +42,52 @@ const (
 
 var pollingCodes = [...]int{http.StatusNoContent, http.StatusAccepted, http.StatusCreated, http.StatusOK}
 
+// FutureAPI contains the set of methods on the Future type.
+type FutureAPI interface {
+	// Response returns the last HTTP response.
+	Response() *http.Response
+
+	// Status returns the last status message of the operation.
+	Status() string
+
+	// PollingMethod returns the method used to monitor the status of the asynchronous operation.
+	PollingMethod() PollingMethodType
+
+	// DoneWithContext queries the service to see if the operation has completed.
+	DoneWithContext(context.Context, autorest.Sender) (bool, error)
+
+	// GetPollingDelay returns a duration the application should wait before checking
+	// the status of the asynchronous request and true; this value is returned from
+	// the service via the Retry-After response header.  If the header wasn't returned
+	// then the function returns the zero-value time.Duration and false.
+	GetPollingDelay() (time.Duration, bool)
+
+	// WaitForCompletionRef will return when one of the following conditions is met: the long
+	// running operation has completed, the provided context is cancelled, or the client's
+	// polling duration has been exceeded.  It will retry failed polling attempts based on
+	// the retry value defined in the client up to the maximum retry attempts.
+	// If no deadline is specified in the context then the client.PollingDuration will be
+	// used to determine if a default deadline should be used.
+	// If PollingDuration is greater than zero the value will be used as the context's timeout.
+	// If PollingDuration is zero then no default deadline will be used.
+	WaitForCompletionRef(context.Context, autorest.Client) error
+
+	// MarshalJSON implements the json.Marshaler interface.
+	MarshalJSON() ([]byte, error)
+
+	// MarshalJSON implements the json.Unmarshaler interface.
+	UnmarshalJSON([]byte) error
+
+	// PollingURL returns the URL used for retrieving the status of the long-running operation.
+	PollingURL() string
+
+	// GetResult should be called once polling has completed successfully.
+	// It makes the final GET call to retrieve the resultant payload.
+	GetResult(autorest.Sender) (*http.Response, error)
+}
+
+var _ FutureAPI = (*Future)(nil)
+
 // Future provides a mechanism to access the status and results of an asynchronous request.
 // Since futures are stateful they should be passed by value to avoid race conditions.
 type Future struct {

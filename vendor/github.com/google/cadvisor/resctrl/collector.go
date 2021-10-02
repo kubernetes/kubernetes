@@ -26,19 +26,19 @@ import (
 )
 
 type collector struct {
-	resctrl intelrdt.IntelRdtManager
+	resctrl intelrdt.Manager
 	stats.NoopDestroy
 }
 
 func newCollector(id string, resctrlPath string) *collector {
 	collector := &collector{
-		resctrl: intelrdt.IntelRdtManager{
-			Config: &configs.Config{
+		resctrl: intelrdt.NewManager(
+			&configs.Config{
 				IntelRdt: &configs.IntelRdt{},
 			},
-			Id:   id,
-			Path: resctrlPath,
-		},
+			id,
+			resctrlPath,
+		),
 	}
 
 	return collector

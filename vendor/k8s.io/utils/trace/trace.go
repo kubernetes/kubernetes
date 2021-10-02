@@ -56,7 +56,7 @@ func writeTraceItemSummary(b *bytes.Buffer, msg string, totalTime time.Duration,
 		b.WriteString(" ")
 	}
 
-	b.WriteString(fmt.Sprintf("%vms (%v)", durationToMilliseconds(totalTime), startTime.Format("15:04:00.000")))
+	b.WriteString(fmt.Sprintf("%vms (%v)", durationToMilliseconds(totalTime), startTime.Format("15:04:05.000")))
 }
 
 func durationToMilliseconds(timeDuration time.Duration) int64 {

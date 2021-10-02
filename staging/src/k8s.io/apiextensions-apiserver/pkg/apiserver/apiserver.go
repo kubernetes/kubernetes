@@ -116,9 +116,11 @@ func (cfg *Config) Complete() CompletedConfig {
 	}
 
 	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.Version = &version.Info{
-		Major: "0",
-		Minor: "1",
+	if c.GenericConfig.Version == nil {
+		c.GenericConfig.Version = &version.Info{
+			Major: "0",
+			Minor: "1",
+		}
 	}
 
 	return CompletedConfig{&c}
@@ -137,7 +139,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	apiResourceConfig := c.GenericConfig.MergedResourceConfig
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(apiextensions.GroupName, Scheme, metav1.ParameterCodec, Codecs)
-	if apiResourceConfig.VersionEnabled(v1beta1.SchemeGroupVersion) {
+	if apiResourceConfig.VersionEnabled(v1.SchemeGroupVersion) {
 		storage := map[string]rest.Storage{}
 		// customresourcedefinitions
 		customResourceDefinitionStorage, err := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
@@ -146,18 +148,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}
 		storage["customresourcedefinitions"] = customResourceDefinitionStorage
 		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefinitionStorage)
-
-		apiGroupInfo.VersionedResourcesStorageMap[v1beta1.SchemeGroupVersion.Version] = storage
-	}
-	if apiResourceConfig.VersionEnabled(v1.SchemeGroupVersion) {
-		storage := map[string]rest.Storage{}
-		// customresourcedefinitions
-		customResourceDefintionStorage, err := customresourcedefinition.NewREST(Scheme, c.GenericConfig.RESTOptionsGetter)
-		if err != nil {
-			return nil, err
-		}
-		storage["customresourcedefinitions"] = customResourceDefintionStorage
-		storage["customresourcedefinitions/status"] = customresourcedefinition.NewStatusREST(Scheme, customResourceDefintionStorage)
 
 		apiGroupInfo.VersionedResourcesStorageMap[v1.SchemeGroupVersion.Version] = storage
 	}

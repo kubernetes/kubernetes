@@ -23,9 +23,8 @@ import (
 	"testing"
 	"time"
 
-	cron "github.com/robfig/cron"
+	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,17 +39,17 @@ func TestGetJobFromTemplate(t *testing.T) {
 	var one int64 = 1
 	var no bool
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
 			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
@@ -98,17 +97,17 @@ func TestGetJobFromTemplate2(t *testing.T) {
 	var one int64 = 1
 	var no bool
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: "snazzycats",
 			UID:       types.UID("1a2b3c"),
 			SelfLink:  "/apis/batch/v1/namespaces/snazzycats/jobs/mycronjob",
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          "* * * * ?",
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      map[string]string{"a": "b"},
 					Annotations: map[string]string{"x": "y"},
@@ -302,7 +301,7 @@ func TestGroupJobsByParent(t *testing.T) {
 	}
 }
 
-func TestGetLatestUnmetScheduleTimes(t *testing.T) {
+func TestGetNextScheduleTime(t *testing.T) {
 	// schedule is hourly on the hour
 	schedule := "0 * * * ?"
 
@@ -326,16 +325,16 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		t.Errorf("test setup error: %v", err)
 	}
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("1a2b3c"),
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate:       batchv1beta1.JobTemplateSpec{},
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate:       batchv1.JobTemplateSpec{},
 		},
 	}
 	{
@@ -344,9 +343,9 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is more than creation time, but less than T1.
 		now := T1.Add(-7 * time.Minute)
-		times := getUnmetScheduleTimes(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
-		if len(times) != 0 {
-			t.Errorf("expected no start times, got:  %v", times)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		if schedule != nil {
+			t.Errorf("expected no start time, got:  %v", schedule)
 		}
 	}
 	{
@@ -355,11 +354,11 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-10 * time.Minute)}
 		// Current time is after T1
 		now := T1.Add(2 * time.Second)
-		times := getUnmetScheduleTimes(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
-		if len(times) != 1 {
-			t.Errorf("expected 1 start time, got: %v", times)
-		} else if !times[0].Equal(T1) {
-			t.Errorf("expected: %v, got: %v", T1, times[0])
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		if schedule == nil {
+			t.Errorf("expected 1 start time, got nil")
+		} else if !schedule.Equal(T1) {
+			t.Errorf("expected: %v, got: %v", T1, schedule)
 		}
 	}
 	{
@@ -370,9 +369,9 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1
 		now := T1.Add(2 * time.Minute)
-		times := getUnmetScheduleTimes(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
-		if len(times) != 0 {
-			t.Errorf("expected 0 start times, got: %v", times)
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		if schedule != nil {
+			t.Errorf("expected 0 start times, got: %v", schedule)
 		}
 	}
 	{
@@ -383,11 +382,11 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		times := getUnmetScheduleTimes(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
-		if len(times) != 1 {
-			t.Errorf("expected 1 start times, got: %v", times)
-		} else if !times[0].Equal(T2) {
-			t.Errorf("expected: %v, got: %v", T1, times[0])
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		if schedule == nil {
+			t.Errorf("expected 1 start times, got nil")
+		} else if !schedule.Equal(T2) {
+			t.Errorf("expected: %v, got: %v", T2, schedule)
 		}
 	}
 	{
@@ -396,16 +395,11 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		// Current time is after T1 and after T2
 		now := T2.Add(5 * time.Minute)
-		times := getUnmetScheduleTimes(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
-		if len(times) != 2 {
-			t.Errorf("expected 2 start times, got: %v", times)
-		} else {
-			if !times[0].Equal(T1) {
-				t.Errorf("expected: %v, got: %v", T1, times[0])
-			}
-			if !times[1].Equal(T2) {
-				t.Errorf("expected: %v, got: %v", T2, times[1])
-			}
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		if schedule == nil {
+			t.Errorf("expected 1 start times, got nil")
+		} else if !schedule.Equal(T2) {
+			t.Errorf("expected: %v, got: %v", T2, schedule)
 		}
 	}
 	{
@@ -413,8 +407,8 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		cj.ObjectMeta.CreationTimestamp = metav1.Time{Time: T1.Add(-2 * time.Hour)}
 		cj.Status.LastScheduleTime = &metav1.Time{Time: T1.Add(-1 * time.Hour)}
 		now := T2.Add(10 * 24 * time.Hour)
-		times := getUnmetScheduleTimes(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
-		if len(times) == 0 {
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
 	}
@@ -426,8 +420,8 @@ func TestGetLatestUnmetScheduleTimes(t *testing.T) {
 		// Deadline is short
 		deadline := int64(2 * 60 * 60)
 		cj.Spec.StartingDeadlineSeconds = &deadline
-		times := getUnmetScheduleTimes(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
-		if len(times) == 0 {
+		schedule, _ := getNextScheduleTime(cj, now, PraseSchedule(cj.Spec.Schedule), recorder)
+		if schedule == nil {
 			t.Errorf("expected more than 0 missed times")
 		}
 	}
@@ -447,16 +441,16 @@ func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 		t.Errorf("test setup error: %v", err)
 	}
 
-	cj := batchv1beta1.CronJob{
+	cj := batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "mycronjob",
 			Namespace: metav1.NamespaceDefault,
 			UID:       types.UID("1a2b3c"),
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule:          schedule,
-			ConcurrencyPolicy: batchv1beta1.AllowConcurrent,
-			JobTemplate:       batchv1beta1.JobTemplateSpec{},
+			ConcurrencyPolicy: batchv1.AllowConcurrent,
+			JobTemplate:       batchv1.JobTemplateSpec{},
 		},
 	}
 	{
@@ -629,5 +623,88 @@ func TestByJobStartTime(t *testing.T) {
 		if !reflect.DeepEqual(testCase.input, testCase.expected) {
 			t.Errorf("case: '%s', jobs not sorted as expected", testCase.name)
 		}
+	}
+}
+
+func TestGetMostRecentScheduleTime(t *testing.T) {
+	type args struct {
+		earliestTime *time.Time
+		now          time.Time
+		schedule     string
+	}
+	tests := []struct {
+		name                   string
+		args                   args
+		expectedTime           *time.Time
+		expectedNumberOfMisses int64
+		wantErr                bool
+	}{
+		{
+			name: "now before next schedule",
+			args: args{
+				earliestTime: topOfTheHour(),
+				now:          topOfTheHour().Add(time.Second * 30),
+				schedule:     "0 * * * *",
+			},
+			expectedTime: nil,
+		},
+		{
+			name: "now just after next schedule",
+			args: args{
+				earliestTime: topOfTheHour(),
+				now:          topOfTheHour().Add(time.Minute * 61),
+				schedule:     "0 * * * *",
+			},
+			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 60),
+			expectedNumberOfMisses: 1,
+		},
+		{
+			name: "missed 5 schedules",
+			args: args{
+				earliestTime: deltaTimeAfterTopOfTheHour(time.Second * 10),
+				now:          *deltaTimeAfterTopOfTheHour(time.Minute * 301),
+				schedule:     "0 * * * *",
+			},
+			expectedTime:           deltaTimeAfterTopOfTheHour(time.Minute * 300),
+			expectedNumberOfMisses: 5,
+		},
+		{
+			name: "rogue cronjob",
+			args: args{
+				earliestTime: deltaTimeAfterTopOfTheHour(time.Second * 10),
+				now:          *deltaTimeAfterTopOfTheHour(time.Hour * 1000000),
+				schedule:     "59 23 31 2 *",
+			},
+			expectedTime:           nil,
+			expectedNumberOfMisses: 0,
+			wantErr:                true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sched, err := cron.ParseStandard(tt.args.schedule)
+			if err != nil {
+				t.Errorf("error setting up the test, %s", err)
+			}
+			gotTime, gotNumberOfMisses, err := getMostRecentScheduleTime(*tt.args.earliestTime, tt.args.now, sched)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("getMostRecentScheduleTime() got no error when expected one")
+				}
+				return
+			}
+			if !tt.wantErr && err != nil {
+				t.Error("getMostRecentScheduleTime() got error when none expected")
+			}
+			if gotTime == nil && tt.expectedTime != nil {
+				t.Errorf("getMostRecentScheduleTime() got nil, want %v", tt.expectedTime)
+			}
+			if gotTime != nil && tt.expectedTime != nil && !gotTime.Equal(*tt.expectedTime) {
+				t.Errorf("getMostRecentScheduleTime() got = %v, want %v", gotTime, tt.expectedTime)
+			}
+			if gotNumberOfMisses != tt.expectedNumberOfMisses {
+				t.Errorf("getMostRecentScheduleTime() got1 = %v, want %v", gotNumberOfMisses, tt.expectedNumberOfMisses)
+			}
+		})
 	}
 }

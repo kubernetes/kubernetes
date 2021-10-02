@@ -13,3 +13,4 @@ readonly ETCD_SERVERS_OVERRIDES={{.ETCDServersOverride}}
 readonly STORAGE_BACKEND={{.StorageBackend}}
 readonly STORAGE_MEDIA_TYPE={{.StorageMediaType}}
 readonly ETCD_COMPACTION_INTERVAL_SEC={{.CompactionInterval}}
+readonly KUBE_API_SERVER_RUNASUSER={{.KubeAPIServerRunAsUser}}

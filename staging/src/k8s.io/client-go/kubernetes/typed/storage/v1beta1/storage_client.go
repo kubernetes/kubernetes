@@ -28,6 +28,7 @@ type StorageV1beta1Interface interface {
 	RESTClient() rest.Interface
 	CSIDriversGetter
 	CSINodesGetter
+	CSIStorageCapacitiesGetter
 	StorageClassesGetter
 	VolumeAttachmentsGetter
 }
@@ -43,6 +44,10 @@ func (c *StorageV1beta1Client) CSIDrivers() CSIDriverInterface {
 
 func (c *StorageV1beta1Client) CSINodes() CSINodeInterface {
 	return newCSINodes(c)
+}
+
+func (c *StorageV1beta1Client) CSIStorageCapacities(namespace string) CSIStorageCapacityInterface {
+	return newCSIStorageCapacities(c, namespace)
 }
 
 func (c *StorageV1beta1Client) StorageClasses() StorageClassInterface {

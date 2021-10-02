@@ -22,25 +22,37 @@ type ginkgoTestingT interface {
 	Fail()
 }
 
+type deferredContainerNode struct {
+	text         string
+	body         func()
+	flag         types.FlagType
+	codeLocation types.CodeLocation
+}
+
 type Suite struct {
 	topLevelContainer *containernode.ContainerNode
 	currentContainer  *containernode.ContainerNode
-	containerIndex    int
-	beforeSuiteNode   leafnodes.SuiteNode
-	afterSuiteNode    leafnodes.SuiteNode
-	runner            *specrunner.SpecRunner
-	failer            *failer.Failer
-	running           bool
+
+	deferredContainerNodes []deferredContainerNode
+
+	containerIndex      int
+	beforeSuiteNode     leafnodes.SuiteNode
+	afterSuiteNode      leafnodes.SuiteNode
+	runner              *specrunner.SpecRunner
+	failer              *failer.Failer
+	running             bool
+	expandTopLevelNodes bool
 }
 
 func New(failer *failer.Failer) *Suite {
 	topLevelContainer := containernode.New("[Top Level]", types.FlagTypeNone, types.CodeLocation{})
 
 	return &Suite{
-		topLevelContainer: topLevelContainer,
-		currentContainer:  topLevelContainer,
-		failer:            failer,
-		containerIndex:    1,
+		topLevelContainer:      topLevelContainer,
+		currentContainer:       topLevelContainer,
+		failer:                 failer,
+		containerIndex:         1,
+		deferredContainerNodes: []deferredContainerNode{},
 	}
 }
 
@@ -51,6 +63,11 @@ func (suite *Suite) Run(t ginkgoTestingT, description string, reporters []report
 
 	if config.ParallelNode > config.ParallelTotal || config.ParallelNode < 1 {
 		panic("ginkgo.parallel.node is one-indexed and must be <= ginkgo.parallel.total")
+	}
+
+	suite.expandTopLevelNodes = true
+	for _, deferredNode := range suite.deferredContainerNodes {
+		suite.PushContainerNode(deferredNode.text, deferredNode.body, deferredNode.flag, deferredNode.codeLocation)
 	}
 
 	r := rand.New(rand.NewSource(config.RandomSeed))
@@ -102,6 +119,9 @@ func (suite *Suite) generateSpecsIterator(description string, config config.Gink
 }
 
 func (suite *Suite) CurrentRunningSpecSummary() (*types.SpecSummary, bool) {
+	if !suite.running {
+		return nil, false
+	}
 	return suite.runner.CurrentSpecSummary()
 }
 
@@ -134,6 +154,23 @@ func (suite *Suite) SetSynchronizedAfterSuiteNode(bodyA interface{}, bodyB inter
 }
 
 func (suite *Suite) PushContainerNode(text string, body func(), flag types.FlagType, codeLocation types.CodeLocation) {
+	/*
+		We defer walking the container nodes (which immediately evaluates the `body` function)
+		until `RunSpecs` is called.  We do this by storing off the deferred container nodes.  Then, when
+		`RunSpecs` is called we actually go through and add the container nodes to the test structure.
+
+		This allows us to defer calling all the `body` functions until _after_ the top level functions
+		have been walked, _after_ func init()s have been called, and _after_ `go test` has called `flag.Parse()`.
+
+		This allows users to load up configuration information in the `TestX` go test hook just before `RunSpecs`
+		is invoked and solves issues like #693 and makes the lifecycle easier to reason about.
+
+	*/
+	if !suite.expandTopLevelNodes {
+		suite.deferredContainerNodes = append(suite.deferredContainerNodes, deferredContainerNode{text, body, flag, codeLocation})
+		return
+	}
+
 	container := containernode.New(text, flag, codeLocation)
 	suite.currentContainer.PushContainerNode(container)
 

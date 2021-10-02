@@ -22,7 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,7 +38,7 @@ import (
 )
 
 func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-activedeadline-update", s, t)
@@ -154,7 +155,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 }
 
 func TestPodReadOnlyFilesystem(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	isReadOnly := true
@@ -190,7 +191,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 func TestPodCreateEphemeralContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-create-ephemeral-containers", s, t)
@@ -234,37 +235,33 @@ func TestPodCreateEphemeralContainers(t *testing.T) {
 
 // setUpEphemeralContainers creates a pod that has Ephemeral Containers. This is a two step
 // process because Ephemeral Containers are not allowed during pod creation.
-func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, containers []v1.EphemeralContainer) error {
-	if _, err := podsClient.Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
-		return fmt.Errorf("failed to create pod: %v", err)
+func setUpEphemeralContainers(podsClient typedv1.PodInterface, pod *v1.Pod, containers []v1.EphemeralContainer) (*v1.Pod, error) {
+	result, err := podsClient.Create(context.TODO(), pod, metav1.CreateOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pod: %v", err)
 	}
 
 	if len(containers) == 0 {
-		return nil
+		return result, nil
 	}
 
 	pod.Spec.EphemeralContainers = containers
 	if _, err := podsClient.Update(context.TODO(), pod, metav1.UpdateOptions{}); err == nil {
-		return fmt.Errorf("unexpected allowed direct update of ephemeral containers during set up: %v", err)
+		return nil, fmt.Errorf("unexpected allowed direct update of ephemeral containers during set up: %v", err)
 	}
 
-	ec, err := podsClient.GetEphemeralContainers(context.TODO(), pod.Name, metav1.GetOptions{})
+	result, err = podsClient.UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{})
 	if err != nil {
-		return fmt.Errorf("unable to get ephemeral containers for test case set up: %v", err)
+		return nil, fmt.Errorf("failed to update ephemeral containers for test case set up: %v", err)
 	}
 
-	ec.EphemeralContainers = containers
-	if _, err = podsClient.UpdateEphemeralContainers(context.TODO(), pod.Name, ec, metav1.UpdateOptions{}); err != nil {
-		return fmt.Errorf("failed to update ephemeral containers for test case set up: %v", err)
-	}
-
-	return nil
+	return result, nil
 }
 
 func TestPodPatchEphemeralContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-patch-ephemeral-containers", s, t)
@@ -302,12 +299,14 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			original:  nil,
 			patchType: types.StrategicMergePatchType,
 			patchBody: []byte(`{
-				"ephemeralContainers": [{
-					"name": "debugger1",
-					"image": "debugimage",
-					"imagePullPolicy": "Always",
-					"terminationMessagePolicy": "File"
-				}]
+				"spec": {
+					"ephemeralContainers": [{
+						"name": "debugger1",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				}
 			}`),
 			valid: true,
 		},
@@ -316,12 +315,14 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			original:  nil,
 			patchType: types.MergePatchType,
 			patchBody: []byte(`{
-				"ephemeralContainers":[{
-					"name": "debugger1",
-					"image": "debugimage",
-					"imagePullPolicy": "Always",
-					"terminationMessagePolicy": "File"
-				}]
+				"spec": {
+					"ephemeralContainers":[{
+						"name": "debugger1",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				}
 			}`),
 			valid: true,
 		},
@@ -329,15 +330,17 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			name:      "create single container (JSON)",
 			original:  nil,
 			patchType: types.JSONPatchType,
+			// Because ephemeralContainers is optional, a JSON patch of an empty ephemeralContainers must add the
+			// list rather than simply appending to it.
 			patchBody: []byte(`[{
 				"op":"add",
-				"path":"/ephemeralContainers/-",
-				"value":{
+				"path":"/spec/ephemeralContainers",
+				"value":[{
 					"name":"debugger1",
 					"image":"debugimage",
 					"imagePullPolicy": "Always",
 					"terminationMessagePolicy": "File"
-				}
+				}]
 			}]`),
 			valid: true,
 		},
@@ -355,12 +358,14 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			},
 			patchType: types.StrategicMergePatchType,
 			patchBody: []byte(`{
-				"ephemeralContainers":[{
-					"name": "debugger2",
-					"image": "debugimage",
-					"imagePullPolicy": "Always",
-					"terminationMessagePolicy": "File"
-				}]
+				"spec": {
+					"ephemeralContainers":[{
+						"name": "debugger2",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				}
 			}`),
 			valid: true,
 		},
@@ -378,17 +383,19 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			},
 			patchType: types.MergePatchType,
 			patchBody: []byte(`{
-				"ephemeralContainers":[{
-					"name": "debugger1",
-					"image": "debugimage",
-					"imagePullPolicy": "Always",
-					"terminationMessagePolicy": "File"
-				},{
-					"name": "debugger2",
-					"image": "debugimage",
-					"imagePullPolicy": "Always",
-					"terminationMessagePolicy": "File"
-				}]
+				"spec": {
+					"ephemeralContainers":[{
+						"name": "debugger1",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					},{
+						"name": "debugger2",
+						"image": "debugimage",
+						"imagePullPolicy": "Always",
+						"terminationMessagePolicy": "File"
+					}]
+				} 
 			}`),
 			valid: true,
 		},
@@ -407,7 +414,7 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 			patchType: types.JSONPatchType,
 			patchBody: []byte(`[{
 				"op":"add",
-				"path":"/ephemeralContainers/-",
+				"path":"/spec/ephemeralContainers/-",
 				"value":{
 					"name":"debugger2",
 					"image":"debugimage",
@@ -430,8 +437,24 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 				},
 			},
 			patchType: types.MergePatchType,
-			patchBody: []byte(`{"ephemeralContainers":[]}`),
+			patchBody: []byte(`{"spec": {"ephemeralContainers":[]}}`),
 			valid:     false,
+		},
+		{
+			name: "remove the single container (JSON)",
+			original: []v1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: v1.EphemeralContainerCommon{
+						Name:                     "debugger1",
+						Image:                    "debugimage",
+						ImagePullPolicy:          "Always",
+						TerminationMessagePolicy: "File",
+					},
+				},
+			},
+			patchType: types.JSONPatchType,
+			patchBody: []byte(`[{"op":"remove","path":"/ephemeralContainers/0"}]`),
+			valid:     false, // disallowed by policy rather than patch semantics
 		},
 		{
 			name: "remove all containers (JSON)",
@@ -446,14 +469,14 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 				},
 			},
 			patchType: types.JSONPatchType,
-			patchBody: []byte(`[{"op":"remove","path":"/ephemeralContainers/0"}]`),
-			valid:     false,
+			patchBody: []byte(`[{"op":"remove","path":"/ephemeralContainers"}]`),
+			valid:     false, // disallowed by policy rather than patch semantics
 		},
 	}
 
 	for i, tc := range cases {
 		pod := testPod(fmt.Sprintf("ephemeral-container-test-%v", i))
-		if err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, tc.original); err != nil {
+		if _, err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, tc.original); err != nil {
 			t.Errorf("%v: %v", tc.name, err)
 		}
 
@@ -470,7 +493,7 @@ func TestPodPatchEphemeralContainers(t *testing.T) {
 func TestPodUpdateEphemeralContainers(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
-	_, s, closeFn := framework.RunAMaster(nil)
+	_, s, closeFn := framework.RunAnAPIServer(nil)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("pod-update-ephemeral-containers", s, t)
@@ -642,23 +665,75 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 	}
 
 	for i, tc := range cases {
-		pod := testPod(fmt.Sprintf("ephemeral-container-test-%v", i))
-		if err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, tc.original); err != nil {
+		pod, err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), testPod(fmt.Sprintf("ephemeral-container-test-%v", i)), tc.original)
+		if err != nil {
 			t.Errorf("%v: %v", tc.name, err)
 		}
 
-		ec, err := client.CoreV1().Pods(ns.Name).GetEphemeralContainers(context.TODO(), pod.Name, metav1.GetOptions{})
-		if err != nil {
-			t.Errorf("%v: unable to get ephemeral containers: %v", tc.name, err)
-		}
-
-		ec.EphemeralContainers = tc.update
-		if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, ec, metav1.UpdateOptions{}); tc.valid && err != nil {
+		pod.Spec.EphemeralContainers = tc.update
+		if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{}); tc.valid && err != nil {
 			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
 		} else if !tc.valid && err == nil {
 			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
 		}
 
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	}
+}
+
+// TestPodEphemeralContainersDisabled tests that the API server returns a 404 when the feature is disabled (because the subresource won't exist).
+// This validates that the feature gate is working, but kubectl also uses the 404 to guess that the feature is disabled on the server.
+func TestPodEphemeralContainersDisabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
+
+	_, s, closeFn := framework.RunAnAPIServer(nil)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("pod-ephemeral-containers-disabled", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ephemeral-container-pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "fake-name",
+					Image: "fakeimage",
+				},
+			},
+		},
+	}
+	pod, err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+
+	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, v1.EphemeralContainer{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon{
+			Name:                     "debugger",
+			Image:                    "debugimage",
+			ImagePullPolicy:          "Always",
+			TerminationMessagePolicy: "File",
+		},
+	})
+
+	if _, err = client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{}); err == nil {
+		t.Fatalf("got nil error when updating ephemeral containers with feature disabled, wanted %q", metav1.StatusReasonNotFound)
+	}
+
+	se, ok := err.(*errors.StatusError)
+	if !ok {
+		t.Fatalf("got error %#v, expected StatusError", err)
+	}
+	if se.ErrStatus.Reason != metav1.StatusReasonNotFound {
+		t.Errorf("got error reason %q when updating ephemeral containers with feature disabled, want %q: %#v", se.ErrStatus.Reason, metav1.StatusReasonNotFound, se)
+	}
+	if se.ErrStatus.Details.Name != "" {
+		t.Errorf("got error details with name %q, want %q: %#v", se.ErrStatus.Details.Name, "", se)
 	}
 }

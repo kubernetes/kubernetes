@@ -247,7 +247,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	expectedErrMsg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", "bar", containerName, format.Pod(&pod), expectedErr, expectedErr.Error())
+	expectedErrMsg := fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", "bar", containerName, format.Pod(&pod), expectedErr, expectedErr.Error())
 	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expected error: %v", expectedErr)

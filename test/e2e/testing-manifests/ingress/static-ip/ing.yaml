@@ -1,4 +1,4 @@
-apiVersion: networking.k8s.io/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: static-ip
@@ -10,6 +10,8 @@ spec:
   # This assumes tls-secret exists.
   # To generate it run the make in this directory.
   - secretName: tls-secret
-  backend:
-    serviceName: echoheaders-https
-    servicePort: 80
+  defaultBackend:
+    service:
+      name: echoheaders-https
+      port:
+        number: 80

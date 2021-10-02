@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 /*
@@ -31,7 +32,7 @@ var (
 )
 
 // verifyRunAsNonRoot verifies RunAsNonRoot on windows.
-// https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/20190103-windows-node-support.md#v1container
+// https://github.com/kubernetes/enhancements/tree/master/keps/sig-windows/116-windows-node-support#v1container
 // Windows does not have a root user, we cannot judge the root identity of the windows container by the way to judge the root(uid=0) of the linux container.
 // According to the discussion of sig-windows, at present, we assume that ContainerAdministrator is the windows container root user,
 // and then optimize this logic according to the best time.
@@ -43,13 +44,15 @@ func verifyRunAsNonRoot(pod *v1.Pod, container *v1.Container, uid *int64, userna
 		return nil
 	}
 	if effectiveSc.RunAsUser != nil {
-		klog.Warningf("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions (pod: %q, container: %s)", format.Pod(pod), container.Name)
+		klog.InfoS("Windows container does not support SecurityContext.RunAsUser, please use SecurityContext.WindowsOptions",
+			"pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.SELinuxOptions != nil {
-		klog.Warningf("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions (pod: %q, container: %s)", format.Pod(pod), container.Name)
+		klog.InfoS("Windows container does not support SecurityContext.SELinuxOptions, please use SecurityContext.WindowsOptions",
+			"pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.RunAsGroup != nil {
-		klog.Warningf("Windows container does not support SecurityContext.RunAsGroup (pod: %q, container: %s)", format.Pod(pod), container.Name)
+		klog.InfoS("Windows container does not support SecurityContext.RunAsGroup", "pod", klog.KObj(pod), "containerName", container.Name)
 	}
 	if effectiveSc.WindowsOptions != nil {
 		if effectiveSc.WindowsOptions.RunAsUserName != nil {

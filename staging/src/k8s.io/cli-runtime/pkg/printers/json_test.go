@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/yaml"
 )
 
 var testData = TestStruct{
@@ -49,10 +48,6 @@ type TestStruct struct {
 
 func (in *TestStruct) DeepCopyObject() runtime.Object {
 	panic("never called")
-}
-
-func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, NewTypeSetter(scheme.Scheme).ToPrinter(&YAMLPrinter{}), yamlUnmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
@@ -104,10 +99,6 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	if !reflect.DeepEqual(obj, &objOut) {
 		t.Errorf("Unexpected inequality:\n%v", diff.ObjectDiff(obj, &objOut))
 	}
-}
-
-func yamlUnmarshal(data []byte, v interface{}) error {
-	return yaml.Unmarshal(data, v)
 }
 
 func TestPrintersSuccess(t *testing.T) {

@@ -50,68 +50,6 @@ var (
 	}
 )
 
-func TestGetServicePrincipalTokenFromMSIWithUserAssignedID(t *testing.T) {
-	configs := []*AzureAuthConfig{
-		{
-			UseManagedIdentityExtension: true,
-			UserAssignedIdentityID:      "UserAssignedIdentityID",
-		},
-		// The Azure service principal is ignored when
-		// UseManagedIdentityExtension is set to true
-		{
-			UseManagedIdentityExtension: true,
-			UserAssignedIdentityID:      "UserAssignedIdentityID",
-			TenantID:                    "TenantID",
-			AADClientID:                 "AADClientID",
-			AADClientSecret:             "AADClientSecret",
-		},
-	}
-	env := &azure.PublicCloud
-
-	for _, config := range configs {
-		token, err := GetServicePrincipalToken(config, env)
-		assert.NoError(t, err)
-
-		msiEndpoint, err := adal.GetMSIVMEndpoint()
-		assert.NoError(t, err)
-
-		spt, err := adal.NewServicePrincipalTokenFromMSIWithUserAssignedID(msiEndpoint,
-			env.ServiceManagementEndpoint, config.UserAssignedIdentityID)
-		assert.NoError(t, err)
-		assert.Equal(t, token, spt)
-	}
-}
-
-func TestGetServicePrincipalTokenFromMSI(t *testing.T) {
-	configs := []*AzureAuthConfig{
-		{
-			UseManagedIdentityExtension: true,
-		},
-		// The Azure service principal is ignored when
-		// UseManagedIdentityExtension is set to true
-		{
-			UseManagedIdentityExtension: true,
-			TenantID:                    "TenantID",
-			AADClientID:                 "AADClientID",
-			AADClientSecret:             "AADClientSecret",
-		},
-	}
-	env := &azure.PublicCloud
-
-	for _, config := range configs {
-		token, err := GetServicePrincipalToken(config, env)
-		assert.NoError(t, err)
-
-		msiEndpoint, err := adal.GetMSIVMEndpoint()
-		assert.NoError(t, err)
-
-		spt, err := adal.NewServicePrincipalTokenFromMSI(msiEndpoint, env.ServiceManagementEndpoint)
-		assert.NoError(t, err)
-		assert.Equal(t, token, spt)
-	}
-
-}
-
 func TestGetServicePrincipalToken(t *testing.T) {
 	config := &AzureAuthConfig{
 		TenantID:        "TenantID",

@@ -25,20 +25,21 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
-	"k8s.io/component-base/logs"
-
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
+	netutils "k8s.io/utils/net"
 )
 
 func TestAddFlags(t *testing.T) {
@@ -111,23 +112,25 @@ func TestAddFlags(t *testing.T) {
 		"--kubelet-client-certificate=/var/run/kubernetes/ceserver.crt",
 		"--kubelet-client-key=/var/run/kubernetes/server.key",
 		"--kubelet-certificate-authority=/var/run/kubernetes/caserver.crt",
+		"--tracing-config-file=/var/run/kubernetes/tracing_config.yaml",
 		"--proxy-client-cert-file=/var/run/kubernetes/proxy.crt",
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
 		"--service-cluster-ip-range=192.168.128.0/17",
+		"--lease-reuse-duration-seconds=100",
 	}
 	fs.Parse(args)
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-		ServiceClusterIPRanges: (&net.IPNet{IP: net.ParseIP("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
+		ServiceClusterIPRanges: (&net.IPNet{IP: netutils.ParseIPSloppy("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		AllowPrivileged:        false,
 		GenericServerRunOptions: &apiserveroptions.ServerRunOptions{
-			AdvertiseAddress:            net.ParseIP("192.168.10.10"),
+			AdvertiseAddress:            netutils.ParseIPSloppy("192.168.10.10"),
 			CorsAllowedOriginList:       []string{"10.10.10.100", "10.10.10.200"},
 			MaxRequestsInFlight:         400,
 			MaxMutatingRequestsInFlight: 200,
@@ -155,13 +158,16 @@ func TestAddFlags(t *testing.T) {
 					TrustedCAFile: "/var/run/kubernetes/etcdca.crt",
 					CertFile:      "/var/run/kubernetes/etcdce.crt",
 				},
-				Paging:                    true,
-				Prefix:                    "/registry",
-				CompactionInterval:        storagebackend.DefaultCompactInterval,
-				CountMetricPollPeriod:     time.Minute,
-				DBMetricPollInterval:      storagebackend.DefaultDBMetricPollInterval,
-				HealthcheckTimeout:        storagebackend.DefaultHealthcheckTimeout,
-				LeaseReuseDurationSeconds: storagebackend.DefaultLeaseReuseDurationSeconds,
+				Paging:                true,
+				Prefix:                "/registry",
+				CompactionInterval:    storagebackend.DefaultCompactInterval,
+				CountMetricPollPeriod: time.Minute,
+				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
+				HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
+				LeaseManagerConfig: etcd3.LeaseManagerConfig{
+					ReuseDurationSeconds: 100,
+					MaxObjectCount:       1000,
+				},
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,
@@ -170,7 +176,7 @@ func TestAddFlags(t *testing.T) {
 			DefaultWatchCacheSize:   100,
 		},
 		SecureServing: (&apiserveroptions.SecureServingOptions{
-			BindAddress: net.ParseIP("192.168.10.20"),
+			BindAddress: netutils.ParseIPSloppy("192.168.10.20"),
 			BindPort:    6443,
 			ServerCert: apiserveroptions.GeneratableKeyCert{
 				CertDirectory: "/var/run/kubernetes",
@@ -300,12 +306,15 @@ func TestAddFlags(t *testing.T) {
 		EgressSelector: &apiserveroptions.EgressSelectorOptions{
 			ConfigFile: "/var/run/kubernetes/egress-selector/connectivity.yaml",
 		},
-		EnableLogsHandler:                 false,
-		EnableAggregatorRouting:           true,
-		ProxyClientKeyFile:                "/var/run/kubernetes/proxy.key",
-		ProxyClientCertFile:               "/var/run/kubernetes/proxy.crt",
-		Metrics:                           &metrics.Options{},
-		Logs:                              logs.NewOptions(),
+		EnableLogsHandler:       false,
+		EnableAggregatorRouting: true,
+		ProxyClientKeyFile:      "/var/run/kubernetes/proxy.key",
+		ProxyClientCertFile:     "/var/run/kubernetes/proxy.crt",
+		Metrics:                 &metrics.Options{},
+		Logs:                    logs.NewOptions(),
+		Traces: &apiserveroptions.TracingOptions{
+			ConfigFile: "/var/run/kubernetes/tracing_config.yaml",
+		},
 		IdentityLeaseDurationSeconds:      3600,
 		IdentityLeaseRenewIntervalSeconds: 10,
 	}

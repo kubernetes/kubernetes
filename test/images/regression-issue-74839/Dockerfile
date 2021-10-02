@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/distroless/base
+ARG BASEIMAGE
+FROM $BASEIMAGE
+
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
 ADD regression-issue-74839 /regression-issue-74839
 

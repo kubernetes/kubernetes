@@ -30,7 +30,7 @@ func ExpandScratchSize(ctx context.Context, path string, size uint64) (err error
 
 	// Manually expand the volume now in order to work around bugs in 19H1 and
 	// prerelease versions of Vb. Remove once this is fixed in Windows.
-	if build := osversion.Get().Build; build >= osversion.V19H1 && build < 19020 {
+	if build := osversion.Build(); build >= osversion.V19H1 && build < 19020 {
 		err = expandSandboxVolume(ctx, path)
 		if err != nil {
 			return err

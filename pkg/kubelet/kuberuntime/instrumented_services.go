@@ -244,6 +244,24 @@ func (in instrumentedRuntimeService) ListContainerStats(filter *runtimeapi.Conta
 	return out, err
 }
 
+func (in instrumentedRuntimeService) PodSandboxStats(podSandboxID string) (*runtimeapi.PodSandboxStats, error) {
+	const operation = "podsandbox_stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.PodSandboxStats(podSandboxID)
+	recordError(operation, err)
+	return out, err
+}
+
+func (in instrumentedRuntimeService) ListPodSandboxStats(filter *runtimeapi.PodSandboxStatsFilter) ([]*runtimeapi.PodSandboxStats, error) {
+	const operation = "list_podsandbox_stats"
+	defer recordOperation(operation, time.Now())
+
+	out, err := in.service.ListPodSandboxStats(filter)
+	recordError(operation, err)
+	return out, err
+}
+
 func (in instrumentedRuntimeService) PortForward(req *runtimeapi.PortForwardRequest) (*runtimeapi.PortForwardResponse, error) {
 	const operation = "port_forward"
 	defer recordOperation(operation, time.Now())

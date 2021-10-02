@@ -22,12 +22,11 @@ testImport:
 - package: github.com/mattn/goveralls
 - package: github.com/pborman/uuid
 - package: github.com/pkg/errors
-- package: go.pedge.io/lion
 - package: github.com/rs/zerolog
 - package: golang.org/x/tools
   subpackages:
   - cover
-- package: github.com/golang/lint
+- package: golang.org/x/lint
   subpackages:
   - golint
 - package: github.com/axw/gocov

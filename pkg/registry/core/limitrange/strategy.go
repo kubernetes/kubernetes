@@ -56,6 +56,11 @@ func (limitrangeStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	return validation.ValidateLimitRange(limitRange)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (limitrangeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (limitrangeStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -69,13 +74,11 @@ func (limitrangeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	return validation.ValidateLimitRange(limitRange)
 }
 
-func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
-	return true
+// WarningsOnUpdate returns warnings for the given update.
+func (limitrangeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
-func (limitrangeStrategy) Export(context.Context, runtime.Object, bool) error {
-	// Copied from OpenShift exporter
-	// TODO: this needs to be fixed
-	//  limitrange.Strategy.PrepareForCreate(ctx, obj)
-	return nil
+func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
+	return true
 }

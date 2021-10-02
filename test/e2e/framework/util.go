@@ -63,6 +63,7 @@ import (
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
@@ -1022,10 +1023,13 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 }
 
 // WaitForAllNodesSchedulable waits up to timeout for all
-// (but TestContext.AllowedNotReadyNodes) to become scheduable.
+// (but TestContext.AllowedNotReadyNodes) to become schedulable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
-	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
+	if TestContext.AllowedNotReadyNodes == -1 {
+		return nil
+	}
 
+	Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
@@ -1118,11 +1122,16 @@ func RunHostCmdWithRetries(ns, name, cmd string, interval, timeout time.Duration
 	}
 }
 
-// AllNodesReady checks whether all registered nodes are ready.
+// AllNodesReady checks whether all registered nodes are ready. Setting -1 on
+// TestContext.AllowedNotReadyNodes will bypass the post test node readiness check.
 // TODO: we should change the AllNodesReady call in AfterEach to WaitForAllNodesHealthy,
 // and figure out how to do it in a configurable way, as we can't expect all setups to run
 // default test add-ons.
 func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
+	if TestContext.AllowedNotReadyNodes == -1 {
+		return nil
+	}
+
 	Logf("Waiting up to %v for all (but %d) nodes to be ready", timeout, TestContext.AllowedNotReadyNodes)
 
 	var notReady []*v1.Node
@@ -1234,33 +1243,36 @@ func RunCmdEnv(env []string, command string, args ...string) (string, string, er
 	return stdout, stderr, nil
 }
 
-// getMasterAddresses returns the externalIP, internalIP and hostname fields of the master.
-// If any of these is unavailable, it is set to "".
-func getMasterAddresses(c clientset.Interface) (string, string, string) {
-	var externalIP, internalIP, hostname string
+// getControlPlaneAddresses returns the externalIP, internalIP and hostname fields of control plane nodes.
+// If any of these is unavailable, empty slices are returned.
+func getControlPlaneAddresses(c clientset.Interface) ([]string, []string, []string) {
+	var externalIPs, internalIPs, hostnames []string
 
-	// Populate the internal IP.
+	// Populate the internal IPs.
 	eps, err := c.CoreV1().Endpoints(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 	if err != nil {
 		Failf("Failed to get kubernetes endpoints: %v", err)
 	}
-	if len(eps.Subsets) != 1 || len(eps.Subsets[0].Addresses) != 1 {
-		Failf("There are more than 1 endpoints for kubernetes service: %+v", eps)
+	for _, subset := range eps.Subsets {
+		for _, address := range subset.Addresses {
+			if address.IP != "" {
+				internalIPs = append(internalIPs, address.IP)
+			}
+		}
 	}
-	internalIP = eps.Subsets[0].Addresses[0].IP
 
 	// Populate the external IP/hostname.
 	hostURL, err := url.Parse(TestContext.Host)
 	if err != nil {
 		Failf("Failed to parse hostname: %v", err)
 	}
-	if net.ParseIP(hostURL.Host) != nil {
-		externalIP = hostURL.Host
+	if netutils.ParseIPSloppy(hostURL.Host) != nil {
+		externalIPs = append(externalIPs, hostURL.Host)
 	} else {
-		hostname = hostURL.Host
+		hostnames = append(hostnames, hostURL.Host)
 	}
 
-	return externalIP, internalIP, hostname
+	return externalIPs, internalIPs, hostnames
 }
 
 // GetControlPlaneAddresses returns all IP addresses on which the kubelet can reach the control plane.
@@ -1268,16 +1280,16 @@ func getMasterAddresses(c clientset.Interface) (string, string, string) {
 // e.g. internal IPs to be used (issue #56787), so that we can be
 // sure to block the control plane fully during tests.
 func GetControlPlaneAddresses(c clientset.Interface) []string {
-	externalIP, internalIP, _ := getMasterAddresses(c)
+	externalIPs, internalIPs, _ := getControlPlaneAddresses(c)
 
 	ips := sets.NewString()
 	switch TestContext.Provider {
 	case "gce", "gke":
-		if externalIP != "" {
-			ips.Insert(externalIP)
+		for _, ip := range externalIPs {
+			ips.Insert(ip)
 		}
-		if internalIP != "" {
-			ips.Insert(internalIP)
+		for _, ip := range internalIPs {
+			ips.Insert(ip)
 		}
 	case "aws":
 		ips.Insert(awsMasterIP)

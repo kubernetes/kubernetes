@@ -171,3 +171,41 @@ func TestWait(t *testing.T) {
 		t.Log(fmt.Sprintf("wait err: %v", err))
 	}
 }
+
+type fakeClock struct {
+	now time.Time
+}
+
+func newFakeClock() *fakeClock {
+	return &fakeClock{
+		now: time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+}
+
+func (fc *fakeClock) Now() time.Time {
+	return fc.now
+}
+
+func (fc *fakeClock) Sleep(d time.Duration) {
+	fc.now = fc.now.Add(d)
+}
+
+func (fc *fakeClock) Since(ts time.Time) time.Duration {
+	return time.Since(ts)
+}
+
+func TestRatePrecisionBug(t *testing.T) {
+	// golang.org/x/time/rate used to have bugs around precision and this
+	// proves that they don't recur (at least in the form we know about).  This
+	// case is specifically designed to trigger the problem after 14 seconds.
+	qps := float32(time.Second) / float32(1031425*time.Microsecond)
+	clock := newFakeClock()
+	tb := NewTokenBucketRateLimiterWithClock(qps, 1, clock)
+
+	for i := 0; i < 60; i++ {
+		if !tb.TryAccept() {
+			t.Fatalf("failed after %d seconds", i*2)
+		}
+		clock.Sleep(2 * time.Second)
+	}
+}

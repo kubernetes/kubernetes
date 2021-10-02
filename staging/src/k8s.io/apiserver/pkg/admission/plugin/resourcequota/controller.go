@@ -377,7 +377,7 @@ func getMatchedLimitedScopes(evaluator quota.Evaluator, inputObject runtime.Obje
 	for _, limitedResource := range limitedResources {
 		matched, err := evaluator.MatchingScopes(inputObject, limitedResource.MatchScopes)
 		if err != nil {
-			klog.Errorf("Error while matching limited Scopes: %v", err)
+			klog.ErrorS(err, "Error while matching limited Scopes")
 			return []corev1.ScopedResourceSelectorRequirement{}, err
 		}
 		for _, scope := range matched {
@@ -449,6 +449,8 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 		match, err := evaluator.Matches(&resourceQuota, inputObject)
 		if err != nil {
 			klog.Errorf("Error occurred while matching resource quota, %v, against input object. Err: %v", resourceQuota, err)
+			klog.ErrorS(err, "Error occurred while matching resource quota against input object",
+				"resourceQuota", resourceQuota)
 			return quotas, err
 		}
 		if !match {

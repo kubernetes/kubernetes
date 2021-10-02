@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/internal/descfmt"
 	"google.golang.org/protobuf/internal/descopts"
 	"google.golang.org/protobuf/internal/encoding/defval"
+	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/internal/strs"
@@ -97,15 +98,6 @@ func (fd *File) lazyInitOnce() {
 	}
 	atomic.StoreUint32(&fd.once, 1)
 	fd.mu.Unlock()
-}
-
-// ProtoLegacyRawDesc is a pseudo-internal API for allowing the v1 code
-// to be able to retrieve the raw descriptor.
-//
-// WARNING: This method is exempt from the compatibility promise and may be
-// removed in the future without warning.
-func (fd *File) ProtoLegacyRawDesc() []byte {
-	return fd.builder.RawDescriptor
 }
 
 // GoPackagePath is a pseudo-internal API for determining the Go package path
@@ -207,7 +199,7 @@ type (
 		Number           pref.FieldNumber
 		Cardinality      pref.Cardinality // must be consistent with Message.RequiredNumbers
 		Kind             pref.Kind
-		JSONName         jsonName
+		StringName       stringName
 		IsProto3Optional bool // promoted from google.protobuf.FieldDescriptorProto
 		IsWeak           bool // promoted from google.protobuf.FieldOptions
 		HasPacked        bool // promoted from google.protobuf.FieldOptions
@@ -277,8 +269,9 @@ func (fd *Field) Options() pref.ProtoMessage {
 func (fd *Field) Number() pref.FieldNumber      { return fd.L1.Number }
 func (fd *Field) Cardinality() pref.Cardinality { return fd.L1.Cardinality }
 func (fd *Field) Kind() pref.Kind               { return fd.L1.Kind }
-func (fd *Field) HasJSONName() bool             { return fd.L1.JSONName.has }
-func (fd *Field) JSONName() string              { return fd.L1.JSONName.get(fd) }
+func (fd *Field) HasJSONName() bool             { return fd.L1.StringName.hasJSON }
+func (fd *Field) JSONName() string              { return fd.L1.StringName.getJSON(fd) }
+func (fd *Field) TextName() string              { return fd.L1.StringName.getText(fd) }
 func (fd *Field) HasPresence() bool {
 	return fd.L1.Cardinality != pref.Repeated && (fd.L0.ParentFile.L1.Syntax == pref.Proto2 || fd.L1.Message != nil || fd.L1.ContainingOneof != nil)
 }
@@ -373,7 +366,7 @@ type (
 	}
 	ExtensionL2 struct {
 		Options          func() pref.ProtoMessage
-		JSONName         jsonName
+		StringName       stringName
 		IsProto3Optional bool // promoted from google.protobuf.FieldDescriptorProto
 		IsPacked         bool // promoted from google.protobuf.FieldOptions
 		Default          defaultValue
@@ -391,8 +384,9 @@ func (xd *Extension) Options() pref.ProtoMessage {
 func (xd *Extension) Number() pref.FieldNumber      { return xd.L1.Number }
 func (xd *Extension) Cardinality() pref.Cardinality { return xd.L1.Cardinality }
 func (xd *Extension) Kind() pref.Kind               { return xd.L1.Kind }
-func (xd *Extension) HasJSONName() bool             { return xd.lazyInit().JSONName.has }
-func (xd *Extension) JSONName() string              { return xd.lazyInit().JSONName.get(xd) }
+func (xd *Extension) HasJSONName() bool             { return xd.lazyInit().StringName.hasJSON }
+func (xd *Extension) JSONName() string              { return xd.lazyInit().StringName.getJSON(xd) }
+func (xd *Extension) TextName() string              { return xd.lazyInit().StringName.getText(xd) }
 func (xd *Extension) HasPresence() bool             { return xd.L1.Cardinality != pref.Repeated }
 func (xd *Extension) HasOptionalKeyword() bool {
 	return (xd.L0.ParentFile.L1.Syntax == pref.Proto2 && xd.L1.Cardinality == pref.Optional) || xd.lazyInit().IsProto3Optional
@@ -506,26 +500,49 @@ func (d *Base) Syntax() pref.Syntax                 { return d.L0.ParentFile.Syn
 func (d *Base) IsPlaceholder() bool                 { return false }
 func (d *Base) ProtoInternal(pragma.DoNotImplement) {}
 
-type jsonName struct {
-	has  bool
-	once sync.Once
-	name string
+type stringName struct {
+	hasJSON  bool
+	once     sync.Once
+	nameJSON string
+	nameText string
 }
 
-// Init initializes the name. It is exported for use by other internal packages.
-func (js *jsonName) Init(s string) {
-	js.has = true
-	js.name = s
+// InitJSON initializes the name. It is exported for use by other internal packages.
+func (s *stringName) InitJSON(name string) {
+	s.hasJSON = true
+	s.nameJSON = name
 }
 
-func (js *jsonName) get(fd pref.FieldDescriptor) string {
-	if !js.has {
-		js.once.Do(func() {
-			js.name = strs.JSONCamelCase(string(fd.Name()))
-		})
-	}
-	return js.name
+func (s *stringName) lazyInit(fd pref.FieldDescriptor) *stringName {
+	s.once.Do(func() {
+		if fd.IsExtension() {
+			// For extensions, JSON and text are formatted the same way.
+			var name string
+			if messageset.IsMessageSetExtension(fd) {
+				name = string("[" + fd.FullName().Parent() + "]")
+			} else {
+				name = string("[" + fd.FullName() + "]")
+			}
+			s.nameJSON = name
+			s.nameText = name
+		} else {
+			// Format the JSON name.
+			if !s.hasJSON {
+				s.nameJSON = strs.JSONCamelCase(string(fd.Name()))
+			}
+
+			// Format the text name.
+			s.nameText = string(fd.Name())
+			if fd.Kind() == pref.GroupKind {
+				s.nameText = string(fd.Message().Name())
+			}
+		}
+	})
+	return s
 }
+
+func (s *stringName) getJSON(fd pref.FieldDescriptor) string { return s.lazyInit(fd).nameJSON }
+func (s *stringName) getText(fd pref.FieldDescriptor) string { return s.lazyInit(fd).nameText }
 
 func DefaultValue(v pref.Value, ev pref.EnumValueDescriptor) defaultValue {
 	dv := defaultValue{has: v.IsValid(), val: v, enum: ev}

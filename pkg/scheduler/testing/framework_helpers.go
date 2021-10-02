@@ -17,25 +17,32 @@ limitations under the License.
 package testing
 
 import (
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
+var configDecoder = scheme.Codecs.UniversalDecoder()
+
 // NewFramework creates a Framework from the register functions and options.
-func NewFramework(fns []RegisterPluginFunc, opts ...runtime.Option) (framework.Framework, error) {
+func NewFramework(fns []RegisterPluginFunc, profileName string, opts ...runtime.Option) (framework.Framework, error) {
 	registry := runtime.Registry{}
-	plugins := &schedulerapi.Plugins{}
-	var pluginConfigs []schedulerapi.PluginConfig
-	for _, f := range fns {
-		f(&registry, plugins, pluginConfigs)
+	profile := &schedulerapi.KubeSchedulerProfile{
+		SchedulerName: profileName,
+		Plugins:       &schedulerapi.Plugins{},
 	}
-	return runtime.NewFramework(registry, plugins, pluginConfigs, opts...)
+	for _, f := range fns {
+		f(&registry, profile)
+	}
+	return runtime.NewFramework(registry, profile, opts...)
 }
 
 // RegisterPluginFunc is a function signature used in method RegisterFilterPlugin()
 // to register a Filter Plugin to a given registry.
-type RegisterPluginFunc func(reg *runtime.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig)
+type RegisterPluginFunc func(reg *runtime.Registry, profile *schedulerapi.KubeSchedulerProfile)
 
 // RegisterQueueSortPlugin returns a function to register a QueueSort Plugin to a given registry.
 func RegisterQueueSortPlugin(pluginName string, pluginNewFunc runtime.PluginFactory) RegisterPluginFunc {
@@ -89,51 +96,50 @@ func RegisterPluginAsExtensions(pluginName string, pluginNewFunc runtime.PluginF
 
 // RegisterPluginAsExtensionsWithWeight returns a function to register a Plugin as given extensionPoints with weight to a given registry.
 func RegisterPluginAsExtensionsWithWeight(pluginName string, weight int32, pluginNewFunc runtime.PluginFactory, extensions ...string) RegisterPluginFunc {
-	return func(reg *runtime.Registry, plugins *schedulerapi.Plugins, pluginConfigs []schedulerapi.PluginConfig) {
+	return func(reg *runtime.Registry, profile *schedulerapi.KubeSchedulerProfile) {
 		reg.Register(pluginName, pluginNewFunc)
 		for _, extension := range extensions {
-			ps := getPluginSetByExtension(plugins, extension)
+			ps := getPluginSetByExtension(profile.Plugins, extension)
 			if ps == nil {
 				continue
 			}
 			ps.Enabled = append(ps.Enabled, schedulerapi.Plugin{Name: pluginName, Weight: weight})
 		}
-		//lint:ignore SA4006 this value of pluginConfigs is never used.
-		//lint:ignore SA4010 this result of append is never used.
-		pluginConfigs = append(pluginConfigs, schedulerapi.PluginConfig{Name: pluginName})
+		// Use defaults from latest config API version.
+		var gvk schema.GroupVersionKind
+		gvk = v1beta2.SchemeGroupVersion.WithKind(pluginName + "Args")
+		if args, _, err := configDecoder.Decode(nil, &gvk, nil); err == nil {
+			profile.PluginConfig = append(profile.PluginConfig, schedulerapi.PluginConfig{
+				Name: pluginName,
+				Args: args,
+			})
+		}
 	}
 }
 
 func getPluginSetByExtension(plugins *schedulerapi.Plugins, extension string) *schedulerapi.PluginSet {
 	switch extension {
 	case "QueueSort":
-		return initializeIfNeeded(&plugins.QueueSort)
+		return &plugins.QueueSort
 	case "Filter":
-		return initializeIfNeeded(&plugins.Filter)
+		return &plugins.Filter
 	case "PreFilter":
-		return initializeIfNeeded(&plugins.PreFilter)
+		return &plugins.PreFilter
 	case "PreScore":
-		return initializeIfNeeded(&plugins.PreScore)
+		return &plugins.PreScore
 	case "Score":
-		return initializeIfNeeded(&plugins.Score)
+		return &plugins.Score
 	case "Bind":
-		return initializeIfNeeded(&plugins.Bind)
+		return &plugins.Bind
 	case "Reserve":
-		return initializeIfNeeded(&plugins.Reserve)
+		return &plugins.Reserve
 	case "Permit":
-		return initializeIfNeeded(&plugins.Permit)
+		return &plugins.Permit
 	case "PreBind":
-		return initializeIfNeeded(&plugins.PreBind)
+		return &plugins.PreBind
 	case "PostBind":
-		return initializeIfNeeded(&plugins.PostBind)
+		return &plugins.PostBind
 	default:
 		return nil
 	}
-}
-
-func initializeIfNeeded(s **schedulerapi.PluginSet) *schedulerapi.PluginSet {
-	if *s == nil {
-		*s = &schedulerapi.PluginSet{}
-	}
-	return *s
 }

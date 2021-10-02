@@ -23,14 +23,15 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/network/common"
 )
 
-var _ = SIGDescribe("EndpointSliceMirroring", func() {
+var _ = common.SIGDescribe("EndpointSliceMirroring", func() {
 	f := framework.NewDefaultFramework("endpointslicemirroring")
 
 	var cs clientset.Interface
@@ -39,7 +40,15 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 		cs = f.ClientSet
 	})
 
-	ginkgo.It("should mirror a custom Endpoints resource through create update and delete", func() {
+	/*
+		Release: v1.21
+		Testname: EndpointSlice Mirroring
+		Description: The discovery.k8s.io API group MUST exist in the /apis discovery document.
+		The discovery.k8s.io/v1 API group/version MUST exist in the /apis/discovery.k8s.io discovery document.
+		The endpointslices resource MUST exist in the /apis/discovery.k8s.io/v1 discovery document.
+		The endpointslices mirrorowing must mirror endpoint create, update, and delete actions.
+	*/
+	framework.ConformanceIt("should mirror a custom Endpoints resource through create update and delete", func() {
 		svc := createServiceReportErr(cs, f.Namespace.Name, &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "example-custom-endpoints",
@@ -72,8 +81,8 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 			framework.ExpectNoError(err, "Unexpected error creating Endpoints")
 
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1beta1.LabelServiceName + "=" + svc.Name,
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
 					framework.Logf("Error listing EndpointSlices: %v", err)
@@ -124,8 +133,8 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 
 			// Expect mirrored EndpointSlice resource to be updated.
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1beta1.LabelServiceName + "=" + svc.Name,
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
 					return false, err
@@ -171,8 +180,8 @@ var _ = SIGDescribe("EndpointSliceMirroring", func() {
 
 			// Expect mirrored EndpointSlice resource to be updated.
 			if err := wait.PollImmediate(2*time.Second, 12*time.Second, func() (bool, error) {
-				esList, err := cs.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
-					LabelSelector: discoveryv1beta1.LabelServiceName + "=" + svc.Name,
+				esList, err := cs.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{
+					LabelSelector: discoveryv1.LabelServiceName + "=" + svc.Name,
 				})
 				if err != nil {
 					return false, err

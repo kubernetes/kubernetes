@@ -1,4 +1,5 @@
-// +build !dockerless
+//go:build linux && !dockerless
+// +build linux,!dockerless
 
 /*
 Copyright 2019 The Kubernetes Authors.

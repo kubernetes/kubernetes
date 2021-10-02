@@ -94,7 +94,7 @@ func (t Token) Pos() int {
 	return t.pos
 }
 
-// Name returns the object name if token is Name, else it will return an error.
+// Name returns the object name if token is Name, else it panics.
 func (t Token) Name() string {
 	if t.kind == Name {
 		return t.str
@@ -154,8 +154,7 @@ func (t Token) Int(bitSize int) (int64, bool) {
 	return n, true
 }
 
-// Uint returns the signed integer number if token is Number, else it will
-// return an error.
+// Uint returns the signed integer number if token is Number.
 //
 // The given bitSize specifies the unsigned integer type that the result must
 // fit into. It returns false if the number is not an unsigned integer value

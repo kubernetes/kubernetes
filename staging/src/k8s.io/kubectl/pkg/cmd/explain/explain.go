@@ -33,7 +33,7 @@ import (
 
 var (
 	explainLong = templates.LongDesc(i18n.T(`
-		List the fields for supported resources
+		List the fields for supported resources.
 
 		This command describes the fields associated with each supported API resource.
 		Fields are identified via a simple JSONPath identifier:
@@ -76,7 +76,7 @@ func NewCmdExplain(parent string, f cmdutil.Factory, streams genericclioptions.I
 	cmd := &cobra.Command{
 		Use:                   "explain RESOURCE",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Documentation of resources"),
+		Short:                 i18n.T("Get documentation for a resource"),
 		Long:                  explainLong + "\n\n" + cmdutil.SuggestAPIResources(parent),
 		Example:               explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -120,12 +120,22 @@ func (o *ExplainOptions) Run(args []string) error {
 	recursive := o.Recursive
 	apiVersionString := o.APIVersion
 
-	// TODO: After we figured out the new syntax to separate group and resource, allow
-	// the users to use it in explain (kubectl explain <group><syntax><resource>).
-	// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
-	fullySpecifiedGVR, fieldsPath, err := explain.SplitAndParseResourceRequest(args[0], o.Mapper)
-	if err != nil {
-		return err
+	var fullySpecifiedGVR schema.GroupVersionResource
+	var fieldsPath []string
+	var err error
+	if len(apiVersionString) == 0 {
+		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequestWithMatchingPrefix(args[0], o.Mapper)
+		if err != nil {
+			return err
+		}
+	} else {
+		// TODO: After we figured out the new syntax to separate group and resource, allow
+		// the users to use it in explain (kubectl explain <group><syntax><resource>).
+		// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
+		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequest(args[0], o.Mapper)
+		if err != nil {
+			return err
+		}
 	}
 
 	gvk, _ := o.Mapper.KindFor(fullySpecifiedGVR)

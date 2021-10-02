@@ -52,16 +52,19 @@ func (assertion *Assertion) buildDescription(optionalDescription ...interface{})
 	switch len(optionalDescription) {
 	case 0:
 		return ""
-	default:
-		return fmt.Sprintf(optionalDescription[0].(string), optionalDescription[1:]...) + "\n"
+	case 1:
+		if describe, ok := optionalDescription[0].(func() string); ok {
+			return describe() + "\n"
+		}
 	}
+	return fmt.Sprintf(optionalDescription[0].(string), optionalDescription[1:]...) + "\n"
 }
 
 func (assertion *Assertion) match(matcher types.GomegaMatcher, desiredMatch bool, optionalDescription ...interface{}) bool {
 	matches, err := matcher.Match(assertion.actualInput)
-	description := assertion.buildDescription(optionalDescription...)
 	assertion.failWrapper.TWithHelper.Helper()
 	if err != nil {
+		description := assertion.buildDescription(optionalDescription...)
 		assertion.failWrapper.Fail(description+err.Error(), 2+assertion.offset)
 		return false
 	}
@@ -72,6 +75,7 @@ func (assertion *Assertion) match(matcher types.GomegaMatcher, desiredMatch bool
 		} else {
 			message = matcher.NegatedFailureMessage(assertion.actualInput)
 		}
+		description := assertion.buildDescription(optionalDescription...)
 		assertion.failWrapper.Fail(description+message, 2+assertion.offset)
 		return false
 	}

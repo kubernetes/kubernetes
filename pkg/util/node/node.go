@@ -33,11 +33,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/features"
-	utilnet "k8s.io/utils/net"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -103,7 +101,7 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	allIPs := make([]net.IP, 0, len(node.Status.Addresses))
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeInternalIP {
-			ip := net.ParseIP(addr.Address)
+			ip := netutils.ParseIPSloppy(addr.Address)
 			if ip != nil {
 				allIPs = append(allIPs, ip)
 			}
@@ -111,7 +109,7 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	}
 	for _, addr := range node.Status.Addresses {
 		if addr.Type == v1.NodeExternalIP {
-			ip := net.ParseIP(addr.Address)
+			ip := netutils.ParseIPSloppy(addr.Address)
 			if ip != nil {
 				allIPs = append(allIPs, ip)
 			}
@@ -122,12 +120,10 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	}
 
 	nodeIPs := []net.IP{allIPs[0]}
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		for _, ip := range allIPs {
-			if utilnet.IsIPv6(ip) != utilnet.IsIPv6(nodeIPs[0]) {
-				nodeIPs = append(nodeIPs, ip)
-				break
-			}
+	for _, ip := range allIPs {
+		if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
+			nodeIPs = append(nodeIPs, ip)
+			break
 		}
 	}
 
@@ -172,42 +168,6 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
 	}
 	return nodeIP
-}
-
-// GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
-// it returns empty-string for no zone.
-// Since there are currently two separate zone keys:
-//   * "failure-domain.beta.kubernetes.io/zone"
-//   * "topology.kubernetes.io/zone"
-// GetZoneKey will first check failure-domain.beta.kubernetes.io/zone and if not exists, will then check
-// topology.kubernetes.io/zone
-func GetZoneKey(node *v1.Node) string {
-	labels := node.Labels
-	if labels == nil {
-		return ""
-	}
-
-	// TODO: "failure-domain.beta..." names are deprecated, but will
-	// stick around a long time due to existing on old extant objects like PVs.
-	// Maybe one day we can stop considering them (see #88493).
-	zone, ok := labels[v1.LabelFailureDomainBetaZone]
-	if !ok {
-		zone, _ = labels[v1.LabelTopologyZone]
-	}
-
-	region, ok := labels[v1.LabelFailureDomainBetaRegion]
-	if !ok {
-		region, _ = labels[v1.LabelTopologyRegion]
-	}
-
-	if region == "" && zone == "" {
-		return ""
-	}
-
-	// We include the null character just in case region or failureDomain has a colon
-	// (We do assume there's no null characters in a region or failureDomain)
-	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
-	return region + ":\x00:" + zone
 }
 
 type nodeForConditionPatch struct {

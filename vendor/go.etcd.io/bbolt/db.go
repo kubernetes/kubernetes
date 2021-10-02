@@ -120,6 +120,12 @@ type DB struct {
 	// of truncate() and fsync() when growing the data file.
 	AllocSize int
 
+	// Mlock locks database file in memory when set to true.
+	// It prevents major page faults, however used memory can't be reclaimed.
+	//
+	// Supported only on Unix via mlock/munlock syscalls.
+	Mlock bool
+
 	path     string
 	openFile func(string, int, os.FileMode) (*os.File, error)
 	file     *os.File
@@ -188,6 +194,7 @@ func Open(path string, mode os.FileMode, options *Options) (*DB, error) {
 	db.MmapFlags = options.MmapFlags
 	db.NoFreelistSync = options.NoFreelistSync
 	db.FreelistType = options.FreelistType
+	db.Mlock = options.Mlock
 
 	// Set default values for later DB operations.
 	db.MaxBatchSize = DefaultMaxBatchSize
@@ -337,13 +344,21 @@ func (db *DB) mmap(minsz int) error {
 	}
 
 	// Ensure the size is at least the minimum size.
-	var size = int(info.Size())
+	fileSize := int(info.Size())
+	var size = fileSize
 	if size < minsz {
 		size = minsz
 	}
 	size, err = db.mmapSize(size)
 	if err != nil {
 		return err
+	}
+
+	if db.Mlock {
+		// Unlock db memory
+		if err := db.munlock(fileSize); err != nil {
+			return err
+		}
 	}
 
 	// Dereference all mmap references before unmapping.
@@ -359,6 +374,13 @@ func (db *DB) mmap(minsz int) error {
 	// Memory-map the data file as a byte slice.
 	if err := mmap(db, size); err != nil {
 		return err
+	}
+
+	if db.Mlock {
+		// Don't allow swapping of data file
+		if err := db.mlock(fileSize); err != nil {
+			return err
+		}
 	}
 
 	// Save references to the meta pages.
@@ -422,12 +444,36 @@ func (db *DB) mmapSize(size int) (int, error) {
 	return int(sz), nil
 }
 
+func (db *DB) munlock(fileSize int) error {
+	if err := munlock(db, fileSize); err != nil {
+		return fmt.Errorf("munlock error: " + err.Error())
+	}
+	return nil
+}
+
+func (db *DB) mlock(fileSize int) error {
+	if err := mlock(db, fileSize); err != nil {
+		return fmt.Errorf("mlock error: " + err.Error())
+	}
+	return nil
+}
+
+func (db *DB) mrelock(fileSizeFrom, fileSizeTo int) error {
+	if err := db.munlock(fileSizeFrom); err != nil {
+		return err
+	}
+	if err := db.mlock(fileSizeTo); err != nil {
+		return err
+	}
+	return nil
+}
+
 // init creates a new database file and initializes its meta pages.
 func (db *DB) init() error {
 	// Create two meta pages on a buffer.
 	buf := make([]byte, db.pageSize*4)
 	for i := 0; i < 2; i++ {
-		p := db.pageInBuffer(buf[:], pgid(i))
+		p := db.pageInBuffer(buf, pgid(i))
 		p.id = pgid(i)
 		p.flags = metaPageFlag
 
@@ -444,13 +490,13 @@ func (db *DB) init() error {
 	}
 
 	// Write an empty freelist at page 3.
-	p := db.pageInBuffer(buf[:], pgid(2))
+	p := db.pageInBuffer(buf, pgid(2))
 	p.id = pgid(2)
 	p.flags = freelistPageFlag
 	p.count = 0
 
 	// Write an empty leaf page at page 4.
-	p = db.pageInBuffer(buf[:], pgid(3))
+	p = db.pageInBuffer(buf, pgid(3))
 	p.id = pgid(3)
 	p.flags = leafPageFlag
 	p.count = 0
@@ -462,6 +508,7 @@ func (db *DB) init() error {
 	if err := fdatasync(db); err != nil {
 		return err
 	}
+	db.filesz = len(buf)
 
 	return nil
 }
@@ -973,6 +1020,12 @@ func (db *DB) grow(sz int) error {
 		if err := db.file.Sync(); err != nil {
 			return fmt.Errorf("file sync error: %s", err)
 		}
+		if db.Mlock {
+			// unlock old file and lock new one
+			if err := db.mrelock(db.filesz, sz); err != nil {
+				return fmt.Errorf("mlock/munlock error: %s", err)
+			}
+		}
 	}
 
 	db.filesz = sz
@@ -1064,6 +1117,11 @@ type Options struct {
 	// OpenFile is used to open files. It defaults to os.OpenFile. This option
 	// is useful for writing hermetic tests.
 	OpenFile func(string, int, os.FileMode) (*os.File, error)
+
+	// Mlock locks database file in memory when set to true.
+	// It prevents potential page faults, however
+	// used memory can't be reclaimed. (UNIX only)
+	Mlock bool
 }
 
 // DefaultOptions represent the options used if nil options are passed into Open().

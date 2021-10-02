@@ -460,8 +460,7 @@ filename | sha256 hash
 * Fix user visible files creation for windows ([#62375](https://github.com/kubernetes/kubernetes/pull/62375), [@feiskyer](https://github.com/feiskyer))
 * Resolves forbidden error when the `daemon-set-controller` cluster role access `controllerrevisions` resources. ([#62146](https://github.com/kubernetes/kubernetes/pull/62146), [@frodenas](https://github.com/frodenas))
 * Update kube-dns to Version 1.14.10. Major changes: ([#62676](https://github.com/kubernetes/kubernetes/pull/62676), [@MrHohn](https://github.com/MrHohn))
-    * - Fix a bug in DNS resolution for externalName services
-    * and PTR records that need to query from upstream nameserver.
+    * - Fix a bug in DNS resolution for externalName services and PTR records that need to query from upstream nameserver.
 
 
 
@@ -1432,7 +1431,7 @@ Service Level Indicators (SLIs) and Service Level Objectives (SLOs) for the syst
 Here's the release [scalability validation report].
 
 [SIG Scalability]: https://github.com/kubernetes/community/tree/master/sig-scalability
-[scalability validation report]: https://github.com/kubernetes/enhancements/tree/master/release-1.8/scalability_validation_report.md
+[scalability validation report]: https://github.com/kubernetes/sig-release/blob/master/releases/release-1.8/scalability_validation_report.md
 
 ### SIG Scheduling
 

@@ -23,13 +23,12 @@ import (
 	"github.com/spf13/cobra"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
-	batchv1beta1client "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
+	batchv1client "k8s.io/client-go/kubernetes/typed/batch/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -39,13 +38,13 @@ import (
 
 var (
 	cronjobLong = templates.LongDesc(i18n.T(`
-		Create a cronjob with the specified name.`))
+		Create a cron job with the specified name.`))
 
 	cronjobExample = templates.Examples(`
-		# Create a cronjob
+		# Create a cron job
 		kubectl create cronjob my-job --image=busybox --schedule="*/1 * * * *"
 
-		# Create a cronjob with command
+		# Create a cron job with a command
 		kubectl create cronjob my-job --image=busybox --schedule="*/1 * * * *" -- date`)
 )
 
@@ -63,7 +62,7 @@ type CreateCronJobOptions struct {
 
 	Namespace        string
 	EnforceNamespace bool
-	Client           batchv1beta1client.BatchV1beta1Interface
+	Client           batchv1client.BatchV1Interface
 	DryRunStrategy   cmdutil.DryRunStrategy
 	DryRunVerifier   *resource.DryRunVerifier
 	Builder          *resource.Builder
@@ -88,7 +87,7 @@ func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 		Use:                   "cronjob NAME --image=image --schedule='0/5 * * * ?' -- [COMMAND] [args...]",
 		DisableFlagsInUseLine: false,
 		Aliases:               []string{"cj"},
-		Short:                 cronjobLong,
+		Short:                 i18n.T("Create a cron job with the specified name"),
 		Long:                  cronjobLong,
 		Example:               cronjobExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -130,7 +129,7 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
-	o.Client, err = batchv1beta1client.NewForConfig(clientConfig)
+	o.Client, err = batchv1client.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
@@ -151,11 +150,7 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {
@@ -170,9 +165,8 @@ func (o *CreateCronJobOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 
 // Run performs the execution of 'create cronjob' sub command
 func (o *CreateCronJobOptions) Run() error {
-	cronjob := o.createCronJob()
-
-	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, cronjob, scheme.DefaultJSONEncoder()); err != nil {
+	cronJob := o.createCronJob()
+	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, cronJob, scheme.DefaultJSONEncoder()); err != nil {
 		return err
 	}
 
@@ -182,30 +176,30 @@ func (o *CreateCronJobOptions) Run() error {
 			createOptions.FieldManager = o.FieldManager
 		}
 		if o.DryRunStrategy == cmdutil.DryRunServer {
-			if err := o.DryRunVerifier.HasSupport(cronjob.GroupVersionKind()); err != nil {
+			if err := o.DryRunVerifier.HasSupport(cronJob.GroupVersionKind()); err != nil {
 				return err
 			}
 			createOptions.DryRun = []string{metav1.DryRunAll}
 		}
 		var err error
-		cronjob, err = o.Client.CronJobs(o.Namespace).Create(context.TODO(), cronjob, createOptions)
+		cronJob, err = o.Client.CronJobs(o.Namespace).Create(context.TODO(), cronJob, createOptions)
 		if err != nil {
 			return fmt.Errorf("failed to create cronjob: %v", err)
 		}
 	}
 
-	return o.PrintObj(cronjob)
+	return o.PrintObj(cronJob)
 }
 
-func (o *CreateCronJobOptions) createCronJob() *batchv1beta1.CronJob {
-	cronjob := &batchv1beta1.CronJob{
-		TypeMeta: metav1.TypeMeta{APIVersion: batchv1beta1.SchemeGroupVersion.String(), Kind: "CronJob"},
+func (o *CreateCronJobOptions) createCronJob() *batchv1.CronJob {
+	cronjob := &batchv1.CronJob{
+		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "CronJob"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: o.Name,
 		},
-		Spec: batchv1beta1.CronJobSpec{
+		Spec: batchv1.CronJobSpec{
 			Schedule: o.Schedule,
-			JobTemplate: batchv1beta1.JobTemplateSpec{
+			JobTemplate: batchv1.JobTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: o.Name,
 				},

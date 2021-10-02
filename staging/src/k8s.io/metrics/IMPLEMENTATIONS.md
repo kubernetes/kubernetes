@@ -4,7 +4,7 @@
 
 - [Heapster](https://github.com/kubernetes/heapster): a application which
   gathers metrics, writes them to metrics storage "sinks", and exposes the
-  resource metrics API from in-memory storage.
+  resource metrics API from in-memory storage.(Heapster is now deprecated. See the [deprecation timeline](https://github.com/kubernetes-retired/heapster/blob/master/docs/deprecation.md) for more information on support.)
 
 - [Metrics Server](https://github.com/kubernetes-incubator/metrics-server):
   a lighter-weight in-memory server specifically for the resource metrics
@@ -16,7 +16,7 @@
 They are listed here for convenience.***
 
 - [Prometheus
-  Adapter](https://github.com/directxman12/k8s-prometheus-adapter).  An
+  Adapter](https://github.com/kubernetes-sigs/prometheus-adapter).  An
   implementation of the custom metrics API that attempts to support
   arbitrary metrics following a set label and naming scheme.
 

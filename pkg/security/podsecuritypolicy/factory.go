@@ -19,9 +19,6 @@ package podsecuritypolicy
 import (
 	"fmt"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
-
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/errors"
@@ -51,11 +48,9 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 	}
 
 	var groupStrat group.GroupStrategy
-	if utilfeature.DefaultFeatureGate.Enabled(features.RunAsGroup) {
-		groupStrat, err = createRunAsGroupStrategy(psp.Spec.RunAsGroup)
-		if err != nil {
-			errs = append(errs, err)
-		}
+	groupStrat, err = createRunAsGroupStrategy(psp.Spec.RunAsGroup)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	seLinuxStrat, err := createSELinuxStrategy(&psp.Spec.SELinux)
@@ -88,7 +83,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *policy.PodSecurityPolicy, 
 		errs = append(errs, err)
 	}
 
-	sysctlsStrat := createSysctlsStrategy(sysctl.SafeSysctlWhitelist(), psp.Spec.AllowedUnsafeSysctls, psp.Spec.ForbiddenSysctls)
+	sysctlsStrat := createSysctlsStrategy(sysctl.SafeSysctlAllowlist(), psp.Spec.AllowedUnsafeSysctls, psp.Spec.ForbiddenSysctls)
 
 	if len(errs) > 0 {
 		return nil, errors.NewAggregate(errs)
@@ -196,6 +191,6 @@ func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []
 }
 
 // createSysctlsStrategy creates a new sysctls strategy.
-func createSysctlsStrategy(safeWhitelist, allowedUnsafeSysctls, forbiddenSysctls []string) sysctl.SysctlsStrategy {
-	return sysctl.NewMustMatchPatterns(safeWhitelist, allowedUnsafeSysctls, forbiddenSysctls)
+func createSysctlsStrategy(safeAllowlist, allowedUnsafeSysctls, forbiddenSysctls []string) sysctl.SysctlsStrategy {
+	return sysctl.NewMustMatchPatterns(safeAllowlist, allowedUnsafeSysctls, forbiddenSysctls)
 }

@@ -236,8 +236,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 					}
 				}
 			} else {
-				klog.Errorf("could not get unique coreID for socket: %d core %d threads: %v",
-					core.SocketID, core.Id, core.Threads)
+				klog.ErrorS(nil, "Could not get unique coreID for socket", "socket", core.SocketID, "core", core.Id, "threads", core.Threads)
 				return nil, err
 			}
 		}
@@ -245,7 +244,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 
 	return &CPUTopology{
 		NumCPUs:    machineInfo.NumCores,
-		NumSockets: len(machineInfo.Topology),
+		NumSockets: machineInfo.NumSockets,
 		NumCores:   numPhysicalCores,
 		CPUDetails: CPUDetails,
 	}, nil

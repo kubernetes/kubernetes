@@ -120,6 +120,9 @@ message CustomResourceConversion {
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
 message CustomResourceDefinition {
+  // Standard object's metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec describes how the user wants the resources to appear
@@ -154,6 +157,9 @@ message CustomResourceDefinitionCondition {
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 message CustomResourceDefinitionList {
+  // Standard object's metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
   // items list individual CustomResourceDefinition objects
@@ -234,6 +240,8 @@ message CustomResourceDefinitionSpec {
 message CustomResourceDefinitionStatus {
   // conditions indicate state for particular aspects of a CustomResourceDefinition
   // +optional
+  // +listType=map
+  // +listMapKey=type
   repeated CustomResourceDefinitionCondition conditions = 1;
 
   // acceptedNames are the names that are actually being used to serve discovery.

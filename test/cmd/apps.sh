@@ -43,8 +43,10 @@ run_daemonset_tests() {
   kubectl set resources daemonsets/bind "${kube_flags[@]:?}" --limits=cpu=200m,memory=512Mi
   kube::test::get_object_assert 'daemonsets bind' "{{${generation_field:?}}}" '4'
   # pod has field for kubectl set field manager
-  output_message=$(kubectl get daemonsets bind -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get daemonsets bind --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-set'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert daemonsets pods,events
 
   # Rollout restart should change generation
   kubectl rollout restart daemonset/bind "${kube_flags[@]:?}"
@@ -210,6 +212,8 @@ run_deployment_tests() {
   kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Controlled By" "Replicas:" "Pods Status:" "Volumes:"
   # Describe command (resource only) should print detailed information
   kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert deployments replicasets,events
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]:?}"
 
@@ -284,6 +288,8 @@ run_deployment_tests() {
   # autoscale 2~3 pods, no CPU utilization specified
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]:?}" --min=2 --max=3
   kube::test::get_object_assert 'hpa nginx-deployment' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '2 3 80'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert horizontalpodautoscalers events
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the deployment reaper.
   kubectl delete hpa nginx-deployment "${kube_flags[@]:?}"
@@ -340,7 +346,7 @@ run_deployment_tests() {
   rs="$(kubectl get rs "${newrs}" -o yaml)"
   kube::test::if_has_string "${rs}" "deployment.kubernetes.io/revision: \"6\""
   # Deployment has field for kubectl rollout field manager
-  output_message=$(kubectl get deployment nginx -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get deployment nginx --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-rollout'
   # Create second deployment
   ${SED} "s/name: nginx$/name: nginx2/" hack/testdata/deployment-revision1.yaml | kubectl create -f - "${kube_flags[@]:?}"
@@ -426,6 +432,9 @@ run_deployment_tests() {
   kubectl set env deployment nginx-deployment --from=secret/test-set-env-secret "${kube_flags[@]:?}"
   # Remove specific env of deployment
   kubectl set env deployment nginx-deployment env-
+  # Assert that we cannot use standard input for both resource and environment variable
+  output_message="$(echo SOME_ENV_VAR_KEY=SOME_ENV_VAR_VAL | kubectl set env -f - - "${kube_flags[@]:?}" 2>&1 || true)"
+  kube::test::if_has_string "${output_message}" 'standard input cannot be used for multiple arguments'
   # Clean up
   kubectl delete deployment nginx-deployment "${kube_flags[@]:?}"
   kubectl delete configmap test-set-env-config "${kube_flags[@]:?}"
@@ -500,6 +509,9 @@ run_stateful_set_tests() {
   kube::test::get_object_assert statefulset "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command: create statefulset
   kubectl create -f hack/testdata/rollingupdate-statefulset.yaml "${kube_flags[@]:?}"
+
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert statefulsets pods,events
 
   ### Scale statefulset test with current-replicas and replicas
   # Pre-condition: 0 replicas
@@ -588,6 +600,8 @@ run_rs_tests() {
   kube::test::describe_resource_events_assert rs true
   # Describe command (resource only) should print detailed information
   kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert replicasets pods,events
 
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
@@ -636,12 +650,8 @@ run_rs_tests() {
   kubectl expose rs frontend --port=80 "${kube_flags[@]:?}"
   # Post-condition: service exists and the port is unnamed
   kube::test::get_object_assert 'service frontend' "{{${port_name:?}}} {{${port_field:?}}}" '<no value> 80'
-  # Create a service using service/v1 generator
-  kubectl expose rs frontend --port=80 --name=frontend-2 --generator=service/v1 "${kube_flags[@]:?}"
-  # Post-condition: service exists and the port is named default.
-  kube::test::get_object_assert 'service frontend-2' "{{${port_name:?}}} {{${port_field:?}}}" 'default 80'
   # Cleanup services
-  kubectl delete service frontend{,-2} "${kube_flags[@]:?}"
+  kubectl delete service frontend "${kube_flags[@]:?}"
 
   # Test set commands
   # Pre-condition: frontend replica set exists at generation 1
@@ -662,7 +672,7 @@ run_rs_tests() {
   kube::test::get_object_assert 'rs frontend' "{{${generation_field:?}}}" '5'
 
   # RS has field for kubectl set field manager
-  output_message=$(kubectl get rs frontend -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get rs frontend --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-set'
 
   ### Delete replica set with id

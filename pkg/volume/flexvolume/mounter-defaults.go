@@ -43,7 +43,7 @@ func (f *mounterDefaults) SetUpAt(dir string, mounterArgs volume.MounterArgs) er
 
 // Returns the default volume attributes.
 func (f *mounterDefaults) GetAttributes() volume.Attributes {
-	klog.V(5).Infof(logPrefix(f.plugin), "using default GetAttributes")
+	klog.V(5).Info(logPrefix(f.plugin), "using default GetAttributes")
 	return volume.Attributes{
 		ReadOnly:        f.readOnly,
 		Managed:         !f.readOnly,

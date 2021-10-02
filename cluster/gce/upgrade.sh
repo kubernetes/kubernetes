@@ -63,7 +63,7 @@ function usage() {
 
   release_stable=$(gsutil cat gs://kubernetes-release/release/stable.txt)
   release_latest=$(gsutil cat gs://kubernetes-release/release/latest.txt)
-  ci_latest=$(gsutil cat gs://kubernetes-release-dev/ci/latest.txt)
+  ci_latest=$(gsutil cat gs://k8s-release-dev/ci/latest.txt)
 
   echo "Right now, versions are as follows:"
   echo "  release/stable: ${0} ${release_stable}"
@@ -480,40 +480,40 @@ function update-coredns-config() {
   fi
 
   echo "== Fetching the latest installed CoreDNS version =="
-  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
 
   case "$(uname -m)" in
       x86_64*)
         host_arch=amd64
-        corefile_tool_SHA="2e1da3d2a27e103597438ccc99be5cf909fd1be038c4770ddac3985e7df18fa2"
+        corefile_tool_SHA="9f2027243e40c939b119684e26c393e06ef6c5a4a4894d3bcfce5be8179ccb24"
         ;;
       i?86_64*)
         host_arch=amd64
-        corefile_tool_SHA="2e1da3d2a27e103597438ccc99be5cf909fd1be038c4770ddac3985e7df18fa2"
+        corefile_tool_SHA="9f2027243e40c939b119684e26c393e06ef6c5a4a4894d3bcfce5be8179ccb24"
         ;;
       amd64*)
         host_arch=amd64
-        corefile_tool_SHA="2e1da3d2a27e103597438ccc99be5cf909fd1be038c4770ddac3985e7df18fa2"
+        corefile_tool_SHA="9f2027243e40c939b119684e26c393e06ef6c5a4a4894d3bcfce5be8179ccb24"
         ;;
       aarch64*)
         host_arch=arm64
-        corefile_tool_SHA="12a08dfa9f01b806ab46902c1e6c909fdf93264f8c6aac3d951e7ac30d9c7f9b"
+        corefile_tool_SHA="970860aeb9f9dfb83f5b2debd812ac2fe3e147e6120b94d3e92eb3421edb51d0"
         ;;
       arm64*)
         host_arch=arm64
-        corefile_tool_SHA="12a08dfa9f01b806ab46902c1e6c909fdf93264f8c6aac3d951e7ac30d9c7f9b"
+        corefile_tool_SHA="970860aeb9f9dfb83f5b2debd812ac2fe3e147e6120b94d3e92eb3421edb51d0"
         ;;
       arm*)
         host_arch=arm
-        corefile_tool_SHA="b5d83f5e29a2900cc345de8e7b5b25c4e5534e57d61bf52395343d76e64026e3"
+        corefile_tool_SHA="43a0aaab91a5f8911c689daeeb3237f4630124cc2c92c8d74d3667d88786a93d"
         ;;
       s390x*)
         host_arch=s390x
-        corefile_tool_SHA="29754c9966f5215260562eed1db1017e86462dbaba1c0ee9801f0f9cdae3bd2f"
+        corefile_tool_SHA="303835430e9bf7c35c387a35018e8da3c12585968934d5dccd9190145efa2fda"
         ;;
       ppc64le*)
         host_arch=ppc64le
-        corefile_tool_SHA="c4271ddc80345ed7b3a3d41b706c5c7abb4ad6a3e3e9f20fe8849699e399adc8"
+        corefile_tool_SHA="0900b74f6ae5631aca953dd126dd0463fc6cff8ecb92094b2b283373951b572f"
         ;;
       *)
         echo "Unsupported host arch. Must be x86_64, 386, arm, arm64, s390x or ppc64le." >&2
@@ -523,7 +523,7 @@ function update-coredns-config() {
 
   # Download the CoreDNS migration tool
   echo "== Downloading the CoreDNS migration tool =="
-  wget -P "${download_dir}" "https://github.com/coredns/corefile-migration/releases/download/v1.0.10/corefile-tool-${host_arch}" >/dev/null 2>&1
+  wget -P "${download_dir}" "https://github.com/coredns/corefile-migration/releases/download/v1.0.11/corefile-tool-${host_arch}" >/dev/null 2>&1
 
   local -r checkSHA=$(sha256sum "${download_dir}/corefile-tool-${host_arch}" | cut -d " " -f 1)
   if [[ "${checkSHA}" != "${corefile_tool_SHA}" ]]; then
@@ -552,7 +552,7 @@ function update-coredns-config() {
 }
 
 echo "Fetching the previously installed CoreDNS version"
-CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
 COREDNS_DEPLOY_RESOURCE_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}')
 
 master_upgrade=true

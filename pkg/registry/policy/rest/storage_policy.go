@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	policyapiv1 "k8s.io/api/policy/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -42,6 +43,14 @@ func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorag
 			apiGroupInfo.VersionedResourcesStorageMap[policyapiv1beta1.SchemeGroupVersion.Version] = storageMap
 		}
 	}
+
+	if apiResourceConfigSource.VersionEnabled(policyapiv1.SchemeGroupVersion) {
+		if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[policyapiv1.SchemeGroupVersion.Version] = storageMap
+		}
+	}
 	return apiGroupInfo, true, nil
 }
 
@@ -60,6 +69,19 @@ func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorag
 		return storage, err
 	}
 	storage["podsecuritypolicies"] = rest
+
+	return storage, err
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+
+	poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage, err := poddisruptionbudgetstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["poddisruptionbudgets"] = poddisruptionbudgetStorage
+	storage["poddisruptionbudgets/status"] = poddisruptionbudgetStatusStorage
 
 	return storage, err
 }

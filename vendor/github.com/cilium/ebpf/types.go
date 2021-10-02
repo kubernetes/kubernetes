@@ -1,6 +1,10 @@
 package ebpf
 
-//go:generate stringer -output types_string.go -type=MapType,ProgramType,AttachType
+import (
+	"github.com/cilium/ebpf/internal/unix"
+)
+
+//go:generate stringer -output types_string.go -type=MapType,ProgramType,AttachType,PinType
 
 // MapType indicates the type map structure
 // that will be initialized in the kernel.
@@ -81,14 +85,27 @@ const (
 	SkStorage
 	// DevMapHash - Hash-based indexing scheme for references to network devices.
 	DevMapHash
+	StructOpts
+	RingBuf
+	InodeStorage
+	TaskStorage
 )
 
 // hasPerCPUValue returns true if the Map stores a value per CPU.
 func (mt MapType) hasPerCPUValue() bool {
-	if mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash {
-		return true
-	}
-	return false
+	return mt == PerCPUHash || mt == PerCPUArray || mt == LRUCPUHash
+}
+
+// canStoreMap returns true if the map type accepts a map fd
+// for update and returns a map id for lookup.
+func (mt MapType) canStoreMap() bool {
+	return mt == ArrayOfMaps || mt == HashOfMaps
+}
+
+// canStoreProgram returns true if the map type accepts a program fd
+// for update and returns a program id for lookup.
+func (mt MapType) canStoreProgram() bool {
+	return mt == ProgramArray
 }
 
 // ProgramType of the eBPF program
@@ -96,60 +113,37 @@ type ProgramType uint32
 
 // eBPF program types
 const (
-	// Unrecognized program type
 	UnspecifiedProgram ProgramType = iota
-	// SocketFilter socket or seccomp filter
 	SocketFilter
-	// Kprobe program
 	Kprobe
-	// SchedCLS traffic control shaper
 	SchedCLS
-	// SchedACT routing control shaper
 	SchedACT
-	// TracePoint program
 	TracePoint
-	// XDP program
 	XDP
-	// PerfEvent program
 	PerfEvent
-	// CGroupSKB program
 	CGroupSKB
-	// CGroupSock program
 	CGroupSock
-	// LWTIn program
 	LWTIn
-	// LWTOut program
 	LWTOut
-	// LWTXmit program
 	LWTXmit
-	// SockOps program
 	SockOps
-	// SkSKB program
 	SkSKB
-	// CGroupDevice program
 	CGroupDevice
-	// SkMsg program
 	SkMsg
-	// RawTracepoint program
 	RawTracepoint
-	// CGroupSockAddr program
 	CGroupSockAddr
-	// LWTSeg6Local program
 	LWTSeg6Local
-	// LircMode2 program
 	LircMode2
-	// SkReuseport program
 	SkReuseport
-	// FlowDissector program
 	FlowDissector
-	// CGroupSysctl program
 	CGroupSysctl
-	// RawTracepointWritable program
 	RawTracepointWritable
-	// CGroupSockopt program
 	CGroupSockopt
-	// Tracing program
 	Tracing
+	StructOps
+	Extension
+	LSM
+	SkLookup
 )
 
 // AttachType of the eBPF program, needed to differentiate allowed context accesses in
@@ -157,7 +151,7 @@ const (
 // Will cause invalid argument (EINVAL) at program load time if set incorrectly.
 type AttachType uint32
 
-// AttachNone is an alias for AttachCGroupInetIngress for readability reasons
+// AttachNone is an alias for AttachCGroupInetIngress for readability reasons.
 const AttachNone AttachType = 0
 
 const (
@@ -190,7 +184,65 @@ const (
 	AttachModifyReturn
 	AttachLSMMac
 	AttachTraceIter
+	AttachCgroupInet4GetPeername
+	AttachCgroupInet6GetPeername
+	AttachCgroupInet4GetSockname
+	AttachCgroupInet6GetSockname
+	AttachXDPDevMap
+	AttachCgroupInetSockRelease
+	AttachXDPCPUMap
+	AttachSkLookup
+	AttachXDP
 )
 
 // AttachFlags of the eBPF program used in BPF_PROG_ATTACH command
 type AttachFlags uint32
+
+// PinType determines whether a map is pinned into a BPFFS.
+type PinType int
+
+// Valid pin types.
+//
+// Mirrors enum libbpf_pin_type.
+const (
+	PinNone PinType = iota
+	// Pin an object by using its name as the filename.
+	PinByName
+)
+
+// LoadPinOptions control how a pinned object is loaded.
+type LoadPinOptions struct {
+	// Request a read-only or write-only object. The default is a read-write
+	// object. Only one of the flags may be set.
+	ReadOnly  bool
+	WriteOnly bool
+
+	// Raw flags for the syscall. Other fields of this struct take precedence.
+	Flags uint32
+}
+
+// Marshal returns a value suitable for BPF_OBJ_GET syscall file_flags parameter.
+func (lpo *LoadPinOptions) Marshal() uint32 {
+	if lpo == nil {
+		return 0
+	}
+
+	flags := lpo.Flags
+	if lpo.ReadOnly {
+		flags |= unix.BPF_F_RDONLY
+	}
+	if lpo.WriteOnly {
+		flags |= unix.BPF_F_WRONLY
+	}
+	return flags
+}
+
+// BatchOptions batch map operations options
+//
+// Mirrors libbpf struct bpf_map_batch_opts
+// Currently BPF_F_FLAG is the only supported
+// flag (for ElemFlags).
+type BatchOptions struct {
+	ElemFlags uint64
+	Flags     uint64
+}

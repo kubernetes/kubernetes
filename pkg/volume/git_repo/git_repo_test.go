@@ -51,7 +51,7 @@ func TestCanSupport(t *testing.T) {
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
-		t.Errorf("Can't find the plugin by name")
+		t.Fatal("Can't find the plugin by name")
 	}
 	if plug.GetPluginName() != "kubernetes.io/git-repo" {
 		t.Errorf("Wrong name: %s", plug.GetPluginName())
@@ -296,7 +296,7 @@ func doTestPlugin(scenario struct {
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
 	if err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Can't find the plugin by name"))
+			fmt.Errorf("can't find the plugin by name"))
 		return allErrs
 	}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
@@ -304,12 +304,12 @@ func doTestPlugin(scenario struct {
 
 	if err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Failed to make a new Mounter: %v", err))
+			fmt.Errorf("failed to make a new Mounter: %w", err))
 		return allErrs
 	}
 	if mounter == nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Got a nil Mounter"))
+			fmt.Errorf("got a nil Mounter"))
 		return allErrs
 	}
 
@@ -317,7 +317,7 @@ func doTestPlugin(scenario struct {
 	suffix := fmt.Sprintf("pods/poduid/volumes/kubernetes.io~git-repo/%v", scenario.vol.Name)
 	if !strings.HasSuffix(path, suffix) {
 		allErrs = append(allErrs,
-			fmt.Errorf("Got unexpected path: %s", path))
+			fmt.Errorf("got unexpected path: %s", path))
 		return allErrs
 	}
 
@@ -353,18 +353,18 @@ func doTestPlugin(scenario struct {
 	unmounter, err := plug.NewUnmounter("vol1", types.UID("poduid"))
 	if err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Failed to make a new Unmounter: %v", err))
+			fmt.Errorf("failed to make a new Unmounter: %w", err))
 		return allErrs
 	}
 	if unmounter == nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Got a nil Unmounter"))
+			fmt.Errorf("got a nil Unmounter"))
 		return allErrs
 	}
 
 	if err := unmounter.TearDown(); err != nil {
 		allErrs = append(allErrs,
-			fmt.Errorf("Expected success, got: %v", err))
+			fmt.Errorf("expected success, got: %w", err))
 		return allErrs
 	}
 	if _, err := os.Stat(path); err == nil {
@@ -372,7 +372,7 @@ func doTestPlugin(scenario struct {
 			fmt.Errorf("TearDown() failed, volume path still exists: %s", path))
 	} else if !os.IsNotExist(err) {
 		allErrs = append(allErrs,
-			fmt.Errorf("TearDown() failed: %v", err))
+			fmt.Errorf("TearDown() failed: %w", err))
 	}
 	return allErrs
 }

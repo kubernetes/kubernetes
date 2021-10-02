@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	storagev1alpha1 "k8s.io/client-go/applyconfigurations/storage/v1alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -126,6 +129,49 @@ func (c *FakeVolumeAttachments) DeleteCollection(ctx context.Context, opts v1.De
 func (c *FakeVolumeAttachments) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.VolumeAttachment, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, name, pt, data, subresources...), &v1alpha1.VolumeAttachment{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.VolumeAttachment), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied volumeAttachment.
+func (c *FakeVolumeAttachments) Apply(ctx context.Context, volumeAttachment *storagev1alpha1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.VolumeAttachment, err error) {
+	if volumeAttachment == nil {
+		return nil, fmt.Errorf("volumeAttachment provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(volumeAttachment)
+	if err != nil {
+		return nil, err
+	}
+	name := volumeAttachment.Name
+	if name == nil {
+		return nil, fmt.Errorf("volumeAttachment.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, *name, types.ApplyPatchType, data), &v1alpha1.VolumeAttachment{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.VolumeAttachment), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeVolumeAttachments) ApplyStatus(ctx context.Context, volumeAttachment *storagev1alpha1.VolumeAttachmentApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.VolumeAttachment, err error) {
+	if volumeAttachment == nil {
+		return nil, fmt.Errorf("volumeAttachment provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(volumeAttachment)
+	if err != nil {
+		return nil, err
+	}
+	name := volumeAttachment.Name
+	if name == nil {
+		return nil, fmt.Errorf("volumeAttachment.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(volumeattachmentsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.VolumeAttachment{})
 	if obj == nil {
 		return nil, err
 	}

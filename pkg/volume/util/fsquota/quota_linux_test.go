@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -113,12 +114,12 @@ func testBackingDev1(testcase backingDevTest) error {
 		return err
 	}
 	if testcase.expectFailure {
-		return fmt.Errorf("Path %s expected to fail; succeeded and got %s", testcase.path, backingDev)
+		return fmt.Errorf("path %s expected to fail; succeeded and got %s", testcase.path, backingDev)
 	}
 	if backingDev == testcase.expectedResult {
 		return nil
 	}
-	return fmt.Errorf("Mismatch: path %s expects mountpoint %s got %s", testcase.path, testcase.expectedResult, backingDev)
+	return fmt.Errorf("mismatch: path %s expects mountpoint %s got %s", testcase.path, testcase.expectedResult, backingDev)
 }
 
 func TestBackingDev(t *testing.T) {
@@ -332,7 +333,7 @@ func (v testVolumeQuota) SetQuotaOnDir(dir string, id common.QuotaID, _ int64) e
 	}
 	oid, ok := testQuotaIDMap[dir]
 	if ok && id != oid {
-		return fmt.Errorf("Directory %s already has a quota applied", dir)
+		return fmt.Errorf("directory %s already has a quota applied", dir)
 	}
 	testQuotaIDMap[dir] = id
 	testIDQuotaMap[id] = dir
@@ -344,7 +345,7 @@ func (v testVolumeQuota) GetQuotaOnDir(path string) (common.QuotaID, error) {
 	if ok {
 		return id, nil
 	}
-	return common.BadQuotaID, fmt.Errorf("No quota available for %s", path)
+	return common.BadQuotaID, fmt.Errorf("no quota available for %s", path)
 }
 
 func (v testVolumeQuota) QuotaIDIsInUse(id common.QuotaID) (bool, error) {

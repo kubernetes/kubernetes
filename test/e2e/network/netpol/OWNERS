@@ -2,7 +2,11 @@ approvers:
  - jayunit100
  - mattfenwick
  - abhiraut
+ - knabben
 reviewers:
  - jayunit100
  - mattfenwick
  - abhiraut
+ - knabben
+labels:
+- area/network-policy

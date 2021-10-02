@@ -226,7 +226,8 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 		return nil, fmt.Errorf("failed to convert merged object to last applied version: %v", err)
 	}
 
-	pruned := convertedMerged.RemoveItems(lastSet.Set())
+	sc, tr := convertedMerged.Schema(), convertedMerged.TypeRef()
+	pruned := convertedMerged.RemoveItems(lastSet.Set().EnsureNamedFieldsAreMembers(sc, tr))
 	pruned, err = s.addBackOwnedItems(convertedMerged, pruned, managers, applyingManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed add back owned items: %v", err)
@@ -272,7 +273,8 @@ func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFie
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field set from pruned object at version %v: %v", version, err)
 		}
-		pruned = merged.RemoveItems(mergedSet.Difference(prunedSet.Union(managed)))
+		sc, tr := merged.Schema(), merged.TypeRef()
+		pruned = merged.RemoveItems(mergedSet.EnsureNamedFieldsAreMembers(sc, tr).Difference(prunedSet.EnsureNamedFieldsAreMembers(sc, tr).Union(managed.EnsureNamedFieldsAreMembers(sc, tr))))
 	}
 	return pruned, nil
 }
@@ -296,7 +298,11 @@ func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field set from merged object in last applied version: %v", err)
 	}
-	return merged.RemoveItems(mergedSet.Difference(prunedSet).Intersection(lastSet.Set())), nil
+	sc, tr := merged.Schema(), merged.TypeRef()
+	prunedSet = prunedSet.EnsureNamedFieldsAreMembers(sc, tr)
+	mergedSet = mergedSet.EnsureNamedFieldsAreMembers(sc, tr)
+	last := lastSet.Set().EnsureNamedFieldsAreMembers(sc, tr)
+	return merged.RemoveItems(mergedSet.Difference(prunedSet).Intersection(last)), nil
 }
 
 // reconcileManagedFieldsWithSchemaChanges reconciles the managed fields with any changes to the

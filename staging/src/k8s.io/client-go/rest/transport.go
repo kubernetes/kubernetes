@@ -83,6 +83,7 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 		BearerTokenFile: c.BearerTokenFile,
 		Impersonate: transport.ImpersonationConfig{
 			UserName: c.Impersonate.UserName,
+			UID:      c.Impersonate.UID,
 			Groups:   c.Impersonate.Groups,
 			Extra:    c.Impersonate.Extra,
 		},

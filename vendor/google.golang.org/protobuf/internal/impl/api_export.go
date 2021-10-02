@@ -167,7 +167,7 @@ func (Export) MessageTypeOf(m message) pref.MessageType {
 	if mv := (Export{}).protoMessageV2Of(m); mv != nil {
 		return mv.ProtoReflect().Type()
 	}
-	return legacyLoadMessageInfo(reflect.TypeOf(m), "")
+	return legacyLoadMessageType(reflect.TypeOf(m), "")
 }
 
 // MessageStringOf returns the message value as a string,

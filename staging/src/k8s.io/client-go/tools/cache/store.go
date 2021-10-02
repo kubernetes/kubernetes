@@ -85,6 +85,11 @@ func (k KeyError) Error() string {
 	return fmt.Sprintf("couldn't create key for object %+v: %v", k.Obj, k.Err)
 }
 
+// Unwrap implements errors.Unwrap
+func (k KeyError) Unwrap() error {
+	return k.Err
+}
+
 // ExplicitKey can be passed to MetaNamespaceKeyFunc if you have the key for
 // the object but not the object itself.
 type ExplicitKey string

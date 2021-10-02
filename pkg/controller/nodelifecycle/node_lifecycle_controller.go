@@ -51,11 +51,11 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	utilnode "k8s.io/component-helpers/node/topology"
+	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -1446,13 +1446,13 @@ func (nc *Controller) markNodeForTainting(node *v1.Node, status v1.ConditionStat
 	defer nc.evictorLock.Unlock()
 	if status == v1.ConditionFalse {
 		if !taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
-			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].SetRemove(node.Name)
+			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name)
 		}
 	}
 
 	if status == v1.ConditionUnknown {
 		if !taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
-			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].SetRemove(node.Name)
+			nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name)
 		}
 	}
 

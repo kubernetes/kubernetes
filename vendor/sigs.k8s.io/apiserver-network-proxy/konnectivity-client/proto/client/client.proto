@@ -29,6 +29,7 @@ enum PacketType {
   CLOSE_REQ = 2;
   CLOSE_RSP = 3;
   DATA = 4;
+  DIAL_CLS = 5;
 }
 
 enum Error {
@@ -45,6 +46,7 @@ message Packet {
     Data data = 4;
     CloseRequest closeRequest = 5;
     CloseResponse closeResponse = 6;
+    CloseDial closeDial = 7;
   }
 }
 
@@ -81,6 +83,11 @@ message CloseResponse {
 
     // connectID indicates the identifier of the connection
     int64 connectID = 2;
+}
+
+message CloseDial {
+    // random id of the DialRequest
+    int64 random = 1;
 }
 
 message Data {

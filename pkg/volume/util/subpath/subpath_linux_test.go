@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 /*
@@ -35,6 +36,7 @@ import (
 
 func TestSafeMakeDir(t *testing.T) {
 	defaultPerm := os.FileMode(0750) + os.ModeDir
+	maxPerm := os.FileMode(0777) + os.ModeDir
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -53,6 +55,16 @@ func TestSafeMakeDir(t *testing.T) {
 			"test/directory",
 			"test/directory",
 			defaultPerm,
+			false,
+		},
+		{
+			"all-created-subpath-directory-with-permissions",
+			func(base string) error {
+				return nil
+			},
+			"test/directory",
+			"test",
+			maxPerm,
 			false,
 		},
 		{
@@ -1045,7 +1057,7 @@ func TestSafeOpen(t *testing.T) {
 				socketFile, socketError := createSocketFile(base)
 
 				if socketError != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", socketFile, socketError)
+					return fmt.Errorf("error preparing socket file %s with %w", socketFile, socketError)
 				}
 				return nil
 			},
@@ -1058,7 +1070,7 @@ func TestSafeOpen(t *testing.T) {
 				testSocketFile, socketError := createSocketFile(base)
 
 				if socketError != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", testSocketFile, socketError)
+					return fmt.Errorf("error preparing socket file %s with %w", testSocketFile, socketError)
 				}
 				return nil
 			},
@@ -1251,7 +1263,7 @@ func validateDirEmpty(dir string) error {
 	}
 
 	if len(files) != 0 {
-		return fmt.Errorf("Directory %q is not empty", dir)
+		return fmt.Errorf("directory %q is not empty", dir)
 	}
 	return nil
 }

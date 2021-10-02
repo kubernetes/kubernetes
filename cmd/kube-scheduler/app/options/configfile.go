@@ -17,18 +17,21 @@ limitations under the License.
 package options
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
-	"k8s.io/klog/v2"
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	kubeschedulerconfigv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	configv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
+	configv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 )
 
-func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+func loadConfigFromFile(file string) (*config.KubeSchedulerConfiguration, error) {
 	data, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
@@ -37,39 +40,60 @@ func loadConfigFromFile(file string) (*kubeschedulerconfig.KubeSchedulerConfigur
 	return loadConfig(data)
 }
 
-func loadConfig(data []byte) (*kubeschedulerconfig.KubeSchedulerConfiguration, error) {
+func loadConfig(data []byte) (*config.KubeSchedulerConfiguration, error) {
 	// The UniversalDecoder runs defaulting and returns the internal type by default.
-	obj, gvk, err := kubeschedulerscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
+	obj, gvk, err := scheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	if cfgObj, ok := obj.(*kubeschedulerconfig.KubeSchedulerConfiguration); ok {
+	if cfgObj, ok := obj.(*config.KubeSchedulerConfiguration); ok {
+		// We don't set this field in pkg/scheduler/apis/config/{version}/conversion.go
+		// because the field will be cleared later by API machinery during
+		// conversion. See KubeSchedulerConfiguration internal type definition for
+		// more details.
+		cfgObj.TypeMeta.APIVersion = gvk.GroupVersion().String()
 		return cfgObj, nil
 	}
 	return nil, fmt.Errorf("couldn't decode as KubeSchedulerConfiguration, got %s: ", gvk)
 }
 
+func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	const mediaType = runtime.ContentTypeYAML
+	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), mediaType)
+	if !ok {
+		return buf, fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
+	}
+
+	var encoder runtime.Encoder
+	switch cfg.TypeMeta.APIVersion {
+	case configv1beta1.SchemeGroupVersion.String():
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta1.SchemeGroupVersion)
+	case configv1beta2.SchemeGroupVersion.String():
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta2.SchemeGroupVersion)
+	default:
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta2.SchemeGroupVersion)
+	}
+	if err := encoder.Encode(cfg, buf); err != nil {
+		return buf, err
+	}
+	return buf, nil
+}
+
 // LogOrWriteConfig logs the completed component config and writes it into the given file name as YAML, if either is enabled
-func LogOrWriteConfig(fileName string, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, completedProfiles []kubeschedulerconfig.KubeSchedulerProfile) error {
+func LogOrWriteConfig(fileName string, cfg *config.KubeSchedulerConfiguration, completedProfiles []config.KubeSchedulerProfile) error {
 	if !(klog.V(2).Enabled() || len(fileName) > 0) {
 		return nil
 	}
 	cfg.Profiles = completedProfiles
 
-	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(kubeschedulerscheme.Codecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
+	buf, err := encodeConfig(cfg)
+	if err != nil {
+		return err
 	}
 
-	encoder := kubeschedulerscheme.Codecs.EncoderForVersion(info.Serializer, kubeschedulerconfigv1beta1.SchemeGroupVersion)
 	if klog.V(2).Enabled() {
-		bytes, err := runtime.Encode(encoder, cfg)
-		if err != nil {
-			return err
-		}
-		configString := string(bytes)
-		klog.Infof("Using component config:\n%+v\n", configString)
+		klog.InfoS("Using component config", "config", buf.String())
 	}
 
 	if len(fileName) > 0 {
@@ -78,10 +102,10 @@ func LogOrWriteConfig(fileName string, cfg *kubeschedulerconfig.KubeSchedulerCon
 			return err
 		}
 		defer configFile.Close()
-		if err := encoder.Encode(cfg, configFile); err != nil {
+		if _, err := io.Copy(configFile, buf); err != nil {
 			return err
 		}
-		klog.Infof("Wrote configuration to: %s\n", fileName)
+		klog.InfoS("Wrote configuration", "file", fileName)
 		os.Exit(0)
 	}
 	return nil

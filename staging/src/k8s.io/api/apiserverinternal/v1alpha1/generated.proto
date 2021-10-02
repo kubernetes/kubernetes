@@ -86,9 +86,12 @@ message StorageVersionCondition {
 
 // A list of StorageVersions.
 message StorageVersionList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
+  // Items holds a list of StorageVersion
   repeated StorageVersion items = 2;
 }
 

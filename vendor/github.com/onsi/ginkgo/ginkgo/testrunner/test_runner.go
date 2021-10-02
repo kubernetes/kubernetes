@@ -49,11 +49,7 @@ func New(suite testsuite.TestSuite, numCPU int, parallelStream bool, timeout tim
 	}
 
 	if !suite.Precompiled {
-		dir, err := ioutil.TempDir("", "ginkgo")
-		if err != nil {
-			panic(fmt.Sprintf("couldn't create temporary directory... might be time to rm -rf:\n%s", err.Error()))
-		}
-		runner.compilationTargetPath = filepath.Join(dir, suite.PackageName+".test")
+		runner.compilationTargetPath, _ = filepath.Abs(filepath.Join(suite.Path, suite.PackageName+".test"))
 	}
 
 	return runner
@@ -248,7 +244,7 @@ func (t *TestRunner) CleanUp() {
 	if t.Suite.Precompiled {
 		return
 	}
-	os.RemoveAll(filepath.Dir(t.compilationTargetPath))
+	os.Remove(t.compilationTargetPath)
 }
 
 func (t *TestRunner) runSerialGinkgoSuite() RunResult {

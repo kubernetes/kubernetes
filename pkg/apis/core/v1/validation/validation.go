@@ -23,10 +23,10 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 )
 
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
@@ -109,10 +109,7 @@ func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) f
 // Validate compute resource typename.
 // Refer to docs/design/resources.md for more details.
 func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	for _, msg := range validation.IsQualifiedName(value) {
-		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
-	}
+	allErrs := apivalidation.ValidateQualifiedName(value, fldPath)
 	if len(allErrs) != 0 {
 		return allErrs
 	}

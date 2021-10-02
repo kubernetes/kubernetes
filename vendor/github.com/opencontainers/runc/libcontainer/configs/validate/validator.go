@@ -6,10 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/intelrdt"
 	selinux "github.com/opencontainers/selinux/go-selinux"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sys/unix"
 )
 
 type Validator interface {
@@ -20,37 +24,35 @@ func New() Validator {
 	return &ConfigValidator{}
 }
 
-type ConfigValidator struct {
-}
+type ConfigValidator struct{}
+
+type check func(config *configs.Config) error
 
 func (v *ConfigValidator) Validate(config *configs.Config) error {
-	if err := v.rootfs(config); err != nil {
-		return err
+	checks := []check{
+		v.cgroups,
+		v.rootfs,
+		v.network,
+		v.hostname,
+		v.security,
+		v.usernamespace,
+		v.cgroupnamespace,
+		v.sysctl,
+		v.intelrdt,
+		v.rootlessEUID,
 	}
-	if err := v.network(config); err != nil {
-		return err
-	}
-	if err := v.hostname(config); err != nil {
-		return err
-	}
-	if err := v.security(config); err != nil {
-		return err
-	}
-	if err := v.usernamespace(config); err != nil {
-		return err
-	}
-	if err := v.cgroupnamespace(config); err != nil {
-		return err
-	}
-	if err := v.sysctl(config); err != nil {
-		return err
-	}
-	if err := v.intelrdt(config); err != nil {
-		return err
-	}
-	if config.RootlessEUID {
-		if err := v.rootlessEUID(config); err != nil {
+	for _, c := range checks {
+		if err := c(config); err != nil {
 			return err
+		}
+	}
+	// Relaxed validation rules for backward compatibility
+	warns := []check{
+		v.mounts, // TODO (runc v1.x.x): make this an error instead of a warning
+	}
+	for _, c := range warns {
+		if err := c(config); err != nil {
+			logrus.WithError(err).Warnf("invalid configuration")
 		}
 	}
 	return nil
@@ -144,6 +146,12 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 		"kernel.shm_rmid_forced": true,
 	}
 
+	var (
+		netOnce    sync.Once
+		hostnet    bool
+		hostnetErr error
+	)
+
 	for s := range config.Sysctl {
 		if validSysctlMap[s] || strings.HasPrefix(s, "fs.mqueue.") {
 			if config.Namespaces.Contains(configs.NEWIPC) {
@@ -153,16 +161,27 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 			}
 		}
 		if strings.HasPrefix(s, "net.") {
-			if config.Namespaces.Contains(configs.NEWNET) {
-				if path := config.Namespaces.PathOf(configs.NEWNET); path != "" {
-					if err := checkHostNs(s, path); err != nil {
-						return err
-					}
+			// Is container using host netns?
+			// Here "host" means "current", not "initial".
+			netOnce.Do(func() {
+				if !config.Namespaces.Contains(configs.NEWNET) {
+					hostnet = true
+					return
 				}
-				continue
-			} else {
-				return fmt.Errorf("sysctl %q is not allowed in the hosts network namespace", s)
+				path := config.Namespaces.PathOf(configs.NEWNET)
+				if path == "" {
+					// own netns, so hostnet = false
+					return
+				}
+				hostnet, hostnetErr = isHostNetNS(path)
+			})
+			if hostnetErr != nil {
+				return hostnetErr
 			}
+			if hostnet {
+				return fmt.Errorf("sysctl %q not allowed in host network namespace", s)
+			}
+			continue
 		}
 		if config.Namespaces.Contains(configs.NEWUTS) {
 			switch s {
@@ -182,21 +201,21 @@ func (v *ConfigValidator) sysctl(config *configs.Config) error {
 
 func (v *ConfigValidator) intelrdt(config *configs.Config) error {
 	if config.IntelRdt != nil {
-		if !intelrdt.IsCatEnabled() && !intelrdt.IsMbaEnabled() {
+		if !intelrdt.IsCATEnabled() && !intelrdt.IsMBAEnabled() {
 			return errors.New("intelRdt is specified in config, but Intel RDT is not supported or enabled")
 		}
 
-		if !intelrdt.IsCatEnabled() && config.IntelRdt.L3CacheSchema != "" {
+		if !intelrdt.IsCATEnabled() && config.IntelRdt.L3CacheSchema != "" {
 			return errors.New("intelRdt.l3CacheSchema is specified in config, but Intel RDT/CAT is not enabled")
 		}
-		if !intelrdt.IsMbaEnabled() && config.IntelRdt.MemBwSchema != "" {
+		if !intelrdt.IsMBAEnabled() && config.IntelRdt.MemBwSchema != "" {
 			return errors.New("intelRdt.memBwSchema is specified in config, but Intel RDT/MBA is not enabled")
 		}
 
-		if intelrdt.IsCatEnabled() && config.IntelRdt.L3CacheSchema == "" {
+		if intelrdt.IsCATEnabled() && config.IntelRdt.L3CacheSchema == "" {
 			return errors.New("Intel RDT/CAT is enabled and intelRdt is specified in config, but intelRdt.l3CacheSchema is empty")
 		}
-		if intelrdt.IsMbaEnabled() && config.IntelRdt.MemBwSchema == "" {
+		if intelrdt.IsMBAEnabled() && config.IntelRdt.MemBwSchema == "" {
 			return errors.New("Intel RDT/MBA is enabled and intelRdt is specified in config, but intelRdt.memBwSchema is empty")
 		}
 	}
@@ -204,43 +223,56 @@ func (v *ConfigValidator) intelrdt(config *configs.Config) error {
 	return nil
 }
 
-func isSymbolicLink(path string) (bool, error) {
-	fi, err := os.Lstat(path)
-	if err != nil {
-		return false, err
-	}
-
-	return fi.Mode()&os.ModeSymlink == os.ModeSymlink, nil
-}
-
-// checkHostNs checks whether network sysctl is used in host namespace.
-func checkHostNs(sysctlConfig string, path string) error {
-	var currentProcessNetns = "/proc/self/ns/net"
-	// readlink on the current processes network namespace
-	destOfCurrentProcess, err := os.Readlink(currentProcessNetns)
-	if err != nil {
-		return fmt.Errorf("read soft link %q error", currentProcessNetns)
-	}
-
-	// First check if the provided path is a symbolic link
-	symLink, err := isSymbolicLink(path)
-	if err != nil {
-		return fmt.Errorf("could not check that %q is a symlink: %v", path, err)
-	}
-
-	if symLink == false {
-		// The provided namespace is not a symbolic link,
-		// it is not the host namespace.
+func (v *ConfigValidator) cgroups(config *configs.Config) error {
+	c := config.Cgroups
+	if c == nil {
 		return nil
 	}
 
-	// readlink on the path provided in the struct
-	destOfContainer, err := os.Readlink(path)
-	if err != nil {
-		return fmt.Errorf("read soft link %q error", path)
+	if (c.Name != "" || c.Parent != "") && c.Path != "" {
+		return fmt.Errorf("cgroup: either Path or Name and Parent should be used, got %+v", c)
 	}
-	if destOfContainer == destOfCurrentProcess {
-		return fmt.Errorf("sysctl %q is not allowed in the hosts network namespace", sysctlConfig)
+
+	r := c.Resources
+	if r == nil {
+		return nil
 	}
+
+	if !cgroups.IsCgroup2UnifiedMode() && r.Unified != nil {
+		return cgroups.ErrV1NoUnified
+	}
+
+	if cgroups.IsCgroup2UnifiedMode() {
+		_, err := cgroups.ConvertMemorySwapToCgroupV2Value(r.MemorySwap, r.Memory)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (v *ConfigValidator) mounts(config *configs.Config) error {
+	for _, m := range config.Mounts {
+		if !filepath.IsAbs(m.Destination) {
+			return fmt.Errorf("invalid mount %+v: mount destination not absolute", m)
+		}
+	}
+
+	return nil
+}
+
+func isHostNetNS(path string) (bool, error) {
+	const currentProcessNetns = "/proc/self/ns/net"
+
+	var st1, st2 unix.Stat_t
+
+	if err := unix.Stat(currentProcessNetns, &st1); err != nil {
+		return false, fmt.Errorf("unable to stat %q: %s", currentProcessNetns, err)
+	}
+	if err := unix.Stat(path, &st2); err != nil {
+		return false, fmt.Errorf("unable to stat %q: %s", path, err)
+	}
+
+	return (st1.Dev == st2.Dev) && (st1.Ino == st2.Ino), nil
 }

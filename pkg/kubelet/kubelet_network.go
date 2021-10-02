@@ -73,8 +73,7 @@ func (kl *Kubelet) updatePodCIDR(cidr string) (bool, error) {
 		// But it is better to be on the safe side to still return true here.
 		return true, fmt.Errorf("failed to update pod CIDR: %v", err)
 	}
-
-	klog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
+	klog.InfoS("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 	return true, nil
 }

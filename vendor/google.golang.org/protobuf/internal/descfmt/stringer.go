@@ -42,6 +42,8 @@ func formatListOpt(vs list, isRoot, allowMulti bool) string {
 			name = "FileImports"
 		case pref.Descriptor:
 			name = reflect.ValueOf(vs).MethodByName("Get").Type().Out(0).Name() + "s"
+		default:
+			name = reflect.ValueOf(vs).Elem().Type().Name()
 		}
 		start, end = name+"{", "}"
 	}

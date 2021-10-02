@@ -337,22 +337,35 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 			setHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet()
+			// stop the kubelet and wait until the server will restart it automatically
+			stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, time.Minute, time.Second).Should(gomega.BeFalse())
+			// wait until the kubelet health check will pass
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, 2*time.Minute, 10*time.Second).Should(gomega.BeTrue())
 
 			waitForHugepages()
 
 			pod := getHugepagesTestPod(f, limits, mounts, volumes)
 
-			ginkgo.By("by running a guarantee pod that requests hugepages")
+			ginkgo.By("by running a test pod that requests hugepages")
 			testpod = f.PodClient().CreateSync(pod)
 		})
 
 		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
 		ginkgo.JustAfterEach(func() {
+			ginkgo.By(fmt.Sprintf("deleting test pod %s", testpod.Name))
+			f.PodClient().DeleteSync(testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+
 			releaseHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
-			restartKubelet()
+			// stop the kubelet and wait until the server will restart it automatically
+			stopKubelet()
 
 			waitForHugepages()
 		})

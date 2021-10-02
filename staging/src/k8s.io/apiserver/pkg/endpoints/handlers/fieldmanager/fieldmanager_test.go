@@ -55,6 +55,7 @@ type fakeObjectConvertor struct {
 	apiVersion fieldpath.APIVersion
 }
 
+//lint:ignore SA4009 backwards compatibility
 func (c *fakeObjectConvertor) Convert(in, out, context interface{}) error {
 	if typedValue, ok := in.(*typed.TypedValue); ok {
 		var err error
@@ -78,19 +79,20 @@ func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManager struct {
 	fieldManager *FieldManager
+	apiVersion   string
 	emptyObj     runtime.Object
 	liveObj      runtime.Object
 }
 
 func NewDefaultTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, false, nil)
+	return NewTestFieldManager(gvk, "", nil)
 }
 
 func NewSubresourceTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
-	return NewTestFieldManager(gvk, true, nil)
+	return NewTestFieldManager(gvk, "scale", nil)
 }
 
-func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool, chainFieldManager func(Manager) Manager) TestFieldManager {
+func NewTestFieldManager(gvk schema.GroupVersionKind, subresource string, chainFieldManager func(Manager) Manager) TestFieldManager {
 	m := NewFakeOpenAPIModels()
 	typeConverter := NewFakeTypeConverter(m)
 	converter := newVersionConverter(typeConverter, &fakeObjectConvertor{}, gvk.GroupVersion())
@@ -102,6 +104,7 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 		&fakeObjectDefaulter{},
 		gvk.GroupVersion(),
 		gvk.GroupVersion(),
+		nil,
 	)
 	if err != nil {
 		panic(err)
@@ -109,17 +112,23 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 	live := &unstructured.Unstructured{}
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
-	f = NewStripMetaManager(f)
-	f = NewManagedFieldsUpdater(f)
-	f = NewBuildManagerInfoManager(f, gvk.GroupVersion())
-	f = NewProbabilisticSkipNonAppliedManager(f, &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability)
-	f = NewLastAppliedManager(f, typeConverter, objectConverter, gvk.GroupVersion())
-	f = NewLastAppliedUpdater(f)
+	f = NewLastAppliedUpdater(
+		NewLastAppliedManager(
+			NewProbabilisticSkipNonAppliedManager(
+				NewBuildManagerInfoManager(
+					NewManagedFieldsUpdater(
+						NewStripMetaManager(f),
+					), gvk.GroupVersion(), subresource,
+				), &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability,
+			), typeConverter, objectConverter, gvk.GroupVersion(),
+		),
+	)
 	if chainFieldManager != nil {
 		f = chainFieldManager(f)
 	}
 	return TestFieldManager{
-		fieldManager: NewFieldManager(f, ignoreManagedFieldsFromRequestObject),
+		fieldManager: NewFieldManager(f, subresource),
+		apiVersion:   gvk.GroupVersion().String(),
 		emptyObj:     live,
 		liveObj:      live.DeepCopyObject(),
 	}
@@ -145,8 +154,16 @@ func NewFakeOpenAPIModels() proto.Models {
 	return m
 }
 
+func (f *TestFieldManager) APIVersion() string {
+	return f.apiVersion
+}
+
 func (f *TestFieldManager) Reset() {
 	f.liveObj = f.emptyObj.DeepCopyObject()
+}
+
+func (f *TestFieldManager) Get() runtime.Object {
+	return f.liveObj.DeepCopyObject()
 }
 
 func (f *TestFieldManager) Apply(obj runtime.Object, manager string, force bool) error {
@@ -758,6 +775,7 @@ func TestNoOpChanges(t *testing.T) {
 			"labels": {
 				"a": "b"
 			},
+			"creationTimestamp": null,
 		}
 	}`), &obj.Object); err != nil {
 		t.Fatalf("error decoding YAML: %v", err)
@@ -1248,7 +1266,7 @@ func TestUpdateViaSubresources(t *testing.T) {
 		},
 	})
 
-	// Check that managed fields cannot be changed via subresources
+	// Check that managed fields cannot be changed explicitly via subresources
 	expectedManager := "fieldmanager_test_subresource"
 	if err := f.Update(obj, expectedManager); err != nil {
 		t.Fatalf("failed to apply object: %v", err)

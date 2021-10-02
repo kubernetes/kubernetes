@@ -75,7 +75,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
 		deletePod: func(namespace, name string) error {
-			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
+			klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
 			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
 		},
 	}
@@ -139,7 +139,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 		return
 	}
 
-	klog.Infof("garbage collecting %v pods", deleteCount)
+	klog.InfoS("Garbage collecting pods", "numPods", deleteCount)
 	// sort only when necessary
 	sort.Sort(byCreationTimestamp(terminatedPods))
 	var wait sync.WaitGroup
@@ -179,11 +179,11 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
 		if !deletedNodesNames.Has(pod.Spec.NodeName) {
 			continue
 		}
-		klog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, pod.Spec.NodeName)
+		klog.V(2).InfoS("Found orphaned Pod assigned to the Node, deleting.", "pod", klog.KObj(pod), "node", pod.Spec.NodeName)
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			klog.V(0).InfoS("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
 		}
 	}
 }
@@ -200,7 +200,7 @@ func (gcc *PodGCController) discoverDeletedNodes(existingNodeNames sets.String) 
 			exists, err := gcc.checkIfNodeExists(nodeName)
 			switch {
 			case err != nil:
-				klog.Errorf("Error while getting node %q: %v", nodeName, err)
+				klog.ErrorS(err, "Error while getting node", "node", nodeName)
 				// Node will be added back to the queue in the subsequent loop if still needed
 			case !exists:
 				deletedNodesNames.Insert(nodeName)
@@ -228,11 +228,11 @@ func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
 			continue
 		}
 
-		klog.V(2).Infof("Found unscheduled terminating Pod %v/%v not assigned to any Node. Deleting.", pod.Namespace, pod.Name)
+		klog.V(2).InfoS("Found unscheduled terminating Pod not assigned to any Node, deleting.", "pod", klog.KObj(pod))
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			klog.V(0).InfoS("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
 		}
 	}
 }

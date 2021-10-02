@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	apiserverinternalv1alpha1 "k8s.io/client-go/applyconfigurations/apiserverinternal/v1alpha1"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -126,6 +129,49 @@ func (c *FakeStorageVersions) DeleteCollection(ctx context.Context, opts v1.Dele
 func (c *FakeStorageVersions) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.StorageVersion, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, name, pt, data, subresources...), &v1alpha1.StorageVersion{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.StorageVersion), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied storageVersion.
+func (c *FakeStorageVersions) Apply(ctx context.Context, storageVersion *apiserverinternalv1alpha1.StorageVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageVersion, err error) {
+	if storageVersion == nil {
+		return nil, fmt.Errorf("storageVersion provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(storageVersion)
+	if err != nil {
+		return nil, err
+	}
+	name := storageVersion.Name
+	if name == nil {
+		return nil, fmt.Errorf("storageVersion.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, *name, types.ApplyPatchType, data), &v1alpha1.StorageVersion{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1alpha1.StorageVersion), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeStorageVersions) ApplyStatus(ctx context.Context, storageVersion *apiserverinternalv1alpha1.StorageVersionApplyConfiguration, opts v1.ApplyOptions) (result *v1alpha1.StorageVersion, err error) {
+	if storageVersion == nil {
+		return nil, fmt.Errorf("storageVersion provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(storageVersion)
+	if err != nil {
+		return nil, err
+	}
+	name := storageVersion.Name
+	if name == nil {
+		return nil, fmt.Errorf("storageVersion.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewRootPatchSubresourceAction(storageversionsResource, *name, types.ApplyPatchType, data, "status"), &v1alpha1.StorageVersion{})
 	if obj == nil {
 		return nil, err
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"errors"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -25,6 +26,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestAuthenticateRequestWithAud(t *testing.T) {
@@ -100,6 +102,90 @@ func TestAuthenticateRequestWithAud(t *testing.T) {
 				assert.Equal(t, 0, success)
 				assert.Equal(t, 1, failed)
 			}
+		})
+	}
+}
+
+func TestAuthenticateMetrics(t *testing.T) {
+	testcases := []struct {
+		name         string
+		header       bool
+		apiAuds      []string
+		respAuds     []string
+		expectMetric bool
+		expectOk     bool
+		expectError  bool
+	}{
+		{
+			name:        "no api audience and no audience in response",
+			header:      true,
+			apiAuds:     nil,
+			respAuds:    nil,
+			expectOk:    true,
+			expectError: false,
+		},
+		{
+			name:        "api audience matching response audience",
+			header:      true,
+			apiAuds:     authenticator.Audiences([]string{"other"}),
+			respAuds:    []string{"other"},
+			expectOk:    true,
+			expectError: false,
+		},
+		{
+			name:        "no intersection results in error",
+			header:      true,
+			apiAuds:     authenticator.Audiences([]string{"other"}),
+			respAuds:    []string{"some"},
+			expectOk:    true,
+			expectError: true,
+		},
+		{
+			name:        "no header results in error",
+			header:      false,
+			apiAuds:     authenticator.Audiences([]string{"other"}),
+			respAuds:    []string{"some"},
+			expectOk:    false,
+			expectError: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := 0
+			auth := withAuthentication(
+				http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+				}),
+				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+					if req.Header.Get("Authorization") == "Something" {
+						return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}, Audiences: authenticator.Audiences(tc.respAuds)}, true, nil
+					}
+					return nil, false, errors.New("Authorization header is missing.")
+				}),
+				http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+				}),
+				tc.apiAuds,
+				func(ctx context.Context, resp *authenticator.Response, ok bool, err error, apiAudiences authenticator.Audiences, authStart time.Time, authFinish time.Time) {
+					called = 1
+					if tc.expectOk != ok {
+						t.Errorf("unexpected value of ok argument: %t", ok)
+					}
+					if tc.expectError {
+						if err == nil {
+							t.Errorf("unexpected value of err argument: %s", err)
+						}
+					} else {
+						if err != nil {
+							t.Errorf("unexpected value of err argument: %s", err)
+						}
+					}
+				},
+			)
+			if tc.header {
+				auth.ServeHTTP(httptest.NewRecorder(), &http.Request{Header: map[string][]string{"Authorization": {"Something"}}})
+			} else {
+				auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
+			}
+			assert.Equal(t, 1, called)
 		})
 	}
 }

@@ -93,6 +93,29 @@ var (
 		},
 		[]string{"operation"},
 	)
+
+	// EndpointSlicesChangedPerSync observes the number of EndpointSlices
+	// changed per sync.
+	EndpointSlicesChangedPerSync = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem: EndpointSliceSubsystem,
+			Name:      "endpointslices_changed_per_sync",
+			Help:      "Number of EndpointSlices changed on each Service sync",
+		},
+		[]string{"topology"}, // either "Auto" or "Disabled"
+	)
+
+	// EndpointSliceSyncs tracks the number of sync operations the controller
+	// runs along with their result.
+	EndpointSliceSyncs = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      EndpointSliceSubsystem,
+			Name:           "syncs",
+			Help:           "Number of EndpointSlice syncs",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"}, // either "success", "stale", or "error"
+	)
 )
 
 var registerMetrics sync.Once
@@ -106,5 +129,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(NumEndpointSlices)
 		legacyregistry.MustRegister(DesiredEndpointSlices)
 		legacyregistry.MustRegister(EndpointSliceChanges)
+		legacyregistry.MustRegister(EndpointSlicesChangedPerSync)
+		legacyregistry.MustRegister(EndpointSliceSyncs)
 	})
 }
