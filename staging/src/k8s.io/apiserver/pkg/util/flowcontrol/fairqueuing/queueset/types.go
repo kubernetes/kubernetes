@@ -62,6 +62,7 @@ type request struct {
 	arrivalTime time.Time
 
 	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
+	// This field is meaningful only while the request is waiting in the virtual world.
 	arrivalR SeatSeconds
 
 	// descr1 and descr2 are not used in any logic but they appear in

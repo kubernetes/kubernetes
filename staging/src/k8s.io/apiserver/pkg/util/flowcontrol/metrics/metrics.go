@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -103,7 +104,6 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
-
 	// PriorityLevelConcurrencyObserverPairGenerator creates pairs that observe concurrency for priority levels
 	PriorityLevelConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
 		&compbasemetrics.HistogramOpts{
@@ -122,8 +122,8 @@ var (
 			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{priorityLevel})
-
+		[]string{priorityLevel},
+	)
 	// ReadWriteConcurrencyObserverPairGenerator creates pairs that observe concurrency broken down by mutating vs readonly
 	ReadWriteConcurrencyObserverPairGenerator = NewSampleAndWaterMarkHistogramsPairGenerator(clock.RealClock{}, time.Millisecond,
 		&compbasemetrics.HistogramOpts{
@@ -142,8 +142,8 @@ var (
 			Buckets:        []float64{0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{requestKind})
-
+		[]string{requestKind},
+	)
 	apiserverCurrentR = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
@@ -154,7 +154,6 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-
 	apiserverDispatchR = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
@@ -165,7 +164,6 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-
 	apiserverLatestS = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
@@ -176,7 +174,6 @@ var (
 		},
 		[]string{priorityLevel},
 	)
-
 	apiserverNextSBounds = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
@@ -187,7 +184,6 @@ var (
 		},
 		[]string{priorityLevel, "bound"},
 	)
-
 	apiserverNextDiscountedSBounds = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
@@ -198,7 +194,6 @@ var (
 		},
 		[]string{priorityLevel, "bound"},
 	)
-
 	apiserverCurrentInqueueRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Namespace:      namespace,
@@ -272,6 +267,17 @@ var (
 		},
 		[]string{priorityLevel, flowSchema},
 	)
+	apiserverEpochAdvances = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "epoch_advance_total",
+			Help:           "Number of times the queueset's progress meter jumped backward",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, "success"},
+	)
+
 	metrics = Registerables{
 		apiserverRejectedRequestsTotal,
 		apiserverDispatchedRequestsTotal,
@@ -287,6 +293,7 @@ var (
 		apiserverCurrentExecutingRequests,
 		apiserverRequestWaitingSeconds,
 		apiserverRequestExecutionSeconds,
+		apiserverEpochAdvances,
 	}.
 		Append(PriorityLevelConcurrencyObserverPairGenerator.metrics()...).
 		Append(ReadWriteConcurrencyObserverPairGenerator.metrics()...)
@@ -351,4 +358,8 @@ func ObserveWaitingDuration(ctx context.Context, priorityLevel, flowSchema, exec
 // ObserveExecutionDuration observes the execution duration for flow control
 func ObserveExecutionDuration(ctx context.Context, priorityLevel, flowSchema string, executionTime time.Duration) {
 	apiserverRequestExecutionSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema).Observe(executionTime.Seconds())
+}
+
+func AddEpochAdvance(ctx context.Context, priorityLevel string, success bool) {
+	apiserverEpochAdvances.WithContext(ctx).WithLabelValues(priorityLevel, strconv.FormatBool(success)).Inc()
 }

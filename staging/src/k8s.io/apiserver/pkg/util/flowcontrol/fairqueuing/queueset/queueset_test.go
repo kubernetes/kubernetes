@@ -179,6 +179,7 @@ type uniformScenario struct {
 	clk                                      *testeventclock.Fake
 	counter                                  counter.GoRoutineCounter
 	padConstrains                            bool
+	expectedEpochAdvances                    int
 }
 
 func (us uniformScenario) exercise(t *testing.T) {
@@ -404,6 +405,18 @@ func (uss *uniformScenarioState) finalReview() {
 		} else {
 			uss.t.Log("Success with" + e)
 		}
+	}
+	e := ""
+	if uss.expectedEpochAdvances > 0 {
+		e = fmt.Sprintf(`        # HELP apiserver_flowcontrol_epoch_advance_total [ALPHA] Number of times the queueset's progress meter jumped backward
+        # TYPE apiserver_flowcontrol_epoch_advance_total counter
+        apiserver_flowcontrol_epoch_advance_total{priority_level=%q,success=%q} %d%s`, uss.name, "true", uss.expectedEpochAdvances, "\n")
+	}
+	err := metrics.GatherAndCompare(e, "apiserver_flowcontrol_epoch_advance_total")
+	if err != nil {
+		uss.t.Error(err)
+	} else {
+		uss.t.Logf("Success with apiserver_flowcontrol_epoch_advance_total = %d", uss.expectedEpochAdvances)
 	}
 }
 
@@ -647,7 +660,7 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 	}.exercise(t)
 }
 
-// TestSeatSecondsRollover demonstrates that SeatSeconds overflow can cause bad stuff to happen.
+// TestSeatSecondsRollover checks that there is not a problem with SeatSecons overflow.
 func TestSeatSecondsRollover(t *testing.T) {
 	metrics.Register()
 	now := time.Now()
@@ -677,13 +690,14 @@ func TestSeatSecondsRollover(t *testing.T) {
 		},
 		concurrencyLimit:       2000,
 		evalDuration:           Quarter * 40,
-		expectedFair:           []bool{false},
+		expectedFair:           []bool{true},
 		expectedFairnessMargin: []float64{0.01},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
 		clk:                    clk,
 		counter:                counter,
+		expectedEpochAdvances:  8,
 	}.exercise(t)
 }
 

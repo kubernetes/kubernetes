@@ -17,29 +17,33 @@ limitations under the License.
 package queueset
 
 import (
-	"fmt"
 	"math"
 	"testing"
 	"time"
 )
 
+// TestSeatSecondsString exercises the SeatSeconds constructor and de-constructors (String, ToFloat).
 func TestSeatSecondsString(t *testing.T) {
-	digits := math.Log10(ssScale)
-	expectFmt := fmt.Sprintf("%%%d.%dfss", int(digits+2), int(digits))
 	testCases := []struct {
-		ss     SeatSeconds
-		expect string
+		ss          SeatSeconds
+		expectFloat float64
+		expectStr   string
 	}{
-		{ss: SeatSeconds(1), expect: fmt.Sprintf(expectFmt, 1.0/ssScale)},
-		{ss: 0, expect: "0.00000000ss"},
-		{ss: SeatsTimesDuration(1, time.Second), expect: "1.00000000ss"},
-		{ss: SeatsTimesDuration(123, 100*time.Millisecond), expect: "12.30000000ss"},
-		{ss: SeatsTimesDuration(1203, 10*time.Millisecond), expect: "12.03000000ss"},
+		{ss: SeatSeconds(1), expectFloat: 1.0 / ssScale, expectStr: "0.00000001ss"},
+		{ss: SeatSeconds(ssScale - 1), expectFloat: (ssScale - 1) / ssScale, expectStr: "0.99999999ss"},
+		{ss: 0, expectFloat: 0, expectStr: "0.00000000ss"},
+		{ss: SeatsTimesDuration(1, time.Second), expectFloat: 1, expectStr: "1.00000000ss"},
+		{ss: SeatsTimesDuration(123, 100*time.Millisecond), expectFloat: 12.3, expectStr: "12.30000000ss"},
+		{ss: SeatsTimesDuration(1203, 10*time.Millisecond), expectFloat: 12.03, expectStr: "12.03000000ss"},
 	}
 	for _, testCase := range testCases {
 		actualStr := testCase.ss.String()
-		if actualStr != testCase.expect {
-			t.Errorf("SeatSeonds(%d) formatted as %q rather than expected %q", uint64(testCase.ss), actualStr, testCase.expect)
+		if actualStr != testCase.expectStr {
+			t.Errorf("SeatSeconds(%d).String() is %q but expected %q", uint64(testCase.ss), actualStr, testCase.expectStr)
+		}
+		actualFloat := testCase.ss.ToFloat()
+		if math.Round(actualFloat*ssScale) != math.Round(testCase.expectFloat*ssScale) {
+			t.Errorf("SeatSeconds(%d).ToFloat() is %v but expected %v", uint64(testCase.ss), actualFloat, testCase.expectFloat)
 		}
 	}
 }
