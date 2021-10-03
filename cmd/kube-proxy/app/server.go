@@ -480,18 +480,15 @@ with the apiserver API to configure the proxy.`,
 			cliflag.PrintFlags(cmd.Flags())
 
 			if err := initForOS(opts.WindowsService); err != nil {
-				klog.ErrorS(err, "Failed OS init")
-				return err
+				return fmt.Errorf("failed os init: %w", err)
 			}
 
 			if err := opts.Complete(); err != nil {
-				klog.ErrorS(err, "Failed complete")
-				return err
+				return fmt.Errorf("failed complete: %w", err)
 			}
 
 			if err := opts.Validate(); err != nil {
-				klog.ErrorS(err, "Failed validate")
-				return err
+				return fmt.Errorf("failed validate: %w", err)
 			}
 
 			if err := opts.Run(); err != nil {
@@ -501,8 +498,6 @@ with the apiserver API to configure the proxy.`,
 
 			return nil
 		},
-		SilenceUsage:  true,
-		SilenceErrors: true,
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
 				if len(arg) > 0 {
