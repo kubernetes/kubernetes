@@ -227,6 +227,9 @@ type MemoryStats struct {
 	// hugepages).
 	// +optional
 	RSSBytes *uint64 `json:"rssBytes,omitempty"`
+	// The amount of swap currently used.
+	// +optional
+	SwapBytes *uint64 `json:"swapBytes,omitempty"`
 	// Cumulative number of minor page faults.
 	// +optional
 	PageFaults *uint64 `json:"pageFaults,omitempty"`

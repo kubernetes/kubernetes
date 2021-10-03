@@ -663,6 +663,7 @@ func checkEmptyMemoryStats(t *testing.T, label string, seed int, info cadvisorap
 	assert.EqualValues(t, 0, *stats.WorkingSetBytes, label+".Mem.WorkingSetBytes")
 	assert.Nil(t, stats.UsageBytes, label+".Mem.UsageBytes")
 	assert.Nil(t, stats.RSSBytes, label+".Mem.RSSBytes")
+	assert.Nil(t, stats.SwapBytes, label+".Mem.SwapBytes")
 	assert.Nil(t, stats.PageFaults, label+".Mem.PageFaults")
 	assert.Nil(t, stats.MajorPageFaults, label+".Mem.MajorPageFaults")
 	assert.Nil(t, stats.AvailableBytes, label+".Mem.AvailableBytes")
