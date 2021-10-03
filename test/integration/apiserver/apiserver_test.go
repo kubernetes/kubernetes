@@ -23,12 +23,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -2202,6 +2204,56 @@ func expectPartialObjectMetaV1EventsProtobuf(t *testing.T, r io.Reader, values .
 		if meta.Annotations["test"] != value {
 			t.Fatalf("expected event %d to have value %q instead of %q", i+1, value, meta.Annotations["test"])
 		}
+	}
+}
+
+func TestClientsetShareTransport(t *testing.T) {
+	var counter int
+	var mu sync.Mutex
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	dialFn := func(ctx context.Context, network, address string) (net.Conn, error) {
+		mu.Lock()
+		counter++
+		mu.Unlock()
+		return (&net.Dialer{}).DialContext(ctx, network, address)
+	}
+	server.ClientConfig.Dial = dialFn
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	// create test namespace
+	_, err := client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-creation",
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("failed to create test ns: %v", err)
+	}
+	// List different objects
+	n, err := client.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d namespaces on the cluster", len(n.Items))
+	p, err := client.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d pods on the cluster", len(p.Items))
+	e, err := client.DiscoveryV1().EndpointSlices("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d endpoint slices on the cluster", len(e.Items))
+	d, err := client.AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Listed %d deployments on the cluster", len(d.Items))
+
+	if counter != 1 {
+		t.Fatalf("expected only one connection, created %d connections", counter)
 	}
 }
 
