@@ -37,7 +37,7 @@ type LogfFn func(format string, args ...interface{})
 
 func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, logf LogfFn) {
 	if newRS != nil {
-		logf(pretty.Sprintf("New ReplicaSet %q of Deployment %q:\n%+v", newRS.Name, deployment.Name, *newRS))
+		logf(pretty.Sprintf("New ReplicaSet %q of Deployment %q:\n%+ v", newRS.Name, deployment.Name, *newRS))
 	} else {
 		logf("New ReplicaSet of Deployment %q is nil.", deployment.Name)
 	}
@@ -45,7 +45,7 @@ func LogReplicaSetsOfDeployment(deployment *apps.Deployment, allOldRSs []*apps.R
 		logf("All old ReplicaSets of Deployment %q:", deployment.Name)
 	}
 	for i := range allOldRSs {
-		logf(pretty.Sprintf("%+v", *allOldRSs[i]))
+		logf(pretty.Sprintf("%+ v", *allOldRSs[i]))
 	}
 }
 
@@ -65,7 +65,7 @@ func LogPodsOfDeployment(c clientset.Interface, deployment *apps.Deployment, rsL
 		if podutil.IsPodAvailable(&pod, minReadySeconds, metav1.Now()) {
 			availability = "available"
 		}
-		logf(pretty.Sprintf("Pod %q is %s:\n%+v", pod.Name, availability, pod))
+		logf(pretty.Sprintf("Pod %q is %s:\n%+ v", pod.Name, availability, pod))
 	}
 }
 

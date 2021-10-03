@@ -93,7 +93,7 @@ func TestDeepHashObject(t *testing.T) {
 }
 
 func toString(obj interface{}) string {
-	return pretty.Sprintf("%#v", obj)
+	return pretty.Sprintf("%# v", obj)
 }
 
 type wheel struct {

@@ -191,7 +191,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 				errObject := apierrors.FromObject(event.Object)
 				statusErr, ok := errObject.(*apierrors.StatusError)
 				if !ok {
-					klog.Error(pretty.Sprintf("Received an error which is not *metav1.Status but %#+v", event.Object))
+					klog.Error(pretty.Sprintf("Received an error which is not *metav1.Status but %#+ v", event.Object))
 					// Retry unknown errors
 					return false, 0
 				}
@@ -220,7 +220,7 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 
 					// Log here so we have a record of hitting the unexpected error
 					// and we can whitelist some error codes if we missed any that are expected.
-					klog.V(5).Info(pretty.Sprintf("Retrying after unexpected error: %#+v", event.Object))
+					klog.V(5).Info(pretty.Sprintf("Retrying after unexpected error: %#+ v", event.Object))
 
 					// Retry
 					return false, statusDelay

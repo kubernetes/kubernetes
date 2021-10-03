@@ -614,7 +614,7 @@ func (is *informerSpy) waitForEvents(t *testing.T, wantEvents bool) {
 			if err != nil {
 				t.Fatalf("wanted no events, but got error: %v", err)
 			} else {
-				t.Fatalf("wanted no events, but got some: %s", pretty.Sprintf("%#v", is))
+				t.Fatalf("wanted no events, but got some: %s", pretty.Sprintf("%# v", is))
 			}
 		}
 	}

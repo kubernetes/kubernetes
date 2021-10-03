@@ -2403,7 +2403,7 @@ func TestValidateDeploymentStatus(t *testing.T) {
 
 		errs := ValidateDeploymentStatus(&status, field.NewPath("status"))
 		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-			errString := pretty.Sprintf("%#v", errs)
+			errString := pretty.Sprintf("%# v", errs)
 			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
 		}
 	}
@@ -2474,7 +2474,7 @@ func TestValidateDeploymentStatusUpdate(t *testing.T) {
 
 		errs := ValidateDeploymentStatusUpdate(to, from)
 		if hasErr := len(errs) > 0; hasErr != test.expectedErr {
-			errString := pretty.Sprintf("%#v", errs)
+			errString := pretty.Sprintf("%# v", errs)
 			t.Errorf("%s: expected error: %t, got error: %t\nerrors: %s", test.name, test.expectedErr, hasErr, errString)
 		}
 	}

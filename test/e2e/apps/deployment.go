@@ -636,7 +636,7 @@ func failureTrap(c clientset.Interface, ns string) {
 	for i := range deployments.Items {
 		d := deployments.Items[i]
 
-		framework.Logf(pretty.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
+		framework.Logf(pretty.Sprintf("Deployment %q:\n%+ v\n", d.Name, d))
 		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c.AppsV1())
 		if err != nil {
 			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
@@ -660,7 +660,7 @@ func failureTrap(c clientset.Interface, ns string) {
 		return
 	}
 	for _, rs := range rss.Items {
-		framework.Logf(pretty.Sprintf("ReplicaSet %q:\n%+v\n", rs.Name, rs))
+		framework.Logf(pretty.Sprintf("ReplicaSet %q:\n%+ v\n", rs.Name, rs))
 		selector, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 		if err != nil {
 			framework.Logf("failed to get selector of ReplicaSet %s: %v", rs.Name, err)
@@ -672,7 +672,7 @@ func failureTrap(c clientset.Interface, ns string) {
 			continue
 		}
 		for _, pod := range podList.Items {
-			framework.Logf(pretty.Sprintf("pod: %q:\n%+v\n", pod.Name, pod))
+			framework.Logf(pretty.Sprintf("pod: %q:\n%+ v\n", pod.Name, pod))
 		}
 	}
 }
