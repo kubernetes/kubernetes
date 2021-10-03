@@ -99,12 +99,12 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 	}
 
 	ownedReplicaSets := make([]*appsv1.ReplicaSet, 0, len(allReplicaSets.Items))
-	for _, rs := range allReplicaSets.Items {
-		if !metav1.IsControlledBy(&rs, deployment) {
+	for i := range allReplicaSets.Items {
+		if !metav1.IsControlledBy(&allReplicaSets.Items[i], deployment) {
 			continue
 		}
 
-		ownedReplicaSets = append(ownedReplicaSets, &rs)
+		ownedReplicaSets = append(ownedReplicaSets, &allReplicaSets.Items[i])
 	}
 
 	// We ignore pod-template-hash because:
