@@ -430,19 +430,19 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 		return existingPreRunE(cmd, args)
 	}
 	if kubeConfigFlags.WrapConfigFn == nil {
-	        // Wraps CommandHeaderRoundTripper around standard RoundTripper.
-	        kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
-		        c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			        // Must be separate RoundTripper; not "crt" closure.
-			        // Fixes: https://github.com/kubernetes/kubectl/issues/1098
-			        return &genericclioptions.CommandHeaderRoundTripper{
-				        Delegate: rt,
-				        Headers:  crt.Headers,
-			        }
-		        })
-		        return c
-	        }
-        }
+		// Wraps CommandHeaderRoundTripper around standard RoundTripper.
+		kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+			c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+				// Must be separate RoundTripper; not "crt" closure.
+				// Fixes: https://github.com/kubernetes/kubectl/issues/1098
+				return &genericclioptions.CommandHeaderRoundTripper{
+					Delegate: rt,
+					Headers:  crt.Headers,
+				}
+			})
+			return c
+		}
+	}
 }
 
 func runHelp(cmd *cobra.Command, args []string) {
