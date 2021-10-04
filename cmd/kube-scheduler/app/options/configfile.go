@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	configv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
+	configv1beta3 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3"
 )
 
 func loadConfigFromFile(file string) (*config.KubeSchedulerConfiguration, error) {
@@ -68,8 +69,10 @@ func encodeConfig(cfg *config.KubeSchedulerConfiguration) (*bytes.Buffer, error)
 	switch cfg.TypeMeta.APIVersion {
 	case configv1beta2.SchemeGroupVersion.String():
 		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta2.SchemeGroupVersion)
+	case configv1beta3.SchemeGroupVersion.String():
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta3.SchemeGroupVersion)
 	default:
-		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta2.SchemeGroupVersion)
+		encoder = scheme.Codecs.EncoderForVersion(info.Serializer, configv1beta3.SchemeGroupVersion)
 	}
 	if err := encoder.Encode(cfg, buf); err != nil {
 		return buf, err
