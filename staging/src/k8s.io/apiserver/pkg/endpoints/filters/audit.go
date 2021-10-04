@@ -43,17 +43,23 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 		return handler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		req, ev, omitStages, err := createAuditEventAndAttachToContext(req, policy)
+		auditContext, err := evaluatePolicyAndCreateAuditEvent(req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))
 			return
 		}
-		ctx := req.Context()
-		if ev == nil || ctx == nil {
+
+		ev := auditContext.Event
+		if ev == nil || req.Context() == nil {
 			handler.ServeHTTP(w, req)
 			return
 		}
+
+		req = req.WithContext(audit.WithAuditContext(req.Context(), auditContext))
+
+		ctx := req.Context()
+		omitStages := auditContext.RequestAuditConfig.OmitStages
 
 		ev.Stage = auditinternal.StageRequestReceived
 		if processed := processAuditEvent(ctx, sink, ev, omitStages); !processed {
@@ -111,38 +117,40 @@ func WithAudit(handler http.Handler, sink audit.Sink, policy audit.PolicyRuleEva
 	})
 }
 
-// createAuditEventAndAttachToContext is responsible for creating the audit event
-// and attaching it to the appropriate request context. It returns:
-// - context with audit event attached to it
-// - created audit event
+// evaluatePolicyAndCreateAuditEvent is responsible for evaluating the audit
+// policy configuration applicable to the request and create a new audit
+// event that will be written to the API audit log.
 // - error if anything bad happened
-func createAuditEventAndAttachToContext(req *http.Request, policy audit.PolicyRuleEvaluator) (*http.Request, *auditinternal.Event, []auditinternal.Stage, error) {
+func evaluatePolicyAndCreateAuditEvent(req *http.Request, policy audit.PolicyRuleEvaluator) (*audit.AuditContext, error) {
 	ctx := req.Context()
 
 	attribs, err := GetAuthorizerAttributes(ctx)
 	if err != nil {
-		return req, nil, nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
+		return nil, fmt.Errorf("failed to GetAuthorizerAttributes: %v", err)
 	}
 
-	level, omitStages := policy.LevelAndStages(attribs)
-	audit.ObservePolicyLevel(ctx, level)
-	if level == auditinternal.LevelNone {
+	ls := policy.EvaluatePolicyRule(attribs)
+	audit.ObservePolicyLevel(ctx, ls.Level)
+	if ls.Level == auditinternal.LevelNone {
 		// Don't audit.
-		return req, nil, nil, nil
+		return &audit.AuditContext{
+			RequestAuditConfig: ls.RequestAuditConfig,
+		}, nil
 	}
 
 	requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(ctx)
 	if !ok {
 		requestReceivedTimestamp = time.Now()
 	}
-	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, level, attribs)
+	ev, err := audit.NewEventFromRequest(req, requestReceivedTimestamp, ls.Level, attribs)
 	if err != nil {
-		return req, nil, nil, fmt.Errorf("failed to complete audit event from request: %v", err)
+		return nil, fmt.Errorf("failed to complete audit event from request: %v", err)
 	}
 
-	req = req.WithContext(request.WithAuditEvent(ctx, ev))
-
-	return req, ev, omitStages, nil
+	return &audit.AuditContext{
+		RequestAuditConfig: ls.RequestAuditConfig,
+		Event:              ev,
+	}, nil
 }
 
 func processAuditEvent(ctx context.Context, sink audit.Sink, ev *auditinternal.Event, omitStages []auditinternal.Stage) bool {

@@ -281,7 +281,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		audit.AddAuditAnnotation(req.Context(), "pandas", "are awesome")
 
 		// confirm that trying to use the audit event directly would never work
-		if ae := request.AuditEventFrom(req.Context()); ae != nil {
+		if ae := audit.AuditEventFrom(req.Context()); ae != nil {
 			t.Errorf("expected nil audit event, got %v", ae)
 		}
 
@@ -307,7 +307,7 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 		}
 
 		// confirm that we have an audit event
-		ae := request.AuditEventFrom(r.Context())
+		ae := audit.AuditEventFrom(r.Context())
 		if ae == nil {
 			t.Error("unexpected nil audit event")
 		}

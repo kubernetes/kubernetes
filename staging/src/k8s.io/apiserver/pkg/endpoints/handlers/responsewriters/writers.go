@@ -267,7 +267,7 @@ func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiat
 		return
 	}
 
-	if ae := request.AuditEventFrom(req.Context()); ae != nil {
+	if ae := audit.AuditEventFrom(req.Context()); ae != nil {
 		audit.LogResponseObject(ae, object, gv, s)
 	}
 
