@@ -108,7 +108,7 @@ func newProxyServer(
 	}
 
 	if canUseIPVS {
-		ipvsInterface = utilipvs.New(execer)
+		ipvsInterface = utilipvs.New()
 	}
 
 	// We omit creation of pretty much everything if we run in cleanup mode
