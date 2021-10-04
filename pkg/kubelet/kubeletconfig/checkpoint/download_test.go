@@ -20,8 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -73,7 +72,7 @@ func TestNewRemoteConfigSource(t *testing.T) {
 			}
 			// underlying object should match the object passed in
 			if !apiequality.Semantic.DeepEqual(c.expect.NodeConfigSource(), source.NodeConfigSource()) {
-				t.Errorf("case %q, expect RemoteConfigSource %s but got %s", c.desc, spew.Sdump(c.expect), spew.Sdump(source))
+				t.Errorf("case %q, expect RemoteConfigSource %s but got %s", c.desc, pretty.Sprint(c.expect), pretty.Sprint(source))
 			}
 		})
 	}
@@ -200,7 +199,7 @@ func TestRemoteConfigMapDownload(t *testing.T) {
 			}
 			// downloaded object should match the expected
 			if !apiequality.Semantic.DeepEqual(expectPayload.object(), p.object()) {
-				t.Errorf("expect Checkpoint %s but got %s", spew.Sdump(expectPayload), spew.Sdump(p))
+				t.Errorf("expect Checkpoint %s but got %s", pretty.Sprint(expectPayload), pretty.Sprint(p))
 			}
 			// source UID and ResourceVersion should be updated by Download
 			if p.UID() != s.UID() {

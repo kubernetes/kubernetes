@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kr/pretty"
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 )
@@ -62,7 +62,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			ginkgo.It("should enforce a profile blocking writes", func() {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					framework.Failf("Unexpected pod status: %s", pretty.Sprint(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated
@@ -73,7 +73,7 @@ var _ = SIGDescribe("AppArmor [Feature:AppArmor][NodeFeature:AppArmor]", func() 
 			ginkgo.It("should enforce a permissive profile", func() {
 				status := runAppArmorTest(f, true, v1.AppArmorBetaProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 				if len(status.ContainerStatuses) == 0 {
-					framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
+					framework.Failf("Unexpected pod status: %s", pretty.Sprint(status))
 					return
 				}
 				state := status.ContainerStatuses[0].State.Terminated

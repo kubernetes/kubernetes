@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	//lint:ignore SA1019 Keep using deprecated module; it still seems to be maintained and the api of the recommended replacement differs
 	"github.com/golang/protobuf/proto"
 	fuzz "github.com/google/gofuzz"
@@ -300,7 +300,6 @@ func roundTripOfExternalType(t *testing.T, scheme *runtime.Scheme, codecFactory 
 //
 //   external -> json/protobuf -> external.
 func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object runtime.Object) {
-	printer := spew.ConfigState{DisableMethods: true}
 	original := object
 
 	// deep copy the original object
@@ -308,8 +307,8 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	name := reflect.TypeOf(object).Elem().Name()
 	if !apiequality.Semantic.DeepEqual(original, object) {
 		t.Errorf("%v: DeepCopy altered the object, diff: %v", name, diff.ObjectReflectDiff(original, object))
-		t.Errorf("%s", spew.Sdump(original))
-		t.Errorf("%s", spew.Sdump(object))
+		t.Errorf("%s", pretty.Sprint(original))
+		t.Errorf("%s", pretty.Sprint(object))
 		return
 	}
 
@@ -317,9 +316,9 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	data, err := runtime.Encode(codec, object)
 	if err != nil {
 		if runtime.IsNotRegisteredError(err) {
-			t.Logf("%v: not registered: %v (%s)", name, err, printer.Sprintf("%#v", object))
+			t.Logf("%v: not registered: %v (%s)", name, err, pretty.Sprintf("%# v", object))
 		} else {
-			t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", object))
+			t.Errorf("%v: %v (%s)", name, err, pretty.Sprintf("%# v", object))
 		}
 		return
 	}
@@ -336,9 +335,9 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	secondData, err := runtime.Encode(codec, object)
 	if err != nil {
 		if runtime.IsNotRegisteredError(err) {
-			t.Logf("%v: not registered: %v (%s)", name, err, printer.Sprintf("%#v", object))
+			t.Logf("%v: not registered: %v (%s)", name, err, pretty.Sprintf("%# v", object))
 		} else {
-			t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", object))
+			t.Errorf("%v: %v (%s)", name, err, pretty.Sprintf("%# v", object))
 		}
 		return
 	}
@@ -346,20 +345,20 @@ func roundTrip(t *testing.T, scheme *runtime.Scheme, codec runtime.Codec, object
 	// serialization to the wire must be stable to ensure that we don't write twice to the DB
 	// when the object hasn't changed.
 	if !bytes.Equal(data, secondData) {
-		t.Errorf("%v: serialization is not stable: %s", name, printer.Sprintf("%#v", object))
+		t.Errorf("%v: serialization is not stable: %s", name, pretty.Sprintf("%# v", object))
 	}
 
 	// decode (deserialize) the encoded data back into an object
 	obj2, err := runtime.Decode(codec, data)
 	if err != nil {
-		t.Errorf("%v: %v\nCodec: %#v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", object))
+		t.Errorf("%v: %v\nCodec: %#v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), pretty.Sprintf("%# v", object))
 		panic("failed")
 	}
 
 	// ensure that the object produced from decoding the encoded data is equal
 	// to the original object
 	if !apiequality.Semantic.DeepEqual(original, obj2) {
-		t.Errorf("%v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(original, obj2), codec, printer.Sprintf("%#v", original), dataAsString(data), printer.Sprintf("%#v", obj2))
+		t.Errorf("%v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(original, obj2), codec, pretty.Sprintf("%# v", original), dataAsString(data), pretty.Sprintf("%# v", obj2))
 		return
 	}
 

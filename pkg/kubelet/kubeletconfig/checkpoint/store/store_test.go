@@ -19,8 +19,7 @@ package store
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 )
@@ -62,10 +61,10 @@ func TestReset(t *testing.T) {
 		}
 		if c.s.assigned != nil || c.s.lastKnownGood != nil {
 			t.Errorf("case %q, expect nil for assigned and last-known-good checkpoints, but still have %q and %q, respectively",
-				spew.Sdump(c.s), c.s.assigned, c.s.lastKnownGood)
+				pretty.Sprint(c.s), c.s.assigned, c.s.lastKnownGood)
 		}
 		if c.updated != updated {
-			t.Errorf("case %q, expect reset to return %t, but got %t", spew.Sdump(c.s), c.updated, updated)
+			t.Errorf("case %q, expect reset to return %t, but got %t", pretty.Sprint(c.s), c.updated, updated)
 		}
 	}
 }

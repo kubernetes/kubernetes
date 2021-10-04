@@ -20,7 +20,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/simple"
 
@@ -445,14 +445,14 @@ func compareGraphs(expected, actual graph.Directed, t *testing.T) {
 	sort.Sort(gonumByUID(actualNodes))
 
 	if len(expectedNodes) != len(actualNodes) {
-		t.Fatal(spew.Sdump(actual))
+		t.Fatal(pretty.Sprint(actual))
 	}
 
 	for i := range expectedNodes {
 		currExpected := *expectedNodes[i].(*gonumVertex)
 		currActual := *actualNodes[i].(*gonumVertex)
 		if currExpected.uid != currActual.uid {
-			t.Errorf("expected %v, got %v", spew.Sdump(currExpected), spew.Sdump(currActual))
+			t.Errorf("expected %v, got %v", pretty.Sprint(currExpected), pretty.Sprint(currActual))
 		}
 
 		expectedFrom := append([]graph.Node{}, expected.From(expectedNodes[i].ID()).(graph.NodeSlicer).NodeSlice()...)
@@ -460,13 +460,13 @@ func compareGraphs(expected, actual graph.Directed, t *testing.T) {
 		sort.Sort(gonumByUID(expectedFrom))
 		sort.Sort(gonumByUID(actualFrom))
 		if len(expectedFrom) != len(actualFrom) {
-			t.Errorf("%q: expected %v, got %v", currExpected.uid, spew.Sdump(expectedFrom), spew.Sdump(actualFrom))
+			t.Errorf("%q: expected %v, got %v", currExpected.uid, pretty.Sprint(expectedFrom), pretty.Sprint(actualFrom))
 		}
 		for i := range expectedFrom {
 			currExpectedFrom := *expectedFrom[i].(*gonumVertex)
 			currActualFrom := *actualFrom[i].(*gonumVertex)
 			if currExpectedFrom.uid != currActualFrom.uid {
-				t.Errorf("expected %v, got %v", spew.Sdump(currExpectedFrom), spew.Sdump(currActualFrom))
+				t.Errorf("expected %v, got %v", pretty.Sprint(currExpectedFrom), pretty.Sprint(currActualFrom))
 			}
 		}
 	}

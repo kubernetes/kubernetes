@@ -21,8 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -139,7 +138,7 @@ func TestAdmit(t *testing.T) {
 				t.Errorf("Test %q: got unexpected error: %v", test.name, err)
 			}
 			if !reflect.DeepEqual(test.expectedObject, obj) {
-				t.Errorf("Test %q: Expected object:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedObject), spew.Sdump(obj))
+				t.Errorf("Test %q: Expected object:\n%s\ngot:\n%s", test.name, pretty.Sprint(test.expectedObject), pretty.Sprint(obj))
 			}
 		})
 	}

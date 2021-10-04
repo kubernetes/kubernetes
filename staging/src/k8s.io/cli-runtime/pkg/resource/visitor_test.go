@@ -29,7 +29,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -182,7 +182,7 @@ func TestFlattenListVisitor(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(test.Infos) != 6 {
-		t.Fatal(spew.Sdump(test.Infos))
+		t.Fatal(pretty.Sprint(test.Infos))
 	}
 }
 
@@ -197,7 +197,7 @@ func TestFlattenListVisitorWithVisitorError(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(test.Infos) != 6 {
-		t.Fatal(spew.Sdump(test.Infos))
+		t.Fatal(pretty.Sprint(test.Infos))
 	}
 }
 

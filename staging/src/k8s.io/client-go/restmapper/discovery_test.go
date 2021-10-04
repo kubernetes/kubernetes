@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,6 +30,7 @@ import (
 	"k8s.io/client-go/rest/fake"
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	"github.com/kr/pretty"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -363,7 +363,7 @@ func TestGetAPIGroupResources(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if !reflect.DeepEqual(test.expected, got) {
-				t.Errorf("unexpected result:\nexpected = %s\ngot = %s", spew.Sdump(test.expected), spew.Sdump(got))
+				t.Errorf("unexpected result:\nexpected = %s\ngot = %s", pretty.Sprint(test.expected), pretty.Sprint(got))
 			}
 		})
 	}

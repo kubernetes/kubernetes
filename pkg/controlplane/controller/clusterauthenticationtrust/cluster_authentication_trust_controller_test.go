@@ -20,8 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -312,7 +311,7 @@ func getFinalConfigMaps(t *testing.T, client *fake.Clientset) (map[string]*corev
 	created := false
 
 	for _, action := range client.Actions() {
-		t.Log(spew.Sdump(action))
+		t.Log(pretty.Sprint(action))
 		if action.Matches("create", "configmaps") {
 			created = true
 			obj := action.(clienttesting.CreateAction).GetObject().(*corev1.ConfigMap)

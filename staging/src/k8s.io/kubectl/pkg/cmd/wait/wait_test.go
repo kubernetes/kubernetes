@@ -22,8 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -142,10 +141,10 @@ func TestWaitForDeletion(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -160,7 +159,7 @@ func TestWaitForDeletion(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -204,10 +203,10 @@ func TestWaitForDeletion(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -234,13 +233,13 @@ func TestWaitForDeletion(t *testing.T) {
 			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -285,19 +284,19 @@ func TestWaitForDeletion(t *testing.T) {
 			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") || actions[1].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[3].Matches("watch", "theresource") || actions[3].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -328,13 +327,13 @@ func TestWaitForDeletion(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -380,13 +379,13 @@ func TestWaitForDeletion(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource-1") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("list", "theresource-2") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -429,19 +428,19 @@ func TestWaitForDeletion(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[3].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -518,10 +517,10 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 1 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -536,7 +535,7 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -558,7 +557,7 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 0 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -588,13 +587,13 @@ func TestWaitForCondition(t *testing.T) {
 			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -639,19 +638,19 @@ func TestWaitForCondition(t *testing.T) {
 			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") || actions[1].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[3].Matches("watch", "theresource") || actions[3].(clienttesting.WatchAction).GetWatchRestrictions().ResourceVersion != "234" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -685,13 +684,13 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -722,13 +721,13 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -774,19 +773,19 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 4 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[2].Matches("list", "theresource") || actions[2].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[3].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -816,13 +815,13 @@ func TestWaitForCondition(t *testing.T) {
 			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -856,13 +855,13 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -893,13 +892,13 @@ func TestWaitForCondition(t *testing.T) {
 			expectedErr: "timed out waiting for the condition on theresource/name-foo",
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},
@@ -938,13 +937,13 @@ func TestWaitForCondition(t *testing.T) {
 
 			validateActions: func(t *testing.T, actions []clienttesting.Action) {
 				if len(actions) != 2 {
-					t.Fatal(spew.Sdump(actions))
+					t.Fatal(pretty.Sprint(actions))
 				}
 				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 				if !actions[1].Matches("watch", "theresource") {
-					t.Error(spew.Sdump(actions))
+					t.Error(pretty.Sprint(actions))
 				}
 			},
 		},

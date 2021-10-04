@@ -22,9 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
-	"k8s.io/api/core/v1"
+	"github.com/kr/pretty"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -270,7 +269,7 @@ func TestPVProtectionController(t *testing.T) {
 		actions := client.Actions()
 
 		if !reflect.DeepEqual(actions, test.expectedActions) {
-			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, spew.Sdump(test.expectedActions), spew.Sdump(actions))
+			t.Errorf("Test %q: action not expected\nExpected:\n%s\ngot:\n%s", test.name, pretty.Sprint(test.expectedActions), pretty.Sprint(actions))
 		}
 
 	}

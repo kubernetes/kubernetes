@@ -23,8 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,7 +107,7 @@ func TestNamespaceCondition(t *testing.T) {
 			}
 		}
 
-		t.Log(spew.Sdump(curr))
+		t.Log(pretty.Sprint(curr))
 		return conditionsFound == 5, nil
 	})
 	if err != nil {

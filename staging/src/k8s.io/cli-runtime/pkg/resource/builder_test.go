@@ -30,7 +30,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	"sigs.k8s.io/yaml"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -50,7 +50,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 
 	// TODO we need to remove this linkage and create our own scheme
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -530,11 +530,11 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 				switch tt.object.(type) {
 				case *v1.Pod:
 					if _, ok := v.Object.(*v1.Pod); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
-						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
+						t.Errorf("unexpected info: %v", pretty.Sprint(v.Object))
 					}
 				case *v1.ReplicationController:
 					if _, ok := v.Object.(*v1.ReplicationController); !ok || v.Name != tt.expectedNames[i] || v.Namespace != "test" {
-						t.Errorf("unexpected info: %v", spew.Sdump(v.Object))
+						t.Errorf("unexpected info: %v", pretty.Sprint(v.Object))
 					}
 				}
 			}

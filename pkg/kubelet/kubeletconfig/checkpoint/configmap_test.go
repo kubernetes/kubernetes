@@ -20,8 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	apiv1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,7 +84,7 @@ func TestNewConfigMapPayload(t *testing.T) {
 			}
 			// underlying object should match the object passed in
 			if !apiequality.Semantic.DeepEqual(c.cm, payload.object()) {
-				t.Errorf("expect %s but got %s", spew.Sdump(c.cm), spew.Sdump(payload))
+				t.Errorf("expect %s but got %s", pretty.Sprint(c.cm), pretty.Sprint(payload))
 			}
 		})
 	}

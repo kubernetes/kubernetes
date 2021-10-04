@@ -5,13 +5,13 @@ module k8s.io/cli-runtime
 go 1.16
 
 require (
-	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/google/uuid v1.1.2
 	github.com/googleapis/gnostic v0.5.5
+	github.com/kr/pretty v0.3.0
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5

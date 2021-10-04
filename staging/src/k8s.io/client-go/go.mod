@@ -23,7 +23,6 @@ require (
 	github.com/imdario/mergo v0.3.5
 	github.com/kr/pretty v0.3.0
 	github.com/peterbourgon/diskv v2.0.1+incompatible
-	github.com/rogpeppe/go-internal v1.8.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5 // indirect

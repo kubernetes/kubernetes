@@ -23,8 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -353,7 +352,7 @@ func TestFsStoreAssigned(t *testing.T) {
 				return
 			}
 			if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
-				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
+				t.Errorf("case %q, expect %q but got %q", pretty.Sprint(c.expect), pretty.Sprint(c.expect), pretty.Sprint(source))
 			}
 		})
 	}
@@ -397,7 +396,7 @@ func TestFsStoreLastKnownGood(t *testing.T) {
 				return
 			}
 			if !checkpoint.EqualRemoteConfigSources(c.expect, source) {
-				t.Errorf("case %q, expect %q but got %q", spew.Sdump(c.expect), spew.Sdump(c.expect), spew.Sdump(source))
+				t.Errorf("case %q, expect %q but got %q", pretty.Sprint(c.expect), pretty.Sprint(c.expect), pretty.Sprint(source))
 			}
 		})
 	}

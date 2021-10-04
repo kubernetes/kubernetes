@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -6315,7 +6315,7 @@ func jsonToYAMLOrError(j []byte) string {
 func toJSON(v interface{}) ([]byte, error) {
 	j, err := json.Marshal(v)
 	if err != nil {
-		return nil, fmt.Errorf("json marshal failed: %v\n%v\n", err, spew.Sdump(v))
+		return nil, fmt.Errorf("json marshal failed: %v\n%v\n", err, pretty.Sprint(v))
 	}
 
 	return j, nil

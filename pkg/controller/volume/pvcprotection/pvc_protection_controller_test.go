@@ -22,8 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -499,13 +498,13 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 		actions := client.Actions()
 		for i, action := range actions {
 			if len(test.expectedActions) < i+1 {
-				t.Errorf("Test %q: %d unexpected actions: %+v", test.name, len(actions)-len(test.expectedActions), spew.Sdump(actions[i:]))
+				t.Errorf("Test %q: %d unexpected actions: %+v", test.name, len(actions)-len(test.expectedActions), pretty.Sprint(actions[i:]))
 				break
 			}
 
 			expectedAction := test.expectedActions[i]
 			if !reflect.DeepEqual(expectedAction, action) {
-				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, spew.Sdump(expectedAction), spew.Sdump(action))
+				t.Errorf("Test %q: action %d\nExpected:\n%s\ngot:\n%s", test.name, i, pretty.Sprint(expectedAction), pretty.Sprint(action))
 			}
 		}
 

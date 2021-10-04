@@ -19,10 +19,10 @@ package apparmor
 import (
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/util/maps"
@@ -104,7 +104,7 @@ func TestGenerate(t *testing.T) {
 
 	for i, test := range tests {
 		s := NewStrategy(test.pspAnnotations)
-		msgAndArgs := []interface{}{"testcase[%d]: %s", i, spew.Sdump(test)}
+		msgAndArgs := []interface{}{"testcase[%d]: %s", i, pretty.Sprint(test)}
 		actual, err := s.Generate(test.podAnnotations, &container)
 		assert.NoError(t, err, msgAndArgs...)
 		assert.Equal(t, test.expected, actual, msgAndArgs...)
@@ -151,7 +151,7 @@ func TestValidate(t *testing.T) {
 	for i, test := range tests {
 		s := NewStrategy(test.pspAnnotations)
 		pod, container := makeTestPod(test.podAnnotations)
-		msgAndArgs := []interface{}{"testcase[%d]: %s", i, spew.Sdump(test)}
+		msgAndArgs := []interface{}{"testcase[%d]: %s", i, pretty.Sprint(test)}
 		errs := s.Validate(pod, container)
 		if test.expectErr {
 			assert.Len(t, errs, 1, msgAndArgs...)

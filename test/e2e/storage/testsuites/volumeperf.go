@@ -19,13 +19,13 @@ package testsuites
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"sync"
 	"time"
 
+	"github.com/kr/pretty"
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -204,7 +204,7 @@ func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDri
 		ginkgo.By("Calculating performance metrics for provisioning operations")
 		createPerformanceStats(provisioningStats, l.options.ProvisioningOptions.Count, l.pvcs)
 
-		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", spew.Sdump(l.options.ProvisioningOptions.ExpectedMetrics)))
+		ginkgo.By(fmt.Sprintf("Validating performance metrics for provisioning operations against baseline %v", pretty.Sprint(l.options.ProvisioningOptions.ExpectedMetrics)))
 		errList := validatePerformanceStats(provisioningStats.operationMetrics, l.options.ProvisioningOptions.ExpectedMetrics)
 		framework.ExpectNoError(errors.NewAggregate(errList), "while validating performance metrics")
 	})
@@ -237,7 +237,7 @@ func createPerformanceStats(stats *performanceStats, provisionCount int, pvcs []
 // validatePerformanceStats validates if test performance metrics meet the baseline target
 func validatePerformanceStats(operationMetrics *storageframework.Metrics, baselineMetrics *storageframework.Metrics) []error {
 	var errList []error
-	framework.Logf("Metrics to evaluate: %+v", spew.Sdump(operationMetrics))
+	framework.Logf("Metrics to evaluate: %+v", pretty.Sprint(operationMetrics))
 
 	if operationMetrics.AvgLatency > baselineMetrics.AvgLatency {
 		err := fmt.Errorf("expected latency to be less than %v but calculated latency %v", baselineMetrics.AvgLatency, operationMetrics.AvgLatency)

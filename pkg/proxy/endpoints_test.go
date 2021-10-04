@@ -21,8 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -458,7 +457,7 @@ func TestEndpointsToEndpointsMap(t *testing.T) {
 			newEndpoints := epTracker.endpointsToEndpointsMap(tc.newEndpoints)
 
 			if len(newEndpoints) != len(tc.expected) {
-				t.Fatalf("[%s] expected %d new, got %d: %v", tc.desc, len(tc.expected), len(newEndpoints), spew.Sdump(newEndpoints))
+				t.Fatalf("[%s] expected %d new, got %d: %v", tc.desc, len(tc.expected), len(newEndpoints), pretty.Sprint(newEndpoints))
 			}
 			for x := range tc.expected {
 				if len(newEndpoints[x]) != len(tc.expected[x]) {

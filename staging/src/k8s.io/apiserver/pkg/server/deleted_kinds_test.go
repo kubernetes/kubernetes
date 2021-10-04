@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -327,7 +327,7 @@ func Test_removeDeletedKinds(t *testing.T) {
 			convertor := &dummyConvertor{}
 			tt.resourceExpirationEvaluator.RemoveDeletedKinds("group.name", convertor, tt.versionedResourcesStorageMap)
 			if !reflect.DeepEqual(tt.expectedStorage, tt.versionedResourcesStorageMap) {
-				t.Fatal(spew.Sdump(tt.versionedResourcesStorageMap))
+				t.Fatal(pretty.Sprint(tt.versionedResourcesStorageMap))
 			}
 		})
 	}
