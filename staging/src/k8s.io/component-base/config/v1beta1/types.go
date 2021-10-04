@@ -81,8 +81,7 @@ type ClientConnectionConfiguration struct {
 	Burst int32 `json:"burst"`
 }
 
-// LoggingConfiguration contains logging options
-// Refer [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.
+// LoggingConfiguration contains logging options.
 type LoggingConfiguration struct {
 	// Format Flag specifies the structure of log messages.
 	// default value of format is `text`
