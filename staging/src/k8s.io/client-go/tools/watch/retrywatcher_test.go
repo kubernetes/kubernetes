@@ -26,8 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-
+	"github.com/kr/pretty"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -530,7 +529,7 @@ func TestRetryWatcher(t *testing.T) {
 			for i := 0; i < len(tc.expected); i++ {
 				event, ok := <-watcher.ResultChan()
 				if !ok {
-					t.Error(spew.Errorf("expected event %#+v, but channel is closed"), tc.expected[i])
+					t.Error(pretty.Errorf("expected event %#+ v, but channel is closed"), tc.expected[i])
 					break
 				}
 
@@ -544,7 +543,7 @@ func TestRetryWatcher(t *testing.T) {
 			select {
 			case event, ok := <-watcher.ResultChan():
 				if ok {
-					t.Error(spew.Errorf("Unexpected event received after reading all the expected ones: %#+v", event))
+					t.Error(pretty.Errorf("Unexpected event received after reading all the expected ones: %#+ v", event))
 				}
 			case <-time.After(10 * time.Millisecond):
 				break
@@ -564,7 +563,7 @@ func TestRetryWatcher(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(tc.expected, got) {
-				t.Fatal(spew.Errorf("expected %#+v, got %#+v;\ndiff: %s", tc.expected, got, diff.ObjectReflectDiff(tc.expected, got)))
+				t.Fatal(pretty.Errorf("expected %#+ v, got %#+ v;\ndiff: %s", tc.expected, got, diff.ObjectReflectDiff(tc.expected, got)))
 			}
 		})
 	}

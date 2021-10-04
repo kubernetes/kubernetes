@@ -23,7 +23,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/davecgh/go-spew/spew"
+	"github.com/kr/pretty"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -75,13 +75,9 @@ func ObjectReflectDiff(a, b interface{}) string {
 // ObjectGoPrintSideBySide prints a and b as textual dumps side by side,
 // enabling easy visual scanning for mismatches.
 func ObjectGoPrintSideBySide(a, b interface{}) string {
-	s := spew.ConfigState{
-		Indent: " ",
-		// Extra deep spew.
-		DisableMethods: true,
-	}
-	sA := s.Sdump(a)
-	sB := s.Sdump(b)
+
+	sA := pretty.Sprint(a)
+	sB := pretty.Sprint(b)
 
 	linesA := strings.Split(sA, "\n")
 	linesB := strings.Split(sB, "\n")

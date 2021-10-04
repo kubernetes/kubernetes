@@ -5,7 +5,6 @@ module k8s.io/apimachinery
 go 1.16
 
 require (
-	github.com/davecgh/go-spew v1.1.1
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/evanphx/json-patch v4.11.0+incompatible
 	github.com/go-logr/logr v1.1.0 // indirect
