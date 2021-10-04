@@ -138,6 +138,14 @@ const (
 	// Postpone deletion of a PV or a PVC when they are being used
 	StorageObjectInUseProtection featuregate.Feature = "StorageObjectInUseProtection"
 
+	// owner: @saad-ali
+	// ga: 	  v1.10
+	//
+	// Allow mounting a subpath of a volume in a container
+	// NOTE: This feature gate has been deprecated and is no longer enforced.
+	// It will be completely removed in 1.25. Until then, it's still visible in `kubelet --help`
+	VolumeSubpath featuregate.Feature = "VolumeSubpath"
+
 	// owner: @pohly
 	// alpha: v1.14
 	// beta: v1.16
@@ -804,6 +812,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIServiceAccountToken:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.Beta},
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
+	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NetworkPolicyEndPort:                           {Default: true, PreRelease: featuregate.Beta},
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
