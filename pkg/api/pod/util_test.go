@@ -36,6 +36,7 @@ import (
 )
 
 func TestVisitContainers(t *testing.T) {
+	setAllFeatureEnabledContainersDuringTest := ContainerType(0)
 	testCases := []struct {
 		desc                       string
 		spec                       *api.PodSpec
@@ -142,7 +143,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers: []string{"i1", "i2", "c1", "c2"},
-			mask:           AllFeatureEnabledContainers(),
+			mask:           setAllFeatureEnabledContainersDuringTest,
 		},
 		{
 			desc: "all feature enabled container types with ephemeral containers enabled",
@@ -161,7 +162,7 @@ func TestVisitContainers(t *testing.T) {
 				},
 			},
 			wantContainers:             []string{"i1", "i2", "c1", "c2", "e1", "e2"},
-			mask:                       AllFeatureEnabledContainers(),
+			mask:                       setAllFeatureEnabledContainersDuringTest,
 			ephemeralContainersEnabled: true,
 		},
 		{
@@ -187,8 +188,9 @@ func TestVisitContainers(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			if tc.ephemeralContainersEnabled {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, tc.ephemeralContainersEnabled)()
+
+			if tc.mask == setAllFeatureEnabledContainersDuringTest {
 				tc.mask = AllFeatureEnabledContainers()
 			}
 
