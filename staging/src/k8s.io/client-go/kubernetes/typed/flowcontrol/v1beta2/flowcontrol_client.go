@@ -20,6 +20,7 @@ package v1beta2
 
 import (
 	v1beta2 "k8s.io/api/flowcontrol/v1beta2"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -69,6 +70,16 @@ func NewForConfigOrDie(c *rest.Config) *FlowcontrolV1beta2Client {
 // New creates a new FlowcontrolV1beta2Client for the given RESTClient.
 func New(c rest.Interface) *FlowcontrolV1beta2Client {
 	return &FlowcontrolV1beta2Client{c}
+}
+
+// NewForFactory creates a new FlowcontrolV1beta2Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *FlowcontrolV1beta2Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1beta2.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1beta2.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &FlowcontrolV1beta2Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

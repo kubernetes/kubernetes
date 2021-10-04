@@ -19,7 +19,9 @@ limitations under the License.
 package internalversion
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
+	example2 "k8s.io/code-generator/examples/apiserver/apis/example2"
 	"k8s.io/code-generator/examples/apiserver/clientset/internalversion/scheme"
 )
 
@@ -63,6 +65,16 @@ func NewForConfigOrDie(c *rest.Config) *SecondExampleClient {
 // New creates a new SecondExampleClient for the given RESTClient.
 func New(c rest.Interface) *SecondExampleClient {
 	return &SecondExampleClient{c}
+}
+
+// NewForFactory creates a new SecondExampleClient for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *SecondExampleClient {
+	var config rest.ClientContentConfig
+	config.GroupVersion = example2.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), example2.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &SecondExampleClient{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

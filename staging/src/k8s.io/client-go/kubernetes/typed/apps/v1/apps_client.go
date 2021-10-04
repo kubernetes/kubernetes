@@ -20,6 +20,7 @@ package v1
 
 import (
 	v1 "k8s.io/api/apps/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -84,6 +85,16 @@ func NewForConfigOrDie(c *rest.Config) *AppsV1Client {
 // New creates a new AppsV1Client for the given RESTClient.
 func New(c rest.Interface) *AppsV1Client {
 	return &AppsV1Client{c}
+}
+
+// NewForFactory creates a new AppsV1Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *AppsV1Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &AppsV1Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

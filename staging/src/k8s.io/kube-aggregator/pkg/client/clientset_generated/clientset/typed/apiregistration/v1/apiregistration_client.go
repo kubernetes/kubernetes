@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
@@ -64,6 +65,16 @@ func NewForConfigOrDie(c *rest.Config) *ApiregistrationV1Client {
 // New creates a new ApiregistrationV1Client for the given RESTClient.
 func New(c rest.Interface) *ApiregistrationV1Client {
 	return &ApiregistrationV1Client{c}
+}
+
+// NewForFactory creates a new ApiregistrationV1Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *ApiregistrationV1Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &ApiregistrationV1Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

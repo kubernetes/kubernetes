@@ -20,6 +20,7 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/policy/v1beta1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -74,6 +75,16 @@ func NewForConfigOrDie(c *rest.Config) *PolicyV1beta1Client {
 // New creates a new PolicyV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *PolicyV1beta1Client {
 	return &PolicyV1beta1Client{c}
+}
+
+// NewForFactory creates a new PolicyV1beta1Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *PolicyV1beta1Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1beta1.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1beta1.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &PolicyV1beta1Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

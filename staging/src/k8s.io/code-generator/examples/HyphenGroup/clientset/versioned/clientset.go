@@ -63,12 +63,12 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var cs Clientset
-	var err error
-	cs.exampleGroupV1, err = examplegroupv1.NewForConfig(&configShallowCopy)
+	factory, err := rest.RESTClientFactoryFor(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
+	var cs Clientset
+	cs.exampleGroupV1 = examplegroupv1.NewForFactory(factory)
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -80,17 +80,22 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
-	var cs Clientset
-	cs.exampleGroupV1 = examplegroupv1.NewForConfigOrDie(c)
-
-	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &cs
+	cs, err := NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return cs
 }
 
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
+	client, ok := c.(*rest.RESTClient)
+	if !ok {
+		return nil
+	}
+	factory := rest.RESTClientFactoryFromClient(*client)
 	var cs Clientset
-	cs.exampleGroupV1 = examplegroupv1.New(c)
+	cs.exampleGroupV1 = examplegroupv1.NewForFactory(factory)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

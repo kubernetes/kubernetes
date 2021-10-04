@@ -19,6 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 	v1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/sample-apiserver/pkg/generated/clientset/versioned/scheme"
@@ -69,6 +70,16 @@ func NewForConfigOrDie(c *rest.Config) *WardleV1alpha1Client {
 // New creates a new WardleV1alpha1Client for the given RESTClient.
 func New(c rest.Interface) *WardleV1alpha1Client {
 	return &WardleV1alpha1Client{c}
+}
+
+// NewForFactory creates a new WardleV1alpha1Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *WardleV1alpha1Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1alpha1.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1alpha1.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &WardleV1alpha1Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

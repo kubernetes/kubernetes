@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 	v1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/clientset/versioned/scheme"
@@ -69,6 +70,16 @@ func NewForConfigOrDie(c *rest.Config) *MetricsV1beta1Client {
 // New creates a new MetricsV1beta1Client for the given RESTClient.
 func New(c rest.Interface) *MetricsV1beta1Client {
 	return &MetricsV1beta1Client{c}
+}
+
+// NewForFactory creates a new MetricsV1beta1Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *MetricsV1beta1Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1beta1.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1beta1.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &MetricsV1beta1Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

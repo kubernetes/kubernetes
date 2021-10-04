@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -64,6 +65,16 @@ func NewForConfigOrDie(c *rest.Config) *ApiextensionsV1Client {
 // New creates a new ApiextensionsV1Client for the given RESTClient.
 func New(c rest.Interface) *ApiextensionsV1Client {
 	return &ApiextensionsV1Client{c}
+}
+
+// NewForFactory creates a new ApiextensionsV1Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *ApiextensionsV1Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &ApiextensionsV1Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

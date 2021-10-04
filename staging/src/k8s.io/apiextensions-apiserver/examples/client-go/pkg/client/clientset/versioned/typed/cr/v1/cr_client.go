@@ -21,6 +21,7 @@ package v1
 import (
 	v1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
 	"k8s.io/apiextensions-apiserver/examples/client-go/pkg/client/clientset/versioned/scheme"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	rest "k8s.io/client-go/rest"
 )
 
@@ -64,6 +65,16 @@ func NewForConfigOrDie(c *rest.Config) *CrV1Client {
 // New creates a new CrV1Client for the given RESTClient.
 func New(c rest.Interface) *CrV1Client {
 	return &CrV1Client{c}
+}
+
+// NewForFactory creates a new CrV1Client for the given RESTClientFactory.
+func NewForFactory(f *rest.RESTClientFactory) *CrV1Client {
+	var config rest.ClientContentConfig
+	config.GroupVersion = v1.SchemeGroupVersion
+	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)
+	apiPath := "/apis"
+	client := f.NewFor(apiPath, config)
+	return &CrV1Client{client}
 }
 
 func setConfigDefaults(config *rest.Config) error {

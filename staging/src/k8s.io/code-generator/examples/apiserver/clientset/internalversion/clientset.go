@@ -79,20 +79,14 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
+	factory, err := rest.RESTClientFactoryFor(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	var cs Clientset
-	var err error
-	cs.example, err = exampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.secondExample, err = secondexampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
-	cs.thirdExample, err = thirdexampleinternalversion.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
+	cs.example = exampleinternalversion.NewForFactory(factory)
+	cs.secondExample = secondexampleinternalversion.NewForFactory(factory)
+	cs.thirdExample = thirdexampleinternalversion.NewForFactory(factory)
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -104,21 +98,24 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
-	var cs Clientset
-	cs.example = exampleinternalversion.NewForConfigOrDie(c)
-	cs.secondExample = secondexampleinternalversion.NewForConfigOrDie(c)
-	cs.thirdExample = thirdexampleinternalversion.NewForConfigOrDie(c)
-
-	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
-	return &cs
+	cs, err := NewForConfig(c)
+	if err != nil {
+		panic(err)
+	}
+	return cs
 }
 
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
+	client, ok := c.(*rest.RESTClient)
+	if !ok {
+		return nil
+	}
+	factory := rest.RESTClientFactoryFromClient(*client)
 	var cs Clientset
-	cs.example = exampleinternalversion.New(c)
-	cs.secondExample = secondexampleinternalversion.New(c)
-	cs.thirdExample = thirdexampleinternalversion.New(c)
+	cs.example = exampleinternalversion.NewForFactory(factory)
+	cs.secondExample = secondexampleinternalversion.NewForFactory(factory)
+	cs.thirdExample = thirdexampleinternalversion.NewForFactory(factory)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
