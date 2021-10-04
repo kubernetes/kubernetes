@@ -1398,7 +1398,6 @@ k8s.io/apimachinery/pkg/runtime/serializer/yaml
 k8s.io/apimachinery/pkg/selection
 k8s.io/apimachinery/pkg/types
 k8s.io/apimachinery/pkg/util/cache
-k8s.io/apimachinery/pkg/util/clock
 k8s.io/apimachinery/pkg/util/diff
 k8s.io/apimachinery/pkg/util/duration
 k8s.io/apimachinery/pkg/util/errors
