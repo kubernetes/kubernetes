@@ -413,10 +413,6 @@ kube::golang::set_platform_envs() {
         export CGO_ENABLED=1
         export CC=${KUBE_LINUX_AMD64_CC:-x86_64-linux-gnu-gcc}
         ;;
-      "linux/386")
-        export CGO_ENABLED=1
-        export CC=${KUBE_LINUX_386_CC:-i686-linux-gnu-gcc}
-        ;;
       "linux/arm")
         export CGO_ENABLED=1
         export CC=${KUBE_LINUX_ARM_CC:-arm-linux-gnueabihf-gcc}
@@ -726,7 +722,6 @@ kube::golang::build_binaries_for_platform() {
       -gcflags "${gogcflags:-}"
       -asmflags "${goasmflags:-}"
       -ldflags "${goldflags:-}"
-      -buildmode pie
       -tags "${gotags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
