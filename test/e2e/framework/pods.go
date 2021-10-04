@@ -40,6 +40,7 @@ import (
 	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -154,18 +155,18 @@ func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralConta
 	namespace := c.f.Namespace.Name
 
 	podJS, err := json.Marshal(pod)
-	ExpectNoError(err, "error creating JSON for pod: %v", err)
+	ExpectNoError(err, "error creating JSON for pod %q", format.Pod(pod))
 
 	ecPod := pod.DeepCopy()
 	ecPod.Spec.EphemeralContainers = append(ecPod.Spec.EphemeralContainers, *ec)
 	ecJS, err := json.Marshal(ecPod)
-	ExpectNoError(err, "error creating JSON for pod with ephemeral container: %v", err)
+	ExpectNoError(err, "error creating JSON for pod with ephemeral container %q", format.Pod(pod))
 
 	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, ecJS, pod)
-	ExpectNoError(err, "error creating patch to add ephemeral container: %v", err)
+	ExpectNoError(err, "error creating patch to add ephemeral container %q", format.Pod(pod))
 
 	_, err = c.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
-	ExpectNoError(err, "Failed to patch ephemeral containers in pod %q: %v", pod.Name, err)
+	ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
 
 	ExpectNoError(e2epod.WaitForContainerRunning(c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
 }
