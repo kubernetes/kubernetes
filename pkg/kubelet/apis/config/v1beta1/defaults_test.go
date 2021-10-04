@@ -24,7 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1beta1 "k8s.io/component-base/config/v1beta1"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -111,7 +111,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.WatchChangeDetectionStrategy,
 				EnforceNodeAllocatable:                    DefaultNodeAllocatableEnforcement,
 				VolumePluginDir:                           DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: componentbaseconfigv1beta1.LoggingConfiguration{
 					Format: "text",
 				},
 				EnableSystemLogHandler:  utilpointer.BoolPtr(true),
@@ -230,7 +230,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "",
 				ProviderID:                  "",
 				KernelMemcgNotification:     false,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: componentbaseconfigv1beta1.LoggingConfiguration{
 					Format:       "",
 					Sanitization: false,
 				},
@@ -326,7 +326,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				EnforceNodeAllocatable: []string{},
 				AllowedUnsafeSysctls:   []string{},
 				VolumePluginDir:        DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: componentbaseconfigv1beta1.LoggingConfiguration{
 					Format:       "text",
 					Sanitization: false,
 				},
@@ -467,7 +467,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "volume-plugin-dir",
 				ProviderID:                  "provider-id",
 				KernelMemcgNotification:     true,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: componentbaseconfigv1beta1.LoggingConfiguration{
 					Format:       "json",
 					Sanitization: true,
 				},
@@ -612,7 +612,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				VolumePluginDir:             "volume-plugin-dir",
 				ProviderID:                  "provider-id",
 				KernelMemcgNotification:     true,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: componentbaseconfigv1beta1.LoggingConfiguration{
 					Format:       "json",
 					Sanitization: true,
 				},
@@ -705,7 +705,7 @@ func TestSetDefaultsKubeletConfiguration(t *testing.T) {
 				ConfigMapAndSecretChangeDetectionStrategy: v1beta1.WatchChangeDetectionStrategy,
 				EnforceNodeAllocatable:                    DefaultNodeAllocatableEnforcement,
 				VolumePluginDir:                           DefaultVolumePluginDir,
-				Logging: componentbaseconfigv1alpha1.LoggingConfiguration{
+				Logging: componentbaseconfigv1beta1.LoggingConfiguration{
 					Format: "text",
 				},
 				EnableSystemLogHandler:  utilpointer.BoolPtr(true),

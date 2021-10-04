@@ -18,7 +18,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1beta1 "k8s.io/component-base/config/v1beta1"
 )
 
 // GenericControllerManagerConfiguration holds configuration for a generic controller-manager.
@@ -32,11 +32,11 @@ type GenericControllerManagerConfiguration struct {
 	MinResyncPeriod metav1.Duration
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration
+	ClientConnection componentbaseconfigv1beta1.ClientConnectionConfiguration
 	// How long to wait between starting controller managers
 	ControllerStartInterval metav1.Duration
 	// leaderElection defines the configuration of leader election client.
-	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration
+	LeaderElection componentbaseconfigv1beta1.LeaderElectionConfiguration
 	// Controllers is the list of controllers to enable or disable
 	// '*' means "all enabled by default controllers"
 	// 'foo' means "enable 'foo'"
@@ -44,7 +44,7 @@ type GenericControllerManagerConfiguration struct {
 	// first item for a particular name wins
 	Controllers []string
 	// DebuggingConfiguration holds configuration for Debugging related features.
-	Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
+	Debugging componentbaseconfigv1beta1.DebuggingConfiguration
 	// LeaderMigrationEnabled indicates whether Leader Migration should be enabled for the controller manager.
 	LeaderMigrationEnabled bool
 	// LeaderMigration holds the configuration for Leader Migration.

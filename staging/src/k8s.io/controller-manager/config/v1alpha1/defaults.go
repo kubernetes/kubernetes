@@ -20,7 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1beta1 "k8s.io/component-base/config/v1beta1"
 )
 
 func RecommendedDefaultGenericControllerManagerConfiguration(obj *GenericControllerManagerConfiguration) {
@@ -46,6 +46,6 @@ func RecommendedDefaultGenericControllerManagerConfiguration(obj *GenericControl
 	}
 
 	// Use the default ClientConnectionConfiguration and LeaderElectionConfiguration options
-	componentbaseconfigv1alpha1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
-	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
+	componentbaseconfigv1beta1.RecommendedDefaultClientConnectionConfiguration(&obj.ClientConnection)
+	componentbaseconfigv1beta1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 }

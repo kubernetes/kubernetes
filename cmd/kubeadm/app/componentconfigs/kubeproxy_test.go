@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
-	componentbaseconfig "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfig "k8s.io/component-base/config/v1beta1"
 	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"

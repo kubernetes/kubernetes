@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1beta1 "k8s.io/component-base/config/v1beta1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	// TODO: Cut references to k8s.io/kubernetes, eventually there should be none from this package
@@ -245,7 +245,7 @@ func SetDefaults_KubeletConfiguration(obj *kubeletconfigv1beta1.KubeletConfigura
 		obj.VolumePluginDir = DefaultVolumePluginDir
 	}
 	// Use the Default LoggingConfiguration option
-	componentbaseconfigv1alpha1.RecommendedLoggingConfiguration(&obj.Logging)
+	componentbaseconfigv1beta1.RecommendedLoggingConfiguration(&obj.Logging)
 	if obj.EnableSystemLogHandler == nil {
 		obj.EnableSystemLogHandler = utilpointer.BoolPtr(true)
 	}

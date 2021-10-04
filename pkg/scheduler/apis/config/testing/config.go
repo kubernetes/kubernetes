@@ -19,7 +19,7 @@ package testing
 import (
 	"testing"
 
-	"k8s.io/component-base/config/v1alpha1"
+	componentbaseconfig "k8s.io/component-base/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -27,7 +27,7 @@ import (
 
 // V1beta2ToInternalWithDefaults creates a v1beta2 default configuration.
 func V1beta2ToInternalWithDefaults(t *testing.T, versionedCfg v1beta2.KubeSchedulerConfiguration) *config.KubeSchedulerConfiguration {
-	versionedCfg.DebuggingConfiguration = *v1alpha1.NewRecommendedDebuggingConfiguration()
+	versionedCfg.DebuggingConfiguration = *componentbaseconfig.NewRecommendedDebuggingConfiguration()
 
 	scheme.Scheme.Default(&versionedCfg)
 	cfg := config.KubeSchedulerConfiguration{}

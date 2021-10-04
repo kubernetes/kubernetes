@@ -17,7 +17,7 @@ limitations under the License.
 package latest
 
 import (
-	"k8s.io/component-base/config/v1alpha1"
+	componentbaseconfig "k8s.io/component-base/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -27,7 +27,7 @@ import (
 // This function needs to be updated whenever we bump the scheduler's component config version.
 func Default() (*config.KubeSchedulerConfiguration, error) {
 	versionedCfg := v1beta2.KubeSchedulerConfiguration{}
-	versionedCfg.DebuggingConfiguration = *v1alpha1.NewRecommendedDebuggingConfiguration()
+	versionedCfg.DebuggingConfiguration = *componentbaseconfig.NewRecommendedDebuggingConfiguration()
 
 	scheme.Scheme.Default(&versionedCfg)
 	cfg := config.KubeSchedulerConfiguration{}

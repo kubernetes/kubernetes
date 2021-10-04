@@ -26,7 +26,7 @@ import (
 
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	v1beta1 "k8s.io/component-base/config/v1beta1"
 	config "k8s.io/controller-manager/config"
 )
 
@@ -96,15 +96,15 @@ func autoConvert_v1alpha1_GenericControllerManagerConfiguration_To_config_Generi
 	out.Port = in.Port
 	out.Address = in.Address
 	out.MinResyncPeriod = in.MinResyncPeriod
-	if err := configv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := v1beta1.Convert_v1beta1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := configv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := v1beta1.Convert_v1beta1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
-	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := v1beta1.Convert_v1beta1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	out.LeaderMigrationEnabled = in.LeaderMigrationEnabled
@@ -118,15 +118,15 @@ func autoConvert_config_GenericControllerManagerConfiguration_To_v1alpha1_Generi
 	out.Port = in.Port
 	out.Address = in.Address
 	out.MinResyncPeriod = in.MinResyncPeriod
-	if err := configv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := v1beta1.Convert_config_ClientConnectionConfiguration_To_v1beta1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.ControllerStartInterval = in.ControllerStartInterval
-	if err := configv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
+	if err := v1beta1.Convert_config_LeaderElectionConfiguration_To_v1beta1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
 	out.Controllers = *(*[]string)(unsafe.Pointer(&in.Controllers))
-	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
+	if err := v1beta1.Convert_config_DebuggingConfiguration_To_v1beta1_DebuggingConfiguration(&in.Debugging, &out.Debugging, s); err != nil {
 		return err
 	}
 	out.LeaderMigrationEnabled = in.LeaderMigrationEnabled

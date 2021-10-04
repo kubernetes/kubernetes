@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1beta1 "k8s.io/component-base/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -150,7 +150,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta2.KubeSchedulerConfigurat
 	}
 
 	// Use the default LeaderElectionConfiguration options
-	componentbaseconfigv1alpha1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
+	componentbaseconfigv1beta1.RecommendedDefaultLeaderElectionConfiguration(&obj.LeaderElection)
 
 	if obj.PodInitialBackoffSeconds == nil {
 		val := int64(1)

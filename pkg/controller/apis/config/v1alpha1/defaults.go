@@ -55,7 +55,7 @@ func SetDefaults_KubeControllerManagerConfiguration(obj *kubectrlmgrconfigv1alph
 		obj.DeprecatedController.RegisterRetryCount = 10
 	}
 
-	// These defaults override the recommended defaults from the componentbaseconfigv1alpha1 package that are applied automatically
+	// These defaults override the recommended defaults from the componentbaseconfigv1beta1 package that are applied automatically
 	// These client-connection defaults are specific to the kube-controller-manager
 	if obj.Generic.ClientConnection.QPS == 0.0 {
 		obj.Generic.ClientConnection.QPS = 20.0

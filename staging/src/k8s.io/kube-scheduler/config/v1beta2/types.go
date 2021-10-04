@@ -22,7 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1beta1 "k8s.io/component-base/config/v1beta1"
 	v1 "k8s.io/kube-scheduler/config/v1"
 	"sigs.k8s.io/yaml"
 )
@@ -48,11 +48,11 @@ type KubeSchedulerConfiguration struct {
 	Parallelism *int32 `json:"parallelism,omitempty"`
 
 	// LeaderElection defines the configuration of leader election client.
-	LeaderElection componentbaseconfigv1alpha1.LeaderElectionConfiguration `json:"leaderElection"`
+	LeaderElection componentbaseconfigv1beta1.LeaderElectionConfiguration `json:"leaderElection"`
 
 	// ClientConnection specifies the kubeconfig file and client connection
 	// settings for the proxy server to use when communicating with the apiserver.
-	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
+	ClientConnection componentbaseconfigv1beta1.ClientConnectionConfiguration `json:"clientConnection"`
 
 	// Note: Both HealthzBindAddress and MetricsBindAddress fields are deprecated.
 	// Only empty address or port 0 is allowed. Anything else will fail validation.
@@ -62,8 +62,8 @@ type KubeSchedulerConfiguration struct {
 	MetricsBindAddress *string `json:"metricsBindAddress,omitempty"`
 
 	// DebuggingConfiguration holds configuration for Debugging related features
-	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
-	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
+	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1beta1.DebuggingConfiguration
+	componentbaseconfigv1beta1.DebuggingConfiguration `json:",inline"`
 
 	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
 	// for running a pod, the scheduler stops its search for more feasible nodes in

@@ -22,7 +22,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/component-base/config"
-	"k8s.io/component-base/config/v1alpha1"
+	componentbaseconfig "k8s.io/component-base/config/v1beta1"
 	"k8s.io/component-base/logs/sanitization"
 )
 
@@ -33,10 +33,10 @@ type Options struct {
 
 // NewOptions return new klog options
 func NewOptions() *Options {
-	c := v1alpha1.LoggingConfiguration{}
-	v1alpha1.RecommendedLoggingConfiguration(&c)
+	c := componentbaseconfig.LoggingConfiguration{}
+	componentbaseconfig.RecommendedLoggingConfiguration(&c)
 	o := &Options{}
-	v1alpha1.Convert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(&c, &o.Config, nil)
+	componentbaseconfig.Convert_v1beta1_LoggingConfiguration_To_config_LoggingConfiguration(&c, &o.Config, nil)
 	return o
 }
 
