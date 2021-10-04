@@ -52,6 +52,7 @@ var (
 		"linux/arm", "linux/386",
 		"windows/amd64", "linux/arm64",
 		"linux/ppc64le", "linux/s390x",
+		"windows/arm64",
 	}
 
 	// directories we always ignore
