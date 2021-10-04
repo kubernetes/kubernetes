@@ -362,6 +362,16 @@ func NewEgressSelector(config *apiserver.EgressSelectorConfiguration) (*EgressSe
 	return cs, nil
 }
 
+// NewEgressSelectorWithMap returns a EgressSelector with the supplied EgressType to DialFunc map.
+func NewEgressSelectorWithMap(m map[EgressType]utilnet.DialFunc) *EgressSelector {
+	if m == nil {
+		m = make(map[EgressType]utilnet.DialFunc)
+	}
+	return &EgressSelector{
+		egressToDialer: m,
+	}
+}
+
 // Lookup gets the dialer function for the network context.
 // This is configured for the Kubernetes API Server at startup.
 func (cs *EgressSelector) Lookup(networkContext NetworkContext) (utilnet.DialFunc, error) {
