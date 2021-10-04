@@ -72,7 +72,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			VolumeMode: &test.VolumeMode,
 		}, ns)
 
-		metricsGrabber, err = e2emetrics.NewMetricsGrabber(c, nil, true, false, true, false, false)
+		metricsGrabber, err = e2emetrics.NewMetricsGrabber(c, nil, f.ClientConfig(), true, false, true, false, false)
 
 		if err != nil {
 			framework.Failf("Error creating metrics grabber : %v", err)
