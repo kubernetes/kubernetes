@@ -31,6 +31,13 @@ import (
 )
 
 const logFlushFreqFlagName = "log-flush-frequency"
+const deprecated = "will be removed in a future release, see https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components"
+
+// TODO (https://github.com/kubernetes/kubernetes/issues/105310): once klog
+// flags are removed, stop warning about "Non-default formats don't honor these
+// flags" in config.go and instead add this remark here.
+//
+// const vmoduleUsage = " (only works for the default text log format)"
 
 var (
 	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
@@ -55,7 +62,22 @@ func AddFlags(fs *pflag.FlagSet) {
 	if f := fs.Lookup("v"); f != nil {
 		return
 	}
-	fs.AddGoFlagSet(packageFlags)
+
+	// Add flags with pflag deprecation remark for some klog flags.
+	packageFlags.VisitAll(func(f *flag.Flag) {
+		pf := pflag.PFlagFromGoFlag(f)
+		switch f.Name {
+		case "v", logFlushFreqFlagName:
+			// unchanged
+		case "vmodule":
+			// TODO: see above
+			// pf.Usage += vmoduleUsage
+		default:
+			// deprecated, but not hidden
+			pf.Deprecated = deprecated
+		}
+		fs.AddFlag(pf)
+	})
 }
 
 // AddGoFlags is a variant of AddFlags for traditional Go flag.FlagSet.
@@ -65,8 +87,20 @@ func AddFlags(fs *pflag.FlagSet) {
 // flag.Parse and cannot change to pflag because it would break their command
 // line interface.
 func AddGoFlags(fs *flag.FlagSet) {
+	// Add flags with deprecation remark added to the usage text of
+	// some klog flags.
 	packageFlags.VisitAll(func(f *flag.Flag) {
-		fs.Var(f.Value, f.Name, f.Usage)
+		usage := f.Usage
+		switch f.Name {
+		case "v", logFlushFreqFlagName:
+			// unchanged
+		case "vmodule":
+			// TODO: see above
+			// usage += vmoduleUsage
+		default:
+			usage += " (DEPRECATED: " + deprecated + ")"
+		}
+		fs.Var(f.Value, f.Name, usage)
 	})
 }
 
