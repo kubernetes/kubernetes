@@ -1250,6 +1250,7 @@ func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 	framework.ExpectNoErrorWithOffset(0, err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
+			node := node
 			nodes = append(nodes, &node)
 		}
 	}
