@@ -534,17 +534,32 @@ func timeout(ctx context.Context, d time.Duration, f func()) error {
 }
 
 // nextPodOrDie returns the next Pod in the scheduler queue.
-// The operation needs to be completed within 15 seconds; otherwise the test gets aborted.
+// The operation needs to be completed within 5 seconds; otherwise the test gets aborted.
 func nextPodOrDie(t *testing.T, testCtx *testutils.TestContext) *framework.QueuedPodInfo {
 	t.Helper()
 
 	var podInfo *framework.QueuedPodInfo
 	// NextPod() is a blocking operation. Wrap it in timeout() to avoid relying on
 	// default go testing timeout (10m) to abort.
-	if err := timeout(testCtx.Ctx, time.Second*15, func() {
+	if err := timeout(testCtx.Ctx, time.Second*5, func() {
 		podInfo = testCtx.Scheduler.NextPod()
 	}); err != nil {
 		t.Fatalf("Timed out waiting for the Pod to be popped: %v", err)
+	}
+	return podInfo
+}
+
+// nextPod returns the next Pod in the scheduler queue, with a 5 seconds timeout.
+func nextPod(t *testing.T, testCtx *testutils.TestContext) *framework.QueuedPodInfo {
+	t.Helper()
+
+	var podInfo *framework.QueuedPodInfo
+	// NextPod() is a blocking operation. Wrap it in timeout() to avoid relying on
+	// default go testing timeout (10m) to abort.
+	if err := timeout(testCtx.Ctx, time.Second*5, func() {
+		podInfo = testCtx.Scheduler.NextPod()
+	}); err != nil {
+		return nil
 	}
 	return podInfo
 }
