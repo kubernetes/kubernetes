@@ -20,23 +20,10 @@ import (
 	"testing"
 
 	"k8s.io/component-base/config/v1alpha1"
-	"k8s.io/kube-scheduler/config/v1beta1"
 	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 )
-
-// V1beta1ToInternalWithDefaults creates a v1beta1 default configuration.
-func V1beta1ToInternalWithDefaults(t *testing.T, versionedCfg v1beta1.KubeSchedulerConfiguration) *config.KubeSchedulerConfiguration {
-	versionedCfg.DebuggingConfiguration = *v1alpha1.NewRecommendedDebuggingConfiguration()
-
-	scheme.Scheme.Default(&versionedCfg)
-	cfg := config.KubeSchedulerConfiguration{}
-	if err := scheme.Scheme.Convert(&versionedCfg, &cfg, nil); err != nil {
-		t.Fatal(err)
-	}
-	return &cfg
-}
 
 // V1beta2ToInternalWithDefaults creates a v1beta2 default configuration.
 func V1beta2ToInternalWithDefaults(t *testing.T, versionedCfg v1beta2.KubeSchedulerConfiguration) *config.KubeSchedulerConfiguration {

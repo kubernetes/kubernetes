@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 )
 
@@ -209,36 +208,8 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	badRemovedPlugins3 := validConfig.DeepCopy() // default v1beta2
 	badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
 
-	goodRemovedPlugins1 := validConfig.DeepCopy() // ServiceAffinity is okay in v1beta1.
-	goodRemovedPlugins1.APIVersion = v1beta1.SchemeGroupVersion.String()
-	goodRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
-
 	goodRemovedPlugins2 := validConfig.DeepCopy()
 	goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "PodTopologySpread", Weight: 2})
-
-	goodRemovedPlugins3 := validConfig.DeepCopy()
-	goodRemovedPlugins3.APIVersion = v1beta1.SchemeGroupVersion.String()
-	goodRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(goodRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
-
-	badConflictPlugins1 := validConfig.DeepCopy()
-	badConflictPlugins1.APIVersion = v1beta1.SchemeGroupVersion.String()
-	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesFit", Weight: 2})
-	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
-	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
-	badConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(badConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
-
-	goodConflictPlugins1 := validConfig.DeepCopy()
-	goodConflictPlugins1.APIVersion = v1beta1.SchemeGroupVersion.String()
-	goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
-	goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
-	goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
-
-	goodConflictPlugins2 := validConfig.DeepCopy()
-	goodConflictPlugins2.APIVersion = v1beta1.SchemeGroupVersion.String()
-	goodConflictPlugins2.Profiles[0].Plugins.Filter.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Filter.Enabled, config.Plugin{Name: "NodeResourcesFit", Weight: 2})
-	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesLeastAllocated", Weight: 2})
-	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
-	goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled = append(goodConflictPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
 
 	deprecatedPluginsConfig := validConfig.DeepCopy()
 	deprecatedPluginsConfig.Profiles[0].PluginConfig = append(deprecatedPluginsConfig.Profiles[0].PluginConfig, config.PluginConfig{
@@ -335,30 +306,9 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         badRemovedPlugins3,
 		},
-		"good-removed-plugins-1": {
-			expectedToFail: false,
-			config:         goodRemovedPlugins1,
-		},
 		"good-removed-plugins-2": {
 			expectedToFail: false,
 			config:         goodRemovedPlugins2,
-		},
-		"good-removed-plugins-3": {
-			expectedToFail: false,
-			config:         goodRemovedPlugins3,
-		},
-		"bad-conflict-plugins-1": {
-			expectedToFail: true,
-			config:         badConflictPlugins1,
-			errorString:    "profiles[0].plugins.score.enabled[0]: Invalid value: \"NodeResourcesFit\": was conflict with [\"NodeResourcesLeastAllocated\" \"NodeResourcesMostAllocated\" \"RequestedToCapacityRatio\"] in version \"kubescheduler.config.k8s.io/v1beta1\" (KubeSchedulerConfiguration is version \"kubescheduler.config.k8s.io/v1beta1\")",
-		},
-		"good-conflict-plugins-1": {
-			expectedToFail: false,
-			config:         goodConflictPlugins1,
-		},
-		"good-conflict-plugins-2": {
-			expectedToFail: false,
-			config:         goodConflictPlugins2,
 		},
 		"bad-plugins-config": {
 			expectedToFail: true,
