@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
@@ -540,12 +540,12 @@ func TestPreFilterPlugin(t *testing.T) {
 	registry := frameworkruntime.Registry{prefilterPluginName: newPlugin(preFilterPlugin)}
 
 	// Setup initial prefilter plugin for testing.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				PreFilter: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				PreFilter: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: prefilterPluginName},
 					},
 				},
@@ -685,32 +685,32 @@ func TestPostFilterPlugin(t *testing.T) {
 			}
 
 			// Setup plugins for testing.
-			cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-				Profiles: []v1beta2.KubeSchedulerProfile{{
+			cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+				Profiles: []v1beta3.KubeSchedulerProfile{{
 					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-					Plugins: &v1beta2.Plugins{
-						Filter: v1beta2.PluginSet{
-							Enabled: []v1beta2.Plugin{
+					Plugins: &v1beta3.Plugins{
+						Filter: v1beta3.PluginSet{
+							Enabled: []v1beta3.Plugin{
 								{Name: filterPluginName},
 							},
 						},
-						Score: v1beta2.PluginSet{
-							Enabled: []v1beta2.Plugin{
+						Score: v1beta3.PluginSet{
+							Enabled: []v1beta3.Plugin{
 								{Name: scorePluginName},
 							},
 							// disable default in-tree Score plugins
 							// to make it easy to control configured ScorePlugins failure
-							Disabled: []v1beta2.Plugin{
+							Disabled: []v1beta3.Plugin{
 								{Name: "*"},
 							},
 						},
-						PostFilter: v1beta2.PluginSet{
-							Enabled: []v1beta2.Plugin{
+						PostFilter: v1beta3.PluginSet{
+							Enabled: []v1beta3.Plugin{
 								{Name: postfilterPluginName},
 							},
 							// Need to disable default in-tree PostFilter plugins, as they will
 							// call RunFilterPlugins and hence impact the "numFilterCalled".
-							Disabled: []v1beta2.Plugin{
+							Disabled: []v1beta3.Plugin{
 								{Name: "*"},
 							},
 						},
@@ -773,12 +773,12 @@ func TestScorePlugin(t *testing.T) {
 		scorePluginName: newPlugin(scorePlugin),
 	}
 
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				Score: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				Score: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: scorePluginName},
 					},
 				},
@@ -851,12 +851,12 @@ func TestNormalizeScorePlugin(t *testing.T) {
 	}
 
 	// Setup initial score plugin for testing.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				Score: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				Score: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: scoreWithNormalizePluginName},
 					},
 				},
@@ -898,12 +898,12 @@ func TestReservePluginReserve(t *testing.T) {
 	registry := frameworkruntime.Registry{reservePluginName: newPlugin(reservePlugin)}
 
 	// Setup initial reserve plugin for testing.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				Reserve: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				Reserve: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: reservePluginName},
 					},
 				},
@@ -975,13 +975,13 @@ func TestPrebindPlugin(t *testing.T) {
 	// Setup initial prebind and filter plugin in different profiles.
 	// The second profile ensures the embedded filter plugin is exclusively called, and hence
 	// we can use its internal `numFilterCalled` to perform some precise checking logic.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{
 			{
 				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-				Plugins: &v1beta2.Plugins{
-					PreBind: v1beta2.PluginSet{
-						Enabled: []v1beta2.Plugin{
+				Plugins: &v1beta3.Plugins{
+					PreBind: v1beta3.PluginSet{
+						Enabled: []v1beta3.Plugin{
 							{Name: preBindPluginName},
 						},
 					},
@@ -989,9 +989,9 @@ func TestPrebindPlugin(t *testing.T) {
 			},
 			{
 				SchedulerName: pointer.StringPtr("2nd-scheduler"),
-				Plugins: &v1beta2.Plugins{
-					Filter: v1beta2.PluginSet{
-						Enabled: []v1beta2.Plugin{
+				Plugins: &v1beta3.Plugins{
+					Filter: v1beta3.PluginSet{
+						Enabled: []v1beta3.Plugin{
 							{Name: filterPluginName},
 						},
 					},
@@ -1255,20 +1255,20 @@ func TestBindPlugin(t *testing.T) {
 	}
 
 	// Setup initial unreserve and bind plugins for testing.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				Reserve: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{{Name: reservePlugin.Name()}},
+			Plugins: &v1beta3.Plugins{
+				Reserve: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{{Name: reservePlugin.Name()}},
 				},
-				Bind: v1beta2.PluginSet{
+				Bind: v1beta3.PluginSet{
 					// Put DefaultBinder last.
-					Enabled:  []v1beta2.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
-					Disabled: []v1beta2.Plugin{{Name: defaultbinder.Name}},
+					Enabled:  []v1beta3.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
+					Disabled: []v1beta3.Plugin{{Name: defaultbinder.Name}},
 				},
-				PostBind: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{{Name: postBindPlugin.Name()}},
+				PostBind: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{{Name: postBindPlugin.Name()}},
 				},
 			},
 		}},
@@ -1444,19 +1444,19 @@ func TestPostBindPlugin(t *testing.T) {
 			}
 
 			// Setup initial prebind and postbind plugin for testing.
-			cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-				Profiles: []v1beta2.KubeSchedulerProfile{{
+			cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+				Profiles: []v1beta3.KubeSchedulerProfile{{
 					SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-					Plugins: &v1beta2.Plugins{
-						PreBind: v1beta2.PluginSet{
-							Enabled: []v1beta2.Plugin{
+					Plugins: &v1beta3.Plugins{
+						PreBind: v1beta3.PluginSet{
+							Enabled: []v1beta3.Plugin{
 								{
 									Name: preBindPluginName,
 								},
 							},
 						},
-						PostBind: v1beta2.PluginSet{
-							Enabled: []v1beta2.Plugin{
+						PostBind: v1beta3.PluginSet{
+							Enabled: []v1beta3.Plugin{
 								{
 									Name: postBindPluginName,
 								},
@@ -1792,12 +1792,12 @@ func TestFilterPlugin(t *testing.T) {
 	registry := frameworkruntime.Registry{filterPluginName: newPlugin(filterPlugin)}
 
 	// Setup initial filter plugin for testing.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				Filter: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				Filter: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: filterPluginName},
 					},
 				},
@@ -1864,12 +1864,12 @@ func TestPreScorePlugin(t *testing.T) {
 	registry := frameworkruntime.Registry{preScorePluginName: newPlugin(preScorePlugin)}
 
 	// Setup initial pre-score plugin for testing.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				PreScore: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				PreScore: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: preScorePluginName},
 					},
 				},
@@ -1945,24 +1945,24 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	}
 
 	// Setup initial permit and filter plugins in the profile.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{
 			{
 				SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-				Plugins: &v1beta2.Plugins{
-					Permit: v1beta2.PluginSet{
-						Enabled: []v1beta2.Plugin{
+				Plugins: &v1beta3.Plugins{
+					Permit: v1beta3.PluginSet{
+						Enabled: []v1beta3.Plugin{
 							{Name: permitPluginName},
 						},
 					},
-					Filter: v1beta2.PluginSet{
+					Filter: v1beta3.PluginSet{
 						// Ensure the fake filter plugin is always called; otherwise noderesources
 						// would fail first and exit the Filter phase.
-						Enabled: []v1beta2.Plugin{
+						Enabled: []v1beta3.Plugin{
 							{Name: filterPluginName},
 							{Name: noderesources.FitName},
 						},
-						Disabled: []v1beta2.Plugin{
+						Disabled: []v1beta3.Plugin{
 							{Name: noderesources.FitName},
 						},
 					},
@@ -2194,17 +2194,17 @@ func TestActivatePods(t *testing.T) {
 	}}
 
 	// Setup initial filter plugin for testing.
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				PreFilter: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				PreFilter: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: jobPluginName},
 					},
 				},
-				PostBind: v1beta2.PluginSet{
-					Enabled: []v1beta2.Plugin{
+				PostBind: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
 						{Name: jobPluginName},
 					},
 				},
@@ -2281,19 +2281,19 @@ func initRegistryAndConfig(t *testing.T, pp ...*PermitPlugin) (frameworkruntime.
 		return frameworkruntime.Registry{}, schedulerconfig.KubeSchedulerProfile{}
 	}
 
-	versionedCfg := v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	versionedCfg := v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				Permit: v1beta2.PluginSet{},
+			Plugins: &v1beta3.Plugins{
+				Permit: v1beta3.PluginSet{},
 			},
 		}},
 	}
 	registry = frameworkruntime.Registry{}
 	for _, p := range pp {
 		registry.Register(p.Name(), newPermitPlugin(p))
-		versionedCfg.Profiles[0].Plugins.Permit.Enabled = append(versionedCfg.Profiles[0].Plugins.Permit.Enabled, v1beta2.Plugin{Name: p.Name()})
+		versionedCfg.Profiles[0].Plugins.Permit.Enabled = append(versionedCfg.Profiles[0].Plugins.Permit.Enabled, v1beta3.Plugin{Name: p.Name()})
 	}
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, versionedCfg)
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, versionedCfg)
 	return registry, cfg.Profiles[0]
 }
