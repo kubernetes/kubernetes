@@ -2699,8 +2699,10 @@ func checkPortConflicts(containers []core.Container, fldPath *field.Path) field.
 		portsPath := idxPath.Child("ports")
 		for pi := range ctr.Ports {
 			idxPath := portsPath.Index(pi)
+
+			// Check for duplicate port
+
 			port := ctr.Ports[pi].HostPort
-			name := ctr.Ports[pi].Name
 			if port == 0 {
 				continue
 			}
@@ -2712,13 +2714,17 @@ func checkPortConflicts(containers []core.Container, fldPath *field.Path) field.
 				portAccumulator.Insert(str)
 			}
 
+			// Check for duplicate named ports
+
+			name := ctr.Ports[pi].Name
 			// Don't error on no name.
-			if name != "" {
-				if nameAccumulator.Has(name) {
-					allErrs = append(allErrs, field.Duplicate(idxPath.Child("namedPort"), name))
-				} else {
-					nameAccumulator.Insert(name)
-				}
+			if name == "" {
+				continue
+			}
+			if nameAccumulator.Has(name) {
+				allErrs = append(allErrs, field.Duplicate(idxPath.Child("namedPort"), name))
+			} else {
+				nameAccumulator.Insert(name)
 			}
 		}
 	}
