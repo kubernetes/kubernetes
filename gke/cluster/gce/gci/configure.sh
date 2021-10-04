@@ -557,6 +557,40 @@ function inplace-run-once {
   fi
 }
 
+function install-auger {
+  echo "Downloading auger binary"
+  if [[ -f "${KUBE_HOME}/bin/auger" ]]; then
+    echo "auger is already installed"
+    return
+  fi
+  AUGER_STORE_PATH="${AUGER_STORE_PATH:-https://storage.googleapis.com/gke-release-staging/auger}"
+  AUGER_VERSION="${AUGER_VERSION:-v1.0.0-gke.1}"
+  download-or-bust "" "${AUGER_STORE_PATH}/${AUGER_VERSION}/auger.sha1"
+  sha1="$(cat auger.sha1)"
+  readonly sha1 # Declare readonly separately to avoid masking error values.
+  rm -f "auger.sha1"
+  download-or-bust "${sha1}" "${AUGER_STORE_PATH}/${AUGER_VERSION}/auger"
+  mv "${KUBE_HOME}/auger" "${KUBE_HOME}/bin/auger"
+  chmod a+x "${KUBE_HOME}/bin/auger"
+  record-preload-info "auger" "${sha1}"
+}
+
+# Extract etcdctl binary from etcd image.
+function install-etcdctl {
+  echo "Installing etcdctl binary"
+  if [[ -f "${KUBE_HOME}/bin/etcdctl" ]]; then
+    echo "etcdctl is already installed"
+    return
+  fi
+  local -r etcd_image="gcr.io/gke-master-images/etcd:${ETCDCTL_VERSION}"
+  container_id="$(docker create "${etcd_image}" sh)"
+  readonly containerId
+  docker cp "${container_id}:usr/local/bin/etcdctl" "${KUBE_HOME}/bin/etcdctl"
+  chmod a+x "${KUBE_HOME}/bin/etcdctl"
+  docker rm "${container_id}"
+  docker rmi "${etcd_image}"
+}
+
 # A helper function for loading a docker image. It keeps trying up to 5 times.
 #
 # $1: Full path of the docker image
@@ -1090,7 +1124,6 @@ log-wrap 'SourceKubeEnv' source "${KUBE_HOME}/kube-env"
 
 log-wrap 'DownloadKubeletConfig' download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
 
-# master certs
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   log-wrap 'DownloadKubeMasterCerts' download-kube-master-certs
 fi
