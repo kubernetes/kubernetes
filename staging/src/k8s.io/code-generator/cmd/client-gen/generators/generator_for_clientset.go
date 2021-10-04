@@ -144,12 +144,12 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	var cs Clientset
-	var err error
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$, err =$.PackageAlias$.NewForConfig(&configShallowCopy)
+	factory, err := rest.RESTClientFactoryFor(&configShallowCopy)
 	if err!=nil {
 		return nil, err
 	}
+	var cs Clientset
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.NewForFactory(factory)
 $end$
 	cs.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
 	if err!=nil {
@@ -163,19 +163,24 @@ var newClientsetForConfigOrDieTemplate = `
 // NewForConfigOrDie creates a new Clientset for the given config and
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *$.Config|raw$) *Clientset {
-	var cs Clientset
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.NewForConfigOrDie(c)
-$end$
-	cs.DiscoveryClient = $.NewDiscoveryClientForConfigOrDie|raw$(c)
-	return &cs
+	cs, err := NewForConfig(c)
+	if err!=nil {
+		panic(err)
+	}
+	return cs
 }
 `
 
 var newClientsetForRESTClientTemplate = `
 // New creates a new Clientset for the given RESTClient.
 func New(c $.RESTClientInterface|raw$) *Clientset {
+	client, ok := c.(*rest.RESTClient)
+	if !ok {
+		return nil
+	}
+	factory := rest.RESTClientFactoryFromClient(*client)
 	var cs Clientset
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.New(c)
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.NewForFactory(factory)
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &cs

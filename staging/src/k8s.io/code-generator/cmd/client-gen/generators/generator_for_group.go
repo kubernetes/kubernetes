@@ -98,10 +98,13 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"apiPath":                        apiPath(g.group),
 		"schemaGroupVersion":             c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/runtime/schema", Name: "GroupVersion"}),
 		"runtimeAPIVersionInternal":      c.Universe.Variable(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "APIVersionInternal"}),
+		"runtimeNewClientNegotiator":     c.Universe.Function(types.Name{Package: "k8s.io/apimachinery/pkg/runtime", Name: "NewClientNegotiator"}),
 		"restConfig":                     c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
+		"restClientContentConfig":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "ClientContentConfig"}),
 		"restDefaultKubernetesUserAgent": c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
 		"restRESTClientInterface":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"restRESTClientFor":              c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
+		"restRESTClientFactory":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFactory"}),
 		"SchemeGroupVersion":             c.Universe.Variable(types.Name{Package: path.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
@@ -125,6 +128,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	sw.Do(newClientForConfigTemplate, m)
 	sw.Do(newClientForConfigOrDieTemplate, m)
 	sw.Do(newClientForRESTClientTemplate, m)
+	sw.Do(newClientForFactoryTemplate, m)
 	if g.version == "" {
 		sw.Do(setInternalVersionClientDefaultsTemplate, m)
 	} else {
@@ -186,6 +190,18 @@ func NewForConfigOrDie(c *$.restConfig|raw$) *$.GroupGoName$$.Version$Client {
 		panic(err)
 	}
 	return client
+}
+`
+
+var newClientForFactoryTemplate = `
+// NewForFactory creates a new $.GroupGoName$$.Version$Client for the given RESTClientFactory.
+func NewForFactory(f *$.restRESTClientFactory|raw$) *$.GroupGoName$$.Version$Client {
+	var config $.restClientContentConfig|raw$
+	config.GroupVersion = $.SchemeGroupVersion|raw$
+	config.Negotiator = $.runtimeNewClientNegotiator|raw$(scheme.Codecs.WithoutConversion(), $.SchemeGroupVersion|raw$)
+	apiPath := $.apiPath$
+	client := f.NewFor(apiPath, config)
+	return &$.GroupGoName$$.Version$Client{client}
 }
 `
 
