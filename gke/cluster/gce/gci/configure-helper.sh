@@ -756,6 +756,9 @@ function create-master-auth {
   echo "Creating master auth files"
   local -r auth_dir="/etc/srv/kubernetes"
   local -r known_tokens_csv="${auth_dir}/known_tokens.csv"
+  # If you add token here, please make sure that your user's requests will be assigned to correct Priority Level.
+  # By adding your user to $AUTH_COMPONENTS_GROUP group
+  # your component's requests will be assigned to workload-low Priority Level.
   if [[ -e "${known_tokens_csv}" && "${METADATA_CLOBBERS_CONFIG:-false}" == "true" ]]; then
     rm "${known_tokens_csv}"
   fi
@@ -775,28 +778,28 @@ function create-master-auth {
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_SCHEDULER_TOKEN},"          "system:kube-scheduler,uid:system:kube-scheduler"
   fi
   if [[ -n "${KUBE_CLUSTER_AUTOSCALER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CLUSTER_AUTOSCALER_TOKEN}," "cluster-autoscaler,uid:cluster-autoscaler"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_CLUSTER_AUTOSCALER_TOKEN}," "cluster-autoscaler,uid:cluster-autoscaler${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
   fi
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
   fi
   if [[ -n "${KUBE_PROXY_OLD_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_OLD_TOKEN},"          "system:kube-proxy,uid:kube_proxy"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_OLD_TOKEN},"          "system:kube-proxy,uid:kube_proxy${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"       "system:node-problem-detector,uid:node-problem-detector"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"       "system:node-problem-detector,uid:node-problem-detector${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
   fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_OLD_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_OLD_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_OLD_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
   fi
   if [[ -n "${GCE_GLBC_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
   fi
   if [[ -n "${ADDON_MANAGER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${ADDON_MANAGER_TOKEN},"           "system:addon-manager,uid:system:addon-manager,system:masters"
   fi
   if [[ -n "${KONNECTIVITY_SERVER_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${KONNECTIVITY_SERVER_TOKEN},"     "system:konnectivity-server,uid:system:konnectivity-server"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KONNECTIVITY_SERVER_TOKEN},"     "system:konnectivity-server,uid:system:konnectivity-server${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
     create-kubeconfig "konnectivity-server" "${KONNECTIVITY_SERVER_TOKEN}"
   fi
   if [[ -n "${MONITORING_TOKEN:-}" ]]; then
@@ -809,7 +812,7 @@ function create-master-auth {
     for extra_component in "${extra_components[@]}"; do
       local token
       token="$(secure_random 32)"
-      append_or_replace_prefixed_line "${known_tokens_csv}" "${token}," "system:${extra_component},uid:system:${extra_component}"
+      append_or_replace_prefixed_line "${known_tokens_csv}" "${token}," "system:${extra_component},uid:system:${extra_component}${AUTH_COMPONENTS_GROUP:+,$AUTH_COMPONENTS_GROUP}"
       create-kubeconfig "${extra_component}" "${token}"
     done
   fi
