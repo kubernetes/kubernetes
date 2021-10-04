@@ -165,7 +165,7 @@ func Convert_Map_string_To_runtime_Object_To_Slice_v1_NamedExtension(in *map[str
 		newExtension := (*in)[key]
 		oldExtension := runtime.RawExtension{}
 		if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&newExtension, &oldExtension, s); err != nil {
-			return err
+			return nil
 		}
 		namedExtension := NamedExtension{key, oldExtension}
 		*out = append(*out, namedExtension)
