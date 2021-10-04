@@ -993,17 +993,17 @@ func (kl *Kubelet) isAdmittedPodTerminal(pod *v1.Pod) bool {
 	// pods are considered inactive if the config source has observed a
 	// terminal phase (if the Kubelet recorded that the pod reached a terminal
 	// phase the pod should never be restarted)
-	if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
-		return true
-	}
+	isTerminal := pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed
+
 	// a pod that has been marked terminal within the Kubelet is considered
 	// inactive (may have been rejected by Kubelet admision)
-	if status, ok := kl.statusManager.GetPodStatus(pod.UID); ok {
-		if status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed {
-			return true
+	if !isTerminal {
+		if status, ok := kl.statusManager.GetPodStatus(pod.UID); ok {
+			isTerminal = status.Phase == v1.PodSucceeded || status.Phase == v1.PodFailed
 		}
 	}
-	return false
+
+	return isTerminal
 }
 
 // removeOrphanedPodStatuses removes obsolete entries in podStatus where
