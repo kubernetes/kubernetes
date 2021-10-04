@@ -345,6 +345,18 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = new(float64)
 		**out = **in
 	}
+	if in.RegisterWithTaints != nil {
+		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
+		*out = make([]corev1.Taint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.RegisterNode != nil {
+		in, out := &in.RegisterNode, &out.RegisterNode
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

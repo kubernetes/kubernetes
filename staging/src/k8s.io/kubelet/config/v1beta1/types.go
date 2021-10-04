@@ -1033,6 +1033,16 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
+	// registerWithTaints are an array of taints to add to a node object when
+	// the kubelet registers itself. This only takes effect when registerNode
+	// is true and upon the initial registration of the node.
+	// Default: nil
+	// +optional
+	RegisterWithTaints []v1.Taint `json:"registerWithTaints,omitempty"`
+	// registerNode enables automatic registration with the apiserver.
+	// Default: true
+	// +optional
+	RegisterNode *bool `json:"registerNode,omitempty"`
 }
 
 type KubeletAuthorizationMode string

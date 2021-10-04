@@ -31,6 +31,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 )
 
 var (
@@ -126,6 +127,16 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	if kc.TopologyManagerPolicy != kubeletconfig.NoneTopologyManagerPolicy && !localFeatureGate.Enabled(features.TopologyManager) {
 		allErrors = append(allErrors, fmt.Errorf("invalid configuration: topologyManagerPolicy %v requires feature gate TopologyManager", kc.TopologyManagerPolicy))
 	}
+
+	for _, nodeTaint := range kc.RegisterWithTaints {
+		if err := utiltaints.CheckTaintValidation(nodeTaint); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("invalid taint: %v", nodeTaint))
+		}
+		if nodeTaint.TimeAdded != nil {
+			allErrors = append(allErrors, fmt.Errorf("taint TimeAdded is not nil"))
+		}
+	}
+
 	switch kc.TopologyManagerPolicy {
 	case kubeletconfig.NoneTopologyManagerPolicy:
 	case kubeletconfig.BestEffortTopologyManagerPolicy:
