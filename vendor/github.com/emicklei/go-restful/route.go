@@ -165,6 +165,6 @@ func (r Route) String() string {
 }
 
 // EnableContentEncoding (default=false) allows for GZIP or DEFLATE encoding of responses. Overrides the container.contentEncodingEnabled value.
-func (r Route) EnableContentEncoding(enabled bool) {
+func (r *Route) EnableContentEncoding(enabled bool) {
 	r.contentEncodingEnabled = &enabled
 }
