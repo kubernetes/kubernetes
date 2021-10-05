@@ -372,9 +372,57 @@ func TestValidateJob(t *testing.T) {
 func TestValidateJobUpdate(t *testing.T) {
 	validGeneratedSelector := getValidGeneratedSelector()
 	validPodTemplateSpecForGenerated := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	validNodeAffinity := &api.Affinity{
+		NodeAffinity: &api.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+				NodeSelectorTerms: []api.NodeSelectorTerm{
+					{
+						MatchExpressions: []api.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"bar", "value2"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	validPodTemplateWithAffinity := getValidPodTemplateSpecForGenerated(validGeneratedSelector)
+	validPodTemplateWithAffinity.Spec.Affinity = &api.Affinity{
+		NodeAffinity: &api.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &api.NodeSelector{
+				NodeSelectorTerms: []api.NodeSelectorTerm{
+					{
+						MatchExpressions: []api.NodeSelectorRequirement{
+							{
+								Key:      "foo",
+								Operator: api.NodeSelectorOpIn,
+								Values:   []string{"bar", "value"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	// This is to test immutability of the selector, both the new and old
+	// selector should match the labels in the template, which is immutable
+	// on its own; therfore, the only way to test selector immutability is
+	// when the new selector is changed but still matches the existing labels.
+	newSelector := getValidGeneratedSelector()
+	newSelector.MatchLabels["foo"] = "bar"
+	validTolerations := []api.Toleration{{
+		Key:      "foo",
+		Operator: api.TolerationOpEqual,
+		Value:    "bar",
+		Effect:   api.TaintEffectPreferNoSchedule,
+	}}
 	cases := map[string]struct {
 		old    batch.Job
 		update func(*batch.Job)
+		opts   JobValidationOptions
 		err    *field.Error
 	}{
 		"mutable fields": {
@@ -416,11 +464,11 @@ func TestValidateJobUpdate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
 				Spec: batch.JobSpec{
 					Selector: validGeneratedSelector,
-					Template: validPodTemplateSpecForGenerated,
+					Template: getValidPodTemplateSpecForGenerated(newSelector),
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Selector.MatchLabels["foo"] = "bar"
+				job.Spec.Selector = newSelector
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -436,7 +484,7 @@ func TestValidateJobUpdate(t *testing.T) {
 				},
 			},
 			update: func(job *batch.Job) {
-				job.Spec.Template.Spec.Containers = nil
+				job.Spec.Template.Spec.DNSPolicy = api.DNSClusterFirstWithHostNet
 			},
 			err: &field.Error{
 				Type:  field.ErrorTypeInvalid,
@@ -461,6 +509,144 @@ func TestValidateJobUpdate(t *testing.T) {
 				Field: "spec.completionMode",
 			},
 		},
+		"immutable node affinity": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Affinity = validNodeAffinity
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template",
+			},
+		},
+		"add node affinity": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Affinity = validNodeAffinity
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
+		"update node affinity": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateWithAffinity,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Affinity = validNodeAffinity
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
+		"remove node affinity": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateWithAffinity,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Affinity.NodeAffinity = nil
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
+		"remove affinity": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateWithAffinity,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Affinity = nil
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
+		"immutable tolerations": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Tolerations = validTolerations
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template",
+			},
+		},
+		"mutable tolerations": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.Tolerations = validTolerations
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
+		"immutable node selector": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+			},
+			err: &field.Error{
+				Type:  field.ErrorTypeInvalid,
+				Field: "spec.template",
+			},
+		},
+		"mutable node selector": {
+			old: batch.Job{
+				ObjectMeta: metav1.ObjectMeta{Name: "abc", Namespace: metav1.NamespaceDefault},
+				Spec: batch.JobSpec{
+					Selector: validGeneratedSelector,
+					Template: validPodTemplateSpecForGenerated,
+				},
+			},
+			update: func(job *batch.Job) {
+				job.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "bar"}
+			},
+			opts: JobValidationOptions{
+				AllowMutableSchedulingDirectives: true,
+			},
+		},
 	}
 	ignoreValueAndDetail := cmpopts.IgnoreFields(field.Error{}, "BadValue", "Detail")
 	for k, tc := range cases {
@@ -468,7 +654,7 @@ func TestValidateJobUpdate(t *testing.T) {
 			tc.old.ResourceVersion = "1"
 			update := tc.old.DeepCopy()
 			tc.update(update)
-			errs := ValidateJobUpdate(&tc.old, update, corevalidation.PodValidationOptions{})
+			errs := ValidateJobUpdate(update, &tc.old, tc.opts)
 			var wantErrs field.ErrorList
 			if tc.err != nil {
 				wantErrs = append(wantErrs, tc.err)
