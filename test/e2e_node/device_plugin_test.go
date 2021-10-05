@@ -34,8 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeletpodresourcesv1 "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubeletpodresourcesv1alpha1 "k8s.io/kubelet/pkg/apis/podresources/v1alpha1"
-	"k8s.io/kubernetes/pkg/features"
-	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -113,12 +111,6 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	pluginSockDir = filepath.Join(pluginSockDir) + "/"
 	ginkgo.Context("DevicePlugin", func() {
 		ginkgo.By("Enabling support for Kubelet Plugins Watcher")
-		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
-			if initialConfig.FeatureGates == nil {
-				initialConfig.FeatureGates = map[string]bool{}
-			}
-			initialConfig.FeatureGates[string(features.KubeletPodResources)] = true
-		})
 		ginkgo.It("[Flaky] Verifies the Kubelet device plugin functionality.", func() {
 			ginkgo.By("Wait for node is ready to start with")
 			e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
