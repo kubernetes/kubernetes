@@ -17,30 +17,24 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/flowcontrol"
 )
 
+// RESTClientFactory allows to create RESTClients sharing the same Transport.
 type RESTClientFactory struct {
 	// base is the root URL for all invocations of the client
 	base *url.URL
-	// rateLimiter is shared among all requests created by this client unless specifically
-	// overridden.
-	rateLimiter flowcontrol.RateLimiter
-	// warningHandler is shared among all requests created by this client.
-	// If not set, defaultWarningHandler is used.
-	warningHandler WarningHandler
-	// creates BackoffManager that is passed to requests.
-	createBackoffMgr func() BackoffManager
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
 }
 
+// RESTClientFactoryFor create a new RESTClientFactory for the configuration.
 func RESTClientFactoryFor(config *Config) (*RESTClientFactory, error) {
 	// Base URL
 	base, _, err := defaultServerUrlFor(config)
@@ -72,60 +66,46 @@ func RESTClientFactoryFor(config *Config) (*RESTClientFactory, error) {
 		}
 	}
 
-	// RateLimiter
-	rateLimiter := config.RateLimiter
-	if rateLimiter == nil {
-		qps := config.QPS
-		if config.QPS == 0.0 {
-			qps = DefaultQPS
-		}
-		burst := config.Burst
-		if config.Burst == 0 {
-			burst = DefaultBurst
-		}
-		if qps > 0 {
-			rateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
-		}
-	}
-
 	return &RESTClientFactory{
-		base:             base,
-		rateLimiter:      rateLimiter,
-		warningHandler:   config.WarningHandler,
-		createBackoffMgr: readExpBackoffConfig,
-		Client:           httpClient,
+		base:   base,
+		Client: httpClient,
 	}, err
 }
 
 func RESTClientFactoryFromClient(c RESTClient) *RESTClientFactory {
 	return &RESTClientFactory{
-		base:             c.base,
-		rateLimiter:      c.GetRateLimiter(),
-		warningHandler:   c.warningHandler,
-		createBackoffMgr: readExpBackoffConfig,
-		Client:           c.Client,
+		base:   c.base,
+		Client: c.Client,
 	}
 }
 
-func (r RESTClientFactory) NewFor(apiPath string, config ClientContentConfig) *RESTClient {
-	// shallow copy
-	c := config
-	if len(c.ContentType) == 0 {
-		c.ContentType = "application/json"
+func (r RESTClientFactory) NewClientWithOptions(apiPath string, config ClientContentConfig, options ...RESTClientOption) (*RESTClient, error) {
+	if config.GroupVersion == (schema.GroupVersion{}) {
+		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
+	}
+	if config.Negotiator == nil {
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
-	if c.Negotiator == nil {
-		c.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), c.GroupVersion)
+	if len(config.ContentType) == 0 {
+		config.ContentType = "application/json"
 	}
 
-	return &RESTClient{
+	client := &RESTClient{
 		// shared
-		base:           r.base,
-		rateLimiter:    r.rateLimiter,
-		warningHandler: r.warningHandler,
-		Client:         r.Client,
+		base:   r.base,
+		Client: r.Client,
 		// per client values
-		versionedAPIPath: DefaultVersionedAPIPath(apiPath, c.GroupVersion),
-		content:          c,
+		versionedAPIPath: DefaultVersionedAPIPath(apiPath, config.GroupVersion),
+		content:          config,
+		// defaults
+		rateLimiter:      flowcontrol.NewTokenBucketRateLimiter(DefaultQPS, DefaultBurst),
+		createBackoffMgr: readExpBackoffConfig,
 	}
+	// Apply all options
+	for _, opt := range options {
+		client = opt(client)
+	}
+
+	return client, nil
 }
