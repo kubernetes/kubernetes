@@ -664,11 +664,7 @@ func configurePodResourcesInKubelet(f *framework.Framework, cleanStateFile bool,
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)
 	newCfg := oldCfg.DeepCopy()
-	if newCfg.FeatureGates == nil {
-		newCfg.FeatureGates = make(map[string]bool)
-	}
-	newCfg.FeatureGates["CPUManager"] = true
-	newCfg.FeatureGates["KubeletPodResourcesGetAllocatable"] = true
+	newCfg.FeatureGates[string(kubefeatures.KubeletPodResourcesGetAllocatable)] = true
 
 	// After graduation of the CPU Manager feature to Beta, the CPU Manager
 	// "none" policy is ON by default. But when we set the CPU Manager policy to
