@@ -356,12 +356,12 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		GroupVersion:       gv,
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
-
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
-	if err == nil && config.WarningHandler != nil {
-		restClient.warningHandler = config.WarningHandler
+	options := []RESTClientOption{WithRateLimiter(rateLimiter)}
+	if config.WarningHandler != nil {
+		options = append(options, WithWarningHandler(config.WarningHandler))
 	}
-	return restClient, err
+
+	return NewRESTClientWithOptions(baseURL, versionedAPIPath, clientContent, httpClient, options...)
 }
 
 // UnversionedRESTClientFor is the same as RESTClientFor, except that it allows
@@ -415,11 +415,12 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
-	if err == nil && config.WarningHandler != nil {
-		restClient.warningHandler = config.WarningHandler
+	options := []RESTClientOption{WithRateLimiter(rateLimiter)}
+	if config.WarningHandler != nil {
+		options = append(options, WithWarningHandler(config.WarningHandler))
 	}
-	return restClient, err
+
+	return NewRESTClientWithOptions(baseURL, versionedAPIPath, clientContent, httpClient, options...)
 }
 
 // SetKubernetesDefaults sets default values on the provided client config for accessing the

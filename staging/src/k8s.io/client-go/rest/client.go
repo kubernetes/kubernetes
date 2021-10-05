@@ -71,6 +71,33 @@ type ClientContentConfig struct {
 	Negotiator runtime.ClientNegotiator
 }
 
+// RESTClientOption defines the functional option type for RESTClient.
+type RESTClientOption func(*RESTClient) *RESTClient
+
+// WithRateLimiter sets a custom rate limiter for the RESTClient.
+func WithRateLimiter(rateLimiter flowcontrol.RateLimiter) RESTClientOption {
+	return func(r *RESTClient) *RESTClient {
+		r.rateLimiter = rateLimiter
+		return r
+	}
+}
+
+// WithWarningHandler sets a custom warning handler for the RESTClient.
+func WithWarningHandler(warningHandler WarningHandler) RESTClientOption {
+	return func(r *RESTClient) *RESTClient {
+		r.warningHandler = warningHandler
+		return r
+	}
+}
+
+// WithBackoffManagerFunc sets a backoff manager constructor that is passed to requests.
+func WithBackoffManagerFunc(createBackoffMgr func() BackoffManager) RESTClientOption {
+	return func(r *RESTClient) *RESTClient {
+		r.createBackoffMgr = createBackoffMgr
+		return r
+	}
+}
+
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
 // The baseURL is expected to point to an HTTP or HTTPS path that is the parent
 // of one or more resources.  The server should return a decodable API resource
@@ -125,6 +152,37 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 
 		Client: client,
 	}, nil
+}
+
+// NewRESTClient creates a new RESTClient with additional options.
+func NewRESTClientWithOptions(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, client *http.Client, options ...RESTClientOption) (*RESTClient, error) {
+	if len(config.ContentType) == 0 {
+		config.ContentType = "application/json"
+	}
+
+	base := *baseURL
+	if !strings.HasSuffix(base.Path, "/") {
+		base.Path += "/"
+	}
+	base.RawQuery = ""
+	base.Fragment = ""
+
+	restClient := &RESTClient{
+		base:             &base,
+		Client:           client,
+		versionedAPIPath: versionedAPIPath,
+		content:          config,
+		// defaults
+		createBackoffMgr: readExpBackoffConfig,
+		rateLimiter:      nil,
+		warningHandler:   nil,
+	}
+	// Apply all options
+	for _, opt := range options {
+		restClient = opt(restClient)
+	}
+
+	return restClient, nil
 }
 
 // GetRateLimiter returns rate limiter for a given client, or nil if it's called on a nil client
