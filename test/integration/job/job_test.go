@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -627,6 +628,81 @@ func TestSuspendJobControllerRestart(t *testing.T) {
 	validateJobPodsStatus(ctx, t, clientSet, job, podsByStatus{
 		Active: 2,
 	}, false)
+}
+
+func TestNodeSelectorUpdate(t *testing.T) {
+	for name, featureGate := range map[string]bool{
+		"feature gate disabled": false,
+		"feature gate enabled":  true,
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobMutableNodeSchedulingDirectives, featureGate)()
+
+			closeFn, restConfig, clientSet, ns := setup(t, "suspend")
+			defer closeFn()
+			ctx, cancel := startJobController(restConfig, clientSet)
+			defer cancel()
+
+			job, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{Spec: batchv1.JobSpec{
+				Parallelism: pointer.Int32Ptr(1),
+				Suspend:     pointer.BoolPtr(true),
+			}})
+			if err != nil {
+				t.Fatalf("Failed to create Job: %v", err)
+			}
+			jobName := job.Name
+			jobNamespace := job.Namespace
+
+			// (1) Unsuspend and set node selector in the same update.
+			nodeSelector := map[string]string{"foo": "bar"}
+			job.Spec.Template.Spec.NodeSelector = nodeSelector
+			job.Spec.Suspend = pointer.BoolPtr(false)
+			_, err = clientSet.BatchV1().Jobs(jobNamespace).Update(ctx, job, metav1.UpdateOptions{})
+			if !featureGate {
+				if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
+					t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
+				}
+			} else if featureGate && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			// (2) Check that the pod was created using the expected node selector.
+			if featureGate {
+				var pod *v1.Pod
+				if err := wait.PollImmediate(waitInterval, wait.ForeverTestTimeout, func() (bool, error) {
+					pods, err := clientSet.CoreV1().Pods(jobNamespace).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						t.Fatalf("Failed to list Job Pods: %v", err)
+					}
+					if len(pods.Items) == 0 {
+						return false, nil
+					}
+					pod = &pods.Items[0]
+					return true, nil
+				}); err != nil || pod == nil {
+					t.Fatalf("pod not found: %v", err)
+				}
+
+				// if the feature gate is enabled, then the job should now be unsuspended and
+				// the pod has the node selector.
+				if diff := cmp.Diff(nodeSelector, pod.Spec.NodeSelector); diff != "" {
+					t.Errorf("Unexpected nodeSelector (-want,+got):\n%s", diff)
+				}
+			}
+
+			// (3) Update node selector again. It should fail since the job is unsuspended.
+			var updatedJob *batchv1.Job
+			if updatedJob, err = clientSet.BatchV1().Jobs(jobNamespace).Get(ctx, jobName, metav1.GetOptions{}); err != nil {
+				t.Fatalf("can't find the job: %v", err)
+			}
+			updatedJob.Spec.Template.Spec.NodeSelector = map[string]string{"foo": "baz"}
+			_, err = clientSet.BatchV1().Jobs(jobNamespace).Update(ctx, updatedJob, metav1.UpdateOptions{})
+			if err == nil || !strings.Contains(err.Error(), "spec.template: Invalid value") {
+				t.Errorf("Expected \"spec.template: Invalid value\" error, got: %v", err)
+			}
+
+		})
+	}
 }
 
 type podsByStatus struct {

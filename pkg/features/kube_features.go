@@ -768,6 +768,14 @@ const (
 	// See https://groups.google.com/g/kubernetes-sig-architecture/c/Nxsc7pfe5rw/m/vF2djJh0BAAJ
 	// for details about the removal of this feature gate.
 	CPUManagerPolicyBetaOptions featuregate.Feature = "CPUManagerPolicyBetaOptions"
+
+	// owner: @ahg
+	// beta: v1.23
+	//
+	// Allow updating node scheduling directives in the pod template of jobs. Specifically,
+	// node affinity, selector and tolerations. This is allowed only for suspended jobs
+	// that have never been unsuspended before.
+	JobMutableNodeSchedulingDirectives featuregate.Feature = "JobMutableNodeSchedulingDirectives"
 )
 
 func init() {
@@ -881,6 +889,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ControllerManagerLeaderMigration:               {Default: true, PreRelease: featuregate.Beta},
 	CPUManagerPolicyAlphaOptions:                   {Default: false, PreRelease: featuregate.Alpha},
 	CPUManagerPolicyBetaOptions:                    {Default: true, PreRelease: featuregate.Beta},
+	JobMutableNodeSchedulingDirectives:             {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
