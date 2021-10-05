@@ -1508,6 +1508,7 @@ k8s.io/apiserver/pkg/endpoints/handlers/responsewriters
 k8s.io/apiserver/pkg/endpoints/metrics
 k8s.io/apiserver/pkg/endpoints/openapi
 k8s.io/apiserver/pkg/endpoints/request
+k8s.io/apiserver/pkg/endpoints/responsewriter
 k8s.io/apiserver/pkg/endpoints/warning
 k8s.io/apiserver/pkg/features
 k8s.io/apiserver/pkg/quota/v1

@@ -21,6 +21,8 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 func TestDefaultStacktracePred(t *testing.T) {
@@ -127,32 +129,81 @@ func TestUnlogged(t *testing.T) {
 	}
 }
 
-type testResponseWriter struct{}
-
-func (*testResponseWriter) Header() http.Header       { return nil }
-func (*testResponseWriter) Write([]byte) (int, error) { return 0, nil }
-func (*testResponseWriter) WriteHeader(int)           {}
-
 func TestLoggedStatus(t *testing.T) {
 	req, err := http.NewRequest("GET", "http://example.com", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	var tw http.ResponseWriter = new(testResponseWriter)
-	logger := newLogged(req, tw)
+	var tw http.ResponseWriter = new(responsewriter.FakeResponseWriter)
+	logger, _ := newLogged(req, tw)
 	logger.Write(nil)
 
 	if logger.status != http.StatusOK {
 		t.Errorf("expected status after write to be %v, got %v", http.StatusOK, logger.status)
 	}
 
-	tw = new(testResponseWriter)
-	logger = newLogged(req, tw)
+	tw = new(responsewriter.FakeResponseWriter)
+	logger, _ = newLogged(req, tw)
 	logger.WriteHeader(http.StatusForbidden)
 	logger.Write(nil)
 
 	if logger.status != http.StatusForbidden {
 		t.Errorf("expected status after write to remain %v, got %v", http.StatusForbidden, logger.status)
+	}
+}
+
+func TestRespLoggerWithDecoratedResponseWriter(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	var tw http.ResponseWriter = new(responsewriter.FakeResponseWriter)
+	_, rwGot := newLogged(req, tw)
+
+	switch v := rwGot.(type) {
+	case *respLogger:
+	default:
+		t.Errorf("Expected respLogger, got %v", reflect.TypeOf(v))
+	}
+
+	tw = new(responsewriter.FakeResponseWriterFlusherCloseNotifier)
+	_, rwGot = newLogged(req, tw)
+
+	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
+	if _, ok := rwGot.(http.CloseNotifier); !ok {
+		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
+	}
+	if _, ok := rwGot.(http.Flusher); !ok {
+		t.Errorf("Expected the wrapper to implement http.Flusher")
+	}
+	if _, ok := rwGot.(http.Hijacker); ok {
+		t.Errorf("Expected http.ResponseWriter not to implement http.Hijacker")
+	}
+
+	tw = new(responsewriter.FakeResponseWriterFlusherCloseNotifierHijacker)
+	_, rwGot = newLogged(req, tw)
+
+	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
+	if _, ok := rwGot.(http.CloseNotifier); !ok {
+		t.Errorf("Expected http.ResponseWriter to implement http.CloseNotifier")
+	}
+	if _, ok := rwGot.(http.Flusher); !ok {
+		t.Errorf("Expected the wrapper to implement http.Flusher")
+	}
+	if _, ok := rwGot.(http.Hijacker); !ok {
+		t.Errorf("Expected http.ResponseWriter to implement http.Hijacker")
+	}
+}
+
+func TestResponseWriterDecorator(t *testing.T) {
+	decorator := &respLogger{
+		w: &responsewriter.FakeResponseWriter{},
+	}
+	var w http.ResponseWriter = decorator
+
+	if inner := w.(responsewriter.UserProvidedDecorator).Unwrap(); inner != decorator.w {
+		t.Errorf("Expected the decorator to return the inner http.ResponseWriter object")
 	}
 }

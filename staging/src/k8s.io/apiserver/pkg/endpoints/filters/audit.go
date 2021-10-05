@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 )
 
 // WithAudit decorates a http.Handler with audit logging information for all the
@@ -178,19 +179,11 @@ func decorateResponseWriter(ctx context.Context, responseWriter http.ResponseWri
 		omitStages:     omitStages,
 	}
 
-	// check if the ResponseWriter we're wrapping is the fancy one we need
-	// or if the basic is sufficient
-	//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-	_, cn := responseWriter.(http.CloseNotifier)
-	_, fl := responseWriter.(http.Flusher)
-	_, hj := responseWriter.(http.Hijacker)
-	if cn && fl && hj {
-		return &fancyResponseWriterDelegator{delegate}
-	}
-	return delegate
+	return responsewriter.WrapForHTTP1Or2(delegate)
 }
 
 var _ http.ResponseWriter = &auditResponseWriter{}
+var _ responsewriter.UserProvidedDecorator = &auditResponseWriter{}
 
 // auditResponseWriter intercepts WriteHeader, sets it in the event. If the sink is set, it will
 // create immediately an event (for long running requests).
@@ -201,6 +194,10 @@ type auditResponseWriter struct {
 	once       sync.Once
 	sink       audit.Sink
 	omitStages []auditinternal.Stage
+}
+
+func (a *auditResponseWriter) Unwrap() http.ResponseWriter {
+	return a.ResponseWriter
 }
 
 func (a *auditResponseWriter) processCode(code int) {
@@ -228,28 +225,11 @@ func (a *auditResponseWriter) WriteHeader(code int) {
 	a.ResponseWriter.WriteHeader(code)
 }
 
-// fancyResponseWriterDelegator implements http.CloseNotifier, http.Flusher and
-// http.Hijacker which are needed to make certain http operation (e.g. watch, rsh, etc)
-// working.
-type fancyResponseWriterDelegator struct {
-	*auditResponseWriter
-}
-
-func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
-	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
-}
-
-func (f *fancyResponseWriterDelegator) Flush() {
-	f.ResponseWriter.(http.Flusher).Flush()
-}
-
-func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (a *auditResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	// fake a response status before protocol switch happens
-	f.processCode(http.StatusSwitchingProtocols)
+	a.processCode(http.StatusSwitchingProtocols)
 
-	return f.ResponseWriter.(http.Hijacker).Hijack()
+	// the outer ResponseWriter object returned by WrapForHTTP1Or2 implements
+	// http.Hijacker if the inner object (a.ResponseWriter) implements http.Hijacker.
+	return a.ResponseWriter.(http.Hijacker).Hijack()
 }
-
-var _ http.CloseNotifier = &fancyResponseWriterDelegator{}
-var _ http.Flusher = &fancyResponseWriterDelegator{}
-var _ http.Hijacker = &fancyResponseWriterDelegator{}

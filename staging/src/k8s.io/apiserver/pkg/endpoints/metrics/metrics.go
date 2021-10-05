@@ -17,9 +17,7 @@ limitations under the License.
 package metrics
 
 import (
-	"bufio"
 	"context"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -34,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
@@ -486,16 +485,7 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: response.ResponseWriter}
 
-		//lint:file-ignore SA1019 Keep supporting deprecated http.CloseNotifier
-		_, cn := response.ResponseWriter.(http.CloseNotifier)
-		_, fl := response.ResponseWriter.(http.Flusher)
-		_, hj := response.ResponseWriter.(http.Hijacker)
-		var rw http.ResponseWriter
-		if cn && fl && hj {
-			rw = &fancyResponseWriterDelegator{delegate}
-		} else {
-			rw = delegate
-		}
+		rw := responsewriter.WrapForHTTP1Or2(delegate)
 		response.ResponseWriter = rw
 
 		routeFunc(req, response)
@@ -513,15 +503,7 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 		}
 
 		delegate := &ResponseWriterDelegator{ResponseWriter: w}
-
-		_, cn := w.(http.CloseNotifier)
-		_, fl := w.(http.Flusher)
-		_, hj := w.(http.Hijacker)
-		if cn && fl && hj {
-			w = &fancyResponseWriterDelegator{delegate}
-		} else {
-			w = delegate
-		}
+		w = responsewriter.WrapForHTTP1Or2(delegate)
 
 		handler(w, req)
 
@@ -612,6 +594,9 @@ func cleanDryRun(u *url.URL) string {
 	return strings.Join(utilsets.NewString(dryRun...).List(), ",")
 }
 
+var _ http.ResponseWriter = (*ResponseWriterDelegator)(nil)
+var _ responsewriter.UserProvidedDecorator = (*ResponseWriterDelegator)(nil)
+
 // ResponseWriterDelegator interface wraps http.ResponseWriter to additionally record content-length, status-code, etc.
 type ResponseWriterDelegator struct {
 	http.ResponseWriter
@@ -619,6 +604,10 @@ type ResponseWriterDelegator struct {
 	status      int
 	written     int64
 	wroteHeader bool
+}
+
+func (r *ResponseWriterDelegator) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
 }
 
 func (r *ResponseWriterDelegator) WriteHeader(code int) {
@@ -642,22 +631,6 @@ func (r *ResponseWriterDelegator) Status() int {
 
 func (r *ResponseWriterDelegator) ContentLength() int {
 	return int(r.written)
-}
-
-type fancyResponseWriterDelegator struct {
-	*ResponseWriterDelegator
-}
-
-func (f *fancyResponseWriterDelegator) CloseNotify() <-chan bool {
-	return f.ResponseWriter.(http.CloseNotifier).CloseNotify()
-}
-
-func (f *fancyResponseWriterDelegator) Flush() {
-	f.ResponseWriter.(http.Flusher).Flush()
-}
-
-func (f *fancyResponseWriterDelegator) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	return f.ResponseWriter.(http.Hijacker).Hijack()
 }
 
 // Small optimization over Itoa
