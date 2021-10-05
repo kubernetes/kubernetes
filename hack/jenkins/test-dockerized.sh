@@ -53,4 +53,61 @@ go install ./cmd/...
 
 # TODO(spiffxp): narrowing down
 # make test-cmd
-make test-integration WHAT="k8s.io/kubernetes/test/integration/apiserver/admissionwebhook"
+integration_tests=(
+  k8s.io/kubernetes/test/integration/apimachinery
+  k8s.io/kubernetes/test/integration/apiserver
+  k8s.io/kubernetes/test/integration/apiserver/admissionwebhook
+  k8s.io/kubernetes/test/integration/apiserver/apply
+  k8s.io/kubernetes/test/integration/apiserver/certreload
+  k8s.io/kubernetes/test/integration/apiserver/flowcontrol
+  k8s.io/kubernetes/test/integration/apiserver/podlogs
+  k8s.io/kubernetes/test/integration/apiserver/tracing
+  # k8s.io/kubernetes/test/integration/auth
+  # k8s.io/kubernetes/test/integration/certificates
+  # k8s.io/kubernetes/test/integration/client
+  # k8s.io/kubernetes/test/integration/configmap
+  # k8s.io/kubernetes/test/integration/controlplane
+  # k8s.io/kubernetes/test/integration/cronjob
+  # k8s.io/kubernetes/test/integration/daemonset
+  # k8s.io/kubernetes/test/integration/defaulttolerationseconds
+  # k8s.io/kubernetes/test/integration/deployment
+  # k8s.io/kubernetes/test/integration/disruption
+  # k8s.io/kubernetes/test/integration/dryrun
+  # k8s.io/kubernetes/test/integration/dualstack
+  # k8s.io/kubernetes/test/integration/endpoints
+  # k8s.io/kubernetes/test/integration/endpointslice
+  # k8s.io/kubernetes/test/integration/etcd
+  # k8s.io/kubernetes/test/integration/events
+  # k8s.io/kubernetes/test/integration/evictions
+  # k8s.io/kubernetes/test/integration/examples
+  # k8s.io/kubernetes/test/integration/garbagecollector
+  # k8s.io/kubernetes/test/integration/ipamperf
+  # k8s.io/kubernetes/test/integration/job
+  # k8s.io/kubernetes/test/integration/kubelet
+  # k8s.io/kubernetes/test/integration/metrics
+  # k8s.io/kubernetes/test/integration/namespace
+  # k8s.io/kubernetes/test/integration/node
+  # k8s.io/kubernetes/test/integration/objectmeta
+  # k8s.io/kubernetes/test/integration/openshift
+  # k8s.io/kubernetes/test/integration/pods
+  # k8s.io/kubernetes/test/integration/quota
+  # k8s.io/kubernetes/test/integration/replicaset
+  # k8s.io/kubernetes/test/integration/replicationcontroller
+  # k8s.io/kubernetes/test/integration/scale
+  # k8s.io/kubernetes/test/integration/scheduler
+  # k8s.io/kubernetes/test/integration/scheduler_perf
+  # k8s.io/kubernetes/test/integration/secrets
+  # k8s.io/kubernetes/test/integration/service
+  # k8s.io/kubernetes/test/integration/serviceaccount
+  # k8s.io/kubernetes/test/integration/serving
+  # k8s.io/kubernetes/test/integration/statefulset
+  # k8s.io/kubernetes/test/integration/storageclasses
+  # k8s.io/kubernetes/test/integration/storageversion
+  # k8s.io/kubernetes/test/integration/tls
+  # k8s.io/kubernetes/test/integration/ttlcontroller
+  # k8s.io/kubernetes/test/integration/volume
+  # k8s.io/kubernetes/test/integration/volumescheduling
+  k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/test/integration
+  k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/test/integration/conversion
+)  
+make test-integration WHAT="${integration_tests[*]}"
