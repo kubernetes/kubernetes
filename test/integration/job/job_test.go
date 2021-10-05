@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -220,6 +221,10 @@ func TestParallelJobParallelism(t *testing.T) {
 }
 
 func TestParallelJobWithCompletions(t *testing.T) {
+	// Lower limits for a job sync so that we can test partial updates with a low
+	// number of pods.
+	t.Cleanup(setDuringTest(&jobcontroller.MaxUncountedPods, 10))
+	t.Cleanup(setDuringTest(&jobcontroller.MaxPodCreateDeletePerSync, 10))
 	for _, wFinalizers := range []bool{false, true} {
 		t.Run(fmt.Sprintf("finalizers=%t", wFinalizers), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobTrackingWithFinalizers, wFinalizers)()
@@ -230,8 +235,8 @@ func TestParallelJobWithCompletions(t *testing.T) {
 
 			jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
 				Spec: batchv1.JobSpec{
-					Parallelism: pointer.Int32Ptr(4),
-					Completions: pointer.Int32Ptr(6),
+					Parallelism: pointer.Int32Ptr(54),
+					Completions: pointer.Int32Ptr(56),
 				},
 			})
 			if err != nil {
@@ -241,23 +246,23 @@ func TestParallelJobWithCompletions(t *testing.T) {
 				t.Errorf("apiserver created job with tracking annotation: %t, want %t", got, wFinalizers)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-				Active: 4,
+				Active: 54,
 			}, wFinalizers)
 			// Failed Pods are replaced.
 			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodFailed, 2); err != nil {
 				t.Fatalf("Failed setting phase %s on Job Pods: %v", v1.PodFailed, err)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-				Active: 4,
+				Active: 54,
 				Failed: 2,
 			}, wFinalizers)
 			// Pods are created until the number of succeeded Pods equals completions.
-			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
+			if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 53); err != nil {
 				t.Fatalf("Failed setting phase %s on Job Pod: %v", v1.PodSucceeded, err)
 			}
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Failed:    2,
-				Succeeded: 3,
+				Succeeded: 53,
 				Active:    3,
 			}, wFinalizers)
 			// No more Pods are created after the Job completes.
@@ -267,7 +272,7 @@ func TestParallelJobWithCompletions(t *testing.T) {
 			validateJobSucceeded(ctx, t, clientSet, jobObj)
 			validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 				Failed:    2,
-				Succeeded: 6,
+				Succeeded: 56,
 			}, false)
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 		})
@@ -781,21 +786,43 @@ func setJobPodsPhase(ctx context.Context, clientSet clientset.Interface, jobObj 
 	if err != nil {
 		return fmt.Errorf("listing Job Pods: %w", err)
 	}
+	updates := make([]v1.Pod, 0, cnt)
 	for _, pod := range pods.Items {
-		if cnt == 0 {
+		if len(updates) == cnt {
 			break
 		}
 		if p := pod.Status.Phase; isPodOwnedByJob(&pod, jobObj) && p != v1.PodFailed && p != v1.PodSucceeded {
 			pod.Status.Phase = phase
-			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, &pod, metav1.UpdateOptions{})
-			if err != nil {
-				return fmt.Errorf("updating Pod status: %w", err)
-			}
-			cnt--
+			updates = append(updates, pod)
 		}
 	}
-	if cnt != 0 {
+	if len(updates) != cnt {
 		return fmt.Errorf("couldn't set phase on %d Job Pods", cnt)
+	}
+	return updatePodStatuses(ctx, clientSet, updates)
+}
+
+func updatePodStatuses(ctx context.Context, clientSet clientset.Interface, updates []v1.Pod) error {
+	wg := sync.WaitGroup{}
+	wg.Add(len(updates))
+	errCh := make(chan error, len(updates))
+
+	for _, pod := range updates {
+		pod := pod
+		go func() {
+			_, err := clientSet.CoreV1().Pods(pod.Namespace).UpdateStatus(ctx, &pod, metav1.UpdateOptions{})
+			if err != nil {
+				errCh <- err
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	select {
+	case err := <-errCh:
+		return fmt.Errorf("updating Pod status: %w", err)
+	default:
 	}
 	return nil
 }
@@ -860,7 +887,11 @@ func setup(t *testing.T, nsBaseName string) (framework.CloseFunc, *restclient.Co
 	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, apiServerCloseFn := framework.RunAnAPIServer(controlPlaneConfig)
 
-	config := restclient.Config{Host: server.URL}
+	config := restclient.Config{
+		Host:  server.URL,
+		QPS:   200.0,
+		Burst: 200,
+	}
 	clientSet, err := clientset.NewForConfig(&config)
 	if err != nil {
 		t.Fatalf("Error creating clientset: %v", err)
@@ -898,4 +929,12 @@ func hasJobTrackingAnnotation(job *batchv1.Job) bool {
 	}
 	_, ok := job.Annotations[batchv1.JobTrackingFinalizer]
 	return ok
+}
+
+func setDuringTest(val *int, newVal int) func() {
+	origVal := *val
+	*val = newVal
+	return func() {
+		*val = origVal
+	}
 }
