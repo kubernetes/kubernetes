@@ -21,11 +21,13 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"os"
 	"strings"
 	"testing"
 	"unicode"
 
 	fuzz "github.com/google/gofuzz"
+	"github.com/spf13/pflag"
 
 	inf "gopkg.in/inf.v0"
 )
@@ -1474,4 +1476,43 @@ func BenchmarkQuantityAsApproximateFloat64(b *testing.B) {
 		}
 	}
 	b.StopTimer()
+}
+
+var _ pflag.Value = &QuantityValue{}
+
+func TestQuantityValueSet(t *testing.T) {
+	q := QuantityValue{}
+
+	if err := q.Set("invalid"); err == nil {
+
+		t.Error("'invalid' did not trigger a parse error")
+	}
+
+	if err := q.Set("1Mi"); err != nil {
+		t.Errorf("parsing 1Mi should have worked, got: %v", err)
+	}
+	if q.Value() != 1024*1024 {
+		t.Errorf("quantity should have been set to 1Mi, got: %v", q)
+	}
+
+	data, err := json.Marshal(q)
+	if err != nil {
+		t.Errorf("unexpected encoding error: %v", err)
+	}
+	expected := `"1Mi"`
+	if string(data) != expected {
+		t.Errorf("expected 1Mi value to be encoded as %q, got: %q", expected, string(data))
+	}
+}
+
+func ExampleQuantityValue() {
+	q := QuantityValue{
+		Quantity: MustParse("1Mi"),
+	}
+	fs := pflag.FlagSet{}
+	fs.SetOutput(os.Stdout)
+	fs.Var(&q, "mem", "sets amount of memory")
+	fs.PrintDefaults()
+	// Output:
+	// --mem quantity   sets amount of memory (default 1Mi)
 }
