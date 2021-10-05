@@ -8,7 +8,8 @@ reviewers:
   - MaciekPytel
   - yujuhong
   - mtaufen
-  - jeremyje
+  - ibabou
+  - pjh
   - sig-scalability-reviewers
 approvers:
   - bowei
@@ -18,7 +19,8 @@ approvers:
   - MaciekPytel
   - yujuhong
   - mtaufen
-  - jeremyje
+  - ibabou
+  - pjh
   - sig-scalability-approvers
 emeritus_approvers:
   - gmarek
