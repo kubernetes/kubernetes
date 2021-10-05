@@ -42,7 +42,7 @@ export KUBE_COVER="n"
 export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
 # Save the verbose stdout as well.
 export KUBE_KEEP_VERBOSE_TEST_OUTPUT=y
-export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
+export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=1
 export LOG_LEVEL=4
 
 cd "${GOPATH}/src/k8s.io/kubernetes"
