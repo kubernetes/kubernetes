@@ -74,7 +74,7 @@ func TestCacheWatcherCleanupNotBlockedByResult(t *testing.T) {
 	// set the size of the buffer of w.result to 0, so that the writes to
 	// w.result is blocked.
 	w = newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
-	go w.processEvents(context.Background(), initEvents, 0)
+	go w.processInterval(context.Background(), intervalFromEvents(initEvents), 0)
 	w.Stop()
 	if err := wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
 		lock.RLock()
@@ -194,7 +194,7 @@ TestCase:
 		}
 
 		w := newCacheWatcher(0, filter, forget, testVersioner{}, time.Now(), false, objectType, "")
-		go w.processEvents(context.Background(), testCase.events, 0)
+		go w.processInterval(context.Background(), intervalFromEvents(testCase.events), 0)
 
 		ch := w.ResultChan()
 		for j, event := range testCase.expected {
@@ -542,7 +542,7 @@ func TestCacheWatcherStoppedInAnotherGoroutine(t *testing.T) {
 		w = newCacheWatcher(2, filter, emptyFunc, testVersioner{}, deadline, false, objectType, "")
 		w.input <- &watchCacheEvent{Object: &v1.Pod{}, ResourceVersion: uint64(i + 1)}
 		ctx, _ := context.WithDeadline(context.Background(), deadline)
-		go w.processEvents(ctx, nil, 0)
+		go w.processInterval(ctx, intervalFromEvents(nil), 0)
 		select {
 		case <-w.ResultChan():
 		case <-time.After(time.Second):
@@ -1411,4 +1411,86 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 func TestCachingObjects(t *testing.T) {
 	t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
 	t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+}
+
+func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+	// Ensure there is enough budget for slow processing since
+	// the entire watch cache is going to be served through the
+	// interval and events won't be popped from the cacheWatcher's
+	// input channel until much later.
+	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
+
+	// We define a custom index validator such that the interval is
+	// able to serve the first bufferSize elements successfully, but
+	// on trying to fill it's buffer again, the indexValidator simulates
+	// an invalidation leading to the watch being closed and the number
+	// of events we actually process to be bufferSize, each event of
+	// type watch.Added.
+	valid := true
+	invalidateCacheInterval := func() {
+		valid = false
+	}
+	once := sync.Once{}
+	indexValidator := func(index int) bool {
+		isValid := valid && (index >= cacher.watchCache.startIndex)
+		once.Do(invalidateCacheInterval)
+		return isValid
+	}
+	cacher.watchCache.indexValidator = indexValidator
+
+	makePod := func(i int) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            fmt.Sprintf("pod-%d", 1000+i),
+				Namespace:       "ns",
+				ResourceVersion: fmt.Sprintf("%d", 1000+i),
+			},
+		}
+	}
+
+	// 250 is arbitrary, point is to have enough elements such that
+	// it generates more than bufferSize number of events allowing
+	// us to simulate the invalidation of the cache interval.
+	totalPods := 250
+	for i := 0; i < totalPods; i++ {
+		err := cacher.watchCache.Add(makePod(i))
+		if err != nil {
+			t.Errorf("error: %v", err)
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{
+		ResourceVersion: "999",
+		Predicate:       storage.Everything,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create watch: %v", err)
+	}
+	defer w.Stop()
+
+	received := 0
+	resChan := w.ResultChan()
+	for event := range resChan {
+		received++
+		t.Logf("event type: %v, events received so far: %d", event.Type, received)
+		if event.Type != watch.Added {
+			t.Errorf("unexpected event type, expected: %s, got: %s, event: %v", watch.Added, event.Type, event)
+		}
+	}
+	// Since the watch is stopped after the interval is invalidated,
+	// we should have processed exactly bufferSize number of elements.
+	if received != bufferSize {
+		t.Errorf("unexpected number of events received, expected: %d, got: %d", bufferSize+1, received)
+	}
 }
