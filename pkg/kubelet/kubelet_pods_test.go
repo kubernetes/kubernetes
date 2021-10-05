@@ -2652,6 +2652,95 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 		},
 		{
+			name: "terminal phase from previous status must remain terminal, restartAlways",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{},
+			previousStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+				// Reason and message should be preserved
+				Reason:  "Test",
+				Message: "test",
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodSucceeded,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 1)),
+					ready(waitingWithLastTerminationUnknown("containerB", 1)),
+				},
+				Reason:  "Test",
+				Message: "test",
+			},
+		},
+		{
+			name: "terminal phase from previous status must remain terminal, restartNever",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					Containers: []v1.Container{
+						{Name: "containerA"},
+						{Name: "containerB"},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{},
+			previousStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+				ContainerStatuses: []v1.ContainerStatus{
+					succeededState("containerA"),
+					succeededState("containerB"),
+				},
+				// Reason and message should be preserved
+				Reason:  "Test",
+				Message: "test",
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodSucceeded,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(succeededState("containerA")),
+					ready(succeededState("containerB")),
+				},
+				Reason:  "Test",
+				Message: "test",
+			},
+		},
+		{
 			name: "running can revert to pending",
 			pod: &v1.Pod{
 				Spec: desiredState,

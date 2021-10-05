@@ -1455,6 +1455,20 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 	allStatus := append(append([]v1.ContainerStatus{}, s.ContainerStatuses...), s.InitContainerStatuses...)
 	s.Phase = getPhase(&pod.Spec, allStatus)
 	klog.V(4).InfoS("Got phase for pod", "pod", klog.KObj(pod), "oldPhase", oldPodStatus.Phase, "phase", s.Phase)
+
+	// Perform a three-way merge between the statuses from the status manager,
+	// runtime, and generated status to ensure terminal status is correctly set.
+	if s.Phase != v1.PodFailed && s.Phase != v1.PodSucceeded {
+		switch {
+		case oldPodStatus.Phase == v1.PodFailed || oldPodStatus.Phase == v1.PodSucceeded:
+			klog.V(4).InfoS("Status manager phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", oldPodStatus.Phase)
+			s.Phase = oldPodStatus.Phase
+		case pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded:
+			klog.V(4).InfoS("API phase was terminal, updating phase to match", "pod", klog.KObj(pod), "phase", pod.Status.Phase)
+			s.Phase = pod.Status.Phase
+		}
+	}
+
 	if s.Phase == oldPodStatus.Phase {
 		// preserve the reason and message which is associated with the phase
 		s.Reason = oldPodStatus.Reason
