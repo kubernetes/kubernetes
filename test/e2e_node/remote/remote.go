@@ -65,8 +65,7 @@ func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
 }
 
 // RunRemote returns the command output, whether the exit was ok, and any errors
-// TODO(random-liu): junitFilePrefix is not prefix actually, the file name is junit-junitFilePrefix.xml. Change the variable name.
-func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string) (string, bool, error) {
+func RunRemote(suite TestSuite, archive string, host string, cleanup bool, imageDesc, junitFileName, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig string) (string, bool, error) {
 	// Create the temp staging directory
 	klog.V(2).Infof("Staging test binaries on %q", host)
 	workspace := newWorkspaceDir()
@@ -111,7 +110,7 @@ func RunRemote(suite TestSuite, archive string, host string, cleanup bool, image
 	}
 
 	klog.V(2).Infof("Running test on %q", host)
-	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFilePrefix, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig, *testTimeout)
+	output, err := suite.RunTest(host, workspace, resultDir, imageDesc, junitFileName, testArgs, ginkgoArgs, systemSpecName, extraEnvs, runtimeConfig, *testTimeout)
 
 	aggErrs := []error{}
 	// Do not log the output here, let the caller deal with the test output.

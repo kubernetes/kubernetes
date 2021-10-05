@@ -340,16 +340,16 @@ func main() {
 		imageConfig := gceImages.images[shortName]
 		fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
 		running++
-		go func(image *internalGCEImage, junitFilePrefix string) {
-			results <- testImage(image, junitFilePrefix)
+		go func(image *internalGCEImage, junitFileName string) {
+			results <- testImage(image, junitFileName)
 		}(&imageConfig, shortName)
 	}
 	if *hosts != "" {
 		for _, host := range strings.Split(*hosts, ",") {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
-			go func(host string, junitFilePrefix string) {
-				results <- testHost(host, *cleanup, "", junitFilePrefix, *ginkgoFlags)
+			go func(host string, junitFileName string) {
+				results <- testHost(host, *cleanup, "", junitFileName, *ginkgoFlags)
 			}(host, host)
 		}
 	}
@@ -436,7 +436,7 @@ func getImageMetadata(input string) *compute.Metadata {
 }
 
 // Run tests in archive against host
-func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoFlagsStr string) *TestResult {
+func testHost(host string, deleteFiles bool, imageDesc, junitFileName, ginkgoFlagsStr string) *TestResult {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
 		return &TestResult{
@@ -466,7 +466,7 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFilePrefix, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs, *runtimeConfig)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFileName, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs, *runtimeConfig)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -526,7 +526,7 @@ func getGCEImage(imageRegex, imageFamily string, project string) (string, error)
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResult {
+func testImage(imageConfig *internalGCEImage, junitFileName string) *TestResult {
 	ginkgoFlagsStr := *ginkgoFlags
 	// Check whether the test is for benchmark.
 	if len(imageConfig.tests) > 0 {
@@ -552,7 +552,7 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
 
-	result := testHost(host, deleteFiles, imageConfig.imageDesc, junitFilePrefix, ginkgoFlagsStr)
+	result := testHost(host, deleteFiles, imageConfig.imageDesc, junitFileName, ginkgoFlagsStr)
 	// This is a temporary solution to collect serial node serial log. Only port 1 contains useful information.
 	// TODO(random-liu): Extract out and unify log collection logic with cluste e2e.
 	serialPortOutput, err := computeService.Instances.GetSerialPortOutput(*project, *zone, host).Port(1).Do()
