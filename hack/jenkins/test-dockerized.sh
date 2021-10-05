@@ -53,4 +53,4 @@ go install ./cmd/...
 
 # TODO(spiffxp): narrowing down
 # make test-cmd
-make test-integration WHAT="k8s.io/kubernetes/test/integration/apimachinery"
+make test-integration WHAT="k8s.io/kubernetes/test/integration/apiserver/admissionwebhook"
