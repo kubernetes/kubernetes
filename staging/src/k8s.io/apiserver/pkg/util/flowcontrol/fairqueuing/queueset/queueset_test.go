@@ -247,7 +247,7 @@ type uniformScenarioThread struct {
 }
 
 func (ust *uniformScenarioThread) start() {
-	initialDelay := time.Duration(11*ust.j + 2*ust.i)
+	initialDelay := time.Duration(90*ust.j + 20*ust.i)
 	if ust.uc.split && ust.j >= ust.uc.nThreads/2 {
 		initialDelay += ust.uss.evalDuration / 2
 		ust.nCalls = ust.nCalls / 2
@@ -601,7 +601,7 @@ func TestUniformFlowsHandSize3(t *testing.T) {
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 60,
 		expectedFair:           []bool{true},
-		expectedFairnessMargin: []float64{0.01},
+		expectedFairnessMargin: []float64{0.03},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
 		evalExecutingMetrics:   true,
@@ -638,6 +638,46 @@ func TestDifferentFlowsExpectEqual(t *testing.T) {
 		concurrencyLimit:       4,
 		evalDuration:           time.Second * 40,
 		expectedFair:           []bool{true},
+		expectedFairnessMargin: []float64{0.01},
+		expectAllRequests:      true,
+		evalInqueueMetrics:     true,
+		evalExecutingMetrics:   true,
+		clk:                    clk,
+		counter:                counter,
+	}.exercise(t)
+}
+
+// TestSeatSecondsRollover demonstrates that SeatSeconds overflow can cause bad stuff to happen.
+func TestSeatSecondsRollover(t *testing.T) {
+	metrics.Register()
+	now := time.Now()
+
+	const Quarter = 91 * 24 * time.Hour
+
+	clk, counter := testeventclock.NewFake(now, 0, nil)
+	qsf := newTestableQueueSetFactory(clk, countingPromiseFactoryFactory(counter))
+	qCfg := fq.QueuingConfig{
+		Name:             "TestSeatSecondsRollover",
+		DesiredNumQueues: 9,
+		QueueLengthLimit: 8,
+		HandSize:         1,
+		RequestWaitLimit: 40 * Quarter,
+	}
+	qsc, err := qsf.BeginConstruction(qCfg, newObserverPair(clk))
+	if err != nil {
+		t.Fatal(err)
+	}
+	qs := qsc.Complete(fq.DispatchingConfig{ConcurrencyLimit: 2000})
+
+	uniformScenario{name: qCfg.Name,
+		qs: qs,
+		clients: []uniformClient{
+			newUniformClient(1001001001, 8, 20, Quarter, Quarter).seats(500),
+			newUniformClient(2002002002, 7, 30, Quarter, Quarter/2).seats(500),
+		},
+		concurrencyLimit:       2000,
+		evalDuration:           Quarter * 40,
+		expectedFair:           []bool{false},
 		expectedFairnessMargin: []float64{0.01},
 		expectAllRequests:      true,
 		evalInqueueMetrics:     true,
@@ -1073,7 +1113,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 }
 
 func TestFindDispatchQueueLocked(t *testing.T) {
-	var G float64 = 0.003
+	const G = 3 * time.Millisecond
 	tests := []struct {
 		name                    string
 		robinIndex              int
@@ -1092,13 +1132,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
 				},
 				{
-					virtualStart: 100,
+					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
@@ -1115,7 +1155,7 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
 					),
@@ -1132,13 +1172,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 50}},
 					),
 				},
 				{
-					virtualStart: 100,
+					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
@@ -1155,13 +1195,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
 					),
 				},
 				{
-					virtualStart: 100,
+					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
@@ -1178,13 +1218,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 			robinIndex:       -1,
 			queues: []*queue{
 				{
-					virtualStart: 200,
+					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
 					),
 				},
 				{
-					virtualStart: 100,
+					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
 						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
 					),
@@ -1204,10 +1244,10 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			qs := &queueSet{
-				estimatedServiceSeconds: G,
-				robinIndex:              test.robinIndex,
-				totSeatsInUse:           test.totSeatsInUse,
-				qCfg:                    fq.QueuingConfig{Name: "TestSelectQueueLocked/" + test.name},
+				estimatedServiceDuration: G,
+				robinIndex:               test.robinIndex,
+				totSeatsInUse:            test.totSeatsInUse,
+				qCfg:                     fq.QueuingConfig{Name: "TestSelectQueueLocked/" + test.name},
 				dCfg: fq.DispatchingConfig{
 					ConcurrencyLimit: test.concurrencyLimit,
 				},
