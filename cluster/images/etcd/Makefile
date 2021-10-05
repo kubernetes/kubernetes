@@ -34,7 +34,7 @@ LATEST_ETCD_VERSION?=3.5.0
 # REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=3
+REVISION?=4
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
@@ -83,6 +83,8 @@ ifeq ($(ARCH),s390x)
 endif
 
 RUNNERIMAGE?=gcr.io/distroless/static:latest
+
+QEMUVERSION?=5.2.0-2
 
 build:
 	# Explicitly copy files to the temp directory
@@ -143,13 +145,20 @@ else
 	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> Dockerfile
 endif
 
+	docker run --rm --privileged multiarch/qemu-user-static:$(QEMUVERSION) --reset -p yes
+	docker buildx version
+	BUILDER=$(shell docker buildx create --use)
+
 	# And build the image
-	docker build \
+	docker buildx build \
 		--pull \
+		--load \
+		--platform linux/$(ARCH) \
 		-t $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) \
 		--build-arg BASEIMAGE=$(BASEIMAGE) \
 		--build-arg RUNNERIMAGE=$(RUNNERIMAGE) \
 		$(TEMP_DIR)
+	docker buildx rm $$BUILDER
 
 push: build
 	docker tag $(REGISTRY)/etcd-$(ARCH):$(IMAGE_TAG) $(MANIFEST_IMAGE)-$(ARCH):$(IMAGE_TAG)

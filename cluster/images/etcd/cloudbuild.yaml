@@ -14,6 +14,7 @@ steps:
       - IMAGE=gcr.io/$PROJECT_ID/etcd
       - BUILD_IMAGE=debian-build
       - TMPDIR=/workspace
+      - HOME=/root  # for docker buildx
     args:
       - '-c'
       - |
