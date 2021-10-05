@@ -127,12 +127,14 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 	}
 }
 
+// SkipUnlessFeatureGate skips if the feature is disabled
 func SkipUnlessFeatureGate(gate featuregate.Feature) {
 	if !utilfeature.DefaultFeatureGate.Enabled(gate) {
 		skipInternalf(1, "Only supported when %v feature is enabled", gate)
 	}
 }
 
+// SkipFeatureGate skips if the feature is enabled
 func SkipIfFeatureGate(gate featuregate.Feature) {
 	if utilfeature.DefaultFeatureGate.Enabled(gate) {
 		skipInternalf(1, "Only supported when %v feature is disabled", gate)
