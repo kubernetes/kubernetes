@@ -51,5 +51,6 @@ make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
+# TODO(spiffxp): narrowing down
 # make test-cmd
-make test-integration
+make test-integration WHAT="k8s.io/kubernetes/test/integration/apimachinery"
