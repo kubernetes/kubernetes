@@ -51,5 +51,5 @@ make generated_files
 go install ./cmd/...
 ./hack/install-etcd.sh
 
-make test-cmd
+# make test-cmd
 make test-integration
