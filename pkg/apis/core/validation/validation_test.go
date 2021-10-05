@@ -18567,11 +18567,98 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 				}},
 			},
 		},
+		{
+			name:            "Non-HostProcess ephemeral container in HostProcess pod should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "HostProcess ephemeral container in HostProcess pod should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				SecurityContext: &core.PodSecurityContext{
+					HostNetwork: true,
+					WindowsOptions: &core.WindowsSecurityContextOptions{
+						HostProcess: &trueVar,
+					},
+				},
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{},
+				}},
+			},
+		},
+		{
+			name:            "Non-HostProcess ephemeral container in Non-HostProcess pod should validate",
+			expectError:     false,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &falseVar,
+							},
+						},
+					},
+				}},
+			},
+		},
+		{
+			name:            "HostProcess ephemeral container in Non-HostProcess pod should not validate",
+			expectError:     true,
+			featureEnabled:  true,
+			allowPrivileged: true,
+			podSpec: &core.PodSpec{
+				Containers: []core.Container{{
+					Name: containerName,
+				}},
+				EphemeralContainers: []core.EphemeralContainer{{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						SecurityContext: &core.SecurityContext{
+							WindowsOptions: &core.WindowsSecurityContextOptions{
+								HostProcess: &trueVar,
+							},
+						},
+					},
+				}},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsHostProcessContainers, testCase.featureEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
 			opts := PodValidationOptions{AllowWindowsHostProcessField: testCase.featureEnabled}
 
