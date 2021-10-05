@@ -75,7 +75,11 @@ func (g *genClientset) GenerateType(c *generator.Context, t *types.Type, w io.Wr
 	m := map[string]interface{}{
 		"allGroups":                            allGroups,
 		"Config":                               c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Config"}),
+		"RESTClientOption":                     c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientOption"}),
 		"DefaultKubernetesUserAgent":           c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "DefaultKubernetesUserAgent"}),
+		"RESTClientFactoryFor":                 c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFactoryFor"}),
+		"RESTClientWithRateLimiter":            c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "WithRateLimiter"}),
+		"RESTClientWithWarningHandler":         c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "WithWarningHandler"}),
 		"RESTClientInterface":                  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"DiscoveryInterface":                   c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryInterface"}),
 		"DiscoveryClient":                      c.Universe.Type(types.Name{Package: "k8s.io/client-go/discovery", Name: "DiscoveryClient"}),
@@ -144,12 +148,23 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 		}
 		configShallowCopy.RateLimiter = $.flowcontrolNewTokenBucketRateLimiter|raw$(configShallowCopy.QPS, configShallowCopy.Burst)
 	}
-	factory, err := rest.RESTClientFactoryFor(&configShallowCopy)
+	factory, err := $.RESTClientFactoryFor|raw$(&configShallowCopy)
 	if err!=nil {
 		return nil, err
 	}
+	options := []$.RESTClientOption|raw${}
+	if configShallowCopy.RateLimiter != nil {
+		options = append(options, $.RESTClientWithRateLimiter|raw$(configShallowCopy.RateLimiter))
+	}
+	if configShallowCopy.WarningHandler != nil {
+		options = append(options, $.RESTClientWithWarningHandler|raw$(configShallowCopy.WarningHandler))
+	}
+
 	var cs Clientset
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.NewForFactory(factory)
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$, err =$.PackageAlias$.NewForFactory(factory, options...)
+if err!=nil {
+	return nil, err
+}
 $end$
 	cs.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
 	if err!=nil {
@@ -180,7 +195,11 @@ func New(c $.RESTClientInterface|raw$) *Clientset {
 	}
 	factory := rest.RESTClientFactoryFromClient(*client)
 	var cs Clientset
-$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$ =$.PackageAlias$.NewForFactory(factory)
+	var err error
+$range .allGroups$    cs.$.LowerCaseGroupGoName$$.Version$, err =$.PackageAlias$.NewForFactory(factory)
+if err!=nil {
+	panic(err)
+}
 $end$
 	cs.DiscoveryClient = $.NewDiscoveryClient|raw$(c)
 	return &cs

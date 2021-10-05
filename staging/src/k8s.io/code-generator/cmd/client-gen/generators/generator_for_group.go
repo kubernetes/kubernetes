@@ -105,6 +105,7 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 		"restRESTClientInterface":        c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
 		"restRESTClientFor":              c.Universe.Function(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFor"}),
 		"restRESTClientFactory":          c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientFactory"}),
+		"restRESTClientOption":           c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "RESTClientOption"}),
 		"SchemeGroupVersion":             c.Universe.Variable(types.Name{Package: path.Vendorless(g.inputPackage), Name: "SchemeGroupVersion"}),
 	}
 	sw.Do(groupInterfaceTemplate, m)
@@ -195,13 +196,16 @@ func NewForConfigOrDie(c *$.restConfig|raw$) *$.GroupGoName$$.Version$Client {
 
 var newClientForFactoryTemplate = `
 // NewForFactory creates a new $.GroupGoName$$.Version$Client for the given RESTClientFactory.
-func NewForFactory(f *$.restRESTClientFactory|raw$) *$.GroupGoName$$.Version$Client {
+func NewForFactory(f *$.restRESTClientFactory|raw$, options ...$.restRESTClientOption|raw$) (*$.GroupGoName$$.Version$Client, error) {
 	var config $.restClientContentConfig|raw$
 	config.GroupVersion = $.SchemeGroupVersion|raw$
 	config.Negotiator = $.runtimeNewClientNegotiator|raw$(scheme.Codecs.WithoutConversion(), $.SchemeGroupVersion|raw$)
 	apiPath := $.apiPath$
-	client := f.NewFor(apiPath, config)
-	return &$.GroupGoName$$.Version$Client{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &$.GroupGoName$$.Version$Client{client}, nil
 }
 `
 
