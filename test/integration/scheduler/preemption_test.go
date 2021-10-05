@@ -1336,52 +1336,37 @@ func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...schedule
 // enabled.
 func TestPreferNominatedNode(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, true)()
-	testCtx := initTestPreferNominatedNode(t, "perfer-nominated-node")
-	t.Cleanup(func() {
-		testutils.CleanupTest(t, testCtx)
-	})
-	cs := testCtx.ClientSet
-	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
-		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
-		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
-	}
+
 	defaultNodeRes := map[v1.ResourceName]string{
 		v1.ResourcePods:   "32",
 		v1.ResourceCPU:    "500m",
 		v1.ResourceMemory: "500",
 	}
-
-	type nodeConfig struct {
-		name string
-		res  map[v1.ResourceName]string
+	defaultPodRes := &v1.ResourceRequirements{Requests: v1.ResourceList{
+		v1.ResourceCPU:    *resource.NewMilliQuantity(100, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
 	}
-
 	tests := []struct {
 		name         string
-		nodes        []*nodeConfig
+		nodeNames    []string
 		existingPods []*v1.Pod
 		pod          *v1.Pod
 		runnningNode string
 	}{
 		{
-			name: "nominated node released all resource, preemptor is scheduled to the nominated node",
-			nodes: []*nodeConfig{
-				{name: "node-1", res: defaultNodeRes},
-				{name: "node-2", res: defaultNodeRes},
-			},
+			name:      "nominated node released all resource, preemptor is scheduled to the nominated node",
+			nodeNames: []string{"node-1", "node-2"},
 			existingPods: []*v1.Pod{
 				initPausePod(&pausePodConfig{
 					Name:      "low-pod1",
-					Namespace: testCtx.NS.Name,
 					Priority:  &lowPriority,
 					NodeName:  "node-2",
 					Resources: defaultPodRes,
 				}),
 			},
 			pod: initPausePod(&pausePodConfig{
-				Name:      "preemptor-pod",
-				Namespace: testCtx.NS.Name,
-				Priority:  &highPriority,
+				Name:     "preemptor-pod",
+				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -1390,24 +1375,19 @@ func TestPreferNominatedNode(t *testing.T) {
 			runnningNode: "node-1",
 		},
 		{
-			name: "nominated node cannot pass all the filters, preemptor should find a different node",
-			nodes: []*nodeConfig{
-				{name: "node-1", res: defaultNodeRes},
-				{name: "node-2", res: defaultNodeRes},
-			},
+			name:      "nominated node cannot pass all the filters, preemptor should find a different node",
+			nodeNames: []string{"node-1", "node-2"},
 			existingPods: []*v1.Pod{
 				initPausePod(&pausePodConfig{
-					Name:      "low-pod1",
-					Namespace: testCtx.NS.Name,
+					Name:      "low-pod",
 					Priority:  &lowPriority,
 					Resources: defaultPodRes,
 					NodeName:  "node-1",
 				}),
 			},
 			pod: initPausePod(&pausePodConfig{
-				Name:      "preemptor-pod",
-				Namespace: testCtx.NS.Name,
-				Priority:  &highPriority,
+				Name:     "preemptor-pod1",
+				Priority: &highPriority,
 				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
@@ -1419,22 +1399,31 @@ func TestPreferNominatedNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			testCtx := initTestPreferNominatedNode(t, "perfer-nominated-node")
+			t.Cleanup(func() {
+				testutils.CleanupTest(t, testCtx)
+			})
+			cs := testCtx.ClientSet
+			nsName := testCtx.NS.Name
 			var err error
 			var preemptor *v1.Pod
-			for _, nodeConf := range test.nodes {
-				_, err := createNode(cs, st.MakeNode().Name(nodeConf.name).Capacity(nodeConf.res).Obj())
+			for _, nodeName := range test.nodeNames {
+				_, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(defaultNodeRes).Obj())
 				if err != nil {
-					t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
+					t.Fatalf("Error creating node %v: %v", nodeName, err)
 				}
 			}
+
 			pods := make([]*v1.Pod, len(test.existingPods))
 			// Create and run existingPods.
 			for i, p := range test.existingPods {
+				p.Namespace = nsName
 				pods[i], err = runPausePod(cs, p)
 				if err != nil {
 					t.Fatalf("Error running pause pod: %v", err)
 				}
 			}
+			test.pod.Namespace = nsName
 			preemptor, err = createPausePod(cs, test.pod)
 			if err != nil {
 				t.Errorf("Error while creating high priority pod: %v", err)
@@ -1456,10 +1445,6 @@ func TestPreferNominatedNode(t *testing.T) {
 			if preemptor.Spec.NodeName != test.runnningNode {
 				t.Errorf("Expect pod running on %v, got %v.", test.runnningNode, preemptor.Spec.NodeName)
 			}
-			pods = append(pods, preemptor)
-			// cleanup
-			defer testutils.CleanupPods(cs, t, pods)
-			cs.CoreV1().Nodes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 		})
 	}
 }
