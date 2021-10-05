@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/util/flowcontrol"
 )
 
 // RESTClientFactory allows to create RESTClients sharing the same Transport.
@@ -99,7 +98,6 @@ func (r RESTClientFactory) NewClientWithOptions(apiPath string, config ClientCon
 		versionedAPIPath: DefaultVersionedAPIPath(apiPath, config.GroupVersion),
 		content:          config,
 		// defaults
-		rateLimiter:      flowcontrol.NewTokenBucketRateLimiter(DefaultQPS, DefaultBurst),
 		createBackoffMgr: readExpBackoffConfig,
 	}
 	// Apply all options
