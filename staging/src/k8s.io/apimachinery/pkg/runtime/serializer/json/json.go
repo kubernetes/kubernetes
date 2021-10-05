@@ -303,7 +303,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 
 func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	if s.options.Yaml {
-		json, err := caseSensitiveJSONIterator.Marshal(obj)
+		json, err := json.Marshal(obj)
 		if err != nil {
 			return err
 		}
@@ -316,7 +316,7 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	}
 
 	if s.options.Pretty {
-		data, err := caseSensitiveJSONIterator.MarshalIndent(obj, "", "  ")
+		data, err := json.MarshalIndent(obj, "", "  ")
 		if err != nil {
 			return err
 		}
