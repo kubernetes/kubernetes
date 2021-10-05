@@ -150,6 +150,10 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 			return hasPVC, err
 		}
 
+		if pvc.Status.Phase == v1.ClaimLost {
+			return hasPVC, fmt.Errorf("persistentvolumeclaim %q bound to non-existent persistentvolume %q", pvc.Name, pvc.Spec.VolumeName)
+		}
+
 		if pvc.DeletionTimestamp != nil {
 			return hasPVC, fmt.Errorf("persistentvolumeclaim %q is being deleted", pvc.Name)
 		}
