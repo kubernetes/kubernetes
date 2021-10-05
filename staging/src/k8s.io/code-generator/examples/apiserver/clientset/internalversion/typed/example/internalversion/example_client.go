@@ -68,13 +68,16 @@ func New(c rest.Interface) *ExampleClient {
 }
 
 // NewForFactory creates a new ExampleClient for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *ExampleClient {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*ExampleClient, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = example.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), example.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &ExampleClient{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &ExampleClient{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {

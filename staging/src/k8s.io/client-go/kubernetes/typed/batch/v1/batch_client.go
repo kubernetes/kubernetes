@@ -73,13 +73,16 @@ func New(c rest.Interface) *BatchV1Client {
 }
 
 // NewForFactory creates a new BatchV1Client for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *BatchV1Client {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*BatchV1Client, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = v1.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &BatchV1Client{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &BatchV1Client{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {

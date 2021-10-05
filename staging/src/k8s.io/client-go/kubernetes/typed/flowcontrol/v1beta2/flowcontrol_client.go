@@ -73,13 +73,16 @@ func New(c rest.Interface) *FlowcontrolV1beta2Client {
 }
 
 // NewForFactory creates a new FlowcontrolV1beta2Client for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *FlowcontrolV1beta2Client {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*FlowcontrolV1beta2Client, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = v1beta2.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1beta2.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &FlowcontrolV1beta2Client{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &FlowcontrolV1beta2Client{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {

@@ -68,13 +68,16 @@ func New(c rest.Interface) *AutoscalingV2beta2Client {
 }
 
 // NewForFactory creates a new AutoscalingV2beta2Client for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *AutoscalingV2beta2Client {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*AutoscalingV2beta2Client, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = v2beta2.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v2beta2.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &AutoscalingV2beta2Client{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &AutoscalingV2beta2Client{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {

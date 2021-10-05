@@ -73,13 +73,16 @@ func New(c rest.Interface) *PolicyV1Client {
 }
 
 // NewForFactory creates a new PolicyV1Client for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *PolicyV1Client {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*PolicyV1Client, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = v1.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &PolicyV1Client{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &PolicyV1Client{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {

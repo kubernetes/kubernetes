@@ -411,51 +411,191 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	options := []rest.RESTClientOption{}
+	if configShallowCopy.RateLimiter != nil {
+		options = append(options, rest.WithRateLimiter(configShallowCopy.RateLimiter))
+	}
+	if configShallowCopy.WarningHandler != nil {
+		options = append(options, rest.WithWarningHandler(configShallowCopy.WarningHandler))
+	}
+
 	var cs Clientset
-	cs.admissionregistrationV1 = admissionregistrationv1.NewForFactory(factory)
-	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.NewForFactory(factory)
-	cs.internalV1alpha1 = internalv1alpha1.NewForFactory(factory)
-	cs.appsV1 = appsv1.NewForFactory(factory)
-	cs.appsV1beta1 = appsv1beta1.NewForFactory(factory)
-	cs.appsV1beta2 = appsv1beta2.NewForFactory(factory)
-	cs.authenticationV1 = authenticationv1.NewForFactory(factory)
-	cs.authenticationV1beta1 = authenticationv1beta1.NewForFactory(factory)
-	cs.authorizationV1 = authorizationv1.NewForFactory(factory)
-	cs.authorizationV1beta1 = authorizationv1beta1.NewForFactory(factory)
-	cs.autoscalingV1 = autoscalingv1.NewForFactory(factory)
-	cs.autoscalingV2beta1 = autoscalingv2beta1.NewForFactory(factory)
-	cs.autoscalingV2beta2 = autoscalingv2beta2.NewForFactory(factory)
-	cs.batchV1 = batchv1.NewForFactory(factory)
-	cs.batchV1beta1 = batchv1beta1.NewForFactory(factory)
-	cs.certificatesV1 = certificatesv1.NewForFactory(factory)
-	cs.certificatesV1beta1 = certificatesv1beta1.NewForFactory(factory)
-	cs.coordinationV1beta1 = coordinationv1beta1.NewForFactory(factory)
-	cs.coordinationV1 = coordinationv1.NewForFactory(factory)
-	cs.coreV1 = corev1.NewForFactory(factory)
-	cs.discoveryV1 = discoveryv1.NewForFactory(factory)
-	cs.discoveryV1beta1 = discoveryv1beta1.NewForFactory(factory)
-	cs.eventsV1 = eventsv1.NewForFactory(factory)
-	cs.eventsV1beta1 = eventsv1beta1.NewForFactory(factory)
-	cs.extensionsV1beta1 = extensionsv1beta1.NewForFactory(factory)
-	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.NewForFactory(factory)
-	cs.flowcontrolV1beta1 = flowcontrolv1beta1.NewForFactory(factory)
-	cs.flowcontrolV1beta2 = flowcontrolv1beta2.NewForFactory(factory)
-	cs.networkingV1 = networkingv1.NewForFactory(factory)
-	cs.networkingV1beta1 = networkingv1beta1.NewForFactory(factory)
-	cs.nodeV1 = nodev1.NewForFactory(factory)
-	cs.nodeV1alpha1 = nodev1alpha1.NewForFactory(factory)
-	cs.nodeV1beta1 = nodev1beta1.NewForFactory(factory)
-	cs.policyV1 = policyv1.NewForFactory(factory)
-	cs.policyV1beta1 = policyv1beta1.NewForFactory(factory)
-	cs.rbacV1 = rbacv1.NewForFactory(factory)
-	cs.rbacV1beta1 = rbacv1beta1.NewForFactory(factory)
-	cs.rbacV1alpha1 = rbacv1alpha1.NewForFactory(factory)
-	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForFactory(factory)
-	cs.schedulingV1beta1 = schedulingv1beta1.NewForFactory(factory)
-	cs.schedulingV1 = schedulingv1.NewForFactory(factory)
-	cs.storageV1beta1 = storagev1beta1.NewForFactory(factory)
-	cs.storageV1 = storagev1.NewForFactory(factory)
-	cs.storageV1alpha1 = storagev1alpha1.NewForFactory(factory)
+	cs.admissionregistrationV1, err = admissionregistrationv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.admissionregistrationV1beta1, err = admissionregistrationv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.internalV1alpha1, err = internalv1alpha1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.appsV1, err = appsv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.appsV1beta1, err = appsv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.appsV1beta2, err = appsv1beta2.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.authenticationV1, err = authenticationv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.authenticationV1beta1, err = authenticationv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.authorizationV1, err = authorizationv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.authorizationV1beta1, err = authorizationv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.autoscalingV1, err = autoscalingv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.autoscalingV2beta1, err = autoscalingv2beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.autoscalingV2beta2, err = autoscalingv2beta2.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.batchV1, err = batchv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.batchV1beta1, err = batchv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.certificatesV1, err = certificatesv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.certificatesV1beta1, err = certificatesv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.coordinationV1beta1, err = coordinationv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.coordinationV1, err = coordinationv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.coreV1, err = corev1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.discoveryV1, err = discoveryv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.discoveryV1beta1, err = discoveryv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.eventsV1, err = eventsv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.eventsV1beta1, err = eventsv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.extensionsV1beta1, err = extensionsv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.flowcontrolV1alpha1, err = flowcontrolv1alpha1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.flowcontrolV1beta1, err = flowcontrolv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.flowcontrolV1beta2, err = flowcontrolv1beta2.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.networkingV1, err = networkingv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.networkingV1beta1, err = networkingv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.nodeV1, err = nodev1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.nodeV1alpha1, err = nodev1alpha1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.nodeV1beta1, err = nodev1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.policyV1, err = policyv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.policyV1beta1, err = policyv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.rbacV1, err = rbacv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.rbacV1beta1, err = rbacv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.rbacV1alpha1, err = rbacv1alpha1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.schedulingV1alpha1, err = schedulingv1alpha1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.schedulingV1beta1, err = schedulingv1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.schedulingV1, err = schedulingv1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.storageV1beta1, err = storagev1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.storageV1, err = storagev1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.storageV1alpha1, err = storagev1alpha1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -482,50 +622,183 @@ func New(c rest.Interface) *Clientset {
 	}
 	factory := rest.RESTClientFactoryFromClient(*client)
 	var cs Clientset
-	cs.admissionregistrationV1 = admissionregistrationv1.NewForFactory(factory)
-	cs.admissionregistrationV1beta1 = admissionregistrationv1beta1.NewForFactory(factory)
-	cs.internalV1alpha1 = internalv1alpha1.NewForFactory(factory)
-	cs.appsV1 = appsv1.NewForFactory(factory)
-	cs.appsV1beta1 = appsv1beta1.NewForFactory(factory)
-	cs.appsV1beta2 = appsv1beta2.NewForFactory(factory)
-	cs.authenticationV1 = authenticationv1.NewForFactory(factory)
-	cs.authenticationV1beta1 = authenticationv1beta1.NewForFactory(factory)
-	cs.authorizationV1 = authorizationv1.NewForFactory(factory)
-	cs.authorizationV1beta1 = authorizationv1beta1.NewForFactory(factory)
-	cs.autoscalingV1 = autoscalingv1.NewForFactory(factory)
-	cs.autoscalingV2beta1 = autoscalingv2beta1.NewForFactory(factory)
-	cs.autoscalingV2beta2 = autoscalingv2beta2.NewForFactory(factory)
-	cs.batchV1 = batchv1.NewForFactory(factory)
-	cs.batchV1beta1 = batchv1beta1.NewForFactory(factory)
-	cs.certificatesV1 = certificatesv1.NewForFactory(factory)
-	cs.certificatesV1beta1 = certificatesv1beta1.NewForFactory(factory)
-	cs.coordinationV1beta1 = coordinationv1beta1.NewForFactory(factory)
-	cs.coordinationV1 = coordinationv1.NewForFactory(factory)
-	cs.coreV1 = corev1.NewForFactory(factory)
-	cs.discoveryV1 = discoveryv1.NewForFactory(factory)
-	cs.discoveryV1beta1 = discoveryv1beta1.NewForFactory(factory)
-	cs.eventsV1 = eventsv1.NewForFactory(factory)
-	cs.eventsV1beta1 = eventsv1beta1.NewForFactory(factory)
-	cs.extensionsV1beta1 = extensionsv1beta1.NewForFactory(factory)
-	cs.flowcontrolV1alpha1 = flowcontrolv1alpha1.NewForFactory(factory)
-	cs.flowcontrolV1beta1 = flowcontrolv1beta1.NewForFactory(factory)
-	cs.flowcontrolV1beta2 = flowcontrolv1beta2.NewForFactory(factory)
-	cs.networkingV1 = networkingv1.NewForFactory(factory)
-	cs.networkingV1beta1 = networkingv1beta1.NewForFactory(factory)
-	cs.nodeV1 = nodev1.NewForFactory(factory)
-	cs.nodeV1alpha1 = nodev1alpha1.NewForFactory(factory)
-	cs.nodeV1beta1 = nodev1beta1.NewForFactory(factory)
-	cs.policyV1 = policyv1.NewForFactory(factory)
-	cs.policyV1beta1 = policyv1beta1.NewForFactory(factory)
-	cs.rbacV1 = rbacv1.NewForFactory(factory)
-	cs.rbacV1beta1 = rbacv1beta1.NewForFactory(factory)
-	cs.rbacV1alpha1 = rbacv1alpha1.NewForFactory(factory)
-	cs.schedulingV1alpha1 = schedulingv1alpha1.NewForFactory(factory)
-	cs.schedulingV1beta1 = schedulingv1beta1.NewForFactory(factory)
-	cs.schedulingV1 = schedulingv1.NewForFactory(factory)
-	cs.storageV1beta1 = storagev1beta1.NewForFactory(factory)
-	cs.storageV1 = storagev1.NewForFactory(factory)
-	cs.storageV1alpha1 = storagev1alpha1.NewForFactory(factory)
+	var err error
+	cs.admissionregistrationV1, err = admissionregistrationv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.admissionregistrationV1beta1, err = admissionregistrationv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.internalV1alpha1, err = internalv1alpha1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.appsV1, err = appsv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.appsV1beta1, err = appsv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.appsV1beta2, err = appsv1beta2.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.authenticationV1, err = authenticationv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.authenticationV1beta1, err = authenticationv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.authorizationV1, err = authorizationv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.authorizationV1beta1, err = authorizationv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.autoscalingV1, err = autoscalingv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.autoscalingV2beta1, err = autoscalingv2beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.autoscalingV2beta2, err = autoscalingv2beta2.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.batchV1, err = batchv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.batchV1beta1, err = batchv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.certificatesV1, err = certificatesv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.certificatesV1beta1, err = certificatesv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.coordinationV1beta1, err = coordinationv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.coordinationV1, err = coordinationv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.coreV1, err = corev1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.discoveryV1, err = discoveryv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.discoveryV1beta1, err = discoveryv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.eventsV1, err = eventsv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.eventsV1beta1, err = eventsv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.extensionsV1beta1, err = extensionsv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.flowcontrolV1alpha1, err = flowcontrolv1alpha1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.flowcontrolV1beta1, err = flowcontrolv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.flowcontrolV1beta2, err = flowcontrolv1beta2.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.networkingV1, err = networkingv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.networkingV1beta1, err = networkingv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.nodeV1, err = nodev1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.nodeV1alpha1, err = nodev1alpha1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.nodeV1beta1, err = nodev1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.policyV1, err = policyv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.policyV1beta1, err = policyv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.rbacV1, err = rbacv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.rbacV1beta1, err = rbacv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.rbacV1alpha1, err = rbacv1alpha1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.schedulingV1alpha1, err = schedulingv1alpha1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.schedulingV1beta1, err = schedulingv1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.schedulingV1, err = schedulingv1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.storageV1beta1, err = storagev1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.storageV1, err = storagev1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.storageV1alpha1, err = storagev1alpha1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

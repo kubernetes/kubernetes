@@ -83,10 +83,27 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	options := []rest.RESTClientOption{}
+	if configShallowCopy.RateLimiter != nil {
+		options = append(options, rest.WithRateLimiter(configShallowCopy.RateLimiter))
+	}
+	if configShallowCopy.WarningHandler != nil {
+		options = append(options, rest.WithWarningHandler(configShallowCopy.WarningHandler))
+	}
+
 	var cs Clientset
-	cs.example = exampleinternalversion.NewForFactory(factory)
-	cs.secondExample = secondexampleinternalversion.NewForFactory(factory)
-	cs.thirdExample = thirdexampleinternalversion.NewForFactory(factory)
+	cs.example, err = exampleinternalversion.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.secondExample, err = secondexampleinternalversion.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.thirdExample, err = thirdexampleinternalversion.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -113,9 +130,19 @@ func New(c rest.Interface) *Clientset {
 	}
 	factory := rest.RESTClientFactoryFromClient(*client)
 	var cs Clientset
-	cs.example = exampleinternalversion.NewForFactory(factory)
-	cs.secondExample = secondexampleinternalversion.NewForFactory(factory)
-	cs.thirdExample = thirdexampleinternalversion.NewForFactory(factory)
+	var err error
+	cs.example, err = exampleinternalversion.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.secondExample, err = secondexampleinternalversion.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.thirdExample, err = thirdexampleinternalversion.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

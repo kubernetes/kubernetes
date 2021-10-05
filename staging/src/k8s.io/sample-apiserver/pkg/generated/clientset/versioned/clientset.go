@@ -75,9 +75,23 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	options := []rest.RESTClientOption{}
+	if configShallowCopy.RateLimiter != nil {
+		options = append(options, rest.WithRateLimiter(configShallowCopy.RateLimiter))
+	}
+	if configShallowCopy.WarningHandler != nil {
+		options = append(options, rest.WithWarningHandler(configShallowCopy.WarningHandler))
+	}
+
 	var cs Clientset
-	cs.wardleV1alpha1 = wardlev1alpha1.NewForFactory(factory)
-	cs.wardleV1beta1 = wardlev1beta1.NewForFactory(factory)
+	cs.wardleV1alpha1, err = wardlev1alpha1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
+	cs.wardleV1beta1, err = wardlev1beta1.NewForFactory(factory, options...)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -104,8 +118,15 @@ func New(c rest.Interface) *Clientset {
 	}
 	factory := rest.RESTClientFactoryFromClient(*client)
 	var cs Clientset
-	cs.wardleV1alpha1 = wardlev1alpha1.NewForFactory(factory)
-	cs.wardleV1beta1 = wardlev1beta1.NewForFactory(factory)
+	var err error
+	cs.wardleV1alpha1, err = wardlev1alpha1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
+	cs.wardleV1beta1, err = wardlev1beta1.NewForFactory(factory)
+	if err != nil {
+		panic(err)
+	}
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

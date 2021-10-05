@@ -68,13 +68,16 @@ func New(c rest.Interface) *EventsV1Client {
 }
 
 // NewForFactory creates a new EventsV1Client for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *EventsV1Client {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*EventsV1Client, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = v1.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &EventsV1Client{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &EventsV1Client{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {

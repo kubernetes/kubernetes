@@ -68,13 +68,16 @@ func New(c rest.Interface) *InternalV1alpha1Client {
 }
 
 // NewForFactory creates a new InternalV1alpha1Client for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *InternalV1alpha1Client {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*InternalV1alpha1Client, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = v1alpha1.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), v1alpha1.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &InternalV1alpha1Client{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &InternalV1alpha1Client{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {

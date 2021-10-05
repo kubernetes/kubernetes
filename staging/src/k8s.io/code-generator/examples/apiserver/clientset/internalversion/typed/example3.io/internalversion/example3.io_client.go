@@ -68,13 +68,16 @@ func New(c rest.Interface) *ThirdExampleClient {
 }
 
 // NewForFactory creates a new ThirdExampleClient for the given RESTClientFactory.
-func NewForFactory(f *rest.RESTClientFactory) *ThirdExampleClient {
+func NewForFactory(f *rest.RESTClientFactory, options ...rest.RESTClientOption) (*ThirdExampleClient, error) {
 	var config rest.ClientContentConfig
 	config.GroupVersion = example3io.SchemeGroupVersion
 	config.Negotiator = runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), example3io.SchemeGroupVersion)
 	apiPath := "/apis"
-	client := f.NewFor(apiPath, config)
-	return &ThirdExampleClient{client}
+	client, err := f.NewClientWithOptions(apiPath, config, options...)
+	if err != nil {
+		return nil, err
+	}
+	return &ThirdExampleClient{client}, nil
 }
 
 func setConfigDefaults(config *rest.Config) error {
