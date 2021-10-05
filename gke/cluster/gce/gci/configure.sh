@@ -35,6 +35,11 @@ DEFAULT_CRICTL_HASH='e4fb9822cb5f71ab8f85021c66170613aae972f4b32030e42868fb36a3b
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
+RIPTIDE_FUSE_BUCKET="${RIPTIDE_FUSE_BUCKET:-gke-release}"
+RIPTIDE_SNAPSHOTTER_BUCKET="${RIPTIDE_SNAPSHOTTER_BUCKET:-gke-release}"
+RIPTIDE_FUSE_VERSION="${RIPTIDE_FUSE_VERSION:-v0.66.0}"
+RIPTIDE_SNAPSHOTTER_VERSION="${RIPTIDE_SNAPSHOTTER_VERSION:-v1.4-12}"
+
 # Standard curl flags.
 CURL_FLAGS='--fail --silent --show-error --retry 5 --retry-delay 3 --connect-timeout 10 --retry-connrefused'
 
@@ -592,6 +597,44 @@ function install-etcdctl {
   docker rmi "${etcd_image}"
 }
 
+function install-gcfsd {
+  echo "Downloading Riptide FUSE client"
+  if is-preloaded "gcfsd" "${RIPTIDE_FUSE_VERSION}"; then
+    echo "gcfsd is preloaded."
+    return
+  fi
+  RIPTIDE_FUSE_STORE_PATH="https://storage.googleapis.com/${RIPTIDE_FUSE_BUCKET}/gcfsd/${RIPTIDE_FUSE_VERSION}"
+  if [[ "${RIPTIDE_FUSE_VERSION}" > v0.19.0 ]] && [[ "${RIPTIDE_FUSE_VERSION}" != v0.4.0 ]] ; then
+    download-or-bust "" "${RIPTIDE_FUSE_STORE_PATH}/gcfsd.tar.gz"
+  fi
+  download-or-bust "" "${RIPTIDE_FUSE_STORE_PATH}/gcfsd"
+  mv "${KUBE_HOME}/gcfsd" "${KUBE_HOME}/bin/gcfsd"
+  chmod a+x "${KUBE_HOME}/bin/gcfsd"
+  record-preload-info "gcfsd" "${RIPTIDE_FUSE_VERSION}"
+}
+
+function install-riptide-snapshotter {
+  echo "Downloading Riptide snapshotter"
+  if is-preloaded "containerd-gcfs-grpc" "${RIPTIDE_SNAPSHOTTER_VERSION}"; then
+    echo "containerd-gcfs-grpc is preloaded."
+    return
+  fi
+  RIPTIDE_SNAPSHOTTER_STORE_PATH="https://storage.googleapis.com/${RIPTIDE_SNAPSHOTTER_BUCKET}/gcfs-snapshotter/${RIPTIDE_SNAPSHOTTER_VERSION}"
+  if [[ "${RIPTIDE_SNAPSHOTTER_VERSION}" > v1.4-2 ]]; then
+    download-or-bust "" "${RIPTIDE_SNAPSHOTTER_STORE_PATH}/containerd-gcfs-grpc.tar.gz"
+  fi
+  download-or-bust "" "${RIPTIDE_SNAPSHOTTER_STORE_PATH}/containerd-gcfs-grpc"
+  mv "${KUBE_HOME}/containerd-gcfs-grpc" "${KUBE_HOME}/bin/containerd-gcfs-grpc"
+  chmod a+x "${KUBE_HOME}/bin/containerd-gcfs-grpc"
+  record-preload-info "containerd-gcfs-grpc" "${RIPTIDE_SNAPSHOTTER_VERSION}"
+}
+
+# Install Riptide FUSE client and Riptide snapshotter
+function install-riptide {
+  install-gcfsd
+  install-riptide-snapshotter
+}
+
 # A helper function for loading a docker image. It keeps trying up to 5 times.
 #
 # $1: Full path of the docker image
@@ -1134,6 +1177,10 @@ log-wrap 'EnsureContainerRuntime' ensure-container-runtime
 
 # binaries and kube-system manifests
 log-wrap 'InstallKubeBinaryConfig' install-kube-binary-config
+
+if [[ "${ENABLE_GCFS:-""}" == "true" ]]; then
+  log-wrap 'InstallRiptide' install-riptide
+fi
 
 # extra node requirements
 log-wrap 'InstallExtraNodeRequirements' install-extra-node-requirements
