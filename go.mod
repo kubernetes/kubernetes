@@ -463,7 +463,7 @@ replace (
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
 	golang.org/x/term => golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
-	golang.org/x/text => golang.org/x/text v0.3.4
+	golang.org/x/text => golang.org/x/text v0.3.6
 	golang.org/x/time => golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/tools => golang.org/x/tools v0.1.0
 	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
