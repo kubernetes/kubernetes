@@ -165,6 +165,28 @@ func (hu *HostUtil) FindMountInfo(path string) (mount.MountInfo, error) {
 	return findMountInfo(path, procMountInfoPath)
 }
 
+// FindExactMountInfo returns exact mount point that matches given path
+func (hu *HostUtil) FindExactMountInfo(path string) (mount.MountInfo, error) {
+	infos, err := mount.ParseMountInfo(procMountInfoPath)
+	if err != nil {
+		return mount.MountInfo{}, err
+	}
+
+	// process /proc/xxx/mountinfo in backward order and find the first mount
+	// point that is prefix of 'path' - that's the mount where path resides
+	var info *mount.MountInfo
+	for i := len(infos) - 1; i >= 0; i-- {
+		if path == infos[i].MountPoint {
+			info = &infos[i]
+			break
+		}
+	}
+	if info == nil {
+		return mount.MountInfo{}, fmt.Errorf("cannot find mount point for %q", path)
+	}
+	return *info, nil
+}
+
 // isShared returns true, if given path is on a mount point that has shared
 // mount propagation.
 func isShared(mount string, mountInfoPath string) (bool, error) {

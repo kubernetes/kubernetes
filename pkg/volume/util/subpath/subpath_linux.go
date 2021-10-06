@@ -116,6 +116,13 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 			return false, "", fmt.Errorf("error calling findMountInfo for %s: %s", bindPathTarget, err)
 		}
 		if mntInfo.Root != subpath.Path {
+			volumeMountInfo, err := linuxHostUtil.FindExactMountInfo(subpath.VolumePath)
+			if err == nil && mount.PathWithinBase(subpath.Path, subpath.VolumePath) &&
+				(volumeMountInfo.Major == mntInfo.Major && volumeMountInfo.Minor == mntInfo.Minor) {
+				klog.V(5).Infof("Skipping bind-mounting subpath %s, volumePath: %s, path: %s", bindPathTarget, subpath.VolumePath, subpath.Path)
+				return true, bindPathTarget, nil
+			}
+
 			// It's already mounted but not what we want, unmount it
 			if err = mounter.Unmount(bindPathTarget); err != nil {
 				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
