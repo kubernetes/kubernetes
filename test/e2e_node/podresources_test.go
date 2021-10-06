@@ -174,27 +174,7 @@ func findContainerDeviceByName(devs []*kubeletpodresourcesv1.ContainerDevices, r
 	return nil
 }
 
-type deviceCheckFunc func(expect podDesc, found podResMap) error
-
-func checkForTopology(expect podDesc, found podResMap) error {
-	if cnts, ok := found[KubeVirtResourceName]; ok {
-		for _, cnt := range cnts {
-			for _, cd := range cnt.GetDevices() {
-				if cd.ResourceName != KubeVirtResourceName {
-					continue
-				}
-				if cd.Topology != nil {
-					//we expect nil topology
-					return fmt.Errorf("Nil topology is expected")
-				}
-			}
-
-		}
-	}
-	return nil
-}
-
-func matchPodDescWithResources(expected []podDesc, found podResMap, deviceCheck deviceCheckFunc) error {
+func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 	for _, podReq := range expected {
 		framework.Logf("matching: %#v", podReq)
 
@@ -227,20 +207,28 @@ func matchPodDescWithResources(expected []podDesc, found podResMap, deviceCheck 
 				return fmt.Errorf("pod %q container %q expected no resources, got %v", podReq.podName, podReq.cntName, devs)
 			}
 		}
-		if deviceCheck != nil {
-			err := deviceCheck(podReq, found)
-			if err != nil {
-				return err
+		if cnts, ok := found[KubeVirtResourceName]; ok {
+			for _, cnt := range cnts {
+				for _, cd := range cnt.GetDevices() {
+					if cd.ResourceName != KubeVirtResourceName {
+						continue
+					}
+					if cd.Topology != nil {
+						//we expect nil topology
+						return fmt.Errorf("Nil topology is expected")
+					}
+				}
+
 			}
 		}
 	}
 	return nil
 }
 
-func expectPodResources(offset int, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc, cf deviceCheckFunc) {
+func expectPodResources(offset int, cli kubeletpodresourcesv1.PodResourcesListerClient, expected []podDesc) {
 	gomega.EventuallyWithOffset(1+offset, func() error {
 		found := getPodResources(cli)
-		return matchPodDescWithResources(expected, found, cf)
+		return matchPodDescWithResources(expected, found)
 	}, time.Minute, 10*time.Second).Should(gomega.BeNil())
 }
 
@@ -284,7 +272,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 		},
 	}
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected, nil)
+	expectPodResources(1, cli, expected)
 	tpd.deletePodsForTest(f)
 
 	tpd = newTestPodData()
@@ -340,7 +328,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 
 	}
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected, nil)
+	expectPodResources(1, cli, expected)
 	tpd.deletePodsForTest(f)
 
 	tpd = newTestPodData()
@@ -384,7 +372,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	}
 
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected, nil)
+	expectPodResources(1, cli, expected)
 
 	if sd != nil {
 		extra = podDesc{
@@ -408,7 +396,7 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 	})
 
 	expected = append(expected, extra)
-	expectPodResources(1, cli, expected, nil)
+	expectPodResources(1, cli, expected)
 	tpd.deletePodsForTest(f)
 
 	tpd = newTestPodData()
@@ -464,11 +452,11 @@ func podresourcesListTests(f *framework.Framework, cli kubeletpodresourcesv1.Pod
 		}
 	}
 	tpd.createPodsForTest(f, expected)
-	expectPodResources(1, cli, expected, nil)
+	expectPodResources(1, cli, expected)
 
 	tpd.deletePod(f, "pod-01")
 	expectedPostDelete := filterOutDesc(expected, "pod-01")
-	expectPodResources(1, cli, expectedPostDelete, nil)
+	expectPodResources(1, cli, expectedPostDelete)
 	tpd.deletePodsForTest(f)
 }
 
@@ -746,12 +734,12 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 				desc,
 			})
 
-			expectPodResources(1, cli, []podDesc{desc}, checkForTopology)
+			expectPodResources(1, cli, []podDesc{desc})
 
 			ginkgo.By("Restarting Kubelet")
 			restartKubelet()
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
-			expectPodResources(1, cli, []podDesc{desc}, checkForTopology)
+			expectPodResources(1, cli, []podDesc{desc})
 			tpd.deletePodsForTest(f)
 		})
 
