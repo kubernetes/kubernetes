@@ -161,7 +161,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	proxyRoundTripper := handlingInfo.proxyRoundTripper
+	var proxyRoundTripper http.RoundTripper = &flowcontrolRoundTripper{rt: handlingInfo.proxyRoundTripper}
 	upgrade := httpstream.IsUpgradeRequest(req)
 
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), proxyRoundTripper)
@@ -176,7 +176,12 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	handler := proxy.NewUpgradeAwareHandler(location, proxyRoundTripper, true, upgrade, &responder{w: w})
 	handler.InterceptRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StreamingProxyRedirects)
 	handler.RequireSameHostRedirects = utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ValidateProxyRedirects)
-	utilflowcontrol.RequestDelegated(req.Context())
+
+	if upgrade {
+		// Don't block the delegation signal on upgrade direct dialing.
+		utilflowcontrol.RequestDelegated(req.Context())
+	}
+
 	handler.ServeHTTP(w, newReq)
 }
 
@@ -273,3 +278,23 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 	}
 	r.handlingInfo.Store(newInfo)
 }
+
+// flowcontrolRoundTripper wraps http.RoundTripper in order to notify
+// the priority and fairness dispatcher before making round trips to a
+// backend.
+type flowcontrolRoundTripper struct {
+	rt http.RoundTripper
+}
+
+func (fcrt *flowcontrolRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	utilflowcontrol.RequestDelegated(r.Context())
+	return fcrt.rt.RoundTrip(r)
+}
+
+// Upgrade connections will use Dial/DialContext and TLSClientConfig
+// from the wrapped RoundTripper, if set.
+func (fcrt *flowcontrolRoundTripper) WrappedRoundTripper() http.RoundTripper {
+	return fcrt.rt
+}
+
+var _ utilnet.RoundTripperWrapper = &flowcontrolRoundTripper{}
