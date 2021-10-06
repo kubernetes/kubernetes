@@ -344,7 +344,7 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager]", func() {
 				return kubeletHealthCheck(kubeletHealthCheckURL)
 			}, time.Minute, time.Second).Should(gomega.BeFalse())
 
-			restartKubelet()
+			restartKubelet(false)
 
 			// wait until the kubelet health check will pass
 			gomega.Eventually(func() bool {
