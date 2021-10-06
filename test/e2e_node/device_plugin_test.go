@@ -220,7 +220,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			restartTime := time.Now()
 			ginkgo.By("Restarting Kubelet")
-			restartKubelet()
+			restartKubelet(true)
 
 			// We need to wait for node to be ready before re-registering stub device plugin.
 			// Otherwise, Kubelet DeviceManager may remove the re-registered sockets after it starts.

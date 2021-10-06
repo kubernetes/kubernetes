@@ -731,7 +731,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			expectPodResources(1, cli, []podDesc{desc})
 
 			ginkgo.By("Restarting Kubelet")
-			restartKubelet()
+			restartKubelet(true)
 			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
 			expectPodResources(1, cli, []podDesc{desc})
 			tpd.deletePodsForTest(f)
