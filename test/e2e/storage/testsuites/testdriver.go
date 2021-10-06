@@ -151,6 +151,7 @@ const (
 	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
+	CapOnlineExpansion     Capability = "onlineExpansion"     // supports online volume expansion
 	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
 	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
 	CapTopology            Capability = "topology"            // support topology

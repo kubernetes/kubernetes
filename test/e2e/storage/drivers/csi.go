@@ -118,8 +118,14 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 		testsuites.CapBlock:               true,
 		testsuites.CapPVCDataSource:       true,
 		testsuites.CapControllerExpansion: true,
+		testsuites.CapOnlineExpansion:     true,
 		testsuites.CapSingleNodeVolume:    true,
-		testsuites.CapVolumeLimits:        true,
+
+		// This is needed for the
+		// testsuites/volumelimits.go `should support volume limits`
+		// test. --maxvolumespernode=10 gets
+		// added when patching the deployment.
+		testsuites.CapVolumeLimits: true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -518,6 +524,7 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				testsuites.CapVolumeLimits:        false,
 				testsuites.CapTopology:            true,
 				testsuites.CapControllerExpansion: true,
+				testsuites.CapOnlineExpansion:     true,
 				testsuites.CapNodeExpansion:       true,
 				testsuites.CapSnapshotDataSource:  true,
 			},
