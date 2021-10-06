@@ -373,11 +373,11 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		})
 
 		ginkgo.It("should fail scheduling due to different NodeAffinity", func() {
-			testPodWithNodeConflict(config, volumeType, conflictNodeName, makeLocalPodWithNodeAffinity, immediateMode)
+			testPodWithNodeConflict(config, testVol, conflictNodeName, makeLocalPodWithNodeAffinity)
 		})
 
 		ginkgo.It("should fail scheduling due to different NodeSelector", func() {
-			testPodWithNodeConflict(config, volumeType, conflictNodeName, makeLocalPodWithNodeSelector, immediateMode)
+			testPodWithNodeConflict(config, testVol, conflictNodeName, makeLocalPodWithNodeSelector)
 		})
 	})
 
@@ -720,10 +720,8 @@ func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
 
 type makeLocalPodWith func(config *localTestConfig, volume *localTestVolume, nodeName string) *v1.Pod
 
-func testPodWithNodeConflict(config *localTestConfig, testVolType localVolumeType, nodeName string, makeLocalPodFunc makeLocalPodWith, bindingMode storagev1.VolumeBindingMode) {
-	ginkgo.By(fmt.Sprintf("local-volume-type: %s", testVolType))
-	testVols := setupLocalVolumesPVCsPVs(config, testVolType, config.randomNode, 1, bindingMode)
-	testVol := testVols[0]
+func testPodWithNodeConflict(config *localTestConfig, testVol *localTestVolume, nodeName string, makeLocalPodFunc makeLocalPodWith) {
+	ginkgo.By(fmt.Sprintf("local-volume-type: %s", testVol.localVolumeType))
 
 	pod := makeLocalPodFunc(config, testVol, nodeName)
 	pod, err := config.client.CoreV1().Pods(config.ns).Create(context.TODO(), pod, metav1.CreateOptions{})
