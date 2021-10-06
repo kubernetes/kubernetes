@@ -100,14 +100,14 @@ type Publisher struct {
 }
 
 // Run starts process
-func (c *Publisher) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
+func (c *Publisher) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting root CA certificate configmap publisher")
 	defer klog.Infof("Shutting down root CA certificate configmap publisher")
 
-	if !cache.WaitForNamedCacheSync("crt configmap", stopCh, c.cmListerSynced) {
+	if !cache.WaitForNamedCacheSync("crt configmap", ctx.Done(), c.cmListerSynced) {
 		return
 	}
 
@@ -115,7 +115,7 @@ func (c *Publisher) Run(ctx context.Context, workers int, stopCh <-chan struct{}
 		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (c *Publisher) configMapDeleted(obj interface{}) {

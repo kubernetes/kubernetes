@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
@@ -148,7 +149,7 @@ func (o *CloudControllerManagerOptions) Flags(allControllers, disabledByDefaultC
 }
 
 // ApplyTo fills up cloud controller manager config with options.
-func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent string) error {
+func (o *CloudControllerManagerOptions) ApplyTo(ctx context.Context, c *config.Config, userAgent string) error {
 	var err error
 	if err = o.Generic.ApplyTo(&c.ComponentConfig.Generic); err != nil {
 		return err
@@ -162,11 +163,11 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 	if err = o.InsecureServing.ApplyTo(&c.InsecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
-	if err = o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err = o.SecureServing.ApplyTo(ctx, &c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil {
-		if err = o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+		if err = o.Authentication.ApplyTo(ctx, &c.Authentication, c.SecureServing, nil); err != nil {
 			return err
 		}
 		if err = o.Authorization.ApplyTo(&c.Authorization); err != nil {

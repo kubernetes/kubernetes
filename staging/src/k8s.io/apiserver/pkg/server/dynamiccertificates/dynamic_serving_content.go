@@ -17,6 +17,7 @@ limitations under the License.
 package dynamiccertificates
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -53,7 +54,7 @@ var _ CertKeyContentProvider = &DynamicCertKeyPairContent{}
 var _ ControllerRunner = &DynamicCertKeyPairContent{}
 
 // NewDynamicServingContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
-func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
+func NewDynamicServingContentFromFiles(ctx context.Context, purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
 	if len(certFile) == 0 || len(keyFile) == 0 {
 		return nil, fmt.Errorf("missing filename for serving cert")
 	}
@@ -65,7 +66,7 @@ func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*Dyna
 		keyFile:  keyFile,
 		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), fmt.Sprintf("DynamicCABundle-%s", purpose)),
 	}
-	if err := ret.loadCertKeyPair(); err != nil {
+	if err := ret.loadCertKeyPair(ctx); err != nil {
 		return nil, err
 	}
 
@@ -78,7 +79,7 @@ func (c *DynamicCertKeyPairContent) AddListener(listener Listener) {
 }
 
 // loadCertKeyPair determines the next set of content for the file.
-func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
+func (c *DynamicCertKeyPairContent) loadCertKeyPair(ctx context.Context) error {
 	cert, err := ioutil.ReadFile(c.certFile)
 	if err != nil {
 		return err
@@ -119,12 +120,12 @@ func (c *DynamicCertKeyPairContent) loadCertKeyPair() error {
 }
 
 // RunOnce runs a single sync loop
-func (c *DynamicCertKeyPairContent) RunOnce() error {
-	return c.loadCertKeyPair()
+func (c *DynamicCertKeyPairContent) RunOnce(ctx context.Context) error {
+	return c.loadCertKeyPair(ctx)
 }
 
 // Run starts the controller and blocks until stopCh is closed.
-func (c *DynamicCertKeyPairContent) Run(workers int, stopCh <-chan struct{}) {
+func (c *DynamicCertKeyPairContent) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -132,16 +133,16 @@ func (c *DynamicCertKeyPairContent) Run(workers int, stopCh <-chan struct{}) {
 	defer klog.InfoS("Shutting down controller", "name", c.name)
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
 	// start the loop that watches the cert and key files until stopCh is closed.
-	go wait.Until(func() {
-		if err := c.watchCertKeyFile(stopCh); err != nil {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		if err := c.watchCertKeyFile(ctx.Done()); err != nil {
 			klog.ErrorS(err, "Failed to watch cert and key file, will retry later")
 		}
-	}, time.Minute, stopCh)
+	}, time.Minute)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (c *DynamicCertKeyPairContent) watchCertKeyFile(stopCh <-chan struct{}) error {
@@ -196,19 +197,19 @@ func (c *DynamicCertKeyPairContent) handleWatchEvent(e fsnotify.Event, w *fsnoti
 	return nil
 }
 
-func (c *DynamicCertKeyPairContent) runWorker() {
-	for c.processNextWorkItem() {
+func (c *DynamicCertKeyPairContent) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
-func (c *DynamicCertKeyPairContent) processNextWorkItem() bool {
+func (c *DynamicCertKeyPairContent) processNextWorkItem(ctx context.Context) bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(dsKey)
 
-	err := c.loadCertKeyPair()
+	err := c.loadCertKeyPair(ctx)
 	if err == nil {
 		c.queue.Forget(dsKey)
 		return true

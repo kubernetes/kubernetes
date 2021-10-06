@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -182,7 +183,7 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 }
 
 // ApplyTo applies the scheduler options to the given scheduler app configuration.
-func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
+func (o *Options) ApplyTo(ctx context.Context, c *schedulerappconfig.Config) error {
 	if len(o.ConfigFile) == 0 {
 		c.ComponentConfig = o.ComponentConfig
 
@@ -208,14 +209,14 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		c.ComponentConfig.Profiles = nil
 	}
 
-	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {
+	if err := o.SecureServing.ApplyTo(ctx, &c.SecureServing, &c.LoopbackClientConfig); err != nil {
 		return err
 	}
 	if o.SecureServing != nil && (o.SecureServing.BindPort != 0 || o.SecureServing.Listener != nil) {
-		if err := o.Authentication.ApplyTo(&c.Authentication, c.SecureServing, nil); err != nil {
+		if err := o.Authentication.ApplyTo(ctx, &c.Authentication, c.SecureServing, nil); err != nil {
 			return err
 		}
-		if err := o.Authorization.ApplyTo(&c.Authorization); err != nil {
+		if err := o.Authorization.ApplyTo(ctx, &c.Authorization); err != nil {
 			return err
 		}
 	}

@@ -76,7 +76,7 @@ func NewCSRCleanerController(
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (ccc *CSRCleanerController) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
+func (ccc *CSRCleanerController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	klog.Infof("Starting CSR cleaner controller")
@@ -86,7 +86,7 @@ func (ccc *CSRCleanerController) Run(ctx context.Context, workers int, stopCh <-
 		go wait.UntilWithContext(ctx, ccc.worker, pollingInterval)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.

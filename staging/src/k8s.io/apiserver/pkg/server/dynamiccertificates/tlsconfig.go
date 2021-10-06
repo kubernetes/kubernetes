@@ -17,6 +17,7 @@ limitations under the License.
 package dynamiccertificates
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -233,7 +234,7 @@ func (c *DynamicServingCertificateController) RunOnce() error {
 }
 
 // Run starts the kube-apiserver and blocks until stopCh is closed.
-func (c *DynamicServingCertificateController) Run(workers int, stopCh <-chan struct{}) {
+func (c *DynamicServingCertificateController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
@@ -244,22 +245,22 @@ func (c *DynamicServingCertificateController) Run(workers int, stopCh <-chan str
 	_ = c.RunOnce()
 
 	// doesn't matter what workers say, only start one.
-	go wait.Until(c.runWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 
 	// start timer that rechecks every minute, just in case.  this also serves to prime the controller quickly.
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		c.Enqueue()
-	}, 1*time.Minute, stopCh)
+	}, 1*time.Minute)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *DynamicServingCertificateController) runWorker() {
-	for c.processNextWorkItem() {
+func (c *DynamicServingCertificateController) runWorker(ctx context.Context) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
-func (c *DynamicServingCertificateController) processNextWorkItem() bool {
+func (c *DynamicServingCertificateController) processNextWorkItem(ctx context.Context) bool {
 	dsKey, quit := c.queue.Get()
 	if quit {
 		return false

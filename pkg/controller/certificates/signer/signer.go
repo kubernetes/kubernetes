@@ -46,42 +46,47 @@ type CSRSigningController struct {
 }
 
 func NewKubeletServingCSRSigningController(
+	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-kubelet-serving", capi.KubeletServingSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController(ctx, "csrsigning-kubelet-serving", capi.KubeletServingSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewKubeletClientCSRSigningController(
+	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-kubelet-client", capi.KubeAPIServerClientKubeletSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController(ctx, "csrsigning-kubelet-client", capi.KubeAPIServerClientKubeletSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewKubeAPIServerClientCSRSigningController(
+	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-kube-apiserver-client", capi.KubeAPIServerClientSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController(ctx, "csrsigning-kube-apiserver-client", capi.KubeAPIServerClientSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewLegacyUnknownCSRSigningController(
+	ctx context.Context,
 	client clientset.Interface,
 	csrInformer certificatesinformers.CertificateSigningRequestInformer,
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	return NewCSRSigningController("csrsigning-legacy-unknown", capiv1beta1.LegacyUnknownSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
+	return NewCSRSigningController(ctx, "csrsigning-legacy-unknown", capiv1beta1.LegacyUnknownSignerName, client, csrInformer, caFile, caKeyFile, certTTL)
 }
 
 func NewCSRSigningController(
+	ctx context.Context,
 	controllerName string,
 	signerName string,
 	client clientset.Interface,
@@ -89,7 +94,7 @@ func NewCSRSigningController(
 	caFile, caKeyFile string,
 	certTTL time.Duration,
 ) (*CSRSigningController, error) {
-	signer, err := newSigner(signerName, caFile, caKeyFile, client, certTTL)
+	signer, err := newSigner(ctx, signerName, caFile, caKeyFile, client, certTTL)
 	if err != nil {
 		return nil, err
 	}
@@ -106,10 +111,10 @@ func NewCSRSigningController(
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (c *CSRSigningController) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
-	go c.dynamicCertReloader.Run(ctx, workers, stopCh)
+func (c *CSRSigningController) Run(ctx context.Context, workers int) {
+	go c.dynamicCertReloader.Run(ctx, workers)
 
-	c.certificateController.Run(ctx, workers, stopCh)
+	c.certificateController.Run(ctx, workers)
 }
 
 type isRequestForSignerFunc func(req *x509.CertificateRequest, usages []capi.KeyUsage, signerName string) (bool, error)
@@ -124,12 +129,12 @@ type signer struct {
 	isRequestForSignerFn isRequestForSignerFunc
 }
 
-func newSigner(signerName, caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration) (*signer, error) {
+func newSigner(ctx context.Context, signerName, caFile, caKeyFile string, client clientset.Interface, certificateDuration time.Duration) (*signer, error) {
 	isRequestForSignerFn, err := getCSRVerificationFuncForSignerName(signerName)
 	if err != nil {
 		return nil, err
 	}
-	caProvider, err := newCAProvider(caFile, caKeyFile)
+	caProvider, err := newCAProvider(ctx, caFile, caKeyFile)
 	if err != nil {
 		return nil, err
 	}

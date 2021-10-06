@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"time"
@@ -40,7 +41,7 @@ type DeprecatedInsecureServingInfo struct {
 
 // Serve starts an insecure http server with the given handler. It fails only if
 // the initial listen call fails. It does not block.
-func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) error {
+func (s *DeprecatedInsecureServingInfo) Serve(ctx context.Context, handler http.Handler, shutdownTimeout time.Duration) error {
 	insecureServer := &http.Server{
 		Addr:           s.Listener.Addr().String(),
 		Handler:        handler,
@@ -55,7 +56,7 @@ func (s *DeprecatedInsecureServingInfo) Serve(handler http.Handler, shutdownTime
 	} else {
 		klog.Infof("Serving insecurely on %s", s.Listener.Addr())
 	}
-	_, _, err := RunServer(insecureServer, s.Listener, shutdownTimeout, stopCh)
+	_, _, err := RunServer(ctx, insecureServer, s.Listener, shutdownTimeout)
 	// NOTE: we do not handle stoppedCh returned by RunServer for graceful termination here
 	return err
 }

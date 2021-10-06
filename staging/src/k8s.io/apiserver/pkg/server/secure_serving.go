@@ -42,7 +42,7 @@ const (
 )
 
 // tlsConfig produces the tls.Config to serve with.
-func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, error) {
+func (s *SecureServingInfo) tlsConfig(ctx context.Context) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
@@ -98,31 +98,31 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of client CA failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
-			if err := controller.RunOnce(); err != nil {
+			if err := controller.RunOnce(ctx); err != nil {
 				klog.Warningf("Initial population of default serving certificate failed: %v", err)
 			}
 
-			go controller.Run(1, stopCh)
+			go controller.Run(ctx, 1)
 		}
 		for _, sniCert := range s.SNICerts {
 			sniCert.AddListener(dynamicCertificateController)
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
 				}
 
-				go controller.Run(1, stopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 
@@ -131,7 +131,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if err := dynamicCertificateController.RunOnce(); err != nil {
 			klog.Warningf("Initial population of dynamic certificates failed: %v", err)
 		}
-		go dynamicCertificateController.Run(1, stopCh)
+		go dynamicCertificateController.Run(ctx, 1)
 
 		tlsConfig.GetConfigForClient = dynamicCertificateController.GetConfigForClient
 	}
@@ -142,12 +142,12 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 // Serve runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
 // The actual server loop (stoppable by closing stopCh) runs in a go routine, i.e. Serve does not block.
 // It returns a stoppedCh that is closed when all non-hijacked active requests have been processed.
-func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, error) {
+func (s *SecureServingInfo) Serve(ctx context.Context, handler http.Handler, shutdownTimeout time.Duration) (<-chan struct{}, error) {
 	if s.Listener == nil {
 		return nil, fmt.Errorf("listener must not be nil")
 	}
 
-	tlsConfig, err := s.tlsConfig(stopCh)
+	tlsConfig, err := s.tlsConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	secureServer.ErrorLog = tlsErrorLogger
 
 	klog.Infof("Serving securely on %s", secureServer.Addr)
-	stoppedCh, _, err := RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
+	stoppedCh, _, err := RunServer(ctx, secureServer, s.Listener, shutdownTimeout)
 	return stoppedCh, err
 }
 
@@ -208,12 +208,12 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 // It returns a listenerStoppedCh that is closed when the underlying http Server has stopped listening.
 // TODO: do a follow up PR to remove this function, change 'Serve' to return listenerStoppedCh
 //  and update all components that call 'Serve'
-func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutdownTimeout time.Duration, stopCh <-chan struct{}) (<-chan struct{}, <-chan struct{}, error) {
+func (s *SecureServingInfo) ServeWithListenerStopped(ctx context.Context, handler http.Handler, shutdownTimeout time.Duration) (<-chan struct{}, <-chan struct{}, error) {
 	if s.Listener == nil {
 		return nil, nil, fmt.Errorf("listener must not be nil")
 	}
 
-	tlsConfig, err := s.tlsConfig(stopCh)
+	tlsConfig, err := s.tlsConfig(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -264,7 +264,7 @@ func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutd
 	secureServer.ErrorLog = tlsErrorLogger
 
 	klog.Infof("Serving securely on %s", secureServer.Addr)
-	return RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
+	return RunServer(ctx, secureServer, s.Listener, shutdownTimeout)
 }
 
 // RunServer spawns a go-routine continuously serving until the stopCh is
@@ -274,10 +274,10 @@ func (s *SecureServingInfo) ServeWithListenerStopped(handler http.Handler, shutd
 // This function does not block
 // TODO: make private when insecure serving is gone from the kube-apiserver
 func RunServer(
+	ctx context.Context,
 	server *http.Server,
 	ln net.Listener,
 	shutDownTimeout time.Duration,
-	stopCh <-chan struct{},
 ) (<-chan struct{}, <-chan struct{}, error) {
 	if ln == nil {
 		return nil, nil, fmt.Errorf("listener must not be nil")
@@ -287,7 +287,7 @@ func RunServer(
 	serverShutdownCh, listenerStoppedCh := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(serverShutdownCh)
-		<-stopCh
+		<-ctx.Done()
 		ctx, cancel := context.WithTimeout(context.Background(), shutDownTimeout)
 		server.Shutdown(ctx)
 		cancel()
@@ -307,7 +307,7 @@ func RunServer(
 
 		msg := fmt.Sprintf("Stopped listening on %s", ln.Addr().String())
 		select {
-		case <-stopCh:
+		case <-ctx.Done():
 			klog.Info(msg)
 		default:
 			panic(fmt.Sprintf("%s due to error: %v", msg, err))

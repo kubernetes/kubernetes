@@ -112,14 +112,14 @@ func NewCertificateController(
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (cc *CertificateController) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
+func (cc *CertificateController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer cc.queue.ShutDown()
 
 	klog.Infof("Starting certificate controller %q", cc.name)
 	defer klog.Infof("Shutting down certificate controller %q", cc.name)
 
-	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), stopCh, cc.csrsSynced) {
+	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), ctx.Done(), cc.csrsSynced) {
 		return
 	}
 
@@ -127,7 +127,7 @@ func (cc *CertificateController) Run(ctx context.Context, workers int, stopCh <-
 		go wait.UntilWithContext(ctx, cc.worker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
