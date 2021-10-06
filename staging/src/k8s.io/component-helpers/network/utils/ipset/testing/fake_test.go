@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/ipset"
+	"k8s.io/component-helpers/network/utils/ipset"
 )
 
 const testVersion = "v6.19"

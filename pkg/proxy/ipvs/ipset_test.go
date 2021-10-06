@@ -19,8 +19,8 @@ package ipvs
 import (
 	"testing"
 
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	fakeipset "k8s.io/kubernetes/pkg/util/ipset/testing"
+	utilipset "k8s.io/component-helpers/network/utils/ipset"
+	fakeipset "k8s.io/component-helpers/network/utils/ipset/testing"
 )
 
 func TestCheckIPSetVersion(t *testing.T) {
