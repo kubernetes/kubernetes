@@ -57,6 +57,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -1101,35 +1102,14 @@ func generateBacksideHTTPSServiceSpec() *v1.Service {
 }
 
 func generateBacksideHTTPSDeploymentSpec() *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "echoheaders-https",
-		},
-		Spec: appsv1.DeploymentSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{
-				"app": "echoheaders-https",
-			}},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						"app": "echoheaders-https",
-					},
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:  "echoheaders-https",
-							Image: imageutils.GetE2EImage(imageutils.EchoServer),
-							Ports: []v1.ContainerPort{{
-								ContainerPort: 8443,
-								Name:          "echo-443",
-							}},
-						},
-					},
-				},
-			},
-		},
-	}
+	labels := map[string]string{"app": "echoheaders-https"}
+	d := e2edeployment.NewDeployment("echoheaders-https", 0, labels, "echoheaders-https", imageutils.GetE2EImage(imageutils.EchoServer), appsv1.RollingUpdateDeploymentStrategyType)
+	d.Spec.Replicas = nil
+	d.Spec.Template.Spec.Containers[0].Ports = []v1.ContainerPort{{
+		ContainerPort: 8443,
+		Name:          "echo-443",
+	}}
+	return d
 }
 
 // SetUpBacksideHTTPSIngress sets up deployment, service and ingress with backside HTTPS configured.
