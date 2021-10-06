@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	basemetricstestutil "k8s.io/component-base/metrics/testutil"
@@ -270,7 +271,7 @@ var (
 			Buckets:        requestDurationSecondsBuckets,
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{priorityLevel, flowSchema},
+		[]string{priorityLevel, flowSchema, "type"},
 	)
 	metrics = Registerables{
 		apiserverRejectedRequestsTotal,
@@ -350,5 +351,9 @@ func ObserveWaitingDuration(ctx context.Context, priorityLevel, flowSchema, exec
 
 // ObserveExecutionDuration observes the execution duration for flow control
 func ObserveExecutionDuration(ctx context.Context, priorityLevel, flowSchema string, executionTime time.Duration) {
-	apiserverRequestExecutionSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema).Observe(executionTime.Seconds())
+	reqType := "regular"
+	if requestInfo, ok := apirequest.RequestInfoFrom(ctx); ok && requestInfo.Verb == "watch" {
+		reqType = requestInfo.Verb
+	}
+	apiserverRequestExecutionSeconds.WithContext(ctx).WithLabelValues(priorityLevel, flowSchema, reqType).Observe(executionTime.Seconds())
 }
