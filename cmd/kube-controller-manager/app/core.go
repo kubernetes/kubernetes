@@ -577,7 +577,7 @@ func startPVCProtectionController(ctx ControllerContext) (http.Handler, bool, er
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.ClientBuilder.ClientOrDie("pvc-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
-		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)
