@@ -35,6 +35,9 @@ import (
 // StacktracePred returns true if a stacktrace should be logged for this status.
 type StacktracePred func(httpStatus int) (logStacktrace bool)
 
+// ShouldLogRequestPred returns true if logging should be enabled for this request
+type ShouldLogRequestPred func() bool
+
 type logger interface {
 	Addf(format string, data ...interface{})
 }
@@ -89,7 +92,18 @@ func DefaultStacktracePred(status int) bool {
 
 // WithLogging wraps the handler with logging.
 func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
+	return withLogging(handler, pred, func() bool {
+		return klog.V(3).Enabled()
+	})
+}
+
+func withLogging(handler http.Handler, stackTracePred StacktracePred, shouldLogRequest ShouldLogRequestPred) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !shouldLogRequest() {
+			handler.ServeHTTP(w, req)
+			return
+		}
+
 		ctx := req.Context()
 		if old := respLoggerFromRequest(req); old != nil {
 			panic("multiple WithLogging calls!")
@@ -100,14 +114,12 @@ func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 			startTime = receivedTimestamp
 		}
 
-		var rl *respLogger
-		rl, w = newLoggedWithStartTime(req, w, startTime)
-		rl.StacktraceWhen(pred)
+		rl := newLoggedWithStartTime(req, w, startTime)
+		rl.StacktraceWhen(stackTracePred)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
+		defer rl.Log()
 
-		if klog.V(3).Enabled() {
-			defer rl.Log()
-		}
+		w = responsewriter.WrapForHTTP1Or2(rl)
 		handler.ServeHTTP(w, req)
 	})
 }
@@ -125,20 +137,18 @@ func respLoggerFromRequest(req *http.Request) *respLogger {
 	return respLoggerFromContext(req.Context())
 }
 
-func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime time.Time) (*respLogger, http.ResponseWriter) {
+func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime time.Time) *respLogger {
 	logger := &respLogger{
 		startTime:         startTime,
 		req:               req,
 		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
-
-	rw := responsewriter.WrapForHTTP1Or2(logger)
-	return logger, rw
+	return logger
 }
 
 // newLogged turns a normal response writer into a logged response writer.
-func newLogged(req *http.Request, w http.ResponseWriter) (*respLogger, http.ResponseWriter) {
+func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
 	return newLoggedWithStartTime(req, w, time.Now())
 }
 
