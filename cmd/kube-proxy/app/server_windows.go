@@ -143,6 +143,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 		}
 	} else {
 		klog.V(0).InfoS("Using userspace Proxier.")
+		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'kernelspace' instead")
 		execer := exec.New()
 		var netshInterface utilnetsh.Interface
 		netshInterface = utilnetsh.New(execer)

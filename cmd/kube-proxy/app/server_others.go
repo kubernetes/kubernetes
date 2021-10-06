@@ -341,6 +341,7 @@ func newProxyServer(
 		proxymetrics.RegisterMetrics()
 	} else {
 		klog.V(0).InfoS("Using userspace Proxier")
+		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'iptables' or 'ipvs' instead")
 
 		// TODO this has side effects that should only happen when Run() is invoked.
 		proxier, err = userspace.NewProxier(
