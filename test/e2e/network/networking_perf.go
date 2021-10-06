@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/network/common"
@@ -133,34 +134,8 @@ func iperf2ServerService(client clientset.Interface, namespace string) (*v1.Serv
 func iperf2ClientDaemonSet(client clientset.Interface, namespace string) (*appsv1.DaemonSet, error) {
 	one := int64(1)
 	labels := map[string]string{labelKey: clientLabelValue}
-	spec := &appsv1.DaemonSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "iperf2-clients",
-			Labels: labels,
-		},
-		Spec: appsv1.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
-				},
-				Spec: v1.PodSpec{
-					Containers: []v1.Container{
-						{
-							Name:    "iperf2-client",
-							Image:   imageutils.GetE2EImage(imageutils.Agnhost),
-							Command: []string{"/agnhost"},
-							Args:    []string{"pause"},
-						},
-					},
-					TerminationGracePeriodSeconds: &one,
-				},
-			},
-		},
-		Status: appsv1.DaemonSetStatus{},
-	}
+	spec := e2edaemonset.NewDaemonSet("iperf2-clients", imageutils.GetE2EImage(imageutils.Agnhost), labels, nil, nil, nil)
+	spec.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
 	ds, err := client.AppsV1().DaemonSets(namespace).Create(context.TODO(), spec, metav1.CreateOptions{})
 	if err != nil {
