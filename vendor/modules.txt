@@ -1329,8 +1329,8 @@ golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/text v0.3.4 => golang.org/x/text v0.3.4
-# golang.org/x/text => golang.org/x/text v0.3.4
+# golang.org/x/text v0.3.6 => golang.org/x/text v0.3.6
+# golang.org/x/text => golang.org/x/text v0.3.6
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
