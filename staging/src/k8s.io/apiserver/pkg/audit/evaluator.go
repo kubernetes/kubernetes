@@ -39,6 +39,10 @@ type AuditContext struct {
 type RequestAuditConfig struct {
 	// OmitStages is the stages that need to be omitted from being audited.
 	OmitStages []audit.Stage
+
+	// OmitManagedFields indicates whether to omit the managed fields of the request
+	// and response bodies from being written to the API audit log.
+	OmitManagedFields bool
 }
 
 // RequestAuditConfigWithLevel includes Level at which the request is being audited.

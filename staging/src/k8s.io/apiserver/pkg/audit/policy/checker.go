@@ -67,7 +67,8 @@ func (p *policyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) au
 			return auditinternal.RequestAuditConfigWithLevel{
 				Level: rule.Level,
 				RequestAuditConfig: auditinternal.RequestAuditConfig{
-					OmitStages: rule.OmitStages,
+					OmitStages:        rule.OmitStages,
+					OmitManagedFields: isOmitManagedFields(&rule, p.OmitManagedFields),
 				},
 			}
 		}
@@ -76,9 +77,22 @@ func (p *policyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) au
 	return auditinternal.RequestAuditConfigWithLevel{
 		Level: DefaultAuditLevel,
 		RequestAuditConfig: auditinternal.RequestAuditConfig{
-			OmitStages: p.OmitStages,
+			OmitStages:        p.OmitStages,
+			OmitManagedFields: p.OmitManagedFields,
 		},
 	}
+}
+
+// isOmitManagedFields returns whether to omit managed fields from the request
+// and response bodies from being written to the API audit log.
+// If a user specifies OmitManagedFields inside a policy rule, that overrides
+// the global policy default in Policy.OmitManagedFields.
+func isOmitManagedFields(policyRule *audit.PolicyRule, policyDefault bool) bool {
+	if policyRule.OmitManagedFields == nil {
+		return policyDefault
+	}
+
+	return *policyRule.OmitManagedFields
 }
 
 // Check whether the rule matches the request attrs.
