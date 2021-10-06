@@ -118,7 +118,6 @@ type DiffOptions struct {
 	EnforceNamespace bool
 	Builder          *resource.Builder
 	Diff             *DiffProgram
-	Prune            bool
 	pruner           *pruner
 }
 
@@ -135,7 +134,6 @@ func NewDiffOptions(ioStreams genericclioptions.IOStreams) *DiffOptions {
 			Exec:      exec.New(),
 			IOStreams: ioStreams,
 		},
-		pruner: newPruner(),
 	}
 }
 
@@ -176,7 +174,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringArray("prunewhitelist", []string{}, "Overwrite the default whitelist with <group/version/kind> for --prune")
-	cmd.Flags().BoolVar(&options.Prune, "prune", options.Prune, "Include resources that would be deleted by pruning. Can be used with -l and default shows all would be pruned resources")
+	cmd.Flags().Bool("prune", false, "Include resources that would be deleted by pruning. Can be used with -l and default shows all resources would be pruned")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
 	cmdutil.AddFieldManagerFlagVar(cmd, &options.FieldManager, apply.FieldManagerClientSideApply)
@@ -649,17 +647,17 @@ func (o *DiffOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 		return err
 	}
 
-	if o.Prune {
-		o.pruner.dynamicClient = o.DynamicClient
-		o.pruner.mapper, err = f.ToRESTMapper()
+	if cmdutil.GetFlagBool(cmd, "prune") {
+		mapper, err := f.ToRESTMapper()
 		if err != nil {
 			return err
 		}
 
-		o.pruner.resources, err = prune.ParseResources(o.pruner.mapper, cmdutil.GetFlagStringArray(cmd, "prunewhitelist"))
+		resources, err := prune.ParseResources(mapper, cmdutil.GetFlagStringArray(cmd, "prunewhitelist"))
 		if err != nil {
 			return err
 		}
+		o.pruner = newPruner(o.DynamicClient, mapper, resources)
 	}
 
 	o.Builder = f.NewBuilder()
@@ -727,7 +725,9 @@ func (o *DiffOptions) Run() error {
 				IOStreams:       o.Diff.IOStreams,
 			}
 
-			o.markVisited(info)
+			if o.pruner != nil {
+				o.pruner.MarkVisited(info)
+			}
 
 			err = differ.Diff(obj, printer)
 			if !isConflict(err) {
@@ -740,7 +740,7 @@ func (o *DiffOptions) Run() error {
 		return err
 	})
 
-	if o.Prune {
+	if o.pruner != nil {
 		prunedObjs, err := o.pruner.pruneAll()
 		if err != nil {
 			klog.Warningf("pruning failed and could not be evaluated err: %v", err)
@@ -749,7 +749,12 @@ func (o *DiffOptions) Run() error {
 		// Print pruned objects into old file and thus, diff
 		// command will show them as pruned.
 		for _, p := range prunedObjs {
-			if err := differ.From.Print(o.pruner.GetObjectName(p), p, printer); err != nil {
+			name, err := o.pruner.GetObjectName(p)
+			if err != nil {
+				klog.Warningf("pruning failed and object name could not be retrieved: %v", err)
+				continue
+			}
+			if err := differ.From.Print(name, p, printer); err != nil {
 				return err
 			}
 		}
@@ -760,16 +765,4 @@ func (o *DiffOptions) Run() error {
 	}
 
 	return differ.Run(o.Diff)
-}
-
-func (o *DiffOptions) markVisited(info *resource.Info) {
-	if info.Namespaced() {
-		o.pruner.visitedNamespaces.Insert(info.Namespace)
-	}
-
-	metadata, err := meta.Accessor(info.Object)
-	if err != nil {
-		return
-	}
-	o.pruner.visitedUids.Insert(string(metadata.GetUID()))
 }

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/cli-runtime/pkg/resource"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -43,10 +43,13 @@ type pruner struct {
 	resources         []prune.Resource
 }
 
-func newPruner() *pruner {
+func newPruner(dc dynamic.Interface, m meta.RESTMapper, r []prune.Resource) *pruner {
 	return &pruner{
 		visitedUids:       sets.NewString(),
 		visitedNamespaces: sets.NewString(),
+		dynamicClient:     dc,
+		mapper:            m,
+		resources:         r,
 	}
 }
 
@@ -112,8 +115,37 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) ([]runtime.O
 	return pobjs, nil
 }
 
-func (p *pruner) GetObjectName(obj runtime.Object) string {
-	// Not compare anything, it is safe to assign random
-	// object name.
-	return string(uuid.NewUUID())
+func (p *pruner) GetObjectName(obj runtime.Object) (string, error) {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	name := metadata.GetName()
+	ns := metadata.GetNamespace()
+
+	group := ""
+	if gvk.Group != "" {
+		group = fmt.Sprintf("%v.", gvk.Group)
+	}
+	return group + fmt.Sprintf(
+		"%v.%v.%v.%v",
+		gvk.Version,
+		gvk.Kind,
+		ns,
+		name,
+	), nil
+}
+
+// MarkVisited marks visited namespaces and uids
+func (p *pruner) MarkVisited(info *resource.Info) {
+	if info.Namespaced() {
+		p.visitedNamespaces.Insert(info.Namespace)
+	}
+
+	metadata, err := meta.Accessor(info.Object)
+	if err != nil {
+		return
+	}
+	p.visitedUids.Insert(string(metadata.GetUID()))
 }
