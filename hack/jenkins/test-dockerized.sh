@@ -62,15 +62,15 @@ integration_tests=(
   k8s.io/kubernetes/test/integration/apiserver/flowcontrol
   k8s.io/kubernetes/test/integration/apiserver/podlogs
   k8s.io/kubernetes/test/integration/apiserver/tracing
-  # k8s.io/kubernetes/test/integration/auth
-  # k8s.io/kubernetes/test/integration/certificates
-  # k8s.io/kubernetes/test/integration/client
-  # k8s.io/kubernetes/test/integration/configmap
-  # k8s.io/kubernetes/test/integration/controlplane
-  # k8s.io/kubernetes/test/integration/cronjob
-  # k8s.io/kubernetes/test/integration/daemonset
-  # k8s.io/kubernetes/test/integration/defaulttolerationseconds
-  # k8s.io/kubernetes/test/integration/deployment
+  k8s.io/kubernetes/test/integration/auth
+  k8s.io/kubernetes/test/integration/certificates
+  k8s.io/kubernetes/test/integration/client
+  k8s.io/kubernetes/test/integration/configmap
+  k8s.io/kubernetes/test/integration/controlplane
+  k8s.io/kubernetes/test/integration/cronjob
+  k8s.io/kubernetes/test/integration/daemonset
+  k8s.io/kubernetes/test/integration/defaulttolerationseconds
+  k8s.io/kubernetes/test/integration/deployment
   # k8s.io/kubernetes/test/integration/disruption
   # k8s.io/kubernetes/test/integration/dryrun
   # k8s.io/kubernetes/test/integration/dualstack
