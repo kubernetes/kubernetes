@@ -28,34 +28,66 @@ import (
 
 func TestVsphereVolumeMap(t *testing.T) {
 	tests := []struct {
-		name            string
-		deviceToAdd     object.VirtualDeviceList
-		nodeToAdd       k8stypes.NodeName
-		volumeToCheck   string
-		runVerification bool
-		expectInMap     bool
+		name        string
+		deviceToAdd object.VirtualDeviceList
+		nodeToAdd   k8stypes.NodeName
+		checkRunner func(volumeMap *VsphereVolumeMap)
 	}{
 		{
-			name:          "adding new volume",
-			deviceToAdd:   getVirtualDeviceList("[foobar] kubevols/foo.vmdk"),
-			nodeToAdd:     convertToK8sType("node1.lan"),
-			volumeToCheck: "[foobar] kubevols/foo.vmdk",
-			expectInMap:   true,
+			name:        "adding new volume",
+			deviceToAdd: getVirtualDeviceList("[foobar] kubevols/foo.vmdk"),
+			nodeToAdd:   convertToK8sType("node1.lan"),
+			checkRunner: func(volumeMap *VsphereVolumeMap) {
+				volumeToCheck := "[foobar] kubevols/foo.vmdk"
+				_, ok := volumeMap.CheckForVolume(volumeToCheck)
+				if !ok {
+					t.Errorf("error checking volume %s, expected true got %v", volumeToCheck, ok)
+				}
+			},
 		},
 		{
-			name:          "mismatching volume",
-			deviceToAdd:   getVirtualDeviceList("[foobar] kubevols/foo.vmdk"),
-			nodeToAdd:     convertToK8sType("node1.lan"),
-			volumeToCheck: "[foobar] kubevols/bar.vmdk",
-			expectInMap:   false,
+			name:        "mismatching volume",
+			deviceToAdd: getVirtualDeviceList("[foobar] kubevols/foo.vmdk"),
+			nodeToAdd:   convertToK8sType("node1.lan"),
+			checkRunner: func(volumeMap *VsphereVolumeMap) {
+				volumeToCheck := "[foobar] kubevols/bar.vmdk"
+				_, ok := volumeMap.CheckForVolume(volumeToCheck)
+				if ok {
+					t.Errorf("error checking volume %s, expected false got %v", volumeToCheck, ok)
+				}
+			},
 		},
 		{
-			name:            "should remove unverified devices",
-			deviceToAdd:     getVirtualDeviceList("[foobar] kubevols/foo.vmdk"),
-			nodeToAdd:       convertToK8sType("node1.lan"),
-			volumeToCheck:   "[foobar] kubevols/foo.vmdk",
-			runVerification: true,
-			expectInMap:     false,
+			name:        "should remove unverified devices",
+			deviceToAdd: getVirtualDeviceList("[foobar] kubevols/foo.vmdk"),
+			nodeToAdd:   convertToK8sType("node1.lan"),
+			checkRunner: func(volumeMap *VsphereVolumeMap) {
+				volumeMap.StartDiskVerification()
+				volumeMap.RemoveUnverified()
+				volumeToCheck := "[foobar] kubevols/foo.vmdk"
+				_, ok := volumeMap.CheckForVolume(volumeToCheck)
+				if ok {
+					t.Errorf("error checking volume %s, expected false got %v", volumeToCheck, ok)
+				}
+				node := k8stypes.NodeName("node1.lan")
+				ok = volumeMap.CheckForNode(node)
+				if ok {
+					t.Errorf("unexpected node %s in node map", node)
+				}
+			},
+		},
+		{
+			name:        "node check should return false for previously added node",
+			deviceToAdd: getVirtualDeviceList("[foobar] kubevols/foo.vmdk"),
+			nodeToAdd:   convertToK8sType("node1.lan"),
+			checkRunner: func(volumeMap *VsphereVolumeMap) {
+				volumeMap.StartDiskVerification()
+				node := k8stypes.NodeName("node1.lan")
+				ok := volumeMap.CheckForNode(node)
+				if ok {
+					t.Errorf("unexpected node %s in node map", node)
+				}
+			},
 		},
 	}
 
@@ -63,15 +95,7 @@ func TestVsphereVolumeMap(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			vMap := NewVsphereVolumeMap()
 			vMap.Add(tc.nodeToAdd, tc.deviceToAdd)
-
-			if tc.runVerification {
-				vMap.StartDiskVerification()
-				vMap.RemoveUnverified()
-			}
-			_, ok := vMap.CheckForVolume(tc.volumeToCheck)
-			if ok != tc.expectInMap {
-				t.Errorf("error checking volume %s, expected %v got %v", tc.volumeToCheck, tc.expectInMap, ok)
-			}
+			tc.checkRunner(vMap)
 		})
 	}
 }
