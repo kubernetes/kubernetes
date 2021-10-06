@@ -1666,3 +1666,59 @@ func TestDowngradeServicePreferToDualStack(t *testing.T) {
 		t.Fatalf("Unexpected error validating the service %s %v", svc.Name, err)
 	}
 }
+
+type serviceMergePatch struct {
+	Spec specMergePatch `json:"spec,omitempty"`
+}
+type specMergePatch struct {
+	Type         v1.ServiceType `json:"type,omitempty"`
+	ExternalName string         `json:"externalName,omitempty"`
+}
+
+// tests success when converting ClusterIP:Headless service to ExternalName
+func Test_ServiceChangeTypeHeadlessToExternalNameWithPatch(t *testing.T) {
+	controlPlaneConfig := framework.NewIntegrationTestControlPlaneConfig()
+	_, server, closeFn := framework.RunAnAPIServer(controlPlaneConfig)
+	defer closeFn()
+
+	config := restclient.Config{Host: server.URL}
+	client, err := clientset.NewForConfig(&config)
+	if err != nil {
+		t.Fatalf("Error creating clientset: %v", err)
+	}
+
+	ns := framework.CreateTestingNamespace("test-service-allocate-node-ports", server, t)
+	defer framework.DeleteTestingNamespace(ns, server, t)
+
+	service := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-123",
+		},
+		Spec: v1.ServiceSpec{
+			Type:      v1.ServiceTypeClusterIP,
+			ClusterIP: "None",
+			Selector:  map[string]string{"foo": "bar"},
+		},
+	}
+
+	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating test service: %v", err)
+	}
+
+	serviceMergePatch := serviceMergePatch{
+		Spec: specMergePatch{
+			Type:         v1.ServiceTypeExternalName,
+			ExternalName: "foo.bar",
+		},
+	}
+	patchBytes, err := json.Marshal(&serviceMergePatch)
+	if err != nil {
+		t.Fatalf("failed to json.Marshal ports: %v", err)
+	}
+
+	_, err = client.CoreV1().Services(ns.Name).Patch(context.TODO(), service.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error patching service using strategic merge patch. %v", err)
+	}
+}
