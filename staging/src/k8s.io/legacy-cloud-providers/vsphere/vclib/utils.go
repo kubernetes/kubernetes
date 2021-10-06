@@ -24,7 +24,6 @@ import (
 
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/klog/v2"
@@ -179,14 +178,6 @@ func IsInvalidCredentialsError(err error) bool {
 		_, isInvalidCredentialsError = soap.ToSoapFault(err).VimFault().(types.InvalidLogin)
 	}
 	return isInvalidCredentialsError
-}
-
-// VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.
-func VerifyVolumePathsForVM(vmMo mo.VirtualMachine, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
-	// Verify if the volume paths are present on the VM backing virtual disk devices
-	vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
-	VerifyVolumePathsForVMDevices(vmDevices, volPaths, nodeName, nodeVolumeMap)
-
 }
 
 // VerifyVolumePathsForVMDevices verifies if the volume paths (volPaths) are attached to VM.

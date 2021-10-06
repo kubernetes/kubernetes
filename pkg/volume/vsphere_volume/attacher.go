@@ -275,7 +275,6 @@ func (plugin *vsphereVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter,
 
 // Detach the given device from the given node.
 func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-
 	volPath := getVolPathfromVolumeName(volumeName)
 	attached, newVolumePath, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
 	if err != nil {
