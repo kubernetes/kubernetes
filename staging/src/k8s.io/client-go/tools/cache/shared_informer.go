@@ -155,7 +155,7 @@ type SharedInformer interface {
 	// It returns a registration handle for the handler that can be used to remove
 	// the handler again and an error if the handler cannot be added.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) (ResourceEventHandlerRegistration, error)
-	// RemoveEventHandlerByRegistration removes a formerly added event handler given by
+	// RemoveEventHandler removes a formerly added event handler given by
 	// its registration handle.
 	// If, for some reason, the same handler has been added multiple
 	// times, only the registration for the given registration handle
@@ -165,7 +165,7 @@ type SharedInformer interface {
 	// Calling Remove on an already removed handle returns no error
 	// because the handler is finally (still) removed after calling this
 	// method.
-	RemoveEventHandlerByRegistration(handle ResourceEventHandlerRegistration) error
+	RemoveEventHandler(handle ResourceEventHandlerRegistration) error
 	// GetStore returns the informer's local cache as a Store.
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
@@ -624,12 +624,12 @@ func (s *sharedIndexInformer) IsStopped() bool {
 	return s.stopped
 }
 
-// RemoveEventHandlerByRegistration tries to remove a formerly added event handler by its
+// RemoveEventHandler tries to remove a formerly added event handler by its
 // registration handle returned for its registration.
 // If a handler has been added multiple times, only the actual registration for the
 // handler will be removed. Other registrations of the same handler will still be
 // active until they are explicitly removes, also.
-func (s *sharedIndexInformer) RemoveEventHandlerByRegistration(handle ResourceEventHandlerRegistration) error {
+func (s *sharedIndexInformer) RemoveEventHandler(handle ResourceEventHandlerRegistration) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
@@ -638,7 +638,7 @@ func (s *sharedIndexInformer) RemoveEventHandlerByRegistration(handle ResourceEv
 	}
 
 	if s.stopped {
-		return fmt.Errorf("handler %v is not removed from shared informer because it has stopped already", handle.listener.handler)
+		return nil
 	}
 
 	// in order to safely remove, we have to
@@ -712,15 +712,15 @@ func (p *sharedProcessor) removeListenerLocked(listener *processorListener) bool
 		l := p.listeners[i]
 		if l == listener {
 			p.listeners = append(p.listeners[:i], p.listeners[i+1:]...)
-			i--
 			found = true
+			break
 		}
 	}
 	for i := 0; i < len(p.syncingListeners); i++ {
 		l := p.syncingListeners[i]
 		if l == listener {
 			p.syncingListeners = append(p.syncingListeners[:i], p.syncingListeners[i+1:]...)
-			i--
+			break
 		}
 	}
 	return found
