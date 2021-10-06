@@ -287,7 +287,11 @@ func (rq *Controller) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(rq.worker(rq.missingUsageQueue), time.Second, stopCh)
 	}
 	// the timer for how often we do a full recalculation across all quotas
-	go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
+	if rq.resyncPeriod() > 0 {
+		go wait.Until(func() { rq.enqueueAll() }, rq.resyncPeriod(), stopCh)
+	} else {
+		klog.Warningf("periodic quota controller resync disabled")
+	}
 	<-stopCh
 }
 
