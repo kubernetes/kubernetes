@@ -54,6 +54,8 @@ type fakePodWorkers struct {
 	removeRuntime         map[types.UID]bool
 	removeContent         map[types.UID]bool
 	terminatingStaticPods map[string]bool
+
+	syncState map[types.UID]PodWorkerState
 }
 
 func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
@@ -83,7 +85,9 @@ func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
 }
 
 func (f *fakePodWorkers) SyncKnownPods(desiredPods []*v1.Pod) map[types.UID]PodWorkerState {
-	return nil
+	f.statusLock.Lock()
+	defer f.statusLock.Unlock()
+	return f.syncState
 }
 
 func (f *fakePodWorkers) IsPodKnownTerminated(uid types.UID) bool {

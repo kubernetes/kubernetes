@@ -1042,7 +1042,7 @@ func (kl *Kubelet) deleteOrphanedMirrorPods() {
 // is executing which means no new pods can appear.
 // NOTE: This function is executed by the main sync loop, so it
 // should not contain any blocking calls.
-func (kl *Kubelet) HandlePodCleanups() error {
+func (kl *Kubelet) HandlePodCleanups(allSourcesSynced bool) error {
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
@@ -1104,82 +1104,90 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	klog.V(3).InfoS("Clean up probes for terminating and terminated pods")
 	kl.probeManager.CleanupPods(runningPods)
 
-	// Terminate any pods that are observed in the runtime but not
-	// present in the list of known running pods from config.
-	runningRuntimePods, err := kl.runtimeCache.GetPods()
-	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
-		return err
-	}
-	for _, runningPod := range runningRuntimePods {
-		switch workerState, ok := workingPods[runningPod.ID]; {
-		case ok && workerState == SyncPod, ok && workerState == TerminatingPod:
-			// if the pod worker is already in charge of this pod, we don't need to do anything
-			continue
-		default:
-			// If the pod isn't in the set that should be running and isn't already terminating, terminate
-			// now. This termination is aggressive because all known pods should already be in a known state
-			// (i.e. a removed static pod should already be terminating), so these are pods that were
-			// orphaned due to kubelet restart or bugs. Since housekeeping blocks other config changes, we
-			// know that another pod wasn't started in the background so we are safe to terminate the
-			// unknown pods.
-			if _, ok := allPodsByUID[runningPod.ID]; !ok {
-				klog.V(3).InfoS("Clean up orphaned pod containers", "podUID", runningPod.ID)
-				one := int64(1)
-				kl.podWorkers.UpdatePod(UpdatePodOptions{
-					UpdateType: kubetypes.SyncPodKill,
-					RunningPod: runningPod,
-					KillPodOptions: &KillPodOptions{
-						PodTerminationGracePeriodSecondsOverride: &one,
-					},
-				})
+	// Only terminate running containers or cleanup runtime resources once we
+	// know our list of known expected pods is complete.
+	//
+	// TODO: Each source should be independently verifiable, since static pods
+	// must be runnable when the apiserver is down and we may need to do cleanup
+	// on their resources even in that scenario.
+	if allSourcesSynced {
+		// Terminate any pods that are observed in the runtime but not
+		// present in the list of known running pods from config.
+		runningRuntimePods, err := kl.runtimeCache.GetPods()
+		if err != nil {
+			klog.ErrorS(err, "Error listing containers")
+			return err
+		}
+		for _, runningPod := range runningRuntimePods {
+			switch workerState, ok := workingPods[runningPod.ID]; {
+			case ok && workerState == SyncPod, ok && workerState == TerminatingPod:
+				// if the pod worker is already in charge of this pod, we don't need to do anything
+				continue
+			default:
+				// If the pod isn't in the set that should be running and isn't already terminating, terminate
+				// now. This termination is aggressive because all known pods should already be in a known state
+				// (i.e. a removed static pod should already be terminating), so these are pods that were
+				// orphaned due to kubelet restart or bugs. Since housekeeping blocks other config changes, we
+				// know that another pod wasn't started in the background so we are safe to terminate the
+				// unknown pods.
+				if _, ok := allPodsByUID[runningPod.ID]; !ok {
+					klog.V(3).InfoS("Clean up orphaned pod containers", "podUID", runningPod.ID)
+					one := int64(1)
+					kl.podWorkers.UpdatePod(UpdatePodOptions{
+						UpdateType: kubetypes.SyncPodKill,
+						RunningPod: runningPod,
+						KillPodOptions: &KillPodOptions{
+							PodTerminationGracePeriodSecondsOverride: &one,
+						},
+					})
+				}
 			}
 		}
+
+		// Remove orphaned pod statuses not in the total list of known config pods
+		klog.V(3).InfoS("Clean up orphaned pod statuses")
+		kl.removeOrphanedPodStatuses(allPods, mirrorPods)
+		// Note that we just killed the unwanted pods. This may not have reflected
+		// in the cache. We need to bypass the cache to get the latest set of
+		// running pods to clean up the volumes.
+		// TODO: Evaluate the performance impact of bypassing the runtime cache.
+		runningRuntimePods, err = kl.containerRuntime.GetPods(false)
+		if err != nil {
+			klog.ErrorS(err, "Error listing containers")
+			return err
+		}
+
+		// Remove orphaned volumes from pods that are known not to have any
+		// containers. Note that we pass all pods (including terminated pods) to
+		// the function, so that we don't remove volumes associated with terminated
+		// but not yet deleted pods.
+		// TODO: this method could more aggressively cleanup terminated pods
+		// in the future (volumes, mount dirs, logs, and containers could all be
+		// better separated)
+		klog.V(3).InfoS("Clean up orphaned pod directories")
+		err = kl.cleanupOrphanedPodDirs(allPods, runningRuntimePods)
+		if err != nil {
+			// We want all cleanup tasks to be run even if one of them failed. So
+			// we just log an error here and continue other cleanup tasks.
+			// This also applies to the other clean up tasks.
+			klog.ErrorS(err, "Failed cleaning up orphaned pod directories")
+		}
+
+		// Remove any orphaned mirror pods (mirror pods are tracked by name via the
+		// pod worker)
+		klog.V(3).InfoS("Clean up orphaned mirror pods")
+		kl.deleteOrphanedMirrorPods()
+
+		// Remove any cgroups in the hierarchy for pods that are definitely no longer
+		// running (not in the container runtime).
+		if kl.cgroupsPerQOS {
+			pcm := kl.containerManager.NewPodContainerManager()
+			klog.V(3).InfoS("Clean up orphaned pod cgroups")
+			kl.cleanupOrphanedPodCgroups(pcm, cgroupPods, possiblyRunningPods)
+		}
+
+		kl.backOff.GC()
 	}
-
-	// Remove orphaned pod statuses not in the total list of known config pods
-	klog.V(3).InfoS("Clean up orphaned pod statuses")
-	kl.removeOrphanedPodStatuses(allPods, mirrorPods)
-	// Note that we just killed the unwanted pods. This may not have reflected
-	// in the cache. We need to bypass the cache to get the latest set of
-	// running pods to clean up the volumes.
-	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningRuntimePods, err = kl.containerRuntime.GetPods(false)
-	if err != nil {
-		klog.ErrorS(err, "Error listing containers")
-		return err
-	}
-
-	// Remove orphaned volumes from pods that are known not to have any
-	// containers. Note that we pass all pods (including terminated pods) to
-	// the function, so that we don't remove volumes associated with terminated
-	// but not yet deleted pods.
-	// TODO: this method could more aggressively cleanup terminated pods
-	// in the future (volumes, mount dirs, logs, and containers could all be
-	// better separated)
-	klog.V(3).InfoS("Clean up orphaned pod directories")
-	err = kl.cleanupOrphanedPodDirs(allPods, runningRuntimePods)
-	if err != nil {
-		// We want all cleanup tasks to be run even if one of them failed. So
-		// we just log an error here and continue other cleanup tasks.
-		// This also applies to the other clean up tasks.
-		klog.ErrorS(err, "Failed cleaning up orphaned pod directories")
-	}
-
-	// Remove any orphaned mirror pods (mirror pods are tracked by name via the
-	// pod worker)
-	klog.V(3).InfoS("Clean up orphaned mirror pods")
-	kl.deleteOrphanedMirrorPods()
-
-	// Remove any cgroups in the hierarchy for pods that are definitely no longer
-	// running (not in the container runtime).
-	if kl.cgroupsPerQOS {
-		pcm := kl.containerManager.NewPodContainerManager()
-		klog.V(3).InfoS("Clean up orphaned pod cgroups")
-		kl.cleanupOrphanedPodCgroups(pcm, cgroupPods, possiblyRunningPods)
-	}
-
-	kl.backOff.GC()
 
 	// If two pods with the same UID are observed in rapid succession, we need to
 	// resynchronize the pod worker after the first pod completes and decide whether

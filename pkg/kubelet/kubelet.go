@@ -199,7 +199,7 @@ type SyncHandler interface {
 	HandlePodRemoves(pods []*v1.Pod)
 	HandlePodReconcile(pods []*v1.Pod)
 	HandlePodSyncs(pods []*v1.Pod)
-	HandlePodCleanups() error
+	HandlePodCleanups(allSourcesSynced bool) error
 }
 
 // Option is a functional option type for Kubelet
@@ -2134,22 +2134,16 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		}
 		handleProbeSync(kl, update, handler, "startup", status)
 	case <-housekeepingCh:
-		if !kl.sourcesReady.AllReady() {
-			// If the sources aren't ready or volume manager has not yet synced the states,
-			// skip housekeeping, as we may accidentally delete pods from unready sources.
-			klog.V(4).InfoS("SyncLoop (housekeeping, skipped): sources aren't ready yet")
-		} else {
-			start := time.Now()
-			klog.V(4).InfoS("SyncLoop (housekeeping)")
-			if err := handler.HandlePodCleanups(); err != nil {
-				klog.ErrorS(err, "Failed cleaning pods")
-			}
-			duration := time.Since(start)
-			if duration > housekeepingWarningDuration {
-				klog.ErrorS(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than 15s", "seconds", duration.Seconds())
-			}
-			klog.V(4).InfoS("SyncLoop (housekeeping) end")
+		start := time.Now()
+		klog.V(4).InfoS("SyncLoop (housekeeping)")
+		if err := handler.HandlePodCleanups(kl.sourcesReady.AllReady()); err != nil {
+			klog.ErrorS(err, "Failed cleaning pods")
 		}
+		duration := time.Since(start)
+		if duration > housekeepingWarningDuration {
+			klog.ErrorS(fmt.Errorf("housekeeping took too long"), "Housekeeping took longer than 15s", "seconds", duration.Seconds())
+		}
+		klog.V(4).InfoS("SyncLoop (housekeeping) end")
 	}
 	return true
 }

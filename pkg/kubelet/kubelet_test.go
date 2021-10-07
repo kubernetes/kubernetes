@@ -449,7 +449,7 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// within a goroutine so a two second delay should be enough time to
 	// mark the pod as killed (within this test case).
 
-	kubelet.HandlePodCleanups()
+	kubelet.HandlePodCleanups(true)
 
 	// assert that unwanted pods were killed
 	if actual, expected := kubelet.podWorkers.(*fakePodWorkers).triggeredDeletion, []types.UID{"12345678"}; !reflect.DeepEqual(actual, expected) {
@@ -460,9 +460,9 @@ func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	// simulate Runtime.KillPod
 	fakeRuntime.PodList = nil
 
-	kubelet.HandlePodCleanups()
-	kubelet.HandlePodCleanups()
-	kubelet.HandlePodCleanups()
+	kubelet.HandlePodCleanups(true)
+	kubelet.HandlePodCleanups(true)
+	kubelet.HandlePodCleanups(true)
 
 	destroyCount := 0
 	err := wait.Poll(100*time.Millisecond, 10*time.Second, func() (bool, error) {
@@ -637,7 +637,7 @@ func TestHandlePodCleanups(t *testing.T) {
 	}
 	kubelet := testKubelet.kubelet
 
-	kubelet.HandlePodCleanups()
+	kubelet.HandlePodCleanups(true)
 
 	// assert that unwanted pods were queued to kill
 	if actual, expected := kubelet.podWorkers.(*fakePodWorkers).triggeredDeletion, []types.UID{"12345678"}; !reflect.DeepEqual(actual, expected) {
@@ -1055,7 +1055,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.podManager.SetPods([]*v1.Pod{})
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(true)
 	if _, found := kl.statusManager.GetPodStatus(podToTest.UID); found {
 		t.Fatalf("expected to not have status cached for pod2")
 	}
@@ -1312,7 +1312,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	}
 
 	// Sync with an empty pod list to delete all mirror pods.
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(true)
 	assert.Len(t, manager.GetPods(), 0, "Expected 0 mirror pods")
 	for i, pod := range orphanPods {
 		name := kubecontainer.GetPodFullName(pod)
@@ -1327,6 +1327,50 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 				t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)
 			}
 		}
+	}
+}
+
+type syncAction struct {
+	updateType kubetypes.SyncPodType
+	pod        *v1.Pod
+}
+
+func TestRestartStaticPodWithIdenticalUID(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+
+	kl := testKubelet.kubelet
+	staticPods := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				UID:       "12345678",
+				Name:      "pod1",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					kubetypes.ConfigSourceAnnotationKey: "file",
+				},
+			},
+		},
+	}
+	kl.podManager.SetPods(staticPods)
+
+	var actions []syncAction
+	kl.podWorkers.(*fakePodWorkers).syncPodFn = func(ctx context.Context, updateType kubetypes.SyncPodType, pod *v1.Pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+		actions = append(actions, syncAction{updateType, pod})
+		return nil
+	}
+	kl.podWorkers.(*fakePodWorkers).syncState = map[types.UID]PodWorkerState{
+		// in config
+		"12345678": TerminatedAndRecreatedPod,
+		// no longer in config
+		"non-existent": TerminatedAndRecreatedPod,
+	}
+
+	// static pods must be restarted without apiserver being available
+	kl.HandlePodCleanups(false)
+
+	if len(actions) != 1 || actions[0].updateType != kubetypes.SyncPodCreate || actions[0].pod.UID != "12345678" {
+		t.Fatalf("expected to see one create pod action: %#v", actions)
 	}
 }
 
@@ -1600,7 +1644,7 @@ func TestDeletePodDirsForDeletedPods(t *testing.T) {
 
 	// Pod 1 has been deleted and no longer exists.
 	kl.podManager.SetPods([]*v1.Pod{pods[0]})
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(true)
 	assert.True(t, dirExists(kl.getPodDir(pods[0].UID)), "Expected directory to exist for pod 0")
 	assert.False(t, dirExists(kl.getPodDir(pods[1].UID)), "Expected directory to be deleted for pod 1")
 }
@@ -1611,7 +1655,7 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 
 	kl.podManager.SetPods(pods)
 	kl.HandlePodSyncs(pods)
-	kl.HandlePodCleanups()
+	kl.HandlePodCleanups(true)
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
 		assert.Equal(t, shouldExist, exist, "directory of pod %d", i)
