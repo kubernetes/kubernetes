@@ -1978,6 +1978,7 @@ k8s.io/component-helpers/node/utils/sysctl
 k8s.io/component-helpers/node/utils/sysctl/testing
 k8s.io/component-helpers/scheduling/corev1
 k8s.io/component-helpers/scheduling/corev1/nodeaffinity
+k8s.io/component-helpers/storage/ephemeral
 k8s.io/component-helpers/storage/volume
 # k8s.io/controller-manager v0.0.0 => ./staging/src/k8s.io/controller-manager
 ## explicit
