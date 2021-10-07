@@ -26,10 +26,10 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
 
-const logFlushFreqFlagName = "log-flush-frequency"
 const deprecated = "will be removed in a future release, see https://github.com/kubernetes/enhancements/tree/master/keps/sig-instrumentation/2845-deprecate-klog-specific-flags-in-k8s-components"
 
 // TODO (https://github.com/kubernetes/kubernetes/issues/105310): once klog
@@ -48,7 +48,7 @@ var (
 
 func init() {
 	klog.InitFlags(packageFlags)
-	packageFlags.DurationVar(&logFlushFreq, logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
+	packageFlags.DurationVar(&logFlushFreq, logsapi.LogFlushFreqFlagName, logsapi.LogFlushFreqDefault, "Maximum number of seconds between log flushes")
 }
 
 type addFlagsOptions struct {
@@ -65,6 +65,13 @@ func SkipLoggingConfigurationFlags() Option {
 		o.skipLoggingConfigurationFlags = true
 	}
 }
+
+// Options is an alias for LoggingConfiguration to comply with component-base
+// conventions.
+type Options = logsapi.LoggingConfiguration
+
+// NewOptions is an alias for NewLoggingConfiguration.
+var NewOptions = logsapi.NewLoggingConfiguration
 
 // AddFlags registers this package's flags on arbitrary FlagSets. This includes
 // the klog flags, with the original underscore as separator between. If
@@ -94,7 +101,7 @@ func AddFlags(fs *pflag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-		case logFlushFreqFlagName:
+		case logsapi.LogFlushFreqFlagName:
 			// unchanged, potentially skip it
 			if o.skipLoggingConfigurationFlags {
 				return
@@ -135,7 +142,7 @@ func AddGoFlags(fs *flag.FlagSet, opts ...Option) {
 			if o.skipLoggingConfigurationFlags {
 				return
 			}
-		case logFlushFreqFlagName:
+		case logsapi.LogFlushFreqFlagName:
 			// unchanged
 			if o.skipLoggingConfigurationFlags {
 				return

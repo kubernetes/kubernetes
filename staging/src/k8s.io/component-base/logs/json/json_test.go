@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/component-base/config"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	logsapi "k8s.io/component-base/logs/api/v1"
 )
 
 // TestZapLoggerInfo test ZapLogger json info format
@@ -112,7 +112,7 @@ func TestZapLoggerInfo(t *testing.T) {
 // TestZapLoggerEnabled test ZapLogger enabled
 func TestZapLoggerEnabled(t *testing.T) {
 	verbosityLevel := 10
-	sampleInfoLogger, _ := NewJSONLogger(config.VerbosityLevel(verbosityLevel), nil, nil, nil)
+	sampleInfoLogger, _ := NewJSONLogger(logsapi.VerbosityLevel(verbosityLevel), nil, nil, nil)
 	for v := 0; v <= verbosityLevel; v++ {
 		enabled := sampleInfoLogger.V(v).Enabled()
 		expectEnabled := v <= verbosityLevel
@@ -135,7 +135,7 @@ func TestZapLoggerV(t *testing.T) {
 	for v := 0; v <= verbosityLevel; v++ {
 		var buffer bytes.Buffer
 		writer := zapcore.AddSync(&buffer)
-		sampleInfoLogger, _ := NewJSONLogger(config.VerbosityLevel(verbosityLevel), writer, nil, nil)
+		sampleInfoLogger, _ := NewJSONLogger(logsapi.VerbosityLevel(verbosityLevel), writer, nil, nil)
 		sampleInfoLogger.V(v).Info("test", "ns", "default", "podnum", 2, "time", time.Microsecond)
 		logStr := buffer.String()
 

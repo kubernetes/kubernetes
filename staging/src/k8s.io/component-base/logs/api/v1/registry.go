@@ -14,22 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package registry
+package v1
 
 import (
 	"fmt"
 	"sort"
 
 	"github.com/go-logr/logr"
-
-	"k8s.io/component-base/config"
 )
 
-// LogRegistry is new init LogFormatRegistry struct
-var LogRegistry = NewLogFormatRegistry()
+var logRegistry = newLogFormatRegistry()
 
-// LogFormatRegistry store klog format registry
-type LogFormatRegistry struct {
+// logFormatRegistry stores factories for all supported logging formats.
+type logFormatRegistry struct {
 	registry map[string]LogFormatFactory
 	frozen   bool
 }
@@ -41,22 +38,28 @@ type LogFormatFactory interface {
 	// Returning a flush function for the logger is optional.
 	// If provided, the caller must ensure that it is called
 	// periodically (if desired) and at program exit.
-	Create(c config.LoggingConfiguration) (log logr.Logger, flush func())
+	Create(c LoggingConfiguration) (log logr.Logger, flush func())
 }
 
-// NewLogFormatRegistry return new init LogFormatRegistry struct
-func NewLogFormatRegistry() *LogFormatRegistry {
-	return &LogFormatRegistry{
+// RegisterLogFormat registers support for a new logging format. This must be called
+// before using any of the methods in LoggingConfiguration.
+func RegisterLogFormat(name string, factory LogFormatFactory) error {
+	return logRegistry.register(name, factory)
+}
+
+func newLogFormatRegistry() *logFormatRegistry {
+	registry := &logFormatRegistry{
 		registry: make(map[string]LogFormatFactory),
 		frozen:   false,
 	}
+	registry.register("text", nil)
+	return registry
 }
 
-// Register new log format registry to global logRegistry.
-// nil is valid and selects the default klog output.
-func (lfr *LogFormatRegistry) Register(name string, factory LogFormatFactory) error {
+// register adds a new log format. It's an error to modify an existing one.
+func (lfr *logFormatRegistry) register(name string, factory LogFormatFactory) error {
 	if lfr.frozen {
-		return fmt.Errorf("log format is frozen, unable to register log format")
+		return fmt.Errorf("log format registry is frozen, unable to register log format %s", name)
 	}
 	if _, ok := lfr.registry[name]; ok {
 		return fmt.Errorf("log format: %s already exists", name)
@@ -65,8 +68,8 @@ func (lfr *LogFormatRegistry) Register(name string, factory LogFormatFactory) er
 	return nil
 }
 
-// Get specified log format logger
-func (lfr *LogFormatRegistry) Get(name string) (LogFormatFactory, error) {
+// get specified log format factory
+func (lfr *logFormatRegistry) get(name string) (LogFormatFactory, error) {
 	re, ok := lfr.registry[name]
 	if !ok {
 		return nil, fmt.Errorf("log format: %s does not exists", name)
@@ -74,28 +77,8 @@ func (lfr *LogFormatRegistry) Get(name string) (LogFormatFactory, error) {
 	return re, nil
 }
 
-// Set specified log format logger
-func (lfr *LogFormatRegistry) Set(name string, factory LogFormatFactory) error {
-	if lfr.frozen {
-		return fmt.Errorf("log format is frozen, unable to set log format")
-	}
-
-	lfr.registry[name] = factory
-	return nil
-}
-
-// Delete specified log format logger
-func (lfr *LogFormatRegistry) Delete(name string) error {
-	if lfr.frozen {
-		return fmt.Errorf("log format is frozen, unable to delete log format")
-	}
-
-	delete(lfr.registry, name)
-	return nil
-}
-
-// List names of registered log formats (sorted)
-func (lfr *LogFormatRegistry) List() []string {
+// list names of registered log formats (sorted)
+func (lfr *logFormatRegistry) list() []string {
 	formats := make([]string, 0, len(lfr.registry))
 	for f := range lfr.registry {
 		formats = append(formats, f)
@@ -104,7 +87,7 @@ func (lfr *LogFormatRegistry) List() []string {
 	return formats
 }
 
-// Freeze freezes the log format registry
-func (lfr *LogFormatRegistry) Freeze() {
+// freeze prevents further modifications of the registered log formats.
+func (lfr *logFormatRegistry) freeze() {
 	lfr.frozen = true
 }
