@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1beta1 "k8s.io/kubelet/config/v1beta1"
 	config "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
@@ -485,9 +484,7 @@ func autoConvert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in 
 	out.VolumePluginDir = in.VolumePluginDir
 	out.ProviderID = in.ProviderID
 	out.KernelMemcgNotification = in.KernelMemcgNotification
-	if err := v1alpha1.Convert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(&in.Logging, &out.Logging, s); err != nil {
-		return err
-	}
+	out.Logging = in.Logging
 	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableSystemLogHandler, &out.EnableSystemLogHandler, s); err != nil {
 		return err
 	}
@@ -661,9 +658,7 @@ func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in 
 	out.EnforceNodeAllocatable = *(*[]string)(unsafe.Pointer(&in.EnforceNodeAllocatable))
 	out.ReservedSystemCPUs = in.ReservedSystemCPUs
 	out.ShowHiddenMetricsForVersion = in.ShowHiddenMetricsForVersion
-	if err := v1alpha1.Convert_config_LoggingConfiguration_To_v1alpha1_LoggingConfiguration(&in.Logging, &out.Logging, s); err != nil {
-		return err
-	}
+	out.Logging = in.Logging
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableSystemLogHandler, &out.EnableSystemLogHandler, s); err != nil {
 		return err
 	}
