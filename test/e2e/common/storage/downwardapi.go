@@ -36,7 +36,7 @@ var _ = SIGDescribe("Downward API [Serial] [Disruptive] [NodeFeature:EphemeralSt
 
 	ginkgo.Context("Downward API tests for local ephemeral storage", func() {
 		ginkgo.BeforeEach(func() {
-			e2eskipper.SkipUnlessFeatureGate(kubefeatures.LocalStorageCapacityIsolation)
+			e2eskipper.SkipUnlessFeatureGateEnabled(kubefeatures.LocalStorageCapacityIsolation)
 		})
 
 		ginkgo.It("should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars", func() {

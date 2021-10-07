@@ -296,7 +296,7 @@ var _ = SIGDescribe("EmptyDir volumes", func() {
 	*/
 	ginkgo.It("pod should support memory backed volumes of specified size", func() {
 		// skip if feature gate is not enabled, this could be elevated to conformance in future if on Linux.
-		e2eskipper.SkipUnlessFeatureGate(features.SizeMemoryBackedVolumes)
+		e2eskipper.SkipUnlessFeatureGateEnabled(features.SizeMemoryBackedVolumes)
 
 		var (
 			volumeName                 = "shared-data"
