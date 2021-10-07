@@ -24,19 +24,14 @@ import (
 	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"k8s.io/component-base/logs/registry"
 )
 
 var (
-	// JSONLogger is global json log format logr
-	JSONLogger logr.Logger
-
 	// timeNow stubbed out for testing
 	timeNow = time.Now
 )
-
-func init() {
-	JSONLogger = NewJSONLogger(zapcore.Lock(os.Stdout))
-}
 
 // NewJSONLogger creates a new json logr.Logger using the given Zap Logger to log.
 func NewJSONLogger(w zapcore.WriteSyncer) logr.Logger {
@@ -63,3 +58,12 @@ func epochMillisTimeEncoder(_ time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	millis := float64(nanos) / float64(time.Millisecond)
 	enc.AppendFloat64(millis)
 }
+
+// Factory produces JSON logger instances.
+type Factory struct{}
+
+func (f Factory) Create() logr.Logger {
+	return NewJSONLogger(zapcore.Lock(os.Stdout))
+}
+
+var _ registry.LogFormatFactory = Factory{}
