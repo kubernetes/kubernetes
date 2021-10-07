@@ -372,6 +372,7 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		if replicationController == nil {
 			framework.Failf(rcIsNil)
 		}
+		//lint:ignore SA5011 nil check happens above, can't be nil.
 		return int(replicationController.Status.ReadyReplicas)
 	case KindDeployment:
 		deployment, err := rc.clientSet.AppsV1().Deployments(rc.nsName).Get(context.TODO(), rc.name, metav1.GetOptions{})
@@ -379,6 +380,7 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		if deployment == nil {
 			framework.Failf(deploymentIsNil)
 		}
+		//lint:ignore SA5011 nil check happens above, can't be nil.
 		return int(deployment.Status.ReadyReplicas)
 	case KindReplicaSet:
 		rs, err := rc.clientSet.AppsV1().ReplicaSets(rc.nsName).Get(context.TODO(), rc.name, metav1.GetOptions{})
@@ -386,6 +388,7 @@ func (rc *ResourceConsumer) GetReplicas() int {
 		if rs == nil {
 			framework.Failf(rsIsNil)
 		}
+		//lint:ignore SA5011 nil check happens above, can't be nil.
 		return int(rs.Status.ReadyReplicas)
 	default:
 		framework.Failf(invalidKind)
