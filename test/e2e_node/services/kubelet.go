@@ -24,9 +24,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
@@ -173,37 +171,8 @@ func (e *E2EServices) startKubelet() (*server, error) {
 	// --read-only-port
 	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 
-	// Setup general overrides for the kubelet.
-	// TODO(endocrimes): Move the following to a `default` configuration file
-
-	kc.CgroupRoot = "/"
-
-	kc.VolumeStatsAggPeriod = metav1.Duration{Duration: 10 * time.Second} // Aggregate volumes frequently so tests don't need to wait as long
-
-	kc.SerializeImagePulls = false
-
+	// Static Pods are in a per-test location, so we override them for tests.
 	kc.StaticPodPath = podPath
-
-	kc.FileCheckFrequency = metav1.Duration{Duration: 10 * time.Second} // Check file frequently so tests won't wait too long
-
-	// Assign a fixed CIDR to the node because there is no node controller.
-	// Note: this MUST be in sync with the IP in
-	// - cluster/gce/config-test.sh and
-	// - test/e2e_node/conformance/run_test.sh.
-	kc.PodCIDR = "10.100.0.0/24"
-
-	kc.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 30 * time.Second}
-
-	kc.EvictionHard = map[string]string{
-		"memory.available":  "250Mi",
-		"nodefs.available":  "10%",
-		"nodefs.inodesFree": "5%",
-	}
-
-	kc.EvictionMinimumReclaim = map[string]string{
-		"nodefs.available":  "5%",
-		"nodefs.inodesFree": "5%",
-	}
 
 	var killCommand, restartCommand *exec.Cmd
 	var isSystemd bool
