@@ -224,7 +224,7 @@ func (c conversionClient) UpdateStatus(ctx context.Context, rs *apps.ReplicaSet,
 }
 
 func (c conversionClient) Get(ctx context.Context, name string, options metav1.GetOptions) (*apps.ReplicaSet, error) {
-	rc, err := c.ReplicationControllerInterface.Get(context.TODO(), name, options)
+	rc, err := c.ReplicationControllerInterface.Get(ctx, name, options)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (c conversionClient) Get(ctx context.Context, name string, options metav1.G
 }
 
 func (c conversionClient) List(ctx context.Context, opts metav1.ListOptions) (*apps.ReplicaSetList, error) {
-	rcList, err := c.ReplicationControllerInterface.List(context.TODO(), opts)
+	rcList, err := c.ReplicationControllerInterface.List(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
