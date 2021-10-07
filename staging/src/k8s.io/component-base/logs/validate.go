@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs/registry"
 )
 
 func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field.Path) field.ErrorList {
@@ -36,7 +37,7 @@ func ValidateLoggingConfiguration(c *config.LoggingConfiguration, fldPath *field
 			}
 		}
 	}
-	if _, err := LogRegistry.Get(c.Format); err != nil {
+	if _, err := registry.LogRegistry.Get(c.Format); err != nil {
 		errs = append(errs, field.Invalid(fldPath.Child("format"), c.Format, "Unsupported log format"))
 	}
 	return errs
