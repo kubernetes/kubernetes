@@ -97,6 +97,22 @@ type queue struct {
 	seatsInUse int
 }
 
+// queueSum tracks the sum of initial seats, final seats, and
+// additional latency aggregated from all requests in a given queue
+type queueSum struct {
+	// InitialSeatsSum is the sum of InitialSeats
+	// associated with all requests in a given queue.
+	InitialSeatsSum int
+
+	// MaxSeatsSum is the sum of MaxSeats
+	// associated with all requests in a given queue.
+	MaxSeatsSum int
+
+	// AdditionalSeatSecondsSum is sum of AdditionalSeatsSeconds
+	// associated with all requests in a given queue.
+	AdditionalSeatSecondsSum SeatSeconds
+}
+
 // Enqueue enqueues a request into the queue and
 // sets the removeFromQueueFn of the request appropriately.
 func (q *queue) Enqueue(request *request) {
@@ -129,6 +145,8 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 		i++
 		return true
 	})
+
+	// TODO: change QueueDump to include queueSum stats
 	return debug.QueueDump{
 		VirtualStart:      q.nextDispatchR.ToFloat(), // TODO: change QueueDump to use SeatSeconds
 		Requests:          digest,

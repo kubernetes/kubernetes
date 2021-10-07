@@ -653,7 +653,9 @@ func TestApfWithRequestDigest(t *testing.T) {
 		RequestInfo: &apirequest.RequestInfo{Verb: "get"},
 		User:        &user.DefaultInfo{Name: "foo"},
 		WorkEstimate: fcrequest.WorkEstimate{
-			InitialSeats: 5,
+			InitialSeats:      5,
+			FinalSeats:        7,
+			AdditionalLatency: 3 * time.Second,
 		},
 	}
 
