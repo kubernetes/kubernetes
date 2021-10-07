@@ -19,6 +19,7 @@ package remote
 import (
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -36,14 +37,54 @@ var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test resu
 
 const archiveName = "e2e_node_test.tar.gz"
 
+func copyKubeletConfigIfExists(kubeletConfigFile, dstDir string) error {
+	srcStat, err := os.Stat(kubeletConfigFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		} else {
+			return err
+		}
+	}
+
+	if !srcStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", kubeletConfigFile)
+	}
+
+	source, err := os.Open(kubeletConfigFile)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	dst := filepath.Join(dstDir, "kubeletconfig.yaml")
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(dst, 0x644)
+}
+
 // CreateTestArchive creates the archive package for the node e2e test.
-func CreateTestArchive(suite TestSuite, systemSpecName string) (string, error) {
+func CreateTestArchive(suite TestSuite, systemSpecName, kubeletConfigFile string) (string, error) {
 	klog.V(2).Infof("Building archive...")
 	tardir, err := ioutil.TempDir("", "node-e2e-archive")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary directory %v", err)
 	}
 	defer os.RemoveAll(tardir)
+
+	err = copyKubeletConfigIfExists(kubeletConfigFile, tardir)
+	if err != nil {
+		return "", fmt.Errorf("failed to copy kubelet config: %v", err)
+	}
 
 	// Call the suite function to setup the test package.
 	err = suite.SetupTestPackage(tardir, systemSpecName)

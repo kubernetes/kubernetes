@@ -69,6 +69,7 @@ var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify a
 var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
 var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var kubeletConfigFile = flag.String("kubelet-config-file", "", "The KubeletConfiguration file that should be applied to the kubelet")
 
 // envs is the type used to collect all node envs. The key is the env name,
 // and the value is the env value
@@ -218,7 +219,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		remote.CreateTestArchive(suite, *systemSpecName)
+		remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile)
 		return
 	}
 
