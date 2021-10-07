@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -131,6 +133,37 @@ func (c *constraint) Validate(ctx context.Context, a admission.Attributes, _ adm
 	return admission.NewForbidden(a, fmt.Errorf("unable to validate against any security context constraint: %v", validationErrs))
 }
 
+// these are the SCCs created by the cluster-kube-apiserver-operator.
+// see the list in https://github.com/openshift/cluster-kube-apiserver-operator/blob/3b0218cf9778cbcf2650ad5aa4e01d7b40a2d05e/bindata/bootkube/scc-manifests/0000_20_kube-apiserver-operator_00_scc-restricted.yaml
+// if these are not present, the lister isn't really finished listing.
+var standardSCCNames = sets.NewString(
+	"anyuid",
+	"hostaccess",
+	"hostmount-anyuid",
+	"hostnetwork",
+	"nonroot",
+	"privileged",
+	"restricted",
+)
+
+func requireStandardSCCs(sccs []*securityv1.SecurityContextConstraints, err error) error {
+	if err != nil {
+		return err
+	}
+
+	allCurrentSCCNames := sets.NewString()
+	for _, curr := range sccs {
+		allCurrentSCCNames.Insert(curr.Name)
+	}
+
+	missingSCCs := standardSCCNames.Difference(allCurrentSCCNames)
+	if len(missingSCCs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("securitycontextconstraints.security.openshift.io cache is missing %v", strings.Join(missingSCCs.List(), ", "))
+}
+
 func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Attributes, pod *coreapi.Pod, specMutationAllowed bool, validatedSCCHint string) (*coreapi.Pod, string, field.ErrorList, error) {
 	// get all constraints that are usable by the user
 	klog.V(4).Infof("getting security context constraints for pod %s (generate: %s) in namespace %s with user info %v", pod.Name, pod.GenerateName, a.GetNamespace(), a.GetUserInfo())
@@ -140,6 +173,24 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 	})
 	if err != nil {
 		return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("securitycontextconstraints.security.openshift.io cache is not synchronized"))
+	}
+
+	// wait a few seconds until the synchronized list returns all the required SCCs created by the kas-o.
+	// If this doesn't happen, then indicate which ones are missing.  This seems odd, but our CI system suggests that this happens occasionally.
+	// If the SCCs were all deleted, then no pod will pass SCC admission until the SCCs are recreated, but the kas-o (which recreates them)
+	// bypasses SCC admission, so this does not create a cycle.
+	var requiredSCCErr error
+	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		if requiredSCCErr = requireStandardSCCs(c.sccLister.List(labels.Everything())); requiredSCCErr != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		if requiredSCCErr != nil {
+			return nil, "", nil, admission.NewForbidden(a, requiredSCCErr)
+		}
+		return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("securitycontextconstraints.security.openshift.io required check failed oddly"))
 	}
 
 	constraints, err := sccmatching.NewDefaultSCCMatcher(c.sccLister, nil).FindApplicableSCCs(ctx, a.GetNamespace())
