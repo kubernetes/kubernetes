@@ -405,7 +405,7 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite, *systemSpecName) })
+	a.Do(func() { a.path, a.err = remote.CreateTestArchive(suite, *systemSpecName, *kubeletConfigFile) })
 	return a.path, a.err
 }
 

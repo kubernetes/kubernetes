@@ -26,7 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -34,9 +33,12 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
+	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	kubeletconfigcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
+	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/remote"
@@ -62,11 +64,9 @@ func (a *args) Set(value string) error {
 
 // kubeletArgs is the override kubelet args specified by the test runner.
 var kubeletArgs args
-var genKubeletConfigFile bool
 
 func init() {
 	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")
-	flag.BoolVar(&genKubeletConfigFile, "generate-kubelet-config-file", true, "The test runner will generate a Kubelet config file containing test defaults instead of passing default flags to the Kubelet.")
 }
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the
@@ -93,6 +93,35 @@ const (
 	// Health check url of kubelet
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
+
+// TODO(endocrimes): Refactor to take a path to the kubeletconfig
+func baseKubeConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
+	cwd, _ := os.Getwd()
+	cfgPath, err := filepath.Abs(filepath.Join(cwd, "kubeletconfig.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = os.Stat(cfgPath)
+	if err != nil {
+		// If the kubeletconfig exists, but for some reason we can't read it, then
+		// return an error to avoid silently skipping it.
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+
+		// If the kubeletconfig file doesn't exist, then use a default configuration
+		// as the base.
+		return options.NewKubeletConfiguration()
+	}
+
+	loader, err := configfiles.NewFsLoader(&utilfs.DefaultFs{}, cfgPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return loader.Load()
+}
 
 // startKubelet starts the Kubelet in a separate process or returns an error
 // if the Kubelet fails to start.
@@ -127,53 +156,54 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, err
 	}
 
-	// PLEASE NOTE: If you set new KubeletConfiguration values or stop setting values here,
-	// you must also update the flag names in kubeletConfigFlags!
-	kubeletConfigFlags := []string{}
-
-	// set up the default kubeletconfiguration
-	kc, err := options.NewKubeletConfiguration()
+	kc, err := baseKubeConfiguration()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to load base kubelet configuration: %v", err)
 	}
 
+	// Apply overrides to allow access to the Kubelet API from the test suite.
+	// These are insecure and should generally not be used outside of test infra.
+
+	// --anonymous-auth
+	kc.Authentication.Anonymous.Enabled = true
+	// --authentication-token-webhook
+	kc.Authentication.Webhook.Enabled = false
+	// --authorization-mode
+	kc.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeAlwaysAllow
+	// --read-only-port
+	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
+
+	// Setup general overrides for the kubelet.
+	// TODO(endocrimes): Move the following to a `default` configuration file
+
 	kc.CgroupRoot = "/"
-	kubeletConfigFlags = append(kubeletConfigFlags, "cgroup-root")
 
 	kc.VolumeStatsAggPeriod = metav1.Duration{Duration: 10 * time.Second} // Aggregate volumes frequently so tests don't need to wait as long
-	kubeletConfigFlags = append(kubeletConfigFlags, "volume-stats-agg-period")
 
 	kc.SerializeImagePulls = false
-	kubeletConfigFlags = append(kubeletConfigFlags, "serialize-image-pulls")
 
 	kc.StaticPodPath = podPath
-	kubeletConfigFlags = append(kubeletConfigFlags, "pod-manifest-path")
 
 	kc.FileCheckFrequency = metav1.Duration{Duration: 10 * time.Second} // Check file frequently so tests won't wait too long
-	kubeletConfigFlags = append(kubeletConfigFlags, "file-check-frequency")
 
 	// Assign a fixed CIDR to the node because there is no node controller.
 	// Note: this MUST be in sync with the IP in
 	// - cluster/gce/config-test.sh and
 	// - test/e2e_node/conformance/run_test.sh.
 	kc.PodCIDR = "10.100.0.0/24"
-	kubeletConfigFlags = append(kubeletConfigFlags, "pod-cidr")
 
 	kc.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 30 * time.Second}
-	kubeletConfigFlags = append(kubeletConfigFlags, "eviction-pressure-transition-period")
 
 	kc.EvictionHard = map[string]string{
 		"memory.available":  "250Mi",
 		"nodefs.available":  "10%",
 		"nodefs.inodesFree": "5%",
 	}
-	kubeletConfigFlags = append(kubeletConfigFlags, "eviction-hard")
 
 	kc.EvictionMinimumReclaim = map[string]string{
 		"nodefs.available":  "5%",
 		"nodefs.inodesFree": "5%",
 	}
-	kubeletConfigFlags = append(kubeletConfigFlags, "eviction-minimum-reclaim")
 
 	var killCommand, restartCommand *exec.Cmd
 	var isSystemd bool
@@ -204,17 +234,14 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		restartCommand = exec.Command("systemctl", "restart", unitName)
 
 		kc.KubeletCgroups = "/kubelet.slice"
-		kubeletConfigFlags = append(kubeletConfigFlags, "kubelet-cgroups")
 	} else {
 		cmdArgs = append(cmdArgs, builder.GetKubeletServerBin())
 		// TODO(random-liu): Get rid of this docker specific thing.
 		cmdArgs = append(cmdArgs, "--runtime-cgroups=/docker-daemon")
 
 		kc.KubeletCgroups = "/kubelet"
-		kubeletConfigFlags = append(kubeletConfigFlags, "kubelet-cgroups")
 
 		kc.SystemCgroups = "/system"
-		kubeletConfigFlags = append(kubeletConfigFlags, "system-cgroups")
 	}
 	cmdArgs = append(cmdArgs,
 		"--kubeconfig", kubeconfigPath,
@@ -277,17 +304,11 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		cmdArgs = append(cmdArgs, "--image-service-endpoint", framework.TestContext.ImageServiceEndpoint)
 	}
 
-	// Write config file or flags, depending on whether --generate-kubelet-config-file was provided
-	if genKubeletConfigFile {
-		if err := writeKubeletConfigFile(kc, kubeletConfigPath); err != nil {
-			return nil, err
-		}
-		// add the flag to load config from a file
-		cmdArgs = append(cmdArgs, "--config", kubeletConfigPath)
-	} else {
-		// generate command line flags from the default config, since --generate-kubelet-config-file was not provided
-		addKubeletConfigFlags(&cmdArgs, kc, kubeletConfigFlags)
+	if err := writeKubeletConfigFile(kc, kubeletConfigPath); err != nil {
+		return nil, err
 	}
+	// add the flag to load config from a file
+	cmdArgs = append(cmdArgs, "--config", kubeletConfigPath)
 
 	// Override the default kubelet flags.
 	cmdArgs = append(cmdArgs, kubeletArgs...)
@@ -309,15 +330,6 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		e.monitorParent,
 		restartOnExit)
 	return server, server.start()
-}
-
-// addKubeletConfigFlags adds the flags we care about from the provided kubelet configuration object
-func addKubeletConfigFlags(cmdArgs *[]string, kc *kubeletconfig.KubeletConfiguration, flags []string) {
-	fs := pflag.NewFlagSet("kubelet", pflag.ExitOnError)
-	options.AddKubeletConfigFlags(fs, kc)
-	for _, name := range flags {
-		*cmdArgs = append(*cmdArgs, fmt.Sprintf("--%s=%s", name, fs.Lookup(name).Value.String()))
-	}
 }
 
 // writeKubeletConfigFile writes the kubelet config file based on the args and returns the filename

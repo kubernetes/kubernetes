@@ -65,11 +65,7 @@ func copyKubeletConfigIfExists(kubeletConfigFile, dstDir string) error {
 	defer destination.Close()
 
 	_, err = io.Copy(destination, source)
-	if err != nil {
-		return err
-	}
-
-	return os.Chmod(dst, 0x644)
+	return err
 }
 
 // CreateTestArchive creates the archive package for the node e2e test.
