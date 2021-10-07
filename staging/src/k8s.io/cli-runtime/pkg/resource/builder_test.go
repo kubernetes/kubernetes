@@ -31,6 +31,8 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/yaml"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -50,7 +52,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 
 	// TODO we need to remove this linkage and create our own scheme
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -1229,7 +1231,7 @@ func TestFieldSelectorRequiresKnownTypes(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 }
-func TestNoSelectorUnknowResourceType(t *testing.T) {
+func TestNoSelectorUnknownResourceType(t *testing.T) {
 	b := newDefaultBuilder().
 		NamespaceParam("test").
 		ResourceTypeOrNameArgs(false, "unknown")
@@ -1802,4 +1804,98 @@ func TestStdinMultiUseError(t *testing.T) {
 	if got, want := newUnstructuredDefaultBuilder().StdinInUse().Stdin().Do().Err(), StdinMultiUseError; !errors.Is(got, want) {
 		t.Errorf("got: %q, want: %q", got, want)
 	}
+}
+
+func TestCustomResourceDefinitionAndCustomResourceParsing(t *testing.T) {
+	const (
+		defaultNs = "some-ns"
+		crd       = `apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: issuers.cert-manager.io
+spec:
+  group: cert-manager.io
+  names:
+    kind: Issuer
+    listKind: IssuerList
+    plural: issuers
+    singular: issuer
+    categories:
+      - cert-manager
+  scope: Namespaced
+  versions:
+    - name: v1
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+      served: true
+      storage: true
+`
+		cr = `apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: ca-issuer
+spec:
+  ca:
+    secretName: ca-key-pair
+`
+	)
+	m := meta.NewDefaultRESTMapper([]schema.GroupVersion{
+		{
+			Group:   "apiextensions.k8s.io",
+			Version: "v1",
+		},
+	})
+	m.AddSpecific(schema.GroupVersionKind{
+		Group:   "apiextensions.k8s.io",
+		Version: "v1",
+		Kind:    "CustomResourceDefinition",
+	}, schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinitions",
+	}, schema.GroupVersionResource{
+		Group:    "apiextensions.k8s.io",
+		Version:  "v1",
+		Resource: "customresourcedefinition",
+	}, meta.RESTScopeRoot)
+
+	b := NewFakeBuilder(
+		fakeClient(),
+		func() (meta.RESTMapper, error) {
+			return m, nil
+		},
+		func() (restmapper.CategoryExpander, error) {
+			return FakeCategoryExpander, nil
+		}).
+		Unstructured().
+		Flatten().
+		ContinueOnError().
+		NamespaceParam(defaultNs).DefaultNamespace().
+		Stream(strings.NewReader(cr), "source CR stream").
+		Stream(strings.NewReader(crd), "source CRD stream")
+
+	result := b.Do()
+	err := result.Err()
+	require.NoError(t, err)
+	visited := 0
+	err = result.Visit(func(info *Info, err error) error {
+		if err != nil {
+			return err
+		}
+		visited++
+		switch info.Name {
+		case "issuers.cert-manager.io":
+			// nothing to do
+		case "ca-issuer":
+			assert.Equal(t, defaultNs, info.Namespace)
+		default:
+			t.Fatal("unexpected resource")
+		}
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 2, visited)
 }
