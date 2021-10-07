@@ -35,7 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/scale"
-	"k8s.io/kube-scheduler/config/v1beta2"
+	"k8s.io/kube-scheduler/config/v1beta3"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -93,12 +93,12 @@ func initTest(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutil
 // initTestDisablePreemption initializes a test environment and creates API server and scheduler with default
 // configuration but with pod preemption disabled.
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestContext {
-	cfg := configtesting.V1beta2ToInternalWithDefaults(t, v1beta2.KubeSchedulerConfiguration{
-		Profiles: []v1beta2.KubeSchedulerProfile{{
+	cfg := configtesting.V1beta3ToInternalWithDefaults(t, v1beta3.KubeSchedulerConfiguration{
+		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
-			Plugins: &v1beta2.Plugins{
-				PostFilter: v1beta2.PluginSet{
-					Disabled: []v1beta2.Plugin{
+			Plugins: &v1beta3.Plugins{
+				PostFilter: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
 						{Name: defaultpreemption.Name},
 					},
 				},
