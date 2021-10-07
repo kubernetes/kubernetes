@@ -1354,6 +1354,55 @@ func TestFinishRequestLocked(t *testing.T) {
 	}
 }
 
+func TestRequestSeats(t *testing.T) {
+	tests := []struct {
+		name     string
+		request  *request
+		expected int
+	}{
+		{
+			name:     "",
+			request:  &request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 3, FinalSeats: 3}},
+			expected: 3,
+		},
+		{
+			name:     "",
+			request:  &request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 3}},
+			expected: 3,
+		},
+		{
+			name:     "",
+			request:  &request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 3, FinalSeats: 1}},
+			expected: 3,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			seatsGot := test.request.MaxSeats()
+			if test.expected != seatsGot {
+				t.Errorf("Expected seats: %d, got %d", test.expected, seatsGot)
+			}
+		})
+	}
+}
+
+func TestRequestAdditionalSeatSeconds(t *testing.T) {
+	request := &request{
+		workEstimate: fcrequest.WorkEstimate{
+			InitialSeats:      3,
+			FinalSeats:        5,
+			AdditionalLatency: 3 * time.Second,
+		},
+	}
+
+	got := request.AdditionalSeatSeconds()
+	want := SeatsTimesDuration(5, 3*time.Second)
+	if want != got {
+		t.Errorf("Expected AdditionalSeatSeconds: %v, but got: %v", want, got)
+	}
+}
+
 func newFIFO(requests ...*request) fifo {
 	l := newRequestFIFO()
 	for i := range requests {

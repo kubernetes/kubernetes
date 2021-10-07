@@ -18,8 +18,10 @@ package e2enode
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -34,10 +36,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -200,6 +205,20 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 			devs := cntInfo.GetDevices()
 			if len(devs) > 0 {
 				return fmt.Errorf("pod %q container %q expected no resources, got %v", podReq.podName, podReq.cntName, devs)
+			}
+		}
+		if cnts, ok := found[KubeVirtResourceName]; ok {
+			for _, cnt := range cnts {
+				for _, cd := range cnt.GetDevices() {
+					if cd.ResourceName != KubeVirtResourceName {
+						continue
+					}
+					if cd.Topology != nil {
+						//we expect nil topology
+						return fmt.Errorf("Nil topology is expected")
+					}
+				}
+
 			}
 		}
 	}
@@ -638,8 +657,84 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 			defer conn.Close()
 
 			ginkgo.By("checking GetAllocatableResources fail if the feature gate is not enabled")
-			_, err = cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			allocatableRes, err := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			framework.Logf("GetAllocatableResources result: %v, err: %v", allocatableRes, err)
 			framework.ExpectError(err, "With feature gate disabled, the call must fail")
+		})
+	})
+
+	ginkgo.Context("Use KubeVirt device plugin, which reports resources w/o hardware topology", func() {
+		ginkgo.It("should return proper podresources the same as before the restart of kubelet", func() {
+
+			if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResources) {
+				e2eskipper.Skipf("this test is meant to run with the POD Resources Extensions feature gate enabled")
+			}
+
+			_, err := os.Stat("/dev/kvm")
+			if errors.Is(err, os.ErrNotExist) {
+				e2eskipper.Skipf("KubeVirt device plugin could work only in kvm based environment")
+			}
+
+			_, cpuAlloc, _ := getLocalNodeCPUDetails(f)
+
+			if cpuAlloc < minCoreCount {
+				e2eskipper.Skipf("Skipping CPU Manager tests since the CPU allocatable < %d", minCoreCount)
+			}
+
+			// Make sure all the feature gates and the right settings are in place.
+			oldCfg := configurePodResourcesInKubelet(f, true, reservedSystemCPUs)
+			defer func() {
+				// restore kubelet config
+				setOldKubeletConfig(f, oldCfg)
+
+				// Delete state file to allow repeated runs
+				deleteStateFile()
+			}()
+
+			dpPod := setupKubeVirtDevicePluginOrFail(f)
+			defer teardownKubeVirtDevicePluginOrFail(f, dpPod)
+
+			waitForKubeVirtResources(f, dpPod)
+
+			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
+			framework.ExpectNoError(err)
+
+			cli, conn, err := podresources.GetV1Client(endpoint, defaultPodResourcesTimeout, defaultPodResourcesMaxSize)
+			framework.ExpectNoError(err)
+			defer conn.Close()
+
+			ginkgo.By("checking List and resources kubevirt resource should be without topology")
+
+			allocatableResponse, _ := cli.GetAllocatableResources(context.TODO(), &kubeletpodresourcesv1.AllocatableResourcesRequest{})
+			for _, dev := range allocatableResponse.GetDevices() {
+				if dev.ResourceName != KubeVirtResourceName {
+					continue
+				}
+
+				framework.ExpectEqual(dev.Topology == nil, true, "Topology is expected to be empty for kubevirt resources")
+			}
+
+			// Run pod which requires KubeVirtResourceName
+			desc := podDesc{
+				podName:        "pod-01",
+				cntName:        "cnt-01",
+				resourceName:   KubeVirtResourceName,
+				resourceAmount: 1,
+				cpuCount:       1,
+			}
+
+			tpd := newTestPodData()
+			tpd.createPodsForTest(f, []podDesc{
+				desc,
+			})
+
+			expectPodResources(1, cli, []podDesc{desc})
+
+			ginkgo.By("Restarting Kubelet")
+			restartKubelet()
+			framework.WaitForAllNodesSchedulable(f.ClientSet, framework.TestContext.NodeSchedulableTimeout)
+			expectPodResources(1, cli, []podDesc{desc})
+			tpd.deletePodsForTest(f)
 		})
 
 	})
@@ -738,4 +833,77 @@ func enablePodResourcesFeatureGateInKubelet(f *framework.Framework) (oldCfg *kub
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
+}
+
+func setupKubeVirtDevicePluginOrFail(f *framework.Framework) *v1.Pod {
+	e2enode.WaitForNodeToBeReady(f.ClientSet, framework.TestContext.NodeName, 5*time.Minute)
+
+	dp := getKubeVirtDevicePluginPod()
+	dp.Spec.NodeName = framework.TestContext.NodeName
+
+	ginkgo.By("Create KubeVirt device plugin pod")
+
+	dpPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(context.TODO(), dp, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	if err = e2epod.WaitForPodCondition(f.ClientSet, metav1.NamespaceSystem, dp.Name, "Ready", 120*time.Second, testutils.PodRunningReady); err != nil {
+		framework.Logf("KubeVirt Pod %v took too long to enter running/ready: %v", dp.Name, err)
+	}
+	framework.ExpectNoError(err)
+
+	return dpPod
+}
+
+func teardownKubeVirtDevicePluginOrFail(f *framework.Framework, pod *v1.Pod) {
+	gp := int64(0)
+	deleteOptions := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
+	ginkgo.By(fmt.Sprintf("Delete KubeVirt device plugin pod %s/%s", pod.Namespace, pod.Name))
+	err := f.ClientSet.CoreV1().Pods(pod.Namespace).Delete(context.TODO(), pod.Name, deleteOptions)
+
+	framework.ExpectNoError(err)
+}
+
+func findKubeVirtResource(node *v1.Node) int64 {
+	framework.Logf("Node status allocatable: %v", node.Status.Allocatable)
+	for key, val := range node.Status.Allocatable {
+		if string(key) == KubeVirtResourceName {
+			v := val.Value()
+			if v > 0 {
+				return v
+			}
+		}
+	}
+	return 0
+}
+
+func waitForKubeVirtResources(f *framework.Framework, pod *v1.Pod) {
+	ginkgo.By("Waiting for kubevirt resources to become available on the local node")
+
+	gomega.Eventually(func() bool {
+		node := getLocalNode(f)
+		kubeVirtResourceAmount := findKubeVirtResource(node)
+		return kubeVirtResourceAmount != 0
+	}, 2*time.Minute, framework.Poll).Should(gomega.BeTrue())
+}
+
+// getKubeVirtDevicePluginPod returns the Device Plugin pod for kube resources in e2e tests.
+func getKubeVirtDevicePluginPod() *v1.Pod {
+	data, err := e2etestfiles.Read(KubeVirtDevicePluginDSYAML)
+	if err != nil {
+		framework.Fail(err.Error())
+	}
+
+	ds := readDaemonSetV1OrDie(data)
+	p := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      KubeVirtDevicePluginName,
+			Namespace: metav1.NamespaceSystem,
+		},
+
+		Spec: ds.Spec.Template.Spec,
+	}
+
+	return p
 }

@@ -26,6 +26,7 @@ import (
 
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/config"
+	"k8s.io/component-base/logs/registry"
 	"k8s.io/klog/v2"
 )
 
@@ -35,16 +36,13 @@ const (
 	JSONLogFormat    = "json"
 )
 
-// LogRegistry is new init LogFormatRegistry struct
-var LogRegistry = NewLogFormatRegistry()
-
 // loggingFlags captures the state of the logging flags, in particular their default value
 // before flag parsing. It is used by UnsupportedLoggingFlags.
 var loggingFlags pflag.FlagSet
 
 func init() {
 	// Text format is default klog format
-	LogRegistry.Register(DefaultLogFormat, nil)
+	registry.LogRegistry.Register(DefaultLogFormat, nil)
 
 	var fs flag.FlagSet
 	klog.InitFlags(&fs)
@@ -63,10 +61,10 @@ func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 	// hyphens, even if currently no normalization function is set for the
 	// flag set yet.
 	unsupportedFlags := strings.Join(unsupportedLoggingFlagNames(cliflag.WordSepNormalizeFunc), ", ")
-	formats := fmt.Sprintf(`"%s"`, strings.Join(LogRegistry.List(), `", "`))
+	formats := fmt.Sprintf(`"%s"`, strings.Join(registry.LogRegistry.List(), `", "`))
 	fs.StringVar(&c.Format, "logging-format", c.Format, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
 	// No new log formats should be added after generation is of flag options
-	LogRegistry.Freeze()
+	registry.LogRegistry.Freeze()
 	fs.BoolVar(&c.Sanitization, "experimental-logging-sanitization", c.Sanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 }

@@ -346,7 +346,7 @@ kubeProxy:
 
 before running
 
-`kube init --config <path_to_configuration_file>`
+`kubeadm init --config <path_to_configuration_file>`
 
 to specify the ipvs mode before deploying the cluster.
 

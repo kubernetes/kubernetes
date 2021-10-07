@@ -101,9 +101,25 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 		// only look for suitable extension executables if
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
-			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
-				fmt.Fprintf(errout, "Error: %v\n", err)
-				os.Exit(1)
+			// Also check the commands that will be added by Cobra.
+			// These commands are only added once rootCmd.Execute() is called, so we
+			// need to check them explicitly here.
+			var cmdName string // first "non-flag" arguments
+			for _, arg := range cmdPathPieces {
+				if !strings.HasPrefix(arg, "-") {
+					cmdName = arg
+					break
+				}
+			}
+
+			switch cmdName {
+			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+				// Don't search for a plugin
+			default:
+				if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+					fmt.Fprintf(errout, "Error: %v\n", err)
+					os.Exit(1)
+				}
 			}
 		}
 	}

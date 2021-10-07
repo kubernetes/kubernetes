@@ -37,7 +37,7 @@ pushd "${KUBE_ROOT}/hack/tools" >/dev/null
   GO111MODULE=on go install k8s.io/klog/hack/tools/logcheck
 popd >/dev/null
 
-# We store packaged that are migrated in .structured_logging
+# We store packages that are migrated in .structured_logging
 migrated_packages_file="${KUBE_ROOT}/hack/.structured_logging"
 
 # Ensure that file is sorted.
@@ -48,15 +48,50 @@ while IFS='' read -r line; do
   migrated_packages+=("$KUBE_ROOT/$line")
 done < <(cat "${migrated_packages_file}")
 
-
+echo "Running structured logging static check on migrated packages"
 ret=0
 GOOS=linux    logcheck "${migrated_packages[@]}" || ret=$?
 GOOS=windows  logcheck "${migrated_packages[@]}" || ret=$?
 
 if [ $ret -eq 0 ]; then
-  echo "Structured logging static check is passed :)."
+  echo "Structured logging static check passed on migrated packages :)"
 else
   echo "Please fix above failures. You can locally test via:"
   echo "hack/verify-structured-logging.sh"
 fi
+
+# Ignore migrated packages as they are already tested
+# Trim the trailing /... from given packages
+ignore_packages=$(grep -oE '^[a-zA-Z0-9/]+[^/\.]' < "${KUBE_ROOT}"/hack/.structured_logging)
+
+all_packages=()
+# shellcheck disable=SC2010
+for i in $(ls -d ./*/ | grep -v 'staging' | grep -v 'vendor' | grep -v 'hack')
+do
+     all_packages+=("$(go list ./"$i"/... 2> /dev/null | sed 's/k8s.io\/kubernetes\///g')")
+  all_packages+=(" ")
+done
+# We exclude vendor/ except vendor/k8s.io
+# This is because vendor/k8s.io is symlinked to staging
+# and needs to be checked
+all_packages+=("vendor/k8s.io")
+
+# Packages to test = all_packages - ignored_packages
+packages=()
+while IFS='' read -r line; do
+  if [ -z "$line" ]; then continue; fi
+  packages+=("$KUBE_ROOT/$line/...")
+done < <(echo "${all_packages[@]}" | tr " " "\n" | grep -v "$ignore_packages")
+
+echo -e "\nRunning structured logging static check on all other packages"
+GOOS=linux    logcheck -allow-unstructured "${packages[@]}" || ret=$?
+GOOS=windows  logcheck -allow-unstructured "${packages[@]}" || ret=$?
+
+if [ $ret -eq 0 ]; then
+  echo "Structured logging static check passed on all packages :)"
+else
+  echo "Please fix above failures. You can locally test via:"
+  echo "hack/verify-structured-logging.sh"
+fi
+
 exit $ret
