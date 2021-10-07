@@ -126,8 +126,8 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 	// see https://github.com/kubernetes/kubernetes/issues/40415
 	// We deterministically choose the oldest new ReplicaSet.
 	sort.Sort(replicaSetsByCreationTimestamp(ownedReplicaSets))
-	for _, rs := range ownedReplicaSets {
-		if !podTemplatesEqualsIgnoringHash(&rs.Spec.Template, &deployment.Spec.Template) {
+	for i, rs := range ownedReplicaSets {
+		if !podTemplatesEqualsIgnoringHash(&ownedReplicaSets[i].Spec.Template, &deployment.Spec.Template) {
 			continue
 		}
 
@@ -151,8 +151,8 @@ func GetPodsForDeployment(client clientset.Interface, deployment *appsv1.Deploym
 
 	replicaSetUID := replicaSet.UID
 	ownedPods := &v1.PodList{Items: make([]v1.Pod, 0, len(allPods.Items))}
-	for _, pod := range allPods.Items {
-		controllerRef := metav1.GetControllerOf(&pod)
+	for i, pod := range allPods.Items {
+		controllerRef := metav1.GetControllerOf(&allPods.Items[i])
 		if controllerRef != nil && controllerRef.UID == replicaSetUID {
 			ownedPods.Items = append(ownedPods.Items, pod)
 		}
