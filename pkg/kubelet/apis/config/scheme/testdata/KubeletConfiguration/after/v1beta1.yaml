@@ -36,7 +36,6 @@ evictionHard:
   imagefs.available: 15%
   memory.available: 100Mi
   nodefs.available: 10%
-  nodefs.inodesFree: 5%
 evictionPressureTransitionPeriod: 5m0s
 failSwapOn: true
 fileCheckFrequency: 20s
