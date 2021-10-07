@@ -89,7 +89,7 @@ func unescapeSystemdCgroupName(part string) string {
 // This function always expands the systemd name into the cgroupfs form. If only
 // the last part is needed, use path.Base(...) on it to discard the rest.
 func (cgroupName CgroupName) ToSystemd() string {
-	if len(cgroupName) == 0 || (len(cgroupName) == 1 && cgroupName[0] == "") {
+	if len(cgroupName) == 0 {
 		return "/"
 	}
 	newparts := []string{}
