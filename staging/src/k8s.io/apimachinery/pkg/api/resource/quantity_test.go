@@ -333,6 +333,11 @@ func TestQuantityParse(t *testing.T) {
 		{"0.05Gi", decQuantity(536870912, -1, BinarySI)},
 		{"0.025Ti", decQuantity(274877906944, -1, BinarySI)},
 
+		// Things in the wrong case but can only mean one suffix
+		{"0.5mi", decQuantity(1024 * 1024 * .5, 0, BinarySI)},
+		{"10K", decQuantity(10, 3, DecimalSI)},
+		{"124g", decQuantity(124, 9, DecimalSI)},
+	
 		// Things written by trolls
 		{"0.000000000001Ki", decQuantity(2, -9, DecimalSI)}, // rounds up, changes format
 		{".001", decQuantity(1, -3, DecimalSI)},
@@ -482,7 +487,8 @@ func TestQuantityParse(t *testing.T) {
 	invalid := []string{
 		"1.1.M",
 		"1+1.0M",
-		"0.1mi",
+		"0.1MI",
+		"0.1mI",
 		"0.1am",
 		"aoeu",
 		".5i",
