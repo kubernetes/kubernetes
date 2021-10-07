@@ -27,8 +27,6 @@ const (
 	ModeWarn       = "warn"
 	DecisionAllow  = "allow"  // Policy evaluated, request allowed
 	DecisionDeny   = "deny"   // Policy evaluated, request denied
-	DecisionExempt = "exempt" // Request exempt, policy not evaluated
-	DecisionError  = "error"  // Error preventing evaluation, policy not evaluated
 )
 
 var (

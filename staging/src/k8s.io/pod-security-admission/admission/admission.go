@@ -303,12 +303,10 @@ var ignoredPodSubresources = map[string]bool{
 func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on ignored subresources
 	if ignoredPodSubresources[attrs.GetSubresource()] {
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionExempt, attrs)
 		return sharedAllowedResponse()
 	}
 
@@ -326,31 +324,27 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 	obj, err := attrs.GetObject()
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to decode object")
 	}
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		klog.InfoS("failed to assert pod type", "type", reflect.TypeOf(obj))
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to decode pod")
 	}
 	if attrs.GetOperation() == admissionv1.Update {
 		oldObj, err := attrs.GetOldObject()
 		if err != nil {
 			klog.ErrorS(err, "failed to decode old object")
-			a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 			return badRequestResponse("failed to decode old object")
 		}
 		oldPod, ok := oldObj.(*corev1.Pod)
 		if !ok {
 			klog.InfoS("failed to assert old pod type", "type", reflect.TypeOf(oldObj))
-			a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 			return badRequestResponse("failed to decode old pod")
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
-			a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
+			a.RecordEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 			return sharedAllowedResponse()
 		}
 	}
@@ -367,7 +361,6 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	}
 	// short-circuit on exempt namespaces and users
 	if a.exemptNamespace(attrs.GetNamespace()) || a.exemptUser(attrs.GetUserName()) {
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionExempt, attrs)
 		return sharedAllowedResponse()
 	}
 
@@ -379,24 +372,23 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	}
 	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
 	if nsPolicyErr == nil && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
+		a.RecordEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 
 	obj, err := attrs.GetObject()
 	if err != nil {
 		klog.ErrorS(err, "failed to decode object")
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to decode object")
 	}
 	podMetadata, podSpec, err := a.PodSpecExtractor.ExtractPodSpec(obj)
 	if err != nil {
 		klog.ErrorS(err, "failed to extract pod spec")
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionError, attrs)
 		return badRequestResponse("failed to extract pod template")
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
+		a.RecordEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, podMetadata, podSpec, attrs, false)
@@ -407,11 +399,8 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 // The returned response may be shared between evaluations and must not be mutated.
 func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, attrs api.Attributes, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
-	var decision metrics.Decision = metrics.DecisionAllow
-	var p = a.defaultPolicy
-	defer a.RecordEvaluation(p, decision, attrs)
+	var decision metrics.Decision
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
-		decision = metrics.DecisionExempt
 		return sharedAllowedResponse()
 	}
 
@@ -452,7 +441,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		}
 	}
 
-	p = nsPolicy
+	a.RecordEvaluation(nsPolicy, decision, attrs)
 	response.AuditAnnotations = auditAnnotations
 	return response
 }
