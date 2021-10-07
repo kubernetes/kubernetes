@@ -637,7 +637,7 @@ func failureTrap(c clientset.Interface, ns string) {
 		d := deployments.Items[i]
 
 		framework.Logf(spew.Sprintf("Deployment %q:\n%+v\n", d.Name, d))
-		_, allOldRSs, newRS, err := deploymentutil.GetAllReplicaSets(&d, c.AppsV1())
+		_, allOldRSs, newRS, err := testutil.GetAllReplicaSets(&d, c)
 		if err != nil {
 			framework.Logf("Could not list ReplicaSets for Deployment %q: %v", d.Name, err)
 			return
@@ -740,7 +740,7 @@ func testDeleteDeployment(f *framework.Framework) {
 
 	deployment, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
+	newRS, err := testutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
 	framework.ExpectNotEqual(newRS, nilRs)
 	stopDeployment(c, ns, deploymentName)
@@ -790,7 +790,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	framework.Logf("Ensuring deployment %q has one old replica set (the one it adopted)", deploy.Name)
 	deployment, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	_, allOldRSs, err := deploymentutil.GetOldReplicaSets(deployment, c.AppsV1())
+	_, allOldRSs, err := testutil.GetOldReplicaSets(deployment, c)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(len(allOldRSs), 1)
 }
@@ -956,7 +956,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	oldRS, err := c.AppsV1().ReplicaSets(ns).Get(context.TODO(), rsName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	ensureReplicas(oldRS, int32(1))
-	newRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
+	newRS, err := testutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
 	ensureReplicas(newRS, int32(1))
 
@@ -1222,7 +1222,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	err = e2edeployment.WaitForDeploymentComplete(c, deployment)
 	framework.ExpectNoError(err)
 
-	firstRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
+	firstRS, err := testutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
 
 	// Update the deployment with a non-existent image so that the new replica set
@@ -1260,7 +1260,7 @@ func testProportionalScalingDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	// Checking state of second rollout's replicaset.
-	secondRS, err := deploymentutil.GetNewReplicaSet(deployment, c.AppsV1())
+	secondRS, err := testutil.GetNewReplicaSet(deployment, c)
 	framework.ExpectNoError(err)
 
 	maxSurge, err := intstr.GetScaledValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.MaxSurge, int(*(deployment.Spec.Replicas)), false)
@@ -1536,8 +1536,8 @@ func watchRecreateDeployment(c clientset.Interface, d *appsv1.Deployment) error 
 		status = d.Status
 
 		if d.Status.UpdatedReplicas > 0 && d.Status.Replicas != d.Status.UpdatedReplicas {
-			_, allOldRSs, err := deploymentutil.GetOldReplicaSets(d, c.AppsV1())
-			newRS, nerr := deploymentutil.GetNewReplicaSet(d, c.AppsV1())
+			_, allOldRSs, err := testutil.GetOldReplicaSets(d, c)
+			newRS, nerr := testutil.GetNewReplicaSet(d, c)
 			if err == nil && nerr == nil {
 				framework.Logf("%+v", d)
 				testutil.LogReplicaSetsOfDeployment(d, allOldRSs, newRS, framework.Logf)
@@ -1572,7 +1572,7 @@ func waitForDeploymentOldRSsNum(c clientset.Interface, ns, deploymentName string
 		}
 		d = deployment
 
-		_, oldRSs, err = deploymentutil.GetOldReplicaSets(deployment, c.AppsV1())
+		_, oldRSs, err = testutil.GetOldReplicaSets(deployment, c)
 		if err != nil {
 			return false, err
 		}
