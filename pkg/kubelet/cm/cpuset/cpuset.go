@@ -58,7 +58,6 @@ func (b Builder) Add(elems ...int) {
 // Result returns the result CPUSet containing all elements that were
 // previously added to this builder. Subsequent calls to Add have no effect.
 func (b Builder) Result() CPUSet {
-	b.done = true
 	return b.result
 }
 

@@ -67,7 +67,7 @@ func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
 		availablePods += 10
 	}
 	//avoid creating exactly max pods
-	availablePods *= 8 / 10
+	availablePods = int32(float64(availablePods) * (float64(8.0) / float64(10.0)))
 	// bound the top and bottom
 	if availablePods > max {
 		availablePods = max
