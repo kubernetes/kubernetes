@@ -208,11 +208,19 @@ func matchPodDescWithResources(expected []podDesc, found podResMap) error {
 			return fmt.Errorf("no container resources for pod %q container %q", podReq.podName, podReq.cntName)
 		}
 		if podReq.RequiresCPU() {
-			if exclusiveCpus := podReq.CpuRequestExclusive(); exclusiveCpus != len(cntInfo.CpuIds) {
+			exclusiveCpus := podReq.CpuRequestExclusive()
+			if exclusiveCpus != len(cntInfo.CpuIds) {
 				if exclusiveCpus == 0 {
 					return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuIds)
 				}
 				return fmt.Errorf("pod %q container %q expected %d cpus got %v", podReq.podName, podReq.cntName, exclusiveCpus, cntInfo.CpuIds)
+			}
+			if exclusiveCpus == 0 && len(cntInfo.CpuAffinity) == 0 {
+				return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuAffinity)
+			}
+		} else {
+			if len(cntInfo.CpuAffinity) == 0 {
+				return fmt.Errorf("pod %q container %q requested %d expected to be allocated CPUs from shared pool %v", podReq.podName, podReq.cntName, podReq.cpuRequest, cntInfo.CpuAffinity)
 			}
 		}
 		if podReq.RequiresDevices() {
@@ -582,6 +590,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 					cpus := reservedSystemCPUs.String()
 					framework.Logf("configurePodResourcesInKubelet: using reservedSystemCPUs=%q", cpus)
 					initialConfig.ReservedSystemCPUs = cpus
+					initialConfig.FeatureGates["KubeletPodResourcesGetCPUAffinity"] = true
 				})
 
 				ginkgo.It("should return the expected responses", func() {
