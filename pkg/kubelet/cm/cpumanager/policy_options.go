@@ -19,12 +19,40 @@ package cpumanager
 import (
 	"fmt"
 	"strconv"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 
 const (
 	// FullPCPUsOnlyOption is the name of the CPU Manager policy option
 	FullPCPUsOnlyOption string = "full-pcpus-only"
 )
+
+var (
+	alphaOptions = sets.NewString()
+	betaOptions  = sets.NewString(
+		FullPCPUsOnlyOption,
+	)
+	stableOptions = sets.NewString()
+)
+
+func CheckPolicyOptionAvailable(option string) error {
+	if !alphaOptions.Has(option) && !betaOptions.Has(option) && !stableOptions.Has(option) {
+		return fmt.Errorf("unknown CPU Manager Policy option: %q", option)
+	}
+
+	if alphaOptions.Has(option) && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManagerPolicyAlphaOptions) {
+		return fmt.Errorf("CPU Manager Policy Alpha-level Options not enabled, but option %q provided", option)
+	}
+
+	if betaOptions.Has(option) && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManagerPolicyBetaOptions) {
+		return fmt.Errorf("CPU Manager Policy Beta-level Options not enabled, but option %q provided", option)
+	}
+
+	return nil
+}
 
 type StaticPolicyOptions struct {
 	// flag to enable extra allocation restrictions to avoid
@@ -41,6 +69,10 @@ type StaticPolicyOptions struct {
 func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOptions, error) {
 	opts := StaticPolicyOptions{}
 	for name, value := range policyOptions {
+		if err := CheckPolicyOptionAvailable(name); err != nil {
+			return opts, err
+		}
+
 		switch name {
 		case FullPCPUsOnlyOption:
 			optValue, err := strconv.ParseBool(value)
@@ -49,6 +81,8 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 			}
 			opts.FullPhysicalCPUsOnly = optValue
 		default:
+			// this should never be reached, we already detect unknown options,
+			// but we keep it as further safety.
 			return opts, fmt.Errorf("unsupported cpumanager option: %q (%s)", name, value)
 		}
 	}

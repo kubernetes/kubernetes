@@ -233,6 +233,8 @@ func configureCPUManagerInKubelet(f *framework.Framework, policyName string, cle
 	}
 	newCfg.FeatureGates["CPUManager"] = true
 	newCfg.FeatureGates["CPUManagerPolicyOptions"] = enableOptions
+	newCfg.FeatureGates["CPUManagerPolicyBetaOptions"] = enableOptions
+	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = enableOptions
 
 	// After graduation of the CPU Manager feature to Beta, the CPU Manager
 	// "none" policy is ON by default. But when we set the CPU Manager policy to
