@@ -43,6 +43,9 @@ type CPUsProvider interface {
 	GetCPUs(podUID, containerName string) []int64
 	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
 	GetAllocatableCPUs() []int64
+	// GetCPUAffinity returns information about taskset corresponding to
+	// the CPUs assigned to pods and containers
+	GetCPUAffinity(podUID, containerName string) []int64
 }
 
 type MemoryProvider interface {

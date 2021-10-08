@@ -233,3 +233,10 @@ func (cm *FakeContainerManager) GetNodeAllocatableAbsolute() v1.ResourceList {
 	defer cm.Unlock()
 	return nil
 }
+
+func (cm *FakeContainerManager) GetCPUAffinity(_, _ string) []int64 {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUAffinity")
+	return nil
+}

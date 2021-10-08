@@ -89,8 +89,8 @@ type Manager interface {
 	// GetAllocatableCPUs returns the assignable (not allocated) CPUs
 	GetAllocatableCPUs() cpuset.CPUSet
 
-	// GetCPUAffinity returns cpuset which includes cpus from shared pools
-	// as well as exclusively allocated cpus
+	// GetCPUAffinity returns information about taskset corresponding to
+	// the CPUs assigned to pods and containers
 	GetCPUAffinity(podUID, containerName string) cpuset.CPUSet
 }
 

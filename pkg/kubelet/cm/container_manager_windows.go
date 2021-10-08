@@ -255,3 +255,7 @@ func (cm *containerManagerImpl) GetAllocatableMemory() []*podresourcesapi.Contai
 func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
 	return nil
 }
+
+func (cm *containerManagerImpl) GetCPUAffinity(_, _ string) []int64 {
+	return nil
+}

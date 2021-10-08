@@ -1121,3 +1121,10 @@ func containerMemoryFromBlock(blocks []memorymanagerstate.Block) []*podresources
 
 	return containerMemories
 }
+
+func (cm *containerManagerImpl) GetCPUAffinity(podUID, containerName string) []int64 {
+	if cm.cpuManager != nil {
+		return cm.cpuManager.GetCPUAffinity(podUID, containerName).ToSliceNoSortInt64()
+	}
+	return []int64{}
+}

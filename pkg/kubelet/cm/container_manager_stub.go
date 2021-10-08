@@ -165,3 +165,7 @@ func NewStubContainerManagerWithDevicePluginResource(extendedPluginResources v1.
 		extendedPluginResources:             extendedPluginResources,
 	}
 }
+
+func (cm *containerManagerStub) GetCPUAffinity(_, _ string) []int64 {
+	return nil
+}

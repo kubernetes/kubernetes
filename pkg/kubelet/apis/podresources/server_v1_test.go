@@ -171,6 +171,7 @@ func TestListPodResourcesV1(t *testing.T) {
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).AnyTimes()
 			mockDevicesProvider.EXPECT().GetAllocatableDevices().Return([]*podresourcesapi.ContainerDevices{}).AnyTimes()
 			mockMemoryProvider.EXPECT().GetAllocatableMemory().Return([]*podresourcesapi.ContainerMemory{}).AnyTimes()
+			mockCPUsProvider.EXPECT().GetCPUAffinity(string(podUID), containerName).Return(tc.cpus).AnyTimes()
 
 			server := NewV1PodResourcesServer(mockPodsProvider, mockDevicesProvider, mockCPUsProvider, mockMemoryProvider)
 			resp, err := server.List(context.TODO(), &podresourcesapi.ListPodResourcesRequest{})

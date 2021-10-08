@@ -178,6 +178,20 @@ func (mr *MockCPUsProviderMockRecorder) GetAllocatableCPUs() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllocatableCPUs", reflect.TypeOf((*MockCPUsProvider)(nil).GetAllocatableCPUs))
 }
 
+// GetCPUAffinity mocks base method
+func (m *MockCPUsProvider) GetCPUAffinity(podUID, containerName string) []int64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCPUAffinity", podUID, containerName)
+	ret0, _ := ret[0].([]int64)
+	return ret0
+}
+
+// GetCPUAffinity indicates an expected call of GetCPUAffinity
+func (mr *MockCPUsProviderMockRecorder) GetCPUAffinity(podUID, containerName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCPUAffinity", reflect.TypeOf((*MockCPUsProvider)(nil).GetCPUAffinity), podUID, containerName)
+}
+
 // MockMemoryProvider is a mock of MemoryProvider interface
 type MockMemoryProvider struct {
 	ctrl     *gomock.Controller
