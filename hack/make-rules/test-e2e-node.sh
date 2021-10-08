@@ -213,6 +213,7 @@ else
     --ginkgo-flags="${ginkgoflags}" --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
     ${test_args}" --runtime-config="${runtime_config}" \
+    --kubelet-config-file="${kubelet_config_file}" \
     --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi

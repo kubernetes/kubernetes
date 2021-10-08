@@ -62,9 +62,11 @@ func (a *args) Set(value string) error {
 
 // kubeletArgs is the override kubelet args specified by the test runner.
 var kubeletArgs args
+var kubeletConfigFile string
 
 func init() {
-	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate.")
+	flag.Var(&kubeletArgs, "kubelet-flags", "Kubelet flags passed to kubelet, this will override default kubelet flags in the test. Flags specified in multiple kubelet-flags will be concatenate. Deprecated, see: --kubelet-config-file.")
+	flag.StringVar(&kubeletConfigFile, "kubelet-config-file", "./kubeletconfig.yaml", "The base KubeletConfiguration to use when setting up the kubelet. This configuration will then be minimially modified to support requirements from the test suite.")
 }
 
 // RunKubelet starts kubelet and waits for termination signal. Once receives the
@@ -92,10 +94,8 @@ const (
 	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
 )
 
-// TODO(endocrimes): Refactor to take a path to the kubeletconfig
-func baseKubeConfiguration() (*kubeletconfig.KubeletConfiguration, error) {
-	cwd, _ := os.Getwd()
-	cfgPath, err := filepath.Abs(filepath.Join(cwd, "kubeletconfig.yaml"))
+func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration, error) {
+	cfgPath, err := filepath.Abs(cfgPath)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		return nil, err
 	}
 
-	kc, err := baseKubeConfiguration()
+	kc, err := baseKubeConfiguration(kubeletConfigFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load base kubelet configuration: %v", err)
 	}
