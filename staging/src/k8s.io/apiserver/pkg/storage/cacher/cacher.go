@@ -777,7 +777,7 @@ func (c *Cacher) GuaranteedUpdate(
 }
 
 // Count implements storage.Interface.
-func (c *Cacher) Count(pathPrefix string) (int64, error) {
+func (c *Cacher) Count(pathPrefix string) (int64, int64, error) {
 	return c.storage.Count(pathPrefix)
 }
 

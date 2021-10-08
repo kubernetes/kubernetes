@@ -247,7 +247,7 @@ type Interface interface {
 		preconditions *Preconditions, tryUpdate UpdateFunc, cachedExistingObject runtime.Object) error
 
 	// Count returns number of different entries under the key (generally being path prefix).
-	Count(key string) (int64, error)
+	Count(key string) (int64, int64, error)
 }
 
 // GetOptions provides the options that may be provided for storage get operations.

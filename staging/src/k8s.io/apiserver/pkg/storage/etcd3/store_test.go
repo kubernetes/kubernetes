@@ -2282,7 +2282,7 @@ func TestCount(t *testing.T) {
 		testPropogateStoreWithKey(ctx, t, store, key, obj)
 	}
 
-	resourceACountGot, err := store.Count(resourceA)
+	resourceACountGot, _, err := store.Count(resourceA)
 	if err != nil {
 		t.Fatalf("store.Count failed: %v", err)
 	}

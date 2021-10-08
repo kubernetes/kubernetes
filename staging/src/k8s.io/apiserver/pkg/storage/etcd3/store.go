@@ -529,7 +529,7 @@ func getNewItemFunc(listObj runtime.Object, v reflect.Value) func() runtime.Obje
 	}
 }
 
-func (s *store) Count(key string) (int64, error) {
+func (s *store) Count(key string) (int64, int64, error) {
 	key = path.Join(s.pathPrefix, key)
 
 	// We need to make sure the key ended with "/" so that we only get children "directories".
@@ -543,9 +543,9 @@ func (s *store) Count(key string) (int64, error) {
 	getResp, err := s.client.KV.Get(context.Background(), key, clientv3.WithRange(clientv3.GetPrefixRangeEnd(key)), clientv3.WithCountOnly())
 	metrics.RecordEtcdRequestLatency("listWithCount", key, startTime)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	return getResp.Count, nil
+	return getResp.Count, getResp.Header.Revision, nil
 }
 
 // continueToken is a simple structured object for encoding the state of a continue token.
