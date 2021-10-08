@@ -18,10 +18,6 @@ package app
 
 import (
 	"errors"
-	"io/ioutil"
-	"strconv"
-	"strings"
-
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 
@@ -46,6 +42,7 @@ type realConntracker struct{}
 var errReadOnlySysFS = errors.New("readOnlySysFS")
 
 func (rct realConntracker) SetMax(max int) error {
+	sys := sysctl.New()
 	if err := rct.setIntSysCtl("nf_conntrack_max", max); err != nil {
 		return err
 	}
@@ -57,14 +54,13 @@ func (rct realConntracker) SetMax(max int) error {
 	// Usually that's fine. But in some configurations such as with github.com/kinvolk/kubeadm-nspawn,
 	// kube-proxy is in another netns.
 	// Therefore, check if writing in hashsize is necessary and skip the writing if not.
-	hashsize, err := readIntStringFile("/sys/module/nf_conntrack/parameters/hashsize")
+	hashsize, err := sys.GetSysctl("/sys/module/nf_conntrack/parameters/hashsize")
 	if err != nil {
 		return err
 	}
 	if hashsize >= (max / 4) {
 		return nil
 	}
-
 	// sysfs is expected to be mounted as 'rw'. However, it may be
 	// unexpectedly mounted as 'ro' by docker because of a known docker
 	// issue (https://github.com/docker/docker/issues/24000). Setting
@@ -79,9 +75,8 @@ func (rct realConntracker) SetMax(max int) error {
 	if !writable {
 		return errReadOnlySysFS
 	}
-	// TODO: generify this and sysctl to a new sysfs.WriteInt()
 	klog.InfoS("Setting conntrack hashsize", "conntrack hashsize", max/4)
-	return writeIntStringFile("/sys/module/nf_conntrack/parameters/hashsize", max/4)
+	return sys.SetSysctl("/sys/module/nf_conntrack/parameters/hashsize", max/4)
 }
 
 func (rct realConntracker) SetTCPEstablishedTimeout(seconds int) error {
@@ -129,16 +124,4 @@ func isSysFSWritable() (bool, error) {
 	}
 
 	return false, errors.New("no sysfs mounted")
-}
-
-func readIntStringFile(filename string) (int, error) {
-	b, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return -1, err
-	}
-	return strconv.Atoi(strings.TrimSpace(string(b)))
-}
-
-func writeIntStringFile(filename string, value int) error {
-	return ioutil.WriteFile(filename, []byte(strconv.Itoa(value)), 0640)
 }
