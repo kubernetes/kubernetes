@@ -460,14 +460,13 @@ var (
 		},
 	)
 	// StartedPodsErrorsTotal is a counter that tracks the number of errors creating pod sandboxes
-	StartedPodsErrorsTotal = metrics.NewCounterVec(
+	StartedPodsErrorsTotal = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           StartedPodsErrorsTotalKey,
 			Help:           "Cumulative number of errors when starting pods",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"message"},
 	)
 	// StartedContainersTotal is a counter that tracks the number of container creation operations
 	StartedContainersTotal = metrics.NewCounterVec(
