@@ -51,6 +51,7 @@ message ContainerResources {
     repeated ContainerDevices devices = 2;
     repeated int64 cpu_ids = 3;
     repeated ContainerMemory memory = 4;
+    repeated int64 cpu_affinity = 5;
 }
 
 // ContainerMemory contains information about memory and hugepages assigned to a container
