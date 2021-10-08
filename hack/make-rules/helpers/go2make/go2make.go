@@ -34,6 +34,9 @@ var flDebug = pflag.BoolP("debug", "d", false, "enable debugging output")
 var flHelp = pflag.BoolP("help", "h", false, "print help and exit")
 
 func main() {
+	// TODO(#82531): fix path resolution and performance running in go module mode
+	os.Setenv("GO111MODULE", "off")
+
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	pflag.Usage = func() { help(os.Stderr) }
 	pflag.Parse()
