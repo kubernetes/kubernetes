@@ -325,18 +325,6 @@ func (req *request) InitialSeats() int {
 	return int(req.workEstimate.InitialSeats)
 }
 
-// AdditionalSeatSeconds returns the amount of work in SeatSeconds produced by
-// the final seats and the additional latency associated with a request.
-func (req *request) AdditionalSeatSeconds() SeatSeconds {
-	return SeatsTimesDuration(float64(req.workEstimate.FinalSeats), req.workEstimate.AdditionalLatency)
-}
-
-// InitialSeatSeconds returns the amount of work in SeatSeconds projected
-// by the initial seats for a given estimated service duration.
-func (req *request) InitialSeatSeconds(estimatedServiceDuration time.Duration) SeatSeconds {
-	return SeatsTimesDuration(float64(req.workEstimate.InitialSeats), estimatedServiceDuration)
-}
-
 func (req *request) NoteQueued(inQueue bool) {
 	if req.queueNoteFn != nil {
 		req.queueNoteFn(inQueue)
@@ -488,7 +476,7 @@ func (qs *queueSet) timeoutOldRequestsAndRejectOrEnqueueLocked(ctx context.Conte
 		descr1:            descr1,
 		descr2:            descr2,
 		queueNoteFn:       queueNoteFn,
-		workEstimate:      *workEstimate,
+		workEstimate:      qs.completeWorkEstimate(workEstimate),
 	}
 	if ok := qs.rejectOrEnqueueLocked(req); !ok {
 		return nil
@@ -516,7 +504,7 @@ func (qs *queueSet) shuffleShardLocked(hashValue uint64, descr1, descr2 interfac
 
 		// this is the total amount of work in seat-seconds for requests
 		// waiting in this queue, we will select the queue with the minimum.
-		thisQueueSeatSeconds := SeatsTimesDuration(float64(queueSum.InitialSeatsSum), qs.estimatedServiceDuration) + queueSum.AdditionalSeatSecondsSum
+		thisQueueSeatSeconds := queueSum.TotalWorkSum
 		klog.V(7).Infof("QS(%s): For request %#+v %#+v considering queue %d with sum: %#v and %d seats in use, nextDispatchR=%v", qs.qCfg.Name, descr1, descr2, queueIdx, queueSum, queue.seatsInUse, queue.nextDispatchR)
 		if thisQueueSeatSeconds < minQueueSeatSeconds {
 			minQueueSeatSeconds = thisQueueSeatSeconds
@@ -634,7 +622,7 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 		arrivalR:          qs.currentR,
 		descr1:            descr1,
 		descr2:            descr2,
-		workEstimate:      *workEstimate,
+		workEstimate:      qs.completeWorkEstimate(workEstimate),
 	}
 	qs.totRequestsExecuting++
 	qs.totSeatsInUse += req.MaxSeats()
@@ -683,7 +671,7 @@ func (qs *queueSet) dispatchLocked() bool {
 			request.workEstimate, queue.index, queue.nextDispatchR, queue.requests.Length(), queue.requestsExecuting, queue.seatsInUse, qs.totSeatsInUse)
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G * width
-	queue.nextDispatchR += request.InitialSeatSeconds(qs.estimatedServiceDuration) + request.AdditionalSeatSeconds()
+	queue.nextDispatchR += request.totalWork()
 	qs.boundNextDispatch(queue)
 	request.decision.Set(decisionExecute)
 	return ok
@@ -734,7 +722,7 @@ func (qs *queueSet) findDispatchQueueLocked() *queue {
 			estimatedWorkInProgress := SeatsTimesDuration(float64(queue.seatsInUse), qs.estimatedServiceDuration)
 			dsMin = ssMin(dsMin, queue.nextDispatchR-estimatedWorkInProgress)
 			dsMax = ssMax(dsMax, queue.nextDispatchR-estimatedWorkInProgress)
-			currentVirtualFinish := queue.nextDispatchR + oldestWaiting.InitialSeatSeconds(qs.estimatedServiceDuration) + oldestWaiting.AdditionalSeatSeconds()
+			currentVirtualFinish := queue.nextDispatchR + oldestWaiting.totalWork()
 			klog.V(11).InfoS("Considering queue to dispatch", "queueSet", qs.qCfg.Name, "queue", qs.robinIndex, "finishR", currentVirtualFinish)
 			if currentVirtualFinish < minVirtualFinish {
 				minVirtualFinish = currentVirtualFinish
