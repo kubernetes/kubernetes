@@ -32,8 +32,6 @@ type Config struct {
 	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
-	LegacyPolicySource *kubeschedulerconfig.SchedulerPolicySource
-
 	// LoopbackClientConfig is a config for a privileged loopback connection
 	LoopbackClientConfig *restclient.Config
 

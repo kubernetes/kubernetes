@@ -63,7 +63,6 @@ func initTestSchedulerForPriorityTest(t *testing.T, scorePluginName string) *tes
 	testCtx := testutils.InitTestSchedulerWithOptions(
 		t,
 		testutils.InitTestAPIServer(t, strings.ToLower(scorePluginName), nil),
-		nil,
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
 	testutils.SyncInformerFactory(testCtx)
