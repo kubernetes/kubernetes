@@ -82,6 +82,7 @@ type request struct {
 type completedWorkEstimate struct {
 	fcrequest.WorkEstimate
 	totalWork SeatSeconds // initial plus final work
+	finalWork SeatSeconds // only final work
 }
 
 // queue is an array of requests with additional metadata required for
@@ -123,14 +124,20 @@ func (req *request) totalWork() SeatSeconds {
 }
 
 func (qs *queueSet) completeWorkEstimate(we *fcrequest.WorkEstimate) completedWorkEstimate {
+	finalWork := qs.computeFinalWork(we)
 	return completedWorkEstimate{
 		WorkEstimate: *we,
-		totalWork:    qs.computeTotalWork(we),
+		totalWork:    qs.computeInitialWork(we) + finalWork,
+		finalWork:    finalWork,
 	}
 }
 
-func (qs *queueSet) computeTotalWork(we *fcrequest.WorkEstimate) SeatSeconds {
-	return SeatsTimesDuration(float64(we.InitialSeats), qs.estimatedServiceDuration) + SeatsTimesDuration(float64(we.FinalSeats), we.AdditionalLatency)
+func (qs *queueSet) computeInitialWork(we *fcrequest.WorkEstimate) SeatSeconds {
+	return SeatsTimesDuration(float64(we.InitialSeats), qs.estimatedServiceDuration)
+}
+
+func (qs *queueSet) computeFinalWork(we *fcrequest.WorkEstimate) SeatSeconds {
+	return SeatsTimesDuration(float64(we.FinalSeats), we.AdditionalLatency)
 }
 
 // Enqueue enqueues a request into the queue and
@@ -198,6 +205,12 @@ func SeatsTimesDuration(seats float64, duration time.Duration) SeatSeconds {
 // This conversion may lose precision.
 func (ss SeatSeconds) ToFloat() float64 {
 	return float64(ss) / ssScale
+}
+
+// DurationPerSeat returns duration per seat.
+// This division may lose precision.
+func (ss SeatSeconds) DurationPerSeat(seats float64) time.Duration {
+	return time.Duration(float64(ss) / seats * (float64(time.Second) / ssScale))
 }
 
 // String converts to a string.
