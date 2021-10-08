@@ -24,12 +24,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
@@ -110,7 +112,34 @@ func baseKubeConfiguration(cfgPath string) (*kubeletconfig.KubeletConfiguration,
 
 		// If the kubeletconfig file doesn't exist, then use a default configuration
 		// as the base.
-		return options.NewKubeletConfiguration()
+		kc, err := options.NewKubeletConfiguration()
+		if err != nil {
+			return nil, err
+		}
+
+		// The following values should match the contents of
+		// test/e2e_node/jenkins/default-kubelet-config.yaml. We can't use go embed
+		// here to fallback as default config lives in a parallel directory.
+		// TODO(endocrimes): Remove fallback for lack of kubelet config when all
+		//                   uses of e2e_node switch to providing one (or move to
+		//                   kubetest2 and pick up the default).
+		kc.CgroupRoot = "/"
+		kc.VolumeStatsAggPeriod = metav1.Duration{Duration: 10 * time.Second}
+		kc.SerializeImagePulls = false
+		kc.FileCheckFrequency = metav1.Duration{Duration: 10 * time.Second}
+		kc.PodCIDR = "10.100.0.0/24"
+		kc.EvictionPressureTransitionPeriod = metav1.Duration{Duration: 30 * time.Second}
+		kc.EvictionHard = map[string]string{
+			"memory.available":  "250Mi",
+			"nodefs.available":  "10%",
+			"nodefs.inodesFree": "5%",
+		}
+		kc.EvictionMinimumReclaim = map[string]string{
+			"nodefs.available":  "5%",
+			"nodefs.inodesFree": "5%",
+		}
+
+		return kc, nil
 	}
 
 	loader, err := configfiles.NewFsLoader(&utilfs.DefaultFs{}, cfgPath)
