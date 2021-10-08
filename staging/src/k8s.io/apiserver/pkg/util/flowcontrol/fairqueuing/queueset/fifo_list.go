@@ -140,11 +140,11 @@ func (l *requestFIFO) Walk(f walkFunc) {
 func addToQueueSum(sum *queueSum, req *request) {
 	sum.InitialSeatsSum += req.InitialSeats()
 	sum.MaxSeatsSum += req.MaxSeats()
-	sum.AdditionalSeatSecondsSum += req.AdditionalSeatSeconds()
+	sum.TotalWorkSum += req.totalWork()
 }
 
 func deductFromQueueSum(sum *queueSum, req *request) {
 	sum.InitialSeatsSum -= req.InitialSeats()
 	sum.MaxSeatsSum -= req.MaxSeats()
-	sum.AdditionalSeatSecondsSum -= req.AdditionalSeatSeconds()
+	sum.TotalWorkSum -= req.totalWork()
 }

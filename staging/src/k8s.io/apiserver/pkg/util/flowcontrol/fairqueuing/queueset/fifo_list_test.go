@@ -153,12 +153,13 @@ func TestFIFOWithRemoveIsIdempotent(t *testing.T) {
 }
 
 func TestFIFOQueueWorkEstimate(t *testing.T) {
+	qs := &queueSet{estimatedServiceDuration: time.Second}
 	list := newRequestFIFO()
 
 	update := func(we *queueSum, req *request, multiplier int) {
 		we.InitialSeatsSum += multiplier * req.InitialSeats()
 		we.MaxSeatsSum += multiplier * req.MaxSeats()
-		we.AdditionalSeatSecondsSum += SeatSeconds(multiplier) * req.AdditionalSeatSeconds()
+		we.TotalWorkSum += SeatSeconds(multiplier) * req.totalWork()
 	}
 
 	assert := func(t *testing.T, want, got *queueSum) {
@@ -168,11 +169,11 @@ func TestFIFOQueueWorkEstimate(t *testing.T) {
 	}
 
 	newRequest := func(initialSeats, finalSeats uint, additionalLatency time.Duration) *request {
-		return &request{workEstimate: fcrequest.WorkEstimate{
+		return &request{workEstimate: qs.completeWorkEstimate(&fcrequest.WorkEstimate{
 			InitialSeats:      initialSeats,
 			FinalSeats:        finalSeats,
 			AdditionalLatency: additionalLatency,
-		}}
+		})}
 	}
 	arrival := []*request{
 		newRequest(1, 3, time.Second),

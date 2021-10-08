@@ -1114,6 +1114,7 @@ func TestTotalRequestsExecutingWithPanic(t *testing.T) {
 
 func TestFindDispatchQueueLocked(t *testing.T) {
 	const G = 3 * time.Millisecond
+	qs0 := &queueSet{estimatedServiceDuration: G}
 	tests := []struct {
 		name                    string
 		robinIndex              int
@@ -1134,13 +1135,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
 				},
 				{
 					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
 				},
 			},
@@ -1157,7 +1158,7 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1})},
 					),
 				},
 			},
@@ -1174,13 +1175,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 50}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 50})},
 					),
 				},
 				{
 					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
 				},
 			},
@@ -1197,13 +1198,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 10})},
 					),
 				},
 				{
 					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
 				},
 			},
@@ -1220,13 +1221,13 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				{
 					nextDispatchR: SeatsTimesDuration(1, 200*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 10}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 10})},
 					),
 				},
 				{
 					nextDispatchR: SeatsTimesDuration(1, 100*time.Second),
 					requests: newFIFO(
-						&request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 25}},
+						&request{workEstimate: qs0.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 25})},
 					),
 				},
 			},
@@ -1309,8 +1310,9 @@ func TestFinishRequestLocked(t *testing.T) {
 			now := time.Now()
 			clk, _ := testeventclock.NewFake(now, 0, nil)
 			qs := &queueSet{
-				clock:   clk,
-				obsPair: newObserverPair(clk),
+				clock:                    clk,
+				estimatedServiceDuration: time.Second,
+				obsPair:                  newObserverPair(clk),
 			}
 			queue := &queue{
 				requests: newRequestFIFO(),
@@ -1318,7 +1320,7 @@ func TestFinishRequestLocked(t *testing.T) {
 			r := &request{
 				qs:           qs,
 				queue:        queue,
-				workEstimate: test.workEstimate,
+				workEstimate: qs.completeWorkEstimate(&test.workEstimate),
 			}
 
 			qs.totRequestsExecuting = 111
@@ -1355,6 +1357,7 @@ func TestFinishRequestLocked(t *testing.T) {
 }
 
 func TestRequestSeats(t *testing.T) {
+	qs := &queueSet{estimatedServiceDuration: time.Second}
 	tests := []struct {
 		name     string
 		request  *request
@@ -1362,17 +1365,17 @@ func TestRequestSeats(t *testing.T) {
 	}{
 		{
 			name:     "",
-			request:  &request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 3, FinalSeats: 3}},
+			request:  &request{workEstimate: qs.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 3, FinalSeats: 3})},
 			expected: 3,
 		},
 		{
 			name:     "",
-			request:  &request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 3}},
+			request:  &request{workEstimate: qs.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 1, FinalSeats: 3})},
 			expected: 3,
 		},
 		{
 			name:     "",
-			request:  &request{workEstimate: fcrequest.WorkEstimate{InitialSeats: 3, FinalSeats: 1}},
+			request:  &request{workEstimate: qs.completeWorkEstimate(&fcrequest.WorkEstimate{InitialSeats: 3, FinalSeats: 1})},
 			expected: 3,
 		},
 	}
@@ -1387,19 +1390,20 @@ func TestRequestSeats(t *testing.T) {
 	}
 }
 
-func TestRequestAdditionalSeatSeconds(t *testing.T) {
+func TestRequestWork(t *testing.T) {
+	qs := &queueSet{estimatedServiceDuration: 2 * time.Second}
 	request := &request{
-		workEstimate: fcrequest.WorkEstimate{
+		workEstimate: qs.completeWorkEstimate(&fcrequest.WorkEstimate{
 			InitialSeats:      3,
-			FinalSeats:        5,
-			AdditionalLatency: 3 * time.Second,
-		},
+			FinalSeats:        50,
+			AdditionalLatency: 70 * time.Second,
+		}),
 	}
 
-	got := request.AdditionalSeatSeconds()
-	want := SeatsTimesDuration(5, 3*time.Second)
+	got := request.totalWork()
+	want := SeatsTimesDuration(3, 2*time.Second) + SeatsTimesDuration(50, 70*time.Second)
 	if want != got {
-		t.Errorf("Expected AdditionalSeatSeconds: %v, but got: %v", want, got)
+		t.Errorf("Expected totalWork: %v, but got: %v", want, got)
 	}
 }
 
