@@ -333,7 +333,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 	}
 	status := *oldStatus.DeepCopy()
 	for i := range status.ContainerStatuses {
-		if status.ContainerStatuses[i].State.Terminated != nil || status.ContainerStatuses[i].State.Waiting != nil {
+		if status.ContainerStatuses[i].State.Terminated != nil {
 			continue
 		}
 		status.ContainerStatuses[i].State = v1.ContainerState{
@@ -345,7 +345,7 @@ func (m *manager) TerminatePod(pod *v1.Pod) {
 		}
 	}
 	for i := range status.InitContainerStatuses {
-		if status.InitContainerStatuses[i].State.Terminated != nil || status.InitContainerStatuses[i].State.Waiting != nil {
+		if status.InitContainerStatuses[i].State.Terminated != nil {
 			continue
 		}
 		status.InitContainerStatuses[i].State = v1.ContainerState{
