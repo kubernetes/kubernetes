@@ -573,9 +573,6 @@ func startPVProtectionController(ctx context.Context, controllerContext Controll
 }
 
 func startTTLAfterFinishedController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-		return nil, false, nil
-	}
 	go ttlafterfinished.New(
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
