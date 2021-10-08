@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -160,5 +161,35 @@ func TestReconnectBrokenTCP(t *testing.T) {
 	dials := atomic.LoadInt32(&lb.dials)
 	if dials != 2 {
 		t.Fatalf("expected %d dials, got %d", 2, dials)
+	}
+}
+
+func TestRestClientTimeout(t *testing.T) {
+	ts := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		fmt.Fprintf(w, "Hello, %s", r.Proto)
+	}))
+	ts.Start()
+	defer ts.Close()
+
+	config := &Config{
+		Host:    ts.URL,
+		Timeout: 1 * time.Second,
+		// These fields are required to create a REST client.
+		ContentConfig: ContentConfig{
+			GroupVersion:         &schema.GroupVersion{},
+			NegotiatedSerializer: &serializer.CodecFactory{},
+		},
+	}
+	client, err := RESTClientFor(config)
+	if err != nil {
+		t.Fatalf("failed to create REST client: %v", err)
+	}
+	_, err = client.Get().AbsPath("/").DoRaw(context.TODO())
+	if err == nil {
+		t.Fatalf("timeout error expected")
+	}
+	if !strings.Contains(err.Error(), "deadline exceeded") {
+		t.Fatalf("timeout error expected, received %v", err)
 	}
 }

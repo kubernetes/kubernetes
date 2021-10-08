@@ -305,7 +305,38 @@ type ContentConfig struct {
 // object. Note that a RESTClient may require fields that are optional when initializing a Client.
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
 // the Kubernetes conventions, but may not be the Kubernetes API.
+// RESTClientFor is equivalent to calling RESTClientForConfigAndClient(config, httpClient),
+// where httpClient was generated with HTTPClientFor(config).
 func RESTClientFor(config *Config) (*RESTClient, error) {
+	if config.GroupVersion == nil {
+		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
+	}
+	if config.NegotiatedSerializer == nil {
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
+	}
+
+	// Validate config.Host before constructing the transport/client so we can fail fast.
+	// ServerURL will be obtained later in RESTClientForConfigAndClient()
+	_, _, err := defaultServerUrlFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	httpClient, err := HTTPClientFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return RESTClientForConfigAndClient(config, httpClient)
+}
+
+// RESTClientForConfigAndClient returns a RESTClient that satisfies the requested attributes on a
+// client Config object.
+// Unlike RESTClientFor, RESTClientForConfigAndClient allows to pass an http.Client that is shared
+// between all the API Groups and Versions.
+// Note that the http client takes precedence over the transport values configured.
+// The http client defaults to the `http.DefaultClient` if nil.
+func RESTClientForConfigAndClient(config *Config, httpClient *http.Client) (*RESTClient, error) {
 	if config.GroupVersion == nil {
 		return nil, fmt.Errorf("GroupVersion is required when initializing a RESTClient")
 	}
@@ -316,19 +347,6 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
-	}
-
-	transport, err := TransportFor(config)
-	if err != nil {
-		return nil, err
-	}
-
-	var httpClient *http.Client
-	if transport != http.DefaultTransport {
-		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
-		}
 	}
 
 	rateLimiter := config.RateLimiter
@@ -371,22 +389,31 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
 	}
 
+	// Validate config.Host before constructing the transport/client so we can fail fast.
+	// ServerURL will be obtained later in UnversionedRESTClientForConfigAndClient()
+	_, _, err := defaultServerUrlFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	httpClient, err := HTTPClientFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return UnversionedRESTClientForConfigAndClient(config, httpClient)
+}
+
+// UnversionedRESTClientForConfigAndClient is the same as RESTClientForConfigAndClient,
+// except that it allows the config.Version to be empty.
+func UnversionedRESTClientForConfigAndClient(config *Config, httpClient *http.Client) (*RESTClient, error) {
+	if config.NegotiatedSerializer == nil {
+		return nil, fmt.Errorf("NegotiatedSerializer is required when initializing a RESTClient")
+	}
+
 	baseURL, versionedAPIPath, err := defaultServerUrlFor(config)
 	if err != nil {
 		return nil, err
-	}
-
-	transport, err := TransportFor(config)
-	if err != nil {
-		return nil, err
-	}
-
-	var httpClient *http.Client
-	if transport != http.DefaultTransport {
-		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
-		}
 	}
 
 	rateLimiter := config.RateLimiter
