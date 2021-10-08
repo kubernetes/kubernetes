@@ -85,7 +85,7 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.17.1
+    version: 1.17.2
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
@@ -108,13 +108,13 @@ dependencies:
       match: minimum_go_version=go([0-9]+\.[0-9]+)
 
   - name: "golang: etcd release version"
-    version: 1.16.8
+    version: 1.16.9
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: 'GOLANG_VERSION\?=\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.23.0-go1.17.1-bullseye.1
+    version: v1.23.0-go1.17.2-bullseye.0
     refPaths:
     - path: build/build-image/cross/VERSION
 
@@ -144,7 +144,7 @@ dependencies:
       match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: v2.3.1-go1.17.1-bullseye.0
+    version: v2.3.1-go1.17.2-bullseye.0
     refPaths:
     - path: build/common.sh
       match: __default_go_runner_version=
