@@ -763,7 +763,7 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 		}
 
 		// take items from the response until the bucket is full, filtering as we go
-		for _, kv := range getResp.Kvs {
+		for i, kv := range getResp.Kvs {
 			if paging && int64(v.Len()) >= pred.Limit {
 				hasMore = true
 				break
@@ -779,6 +779,9 @@ func (s *store) List(ctx context.Context, key string, opts storage.ListOptions, 
 				return err
 			}
 			numEvald++
+
+			// free kv early. Long lists can take O(seconds) to decode.
+			getResp.Kvs[i] = nil
 		}
 
 		// indicate to the client which resource version was returned
