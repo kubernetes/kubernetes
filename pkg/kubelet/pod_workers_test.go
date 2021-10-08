@@ -135,6 +135,18 @@ func newPod(uid, name string) *v1.Pod {
 	}
 }
 
+func newPodWithPhase(uid, name string, phase v1.PodPhase) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:  types.UID(uid),
+			Name: name,
+		},
+		Status: v1.PodStatus{
+			Phase: phase,
+		},
+	}
+}
+
 // syncPodRecord is a record of a sync pod call
 type syncPodRecord struct {
 	name       string
@@ -265,6 +277,36 @@ func TestUpdatePod(t *testing.T) {
 		if processed[uid][last].name != strconv.Itoa(i) {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, last, processed[uid][last])
 		}
+	}
+}
+
+func TestUpdatePodWithTerminatedPod(t *testing.T) {
+	podWorkers, _ := createPodWorkers()
+	terminatedPod := newPodWithPhase("0000-0000-0000", "done-pod", v1.PodSucceeded)
+	runningPod := &kubecontainer.Pod{ID: "0000-0000-0001", Name: "done-pod"}
+	pod := newPod("0000-0000-0002", "running-pod")
+
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        terminatedPod,
+		UpdateType: kubetypes.SyncPodCreate,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		Pod:        pod,
+		UpdateType: kubetypes.SyncPodCreate,
+	})
+	podWorkers.UpdatePod(UpdatePodOptions{
+		UpdateType: kubetypes.SyncPodKill,
+		RunningPod: runningPod,
+	})
+
+	if podWorkers.IsPodKnownTerminated(pod.UID) == true {
+		t.Errorf("podWorker state should not be terminated")
+	}
+	if podWorkers.IsPodKnownTerminated(terminatedPod.UID) == false {
+		t.Errorf("podWorker state should be terminated")
+	}
+	if podWorkers.IsPodKnownTerminated(runningPod.ID) == true {
+		t.Errorf("podWorker state should not be marked terminated for a running pod")
 	}
 }
 

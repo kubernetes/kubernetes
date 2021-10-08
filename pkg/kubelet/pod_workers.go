@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -485,6 +486,22 @@ func (p *podWorkers) IsPodForMirrorPodTerminatingByFullName(podFullName string) 
 	return ok
 }
 
+func isPodStatusCacheTerminal(status *kubecontainer.PodStatus) bool {
+	runningContainers := 0
+	runningSandboxes := 0
+	for _, container := range status.ContainerStatuses {
+		if container.State == kubecontainer.ContainerStateRunning {
+			runningContainers++
+		}
+	}
+	for _, sb := range status.SandboxStatuses {
+		if sb.State == runtimeapi.PodSandboxState_SANDBOX_READY {
+			runningSandboxes++
+		}
+	}
+	return runningContainers == 0 && runningSandboxes == 0
+}
+
 // UpdatePod carries a configuration change or termination state to a pod. A pod is either runnable,
 // terminating, or terminated, and will transition to terminating if deleted on the apiserver, it is
 // discovered to have a terminal phase (Succeeded or Failed), or if it is evicted by the kubelet.
@@ -519,6 +536,22 @@ func (p *podWorkers) UpdatePod(options UpdatePodOptions) {
 		klog.V(4).InfoS("Pod is being synced for the first time", "pod", klog.KObj(pod), "podUID", pod.UID)
 		status = &podSyncStatus{
 			syncedAt: now,
+		}
+		// if this pod is being synced for the first time, we need to make sure it is an active pod
+		if !isRuntimePod && (pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded) {
+			// check to see if the pod is not running and the pod is terminal.
+			// If this succeeds then record in the podWorker that it is terminated.
+			if statusCache, err := p.podCache.Get(pod.UID); err == nil {
+				if isPodStatusCacheTerminal(statusCache) {
+					status = &podSyncStatus{
+						terminatedAt:       now,
+						terminatingAt:      now,
+						syncedAt:           now,
+						startedTerminating: true,
+						finished:           true,
+					}
+				}
+			}
 		}
 		p.podSyncStatuses[uid] = status
 	}
