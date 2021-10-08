@@ -145,9 +145,9 @@ func newHollowNodeCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:  "kubemark",
 		Long: "kubemark",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
-			run(cmd, s)
+			return run(cmd, s)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -166,24 +166,24 @@ func newHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(cmd *cobra.Command, config *hollowNodeConfig) {
+func run(cmd *cobra.Command, config *hollowNodeConfig) error {
 	// To help debugging, immediately log version and print flags.
 	klog.Infof("Version: %+v", version.Get())
 	cliflag.PrintFlags(cmd.Flags())
 
 	if !knownMorphs.Has(config.Morph) {
-		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
+		return fmt.Errorf("Unknown morph: %v. allowed values: %v", config.Morph, knownMorphs.List())
 	}
 
 	// create a client to communicate with API server.
 	clientConfig, err := config.createClientConfigFromFile()
 	if err != nil {
-		klog.Fatalf("Failed to create a ClientConfig: %v. Exiting.", err)
+		return fmt.Errorf("Failed to create a ClientConfig, error: %w. Exiting", err)
 	}
 
 	client, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		klog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
+		return fmt.Errorf("Failed to create a ClientSet, error: %w. Exiting", err)
 	}
 
 	if config.Morph == "kubelet" {
@@ -200,7 +200,7 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 		heartbeatClientConfig.QPS = float32(-1)
 		heartbeatClient, err := clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
-			klog.Fatalf("Failed to create a ClientSet: %v. Exiting.", err)
+			return fmt.Errorf("Failed to create a ClientSet, error: %w. Exiting", err)
 		}
 
 		cadvisorInterface := &cadvisortest.Fake{
@@ -221,23 +221,23 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 
 		endpoint, err := fakeremote.GenerateEndpoint()
 		if err != nil {
-			klog.Fatalf("Failed to generate fake endpoint %v.", err)
+			return fmt.Errorf("Failed to generate fake endpoint, error: %w", err)
 		}
 		fakeRemoteRuntime := fakeremote.NewFakeRemoteRuntime()
 		if err = fakeRemoteRuntime.Start(endpoint); err != nil {
-			klog.Fatalf("Failed to start fake runtime %v.", err)
+			return fmt.Errorf("Failed to start fake runtime, error: %w", err)
 		}
 		defer fakeRemoteRuntime.Stop()
 		runtimeService, err := remote.NewRemoteRuntimeService(endpoint, 15*time.Second)
 		if err != nil {
-			klog.Fatalf("Failed to init runtime service %v.", err)
+			return fmt.Errorf("Failed to init runtime service, error: %w", err)
 		}
 
 		var imageService internalapi.ImageManagerService = fakeRemoteRuntime.ImageService
 		if config.UseHostImageService {
 			imageService, err = remote.NewRemoteImageService(f.RemoteImageEndpoint, 15*time.Second)
 			if err != nil {
-				klog.Fatalf("Failed to init image service %v.", err)
+				return fmt.Errorf("Failed to init image service, error: %w", err)
 			}
 		}
 
@@ -256,7 +256,7 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 	if config.Morph == "proxy" {
 		client, err := clientset.NewForConfig(clientConfig)
 		if err != nil {
-			klog.Fatalf("Failed to create API Server client: %v", err)
+			return fmt.Errorf("Failed to create API Server client, error: %w", err)
 		}
 		iptInterface := fakeiptables.NewFake()
 		sysctl := fakesysctl.NewFake()
@@ -280,8 +280,10 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 			config.ProxierMinSyncPeriod,
 		)
 		if err != nil {
-			klog.Fatalf("Failed to create hollowProxy instance: %v", err)
+			return fmt.Errorf("Failed to create hollowProxy instance, error: %w", err)
 		}
-		hollowProxy.Run()
+		return hollowProxy.Run()
 	}
+
+	return nil
 }

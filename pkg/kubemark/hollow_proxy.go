@@ -132,8 +132,9 @@ func NewHollowProxyOrDie(
 	}, nil
 }
 
-func (hp *HollowProxy) Run() {
+func (hp *HollowProxy) Run() error {
 	if err := hp.ProxyServer.Run(); err != nil {
-		klog.Fatalf("Error while running proxy: %v\n", err)
+		return fmt.Errorf("Error while running proxy: %w", err)
 	}
+	return nil
 }
