@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -31,11 +30,7 @@ import (
 type DeprecatedOptions struct {
 	// The fields below here are placeholders for flags that can't be directly
 	// mapped into componentconfig.KubeSchedulerConfiguration.
-	PolicyConfigFile         string
-	PolicyConfigMapName      string
-	PolicyConfigMapNamespace string
-	UseLegacyPolicyConfig    bool
-	Port                     int
+	Port int
 }
 
 // TODO: remove these insecure flags in v1.24
@@ -59,12 +54,6 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 
 	addDummyInsecureFlags(o, fs)
 
-	fs.StringVar(&o.PolicyConfigFile, "policy-config-file", o.PolicyConfigFile, "DEPRECATED: file with scheduler policy configuration. This file is used if policy ConfigMap is not provided or --use-legacy-policy-config=true. Note: The predicates/priorities defined in this file will take precedence over any profiles define in ComponentConfig.")
-	usage := fmt.Sprintf("DEPRECATED: name of the ConfigMap object that contains scheduler's policy configuration. It must exist in the system namespace before scheduler initialization if --use-legacy-policy-config=false. The config must be provided as the value of an element in 'Data' map with the key='%v'. Note: The predicates/priorities defined in this file will take precedence over any profiles define in ComponentConfig.", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
-	fs.StringVar(&o.PolicyConfigMapName, "policy-configmap", o.PolicyConfigMapName, usage)
-	fs.StringVar(&o.PolicyConfigMapNamespace, "policy-configmap-namespace", o.PolicyConfigMapNamespace, "DEPRECATED: the namespace where policy ConfigMap is located. The kube-system namespace will be used if this is not provided or is empty. Note: The predicates/priorities defined in this file will take precedence over any profiles define in ComponentConfig.")
-	fs.BoolVar(&o.UseLegacyPolicyConfig, "use-legacy-policy-config", o.UseLegacyPolicyConfig, "DEPRECATED: when set to true, scheduler will ignore policy ConfigMap and uses policy config file. Note: The scheduler will fail if this is combined with Plugin configs")
-
 	fs.BoolVar(&cfg.EnableProfiling, "profiling", cfg.EnableProfiling, "DEPRECATED: enable profiling via web interface host:port/debug/pprof/. This parameter is ignored if a config file is specified in --config.")
 	fs.BoolVar(&cfg.EnableContentionProfiling, "contention-profiling", cfg.EnableContentionProfiling, "DEPRECATED: enable lock contention profiling, if profiling is enabled. This parameter is ignored if a config file is specified in --config.")
 	fs.StringVar(&cfg.ClientConnection.Kubeconfig, "kubeconfig", cfg.ClientConnection.Kubeconfig, "DEPRECATED: path to kubeconfig file with authorization and master location information. This parameter is ignored if a config file is specified in --config.")
@@ -79,39 +68,9 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 func (o *DeprecatedOptions) Validate() []error {
 	var errs []error
 
-	if o.UseLegacyPolicyConfig && len(o.PolicyConfigFile) == 0 {
-		errs = append(errs, field.Required(field.NewPath("policyConfigFile"), "required when --use-legacy-policy-config is true"))
-	}
-
 	// TODO: delete this check after insecure flags removed in v1.24
 	if o.Port != 0 {
 		errs = append(errs, field.Required(field.NewPath("port"), fmt.Sprintf("invalid port value %d: only zero is allowed", o.Port)))
 	}
 	return errs
-}
-
-// ApplyTo sets cfg.PolicySource from flags passed on the command line in the following precedence order:
-//
-// 1. --use-legacy-policy-config to use a policy file.
-// 2. --policy-configmap to use a policy config map value.
-func (o *DeprecatedOptions) ApplyTo(c *schedulerappconfig.Config) {
-	if o == nil {
-		return
-	}
-
-	switch {
-	case o.UseLegacyPolicyConfig || (len(o.PolicyConfigFile) > 0 && o.PolicyConfigMapName == ""):
-		c.LegacyPolicySource = &kubeschedulerconfig.SchedulerPolicySource{
-			File: &kubeschedulerconfig.SchedulerPolicyFileSource{
-				Path: o.PolicyConfigFile,
-			},
-		}
-	case len(o.PolicyConfigMapName) > 0:
-		c.LegacyPolicySource = &kubeschedulerconfig.SchedulerPolicySource{
-			ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
-				Name:      o.PolicyConfigMapName,
-				Namespace: o.PolicyConfigMapNamespace,
-			},
-		}
-	}
 }

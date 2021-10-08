@@ -154,7 +154,6 @@ func TestPreemption(t *testing.T) {
 
 	testCtx := testutils.InitTestSchedulerWithOptions(t,
 		testutils.InitTestAPIServer(t, "preemption", nil),
-		nil,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	testutils.SyncInformerFactory(testCtx)
@@ -601,7 +600,7 @@ func TestDisablePreemption(t *testing.T) {
 // This test verifies that system critical priorities are created automatically and resolved properly.
 func TestPodPriorityResolution(t *testing.T) {
 	admission := priority.NewPlugin()
-	testCtx := testutils.InitTestScheduler(t, testutils.InitTestAPIServer(t, "preemption", admission), nil)
+	testCtx := testutils.InitTestScheduler(t, testutils.InitTestAPIServer(t, "preemption", admission))
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
@@ -1321,7 +1320,7 @@ func TestPDBInPreemption(t *testing.T) {
 }
 
 func initTestPreferNominatedNode(t *testing.T, nsPrefix string, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), nil, opts...)
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testutils.InitTestAPIServer(t, nsPrefix, nil), opts...)
 	testutils.SyncInformerFactory(testCtx)
 	// wraps the NextPod() method to make it appear the preemption has been done already and the nominated node has been set.
 	f := testCtx.Scheduler.NextPod

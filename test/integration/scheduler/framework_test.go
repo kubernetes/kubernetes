@@ -1275,7 +1275,7 @@ func TestBindPlugin(t *testing.T) {
 	})
 
 	// Create the scheduler with the test plugin set.
-	testCtx := testutils.InitTestSchedulerWithOptions(t, testContext, nil,
+	testCtx := testutils.InitTestSchedulerWithOptions(t, testContext,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 	testutils.SyncInformerFactory(testCtx)
@@ -2261,7 +2261,7 @@ func TestActivatePods(t *testing.T) {
 }
 
 func initTestSchedulerForFrameworkTest(t *testing.T, testCtx *testutils.TestContext, nodeCount int, opts ...scheduler.Option) *testutils.TestContext {
-	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, nil, opts...)
+	testCtx = testutils.InitTestSchedulerWithOptions(t, testCtx, opts...)
 	testutils.SyncInformerFactory(testCtx)
 	go testCtx.Scheduler.Run(testCtx.Ctx)
 

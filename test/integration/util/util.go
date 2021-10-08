@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,9 +44,6 @@ import (
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/scheduler"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
-	schedulerapiv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -389,10 +385,9 @@ func WaitForSchedulerCacheCleanup(sched *scheduler.Scheduler, t *testing.T) {
 func InitTestScheduler(
 	t *testing.T,
 	testCtx *TestContext,
-	policy *schedulerapi.Policy,
 ) *TestContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return InitTestSchedulerWithOptions(t, testCtx, policy)
+	return InitTestSchedulerWithOptions(t, testCtx)
 }
 
 // InitTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -400,7 +395,6 @@ func InitTestScheduler(
 func InitTestSchedulerWithOptions(
 	t *testing.T,
 	testCtx *TestContext,
-	policy *schedulerapi.Policy,
 	opts ...scheduler.Option,
 ) *TestContext {
 	// 1. Create scheduler
@@ -415,9 +409,6 @@ func InitTestSchedulerWithOptions(
 		Interface: testCtx.ClientSet.EventsV1(),
 	})
 
-	if policy != nil {
-		opts = append(opts, scheduler.WithLegacyPolicySource(CreateSchedulerPolicySource(policy, testCtx.ClientSet)))
-	}
 	opts = append(opts, scheduler.WithKubeConfig(testCtx.KubeConfig))
 	testCtx.Scheduler, err = scheduler.New(
 		testCtx.ClientSet,
@@ -436,31 +427,6 @@ func InitTestSchedulerWithOptions(
 	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	return testCtx
-}
-
-// CreateSchedulerPolicySource creates a source from the given policy.
-func CreateSchedulerPolicySource(policy *schedulerapi.Policy, clientSet clientset.Interface) *schedulerapi.SchedulerPolicySource {
-	// Serialize the Policy object into a ConfigMap later.
-	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	if !ok {
-		panic("could not find json serializer")
-	}
-	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, schedulerapiv1.SchemeGroupVersion)
-	policyString := runtime.EncodeOrDie(encoder, policy)
-	configPolicyName := "scheduler-custom-policy-config"
-	policyConfigMap := v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-		Data:       map[string]string{schedulerapi.SchedulerPolicyConfigMapKey: policyString},
-	}
-	policyConfigMap.APIVersion = "v1"
-	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(context.TODO(), &policyConfigMap, metav1.CreateOptions{})
-
-	return &schedulerapi.SchedulerPolicySource{
-		ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
-			Namespace: policyConfigMap.Namespace,
-			Name:      policyConfigMap.Name,
-		},
-	}
 }
 
 // WaitForPodToScheduleWithTimeout waits for a pod to get scheduled and returns

@@ -23,7 +23,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -76,12 +75,9 @@ func NewOptions() (*Options, error) {
 		SecureServing:  apiserveroptions.NewSecureServingOptions().WithLoopback(),
 		Authentication: apiserveroptions.NewDelegatingAuthenticationOptions(),
 		Authorization:  apiserveroptions.NewDelegatingAuthorizationOptions(),
-		Deprecated: &DeprecatedOptions{
-			UseLegacyPolicyConfig:    false,
-			PolicyConfigMapNamespace: metav1.NamespaceSystem,
-		},
-		Metrics: metrics.NewOptions(),
-		Logs:    logs.NewOptions(),
+		Deprecated:     &DeprecatedOptions{},
+		Metrics:        metrics.NewOptions(),
+		Logs:           logs.NewOptions(),
 	}
 
 	o.Authentication.TolerateInClusterLookupFailure = true
@@ -161,10 +157,7 @@ func (o *Options) Complete(nfs *cliflag.NamedFlagSets) error {
 // Flags returns flags for a specific scheduler by section name
 func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	fs := nfs.FlagSet("misc")
-	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, `The path to the configuration file. The following flags can overwrite fields in this file:
-  --policy-config-file
-  --policy-configmap
-  --policy-configmap-namespace`)
+	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the configuration values to this file and exit.")
 	fs.StringVar(&o.Master, "master", o.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 
@@ -185,8 +178,6 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 	if len(o.ConfigFile) == 0 {
 		c.ComponentConfig = o.ComponentConfig
-
-		o.Deprecated.ApplyTo(c)
 	} else {
 		cfg, err := loadConfigFromFile(o.ConfigFile)
 		if err != nil {
@@ -197,15 +188,6 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 
 		c.ComponentConfig = *cfg
-
-		// apply any deprecated Policy flags, if applicable
-		o.Deprecated.ApplyTo(c)
-	}
-
-	// If the user is using the legacy policy config, clear the profiles, they will be set
-	// on scheduler instantiation based on the configurations in the policy file.
-	if c.LegacyPolicySource != nil {
-		c.ComponentConfig.Profiles = nil
 	}
 
 	if err := o.SecureServing.ApplyTo(&c.SecureServing, &c.LoopbackClientConfig); err != nil {

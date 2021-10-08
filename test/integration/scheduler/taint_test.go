@@ -75,7 +75,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
-	testCtx = testutils.InitTestScheduler(t, testCtx, nil)
+	testCtx = testutils.InitTestScheduler(t, testCtx)
 	defer testutils.CleanupTest(t, testCtx)
 
 	cs := testCtx.ClientSet
