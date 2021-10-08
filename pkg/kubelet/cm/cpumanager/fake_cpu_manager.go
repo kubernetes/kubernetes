@@ -70,13 +70,18 @@ func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
-func (m *fakeManager) GetCPUs(podUID, containerName string) cpuset.CPUSet {
-	klog.InfoS("GetCPUs", "podUID", podUID, "containerName", containerName)
+func (m *fakeManager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
+	klog.InfoS("GetExclusiveCPUs", "podUID", podUID, "containerName", containerName)
 	return cpuset.CPUSet{}
 }
 
 func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
 	klog.InfoS("Get Allocatable CPUs")
+	return cpuset.CPUSet{}
+}
+
+func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
+	klog.InfoS("GetCPUAffinity", "podUID", podUID, "containerName", containerName)
 	return cpuset.CPUSet{}
 }
 

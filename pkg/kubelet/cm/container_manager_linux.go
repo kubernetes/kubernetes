@@ -1064,7 +1064,7 @@ func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.Conta
 
 func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
 	if cm.cpuManager != nil {
-		return cm.cpuManager.GetCPUs(podUID, containerName).ToSliceNoSortInt64()
+		return cm.cpuManager.GetExclusiveCPUs(podUID, containerName).ToSliceNoSortInt64()
 	}
 	return []int64{}
 }
