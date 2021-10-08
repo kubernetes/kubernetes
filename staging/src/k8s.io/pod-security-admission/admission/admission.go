@@ -356,7 +356,6 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attributes) *admissionv1.AdmissionResponse {
 	// short-circuit on subresources
 	if attrs.GetSubresource() != "" {
-		a.RecordEvaluation(a.defaultPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 	// short-circuit on exempt namespaces and users
