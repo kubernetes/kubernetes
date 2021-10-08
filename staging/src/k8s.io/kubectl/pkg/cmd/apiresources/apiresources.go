@@ -18,6 +18,7 @@ package apiresources
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"sigs.k8s.io/yaml"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -75,9 +77,9 @@ type APIResourceOptions struct {
 
 // groupResource contains the APIGroup and APIResource
 type groupResource struct {
-	APIGroup        string
-	APIGroupVersion string
-	APIResource     metav1.APIResource
+	APIGroup        string             `json:"group"`
+	APIGroupVersion string             `json:"groupVersion"`
+	APIResource     metav1.APIResource `json:"resource"`
 }
 
 // NewAPIResourceOptions creates the options for APIResource
@@ -117,7 +119,7 @@ func NewCmdAPIResources(f cmdutil.Factory, ioStreams genericclioptions.IOStreams
 
 // Validate checks to the APIResourceOptions to see if there is sufficient information run the command
 func (o *APIResourceOptions) Validate() error {
-	supportedOutputTypes := sets.NewString("", "wide", "name")
+	supportedOutputTypes := sets.NewString("", "wide", "name", "yaml", "json")
 	if !supportedOutputTypes.Has(o.Output) {
 		return fmt.Errorf("--output %v is not available", o.Output)
 	}
@@ -196,41 +198,58 @@ func (o *APIResourceOptions) RunAPIResources(cmd *cobra.Command, f cmdutil.Facto
 		}
 	}
 
-	if o.NoHeaders == false && o.Output != "name" {
-		if err = printContextHeaders(w, o.Output); err != nil {
-			return err
-		}
-	}
-
 	sort.Stable(sortableResource{resources, o.SortBy})
-	for _, r := range resources {
+	if o.Output == "yaml" || o.Output == "json" {
+		var data []byte
+		var err error
 		switch o.Output {
-		case "name":
-			name := r.APIResource.Name
-			if len(r.APIGroup) > 0 {
-				name += "." + r.APIGroup
-			}
-			if _, err := fmt.Fprintf(w, "%s\n", name); err != nil {
+		case "yaml":
+			data, err = yaml.Marshal(resources)
+		case "json":
+			data, err = json.Marshal(resources)
+		}
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			if _, err := w.Write(data); err != nil {
 				errs = append(errs, err)
 			}
-		case "wide":
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\n",
-				r.APIResource.Name,
-				strings.Join(r.APIResource.ShortNames, ","),
-				r.APIGroupVersion,
-				r.APIResource.Namespaced,
-				r.APIResource.Kind,
-				r.APIResource.Verbs); err != nil {
-				errs = append(errs, err)
+		}
+	} else {
+		if o.NoHeaders == false && o.Output != "name" {
+			if err = printContextHeaders(w, o.Output); err != nil {
+				return err
 			}
-		case "":
-			if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n",
-				r.APIResource.Name,
-				strings.Join(r.APIResource.ShortNames, ","),
-				r.APIGroupVersion,
-				r.APIResource.Namespaced,
-				r.APIResource.Kind); err != nil {
-				errs = append(errs, err)
+		}
+		for _, r := range resources {
+			switch o.Output {
+			case "name":
+				name := r.APIResource.Name
+				if len(r.APIGroup) > 0 {
+					name += "." + r.APIGroup
+				}
+				if _, err := fmt.Fprintf(w, "%s\n", name); err != nil {
+					errs = append(errs, err)
+				}
+			case "wide":
+				if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\t%v\n",
+					r.APIResource.Name,
+					strings.Join(r.APIResource.ShortNames, ","),
+					r.APIGroupVersion,
+					r.APIResource.Namespaced,
+					r.APIResource.Kind,
+					r.APIResource.Verbs); err != nil {
+					errs = append(errs, err)
+				}
+			case "":
+				if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%v\t%s\n",
+					r.APIResource.Name,
+					strings.Join(r.APIResource.ShortNames, ","),
+					r.APIGroupVersion,
+					r.APIResource.Namespaced,
+					r.APIResource.Kind); err != nil {
+					errs = append(errs, err)
+				}
 			}
 		}
 	}
