@@ -76,23 +76,25 @@ func TestCoreResourceEnqueue(t *testing.T) {
 	// - Pod1 is a best-effort Pod, but doesn't have the required toleration.
 	// - Pod2 requests a large amount of CPU resource that the node cannot fit.
 	//   Note: Pod2 will fail the tainttoleration plugin b/c that's ordered prior to noderesources.
+	// - Pod3 has the required toleration, but requests a non-existing PVC.
 	pod1 := st.MakePod().Namespace(ns).Name("pod1").Container("image").Obj()
 	pod2 := st.MakePod().Namespace(ns).Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj()
-	for _, pod := range []*v1.Pod{pod1, pod2} {
+	pod3 := st.MakePod().Namespace(ns).Name("pod3").Toleration("foo").PVC("pvc").Container("image").Obj()
+	for _, pod := range []*v1.Pod{pod1, pod2, pod3} {
 		if _, err := cs.CoreV1().Pods(ns).Create(ctx, pod, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Pod %q: %v", pod.Name, err)
 		}
 	}
 
-	// Wait for the two pods to be present in the scheduling queue.
+	// Wait for the three pods to be present in the scheduling queue.
 	if err := wait.Poll(time.Millisecond*200, wait.ForeverTestTimeout, func() (bool, error) {
-		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 2, nil
+		return len(testCtx.Scheduler.SchedulingQueue.PendingPods()) == 3, nil
 	}); err != nil {
 		t.Fatal(err)
 	}
 
-	// Pop the two pods out. They should be unschedulable.
-	for i := 0; i < 2; i++ {
+	// Pop the three pods out. They should be unschedulable.
+	for i := 0; i < 3; i++ {
 		podInfo := nextPodOrDie(t, testCtx)
 		fwk, ok := testCtx.Scheduler.Profiles[podInfo.Pod.Spec.SchedulerName]
 		if !ok {
@@ -126,9 +128,10 @@ func TestCoreResourceEnqueue(t *testing.T) {
 		t.Fatalf("Exepcted pod1 to be popped, but got %v", got)
 	}
 
-	// Pod2 is not expected to be popped out.
-	// Although the failure reason has been lifted, it still won't be moved to active due to
-	// the node event's preCheckForNode().
+	// Pod2 and Pod3 are not expected to be popped out.
+	// - Although the failure reason has been lifted, Pod2 still won't be moved to active due to
+	//   the node event's preCheckForNode().
+	// - Regarding Pod3, the NodeTaintChange event is irrelevant with its scheduling failure.
 	podInfo = nextPod(t, testCtx)
 	if podInfo != nil {
 		t.Fatalf("Unexpected pod %v get popped out", podInfo.Pod.Name)
