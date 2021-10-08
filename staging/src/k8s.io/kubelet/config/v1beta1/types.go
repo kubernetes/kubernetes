@@ -383,14 +383,13 @@ type KubeletConfiguration struct {
 	// Default: "5m"
 	// +optional
 	NodeStatusReportFrequency metav1.Duration `json:"nodeStatusReportFrequency,omitempty"`
-	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease,
-	// when the NodeLease feature is enabled. This feature provides an indicator of node
-	// health by having the Kubelet create and periodically renew a lease, named after the node,
-	// in the kube-node-lease namespace. If the lease expires, the node can be considered unhealthy.
-	// The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal interval
-	// may be set based on the lease duration.
+	// nodeLeaseDurationSeconds is the duration the Kubelet will set on its corresponding Lease.
+	// NodeLease provides an indicator of node health by having the Kubelet create and
+	// periodically renew a lease, named after the node, in the kube-node-lease namespace.
+	// If the lease expires, the node can be considered unhealthy.
+	// The lease is currently renewed every 10s, per KEP-0009. In the future, the lease renewal
+	// interval may be set based on the lease duration.
 	// The field value must be greater than 0.
-	// Requires the NodeLease feature gate to be enabled.
 	// If DynamicKubeletConfig (deprecated; default off) is on, when
 	// dynamically updating this field, consider that
 	// decreasing the duration may reduce tolerance for issues that temporarily prevent
@@ -399,11 +398,9 @@ type KubeletConfiguration struct {
 	// +optional
 	NodeLeaseDurationSeconds int32 `json:"nodeLeaseDurationSeconds,omitempty"`
 	// imageMinimumGCAge is the minimum age for an unused image before it is
-	// garbage collected.
-	// If DynamicKubeletConfig (deprecated; default off) is on, when
-	// dynamically updating this field, consider that
-	// it may trigger or delay garbage collection, and may change the image overhead
-	// on the node.
+	// garbage collected. If DynamicKubeletConfig (deprecated; default off)
+	// is on, when dynamically updating this field, consider that  it may trigger or
+	// delay garbage collection, and may change the image overhead on the node.
 	// Default: "2m"
 	// +optional
 	ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge,omitempty"`

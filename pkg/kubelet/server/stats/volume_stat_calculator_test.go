@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
@@ -97,12 +98,15 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	// Setup mock stats provider
-	mockStats := new(statstest.StatsProvider)
+	mockStats := statstest.NewMockProvider(mockCtrl)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
-	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
-	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
+	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 1)
 	fakeEventRecorder := record.FakeRecorder{
@@ -141,11 +145,14 @@ func TestPVCRef(t *testing.T) {
 }
 
 func TestNormalVolumeEvent(t *testing.T) {
-	mockStats := new(statstest.StatsProvider)
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockStats := statstest.NewMockProvider(mockCtrl)
+
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
-	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
-	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
+	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
 	fakeEventRecorder := record.FakeRecorder{
@@ -163,12 +170,15 @@ func TestNormalVolumeEvent(t *testing.T) {
 
 func TestAbnormalVolumeEvent(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeHealth, true)()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
 	// Setup mock stats provider
-	mockStats := new(statstest.StatsProvider)
+	mockStats := statstest.NewMockProvider(mockCtrl)
 	volumes := map[string]volume.Volume{vol0: &fakeVolume{}}
-	mockStats.On("ListVolumesForPod", fakePod.UID).Return(volumes, true)
+	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol1: &fakeBlockVolume{}}
-	mockStats.On("ListBlockVolumesForPod", fakePod.UID).Return(blockVolumes, true)
+	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
 
 	eventStore := make(chan string, 2)
 	fakeEventRecorder := record.FakeRecorder{

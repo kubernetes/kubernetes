@@ -36,14 +36,41 @@
       ],
       "extra": {
         "21": [
-  "22"
-]
+          "22"
+        ]
       }
     },
-    "object": {"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}},
-    "oldObject": {"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}},
+    "object": {
+      "apiVersion": "example.com/v1",
+      "kind": "CustomType",
+      "spec": {
+        "replicas": 1
+      },
+      "status": {
+        "available": 1
+      }
+    },
+    "oldObject": {
+      "apiVersion": "example.com/v1",
+      "kind": "CustomType",
+      "spec": {
+        "replicas": 1
+      },
+      "status": {
+        "available": 1
+      }
+    },
     "dryRun": false,
-    "options": {"apiVersion":"example.com/v1","kind":"CustomType","spec":{"replicas":1},"status":{"available":1}}
+    "options": {
+      "apiVersion": "example.com/v1",
+      "kind": "CustomType",
+      "spec": {
+        "replicas": 1
+      },
+      "status": {
+        "available": 1
+      }
+    }
   },
   "response": {
     "uid": "輂]¨\u0026桰]]æȌ殸2爟¼ªov鈶",

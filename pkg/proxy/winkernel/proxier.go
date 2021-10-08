@@ -149,7 +149,7 @@ func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
 
 func getNetworkName(hnsNetworkName string) (string, error) {
 	if len(hnsNetworkName) == 0 {
-		klog.V(3).InfoS("network-name flag not set. Checking environment variable")
+		klog.V(3).InfoS("network-name flag not set, checking environment variable")
 		hnsNetworkName = os.Getenv("KUBE_NETWORK")
 		if len(hnsNetworkName) == 0 {
 			return "", fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
@@ -161,7 +161,7 @@ func getNetworkName(hnsNetworkName string) (string, error) {
 func getNetworkInfo(hns HostNetworkService, hnsNetworkName string) (*hnsNetworkInfo, error) {
 	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
 	for err != nil {
-		klog.ErrorS(err, "Unable to find HNS Network specified. Please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
+		klog.ErrorS(err, "Unable to find HNS Network specified, please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
 		time.Sleep(1 * time.Second)
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 	}
@@ -180,11 +180,6 @@ type StackCompatTester interface {
 type DualStackCompatTester struct{}
 
 func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
-	dualStackFeatureEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack)
-	if !dualStackFeatureEnabled {
-		return false
-	}
-
 	// First tag of hcsshim that has a proper check for dual stack support is v0.8.22 due to a bug.
 	if err := hcn.IPv6DualStackSupported(); err != nil {
 		// Hcn *can* fail the query to grab the version of hcn itself (which this call will do internally before parsing
@@ -194,7 +189,7 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 		// used here. For now, seeming as how nothing before ws2019 (1809) is listed as supported for k8s we can pretty much assume
 		// any error here isn't because the query failed, it's just that dualstack simply isn't supported on the host. With all
 		// that in mind, just log as info and not error to let the user know we're falling back.
-		klog.InfoS("This version of Windows does not support dual-stack. Falling back to single-stack", "err", err.Error())
+		klog.InfoS("This version of Windows does not support dual-stack, falling back to single-stack", "err", err.Error())
 		return false
 	}
 
@@ -202,18 +197,18 @@ func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
 	hns, _ := newHostNetworkService()
 	networkName, err := getNetworkName(networkName)
 	if err != nil {
-		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
+		klog.ErrorS(err, "Unable to determine dual-stack status, falling back to single-stack")
 		return false
 	}
 	networkInfo, err := getNetworkInfo(hns, networkName)
 	if err != nil {
-		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
+		klog.ErrorS(err, "Unable to determine dual-stack status, falling back to single-stack")
 		return false
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) && isOverlay(networkInfo) {
 		// Overlay (VXLAN) networks on Windows do not support dual-stack networking today
-		klog.InfoS("Winoverlay does not support dual-stack. Falling back to single-stack")
+		klog.InfoS("Winoverlay does not support dual-stack, falling back to single-stack")
 		return false
 	}
 
@@ -333,7 +328,7 @@ func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName)
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName])
 	} else {
 		// If no service exists, just cleanup the remote endpoints
-		klog.V(3).InfoS("Endpoints are orphaned. Cleaning up")
+		klog.V(3).InfoS("Endpoints are orphaned, cleaning up")
 		// Cleanup Endpoints references
 		epInfos, exists := proxier.endpointsMap[*svcPortName]
 
@@ -664,7 +659,7 @@ func NewProxier(
 
 		if nodeIP.IsUnspecified() {
 			// attempt to get the correct ip address
-			klog.V(2).InfoS("node ip was unspecified.  Attempting to find node ip")
+			klog.V(2).InfoS("node ip was unspecified, attempting to find node ip")
 			nodeIP, err = apiutil.ResolveBindAddress(nodeIP)
 			if err != nil {
 				klog.InfoS("failed to find an ip. You may need set the --bind-address flag", "err", err)
@@ -994,7 +989,7 @@ func (proxier *Proxier) syncProxyRules() {
 	prevNetworkID := proxier.network.id
 	updatedNetwork, err := hns.getNetworkByName(hnsNetworkName)
 	if updatedNetwork == nil || updatedNetwork.id != prevNetworkID || isNetworkNotFoundError(err) {
-		klog.InfoS("The HNS network %s is not present or has changed since the last sync. Please check the CNI deployment", "hnsNetworkName", hnsNetworkName)
+		klog.InfoS("The HNS network is not present or has changed since the last sync, please check the CNI deployment", "hnsNetworkName", hnsNetworkName)
 		proxier.cleanupAllPolicies()
 		if updatedNetwork != nil {
 			proxier.network = *updatedNetwork
@@ -1116,14 +1111,14 @@ func (proxier *Proxier) syncProxyRules() {
 					networkName := proxier.network.name
 					updatedNetwork, err := hns.getNetworkByName(networkName)
 					if err != nil {
-						klog.ErrorS(err, "Unable to find HNS Network specified. Please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
+						klog.ErrorS(err, "Unable to find HNS Network specified, please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
 						proxier.cleanupAllPolicies()
 						return
 					}
 					proxier.network = *updatedNetwork
 					providerAddress := proxier.network.findRemoteSubnetProviderAddress(ep.IP())
 					if len(providerAddress) == 0 {
-						klog.InfoS("Could not find provider address. Assuming it is a public IP", "ip", ep.IP())
+						klog.InfoS("Could not find provider address, assuming it is a public IP", "ip", ep.IP())
 						providerAddress = proxier.nodeIP.String()
 					}
 
@@ -1202,7 +1197,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if len(hnsEndpoints) == 0 {
-			klog.ErrorS(nil, "Endpoint information not available for service. Not applying any policy", "svcName", svcName.String())
+			klog.ErrorS(nil, "Endpoint information not available for service, not applying any policy", "svcName", svcName.String())
 			continue
 		}
 

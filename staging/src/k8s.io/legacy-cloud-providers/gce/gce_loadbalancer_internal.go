@@ -53,16 +53,20 @@ const (
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
-	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) && existingFwdRule == nil {
-		// When ILBSubsets is enabled, new ILB services will not be processed here.
-		// Services that have existing GCE resources created by this controller will continue to update.
-		klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, since %s feature is enabled.", svc.Namespace, svc.Name, AlphaFeatureILBSubsets)
-		return nil, cloudprovider.ImplementedElsewhere
-	}
-	if hasFinalizer(svc, ILBFinalizerV2) {
-		// Another controller is handling the resources for this service.
-		klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, as service contains %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV2)
-		return nil, cloudprovider.ImplementedElsewhere
+	if existingFwdRule == nil && !hasFinalizer(svc, ILBFinalizerV1) {
+		// Neither the forwarding rule nor the V1 finalizer exists. This is most likely a new service.
+		if g.AlphaFeatureGate.Enabled(AlphaFeatureILBSubsets) {
+			// When ILBSubsets is enabled, new ILB services will not be processed here.
+			// Services that have existing GCE resources created by this controller or the v1 finalizer
+			// will continue to update.
+			klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, since %s feature is enabled.", svc.Namespace, svc.Name, AlphaFeatureILBSubsets)
+			return nil, cloudprovider.ImplementedElsewhere
+		}
+		if hasFinalizer(svc, ILBFinalizerV2) {
+			// No V1 resources present - Another controller is handling the resources for this service.
+			klog.V(2).Infof("Skipped ensureInternalLoadBalancer for service %s/%s, as service contains %q finalizer.", svc.Namespace, svc.Name, ILBFinalizerV2)
+			return nil, cloudprovider.ImplementedElsewhere
+		}
 	}
 
 	nm := types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}

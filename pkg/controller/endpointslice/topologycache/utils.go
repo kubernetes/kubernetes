@@ -188,9 +188,13 @@ func getHintsByZone(slice *discovery.EndpointSlice, allocatedHintsByZone Endpoin
 		if endpoint.Hints == nil || len(endpoint.Hints.ForZones) == 0 {
 			return nil
 		}
-		zone := endpoint.Hints.ForZones[0].Name
-		if _, ok := allocations[zone]; ok {
-			return nil
+
+		for i := range endpoint.Hints.ForZones {
+			zone := endpoint.Hints.ForZones[i].Name
+			if _, ok := allocations[zone]; !ok {
+				return nil
+			}
+			hintsByZone[zone]++
 		}
 	}
 

@@ -61,13 +61,24 @@ type policyRuleEvaluator struct {
 	audit.Policy
 }
 
-func (p *policyRuleEvaluator) LevelAndStages(attrs authorizer.Attributes) (audit.Level, []audit.Stage) {
+func (p *policyRuleEvaluator) EvaluatePolicyRule(attrs authorizer.Attributes) auditinternal.RequestAuditConfigWithLevel {
 	for _, rule := range p.Rules {
 		if ruleMatches(&rule, attrs) {
-			return rule.Level, rule.OmitStages
+			return auditinternal.RequestAuditConfigWithLevel{
+				Level: rule.Level,
+				RequestAuditConfig: auditinternal.RequestAuditConfig{
+					OmitStages: rule.OmitStages,
+				},
+			}
 		}
 	}
-	return DefaultAuditLevel, p.OmitStages
+
+	return auditinternal.RequestAuditConfigWithLevel{
+		Level: DefaultAuditLevel,
+		RequestAuditConfig: auditinternal.RequestAuditConfig{
+			OmitStages: p.OmitStages,
+		},
+	}
 }
 
 // Check whether the rule matches the request attrs.
@@ -210,6 +221,11 @@ type fakePolicyRuleEvaluator struct {
 	stage []audit.Stage
 }
 
-func (f *fakePolicyRuleEvaluator) LevelAndStages(_ authorizer.Attributes) (audit.Level, []audit.Stage) {
-	return f.level, f.stage
+func (f *fakePolicyRuleEvaluator) EvaluatePolicyRule(_ authorizer.Attributes) auditinternal.RequestAuditConfigWithLevel {
+	return auditinternal.RequestAuditConfigWithLevel{
+		Level: f.level,
+		RequestAuditConfig: auditinternal.RequestAuditConfig{
+			OmitStages: f.stage,
+		},
+	}
 }

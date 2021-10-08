@@ -51,9 +51,9 @@ type fifo interface {
 	// Length returns the number of requests in the list.
 	Length() int
 
-	// SeatsSum returns the total number of seats of all requests
-	// in this list.
-	SeatsSum() int
+	// QueueSum returns the sum of initial seats, final seats, and
+	// additional latency aggregated from all requests in this queue.
+	QueueSum() queueSum
 
 	// Walk iterates through the list in order of oldest -> newest
 	// and executes the specified walkFunc for each request in that order.
@@ -68,7 +68,7 @@ type fifo interface {
 type requestFIFO struct {
 	*list.List
 
-	seatsSum int
+	sum queueSum
 }
 
 func newRequestFIFO() fifo {
@@ -81,19 +81,19 @@ func (l *requestFIFO) Length() int {
 	return l.Len()
 }
 
-func (l *requestFIFO) SeatsSum() int {
-	return l.seatsSum
+func (l *requestFIFO) QueueSum() queueSum {
+	return l.sum
 }
 
 func (l *requestFIFO) Enqueue(req *request) removeFromFIFOFunc {
 	e := l.PushBack(req)
-	l.seatsSum += req.Seats()
+	addToQueueSum(&l.sum, req)
 
 	return func() *request {
 		if e.Value != nil {
 			l.Remove(e)
 			e.Value = nil
-			l.seatsSum -= req.Seats()
+			deductFromQueueSum(&l.sum, req)
 		}
 		return req
 	}
@@ -122,7 +122,7 @@ func (l *requestFIFO) getFirst(remove bool) (*request, bool) {
 
 	request, ok := e.Value.(*request)
 	if remove && ok {
-		l.seatsSum -= request.Seats()
+		deductFromQueueSum(&l.sum, request)
 	}
 	return request, ok
 }
@@ -135,4 +135,16 @@ func (l *requestFIFO) Walk(f walkFunc) {
 			}
 		}
 	}
+}
+
+func addToQueueSum(sum *queueSum, req *request) {
+	sum.InitialSeatsSum += req.InitialSeats()
+	sum.MaxSeatsSum += req.MaxSeats()
+	sum.AdditionalSeatSecondsSum += req.AdditionalSeatSeconds()
+}
+
+func deductFromQueueSum(sum *queueSum, req *request) {
+	sum.InitialSeatsSum -= req.InitialSeats()
+	sum.MaxSeatsSum -= req.MaxSeats()
+	sum.AdditionalSeatSecondsSum -= req.AdditionalSeatSeconds()
 }

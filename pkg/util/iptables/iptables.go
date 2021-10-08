@@ -89,6 +89,9 @@ type Interface interface {
 	// mapped to the same IP:PORT and consequently some suffer packet
 	// drops.
 	HasRandomFully() bool
+
+	// Present checks if the kernel supports the iptable interface
+	Present() bool
 }
 
 // Protocol defines the ip protocol either ipv4 or ipv6
@@ -721,6 +724,16 @@ func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol)
 
 func (runner *runner) HasRandomFully() bool {
 	return runner.hasRandomFully
+}
+
+// Present tests if iptable is supported on current kernel by checking the existence
+// of default table and chain
+func (runner *runner) Present() bool {
+	if _, err := runner.ChainExists(TableNAT, ChainPostrouting); err != nil {
+		return false
+	}
+
+	return true
 }
 
 var iptablesNotFoundStrings = []string{

@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"runtime"
 	"sync/atomic"
+	"time"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta2"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -176,6 +177,10 @@ func WithPriorityAndFairness(
 			}()
 
 			execute := func() {
+				startedAt := time.Now()
+				defer func() {
+					httplog.AddKeyValue(ctx, "apf_init_latency", time.Now().Sub(startedAt))
+				}()
 				noteExecutingDelta(1)
 				defer noteExecutingDelta(-1)
 				served = true

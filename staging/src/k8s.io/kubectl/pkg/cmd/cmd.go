@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -102,9 +101,25 @@ func NewDefaultKubectlCommandWithArgs(pluginHandler PluginHandler, args []string
 		// only look for suitable extension executables if
 		// the specified command does not already exist
 		if _, _, err := cmd.Find(cmdPathPieces); err != nil {
-			if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
-				fmt.Fprintf(errout, "Error: %v\n", err)
-				os.Exit(1)
+			// Also check the commands that will be added by Cobra.
+			// These commands are only added once rootCmd.Execute() is called, so we
+			// need to check them explicitly here.
+			var cmdName string // first "non-flag" arguments
+			for _, arg := range cmdPathPieces {
+				if !strings.HasPrefix(arg, "-") {
+					cmdName = arg
+					break
+				}
+			}
+
+			switch cmdName {
+			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
+				// Don't search for a plugin
+			default:
+				if err := HandlePluginCommand(pluginHandler, cmdPathPieces); err != nil {
+					fmt.Fprintf(errout, "Error: %v\n", err)
+					os.Exit(1)
+				}
 			}
 		}
 	}
@@ -255,13 +270,11 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+	// From this point and forward we get warnings on flags that contain "_" separators
+	// when adding them with hyphen instead of the original name.
+	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
 	flags := cmds.PersistentFlags()
-	flags.SetNormalizeFunc(cliflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
-
-	// Normalize all flags that are coming from other packages or pre-configurations
-	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
 
@@ -270,11 +283,9 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	kubeConfigFlags := genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag()
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
-	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	matchVersionKubeConfigFlags.AddFlags(flags)
 	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
 	addCmdHeaderHooks(cmds, kubeConfigFlags)
-
-	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
 	f := cmdutil.NewFactory(matchVersionKubeConfigFlags)
 
@@ -284,9 +295,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// TODO: Consider adding a flag or file preference for setting
 	// the language, instead of just loading from the LANG env. variable.
 	i18n.LoadTranslations("kubectl", nil)
-
-	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 
@@ -392,6 +400,9 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(apiresources.NewCmdAPIResources(f, ioStreams))
 	cmds.AddCommand(options.NewCmdOptions(ioStreams.Out))
 
+	// Stop warning about normalization of flags. That makes it possible to
+	// add the klog flags later.
+	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 	return cmds
 }
 
@@ -425,8 +436,12 @@ func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.C
 	// Wraps CommandHeaderRoundTripper around standard RoundTripper.
 	kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
 		c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
-			crt.Delegate = rt
-			return crt
+			// Must be separate RoundTripper; not "crt" closure.
+			// Fixes: https://github.com/kubernetes/kubectl/issues/1098
+			return &genericclioptions.CommandHeaderRoundTripper{
+				Delegate: rt,
+				Headers:  crt.Headers,
+			}
 		})
 		return c
 	}

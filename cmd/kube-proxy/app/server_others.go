@@ -44,13 +44,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	toolswatch "k8s.io/client-go/tools/watch"
 	"k8s.io/component-base/configz"
 	"k8s.io/component-base/metrics"
 	utilsysctl "k8s.io/component-helpers/node/utils/sysctl"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -183,29 +181,25 @@ func newProxyServer(
 	iptInterface = utiliptables.New(execer, primaryProtocol)
 
 	var ipt [2]utiliptables.Interface
-	dualStack := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && proxyMode != proxyModeUserspace
-	if dualStack {
+	dualStack := true // While we assume that node supports, we do further checks below
+
+	if proxyMode != proxyModeUserspace {
 		// Create iptables handlers for both families, one is already created
 		// Always ordered as IPv4, IPv6
 		if primaryProtocol == utiliptables.ProtocolIPv4 {
 			ipt[0] = iptInterface
 			ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIPv6)
-
-			// Just because the feature gate is enabled doesn't mean the node
-			// actually supports dual-stack
-			if _, err := ipt[1].ChainExists(utiliptables.TableNAT, utiliptables.ChainPostrouting); err != nil {
-				klog.Warningf("No iptables support for IPv6: %v", err)
-				dualStack = false
-			}
 		} else {
 			ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIPv4)
 			ipt[1] = iptInterface
 		}
-	}
-	if dualStack {
-		klog.V(0).InfoS("kube-proxy running in dual-stack mode", "ipFamily", iptInterface.Protocol())
-	} else {
-		klog.V(0).InfoS("kube-proxy running in single-stack mode", "ipFamily", iptInterface.Protocol())
+
+		for _, perFamilyIpt := range ipt {
+			if !perFamilyIpt.Present() {
+				klog.V(0).InfoS("kube-proxy running in single-stack mode, this ipFamily is not supported", "ipFamily", perFamilyIpt.Protocol())
+				dualStack = false
+			}
+		}
 	}
 
 	if proxyMode == proxyModeIPTables {
@@ -216,8 +210,8 @@ func newProxyServer(
 		}
 
 		if dualStack {
+			klog.V(0).InfoS("kube-proxy running in dual-stack mode", "ipFamily", iptInterface.Protocol())
 			klog.V(0).InfoS("Creating dualStackProxier for iptables")
-
 			// Always ordered to match []ipt
 			var localDetectors [2]proxyutiliptables.LocalTrafficDetector
 			localDetectors, err = getDualStackLocalDetectorTuple(detectLocalMode, config, ipt, nodeInfo)
@@ -241,7 +235,8 @@ func newProxyServer(
 				healthzServer,
 				config.NodePortAddresses,
 			)
-		} else { // Create a single-stack proxier.
+		} else {
+			// Create a single-stack proxier if and only if the node does not support dual-stack (i.e, no iptables support).
 			var localDetector proxyutiliptables.LocalTrafficDetector
 			localDetector, err = getLocalDetector(detectLocalMode, config, iptInterface, nodeInfo)
 			if err != nil {
@@ -346,6 +341,7 @@ func newProxyServer(
 		proxymetrics.RegisterMetrics()
 	} else {
 		klog.V(0).InfoS("Using userspace Proxier")
+		klog.V(0).InfoS("The userspace proxier is now deprecated and will be removed in a future release, please use 'iptables' or 'ipvs' instead")
 
 		// TODO this has side effects that should only happen when Run() is invoked.
 		proxier, err = userspace.NewProxier(

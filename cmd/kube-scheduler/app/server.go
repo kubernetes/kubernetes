@@ -88,8 +88,6 @@ for more information about scheduling and the kube-scheduler component.`,
 			}
 			return nil
 		},
-		SilenceErrors: true,
-		SilenceUsage:  true,
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
 				if len(arg) > 0 {
@@ -99,6 +97,7 @@ for more information about scheduling and the kube-scheduler component.`,
 			return nil
 		},
 	}
+
 	fs := cmd.Flags()
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())

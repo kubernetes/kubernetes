@@ -33,10 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/kubernetes/pkg/features"
 	netutils "k8s.io/utils/net"
 )
 
@@ -122,12 +120,10 @@ func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
 	}
 
 	nodeIPs := []net.IP{allIPs[0]}
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		for _, ip := range allIPs {
-			if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
-				nodeIPs = append(nodeIPs, ip)
-				break
-			}
+	for _, ip := range allIPs {
+		if netutils.IsIPv6(ip) != netutils.IsIPv6(nodeIPs[0]) {
+			nodeIPs = append(nodeIPs, ip)
+			break
 		}
 	}
 

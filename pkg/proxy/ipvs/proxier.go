@@ -1025,6 +1025,9 @@ func (proxier *Proxier) syncProxyRules() {
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				staleServices.Insert(extIP)
 			}
+			for _, extIP := range svcInfo.LoadBalancerIPStrings() {
+				staleServices.Insert(extIP)
+			}
 		}
 	}
 

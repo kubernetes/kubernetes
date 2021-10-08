@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -104,7 +103,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	}
 	fss := cliflag.NamedFlagSets{}
 	command := app.NewCloudControllerManagerCommand(s, cloudInitializer, app.DefaultInitFuncConstructors, fss, stopCh)
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	commandArgs := []string{}
 	listeners := []net.Listener{}

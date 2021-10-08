@@ -135,6 +135,13 @@ func (pvcb pvcBuilder) withRequestStorage(request resource.Quantity) pvcBuilder 
 	return pvcb
 }
 
+func (pvcb pvcBuilder) withPhase(phase v1.PersistentVolumeClaimPhase) pvcBuilder {
+	pvcb.PersistentVolumeClaim.Status = v1.PersistentVolumeClaimStatus{
+		Phase: phase,
+	}
+	return pvcb
+}
+
 type podBuilder struct {
 	*v1.Pod
 }

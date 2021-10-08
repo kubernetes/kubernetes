@@ -439,6 +439,11 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 				"-m0", // Zero blocks reserved for super-user
 				source,
 			}
+		} else if fstype == "xfs" {
+			args = []string{
+				"-f", // force flag
+				source,
+			}
 		}
 
 		klog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)

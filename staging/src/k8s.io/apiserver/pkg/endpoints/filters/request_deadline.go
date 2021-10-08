@@ -108,16 +108,20 @@ func withFailedRequestAudit(failedHandler http.Handler, statusErr *apierrors.Sta
 		return failedHandler
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		req, ev, omitStages, err := createAuditEventAndAttachToContext(req, policy)
+		a, err := evaluatePolicyAndCreateAuditEvent(req, policy)
 		if err != nil {
 			utilruntime.HandleError(fmt.Errorf("failed to create audit event: %v", err))
 			responsewriters.InternalError(w, req, errors.New("failed to create audit event"))
 			return
 		}
+
+		ev := a.Event
 		if ev == nil {
 			failedHandler.ServeHTTP(w, req)
 			return
 		}
+
+		req = req.WithContext(audit.WithAuditContext(req.Context(), a))
 
 		ev.ResponseStatus = &metav1.Status{}
 		ev.Stage = auditinternal.StageResponseStarted
@@ -125,7 +129,7 @@ func withFailedRequestAudit(failedHandler http.Handler, statusErr *apierrors.Sta
 			ev.ResponseStatus.Message = statusErr.Error()
 		}
 
-		rw := decorateResponseWriter(req.Context(), w, ev, sink, omitStages)
+		rw := decorateResponseWriter(req.Context(), w, ev, sink, a.RequestAuditConfig.OmitStages)
 		failedHandler.ServeHTTP(rw, req)
 	})
 }

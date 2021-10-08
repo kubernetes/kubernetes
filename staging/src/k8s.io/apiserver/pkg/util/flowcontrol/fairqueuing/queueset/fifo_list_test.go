@@ -18,9 +18,11 @@ package queueset
 
 import (
 	"math/rand"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	fcrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
@@ -150,59 +152,88 @@ func TestFIFOWithRemoveIsIdempotent(t *testing.T) {
 	verifyOrder(t, orderExpected, remainingRequests)
 }
 
-func TestFIFOSeatsSum(t *testing.T) {
+func TestFIFOQueueWorkEstimate(t *testing.T) {
 	list := newRequestFIFO()
 
-	newRequest := func(width uint) *request {
-		return &request{workEstimate: fcrequest.WorkEstimate{Seats: width}}
+	update := func(we *queueSum, req *request, multiplier int) {
+		we.InitialSeatsSum += multiplier * req.InitialSeats()
+		we.MaxSeatsSum += multiplier * req.MaxSeats()
+		we.AdditionalSeatSecondsSum += SeatSeconds(multiplier) * req.AdditionalSeatSeconds()
 	}
-	arrival := []*request{newRequest(1), newRequest(2), newRequest(3)}
+
+	assert := func(t *testing.T, want, got *queueSum) {
+		if !reflect.DeepEqual(want, got) {
+			t.Errorf("Expected queue work estimate to match, diff: %s", cmp.Diff(want, got))
+		}
+	}
+
+	newRequest := func(initialSeats, finalSeats uint, additionalLatency time.Duration) *request {
+		return &request{workEstimate: fcrequest.WorkEstimate{
+			InitialSeats:      initialSeats,
+			FinalSeats:        finalSeats,
+			AdditionalLatency: additionalLatency,
+		}}
+	}
+	arrival := []*request{
+		newRequest(1, 3, time.Second),
+		newRequest(2, 2, 2*time.Second),
+		newRequest(3, 1, 3*time.Second),
+	}
 	removeFn := make([]removeFromFIFOFunc, 0)
 
-	seatsSum := 0
+	queueSumExpected := queueSum{}
 	for i := range arrival {
-		removeFn = append(removeFn, list.Enqueue(arrival[i]))
+		req := arrival[i]
+		removeFn = append(removeFn, list.Enqueue(req))
+		update(&queueSumExpected, req, 1)
 
-		seatsSum += i + 1
-		if list.SeatsSum() != seatsSum {
-			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
-		}
+		workEstimateGot := list.QueueSum()
+		assert(t, &queueSumExpected, &workEstimateGot)
 	}
 
+	// NOTE: the test expects the request and the remove func to be at the same index
 	for i := range removeFn {
+		req := arrival[i]
 		removeFn[i]()
 
-		seatsSum -= i + 1
-		if list.SeatsSum() != seatsSum {
-			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
-		}
+		update(&queueSumExpected, req, -1)
+
+		workEstimateGot := list.QueueSum()
+		assert(t, &queueSumExpected, &workEstimateGot)
 
 		// check idempotency
 		removeFn[i]()
-		if list.SeatsSum() != seatsSum {
-			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
-		}
+
+		workEstimateGot = list.QueueSum()
+		assert(t, &queueSumExpected, &workEstimateGot)
 	}
 
 	// Check second type of idempotency: Dequeue + removeFn.
 	for i := range arrival {
-		removeFn[i] = list.Enqueue(arrival[i])
-		seatsSum += i + 1
+		req := arrival[i]
+		removeFn[i] = list.Enqueue(req)
+
+		update(&queueSumExpected, req, 1)
 	}
 
 	for i := range arrival {
+		// we expect Dequeue to pop the oldest request that should
+		// have the lowest index as well.
+		req := arrival[i]
+
 		if _, ok := list.Dequeue(); !ok {
 			t.Errorf("Unexpected failed dequeue: %d", i)
 		}
-		seatsSum -= i + 1
-		if list.SeatsSum() != seatsSum {
-			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
-		}
+
+		update(&queueSumExpected, req, -1)
+
+		queueSumGot := list.QueueSum()
+		assert(t, &queueSumExpected, &queueSumGot)
 
 		removeFn[i]()
-		if list.SeatsSum() != seatsSum {
-			t.Errorf("Expected seatsSum: %d, but got: %d", seatsSum, list.SeatsSum())
-		}
+
+		queueSumGot = list.QueueSum()
+		assert(t, &queueSumExpected, &queueSumGot)
 	}
 }
 

@@ -34,14 +34,29 @@ const (
 )
 
 type WorkEstimate struct {
-	// Seats represents the number of seats associated with this request
-	Seats uint
+	// InitialSeats is the number of seats occupied while the server is
+	// executing this request.
+	InitialSeats uint
+
+	// FinalSeats is the number of seats occupied at the end,
+	// during the AdditionalLatency.
+	FinalSeats uint
 
 	// AdditionalLatency specifies the additional duration the seats allocated
 	// to this request must be reserved after the given request had finished.
 	// AdditionalLatency should not have any impact on the user experience, the
 	// caller must not experience this additional latency.
 	AdditionalLatency time.Duration
+}
+
+// MaxSeats returns the number of seats this request requires, it is the maximum
+// of the two, WorkEstimate.InitialSeats and WorkEstimate.FinalSeats.
+func (we *WorkEstimate) MaxSeats() int {
+	if we.InitialSeats >= we.FinalSeats {
+		return int(we.InitialSeats)
+	}
+
+	return int(we.FinalSeats)
 }
 
 // objectCountGetterFunc represents a function that gets the total
@@ -77,7 +92,7 @@ func (e *workEstimator) estimate(r *http.Request) WorkEstimate {
 	if !ok {
 		klog.ErrorS(fmt.Errorf("no RequestInfo found in context"), "Failed to estimate work for the request", "URI", r.RequestURI)
 		// no RequestInfo should never happen, but to be on the safe side let's return maximumSeats
-		return WorkEstimate{Seats: maximumSeats}
+		return WorkEstimate{InitialSeats: maximumSeats}
 	}
 
 	switch requestInfo.Verb {
@@ -85,5 +100,5 @@ func (e *workEstimator) estimate(r *http.Request) WorkEstimate {
 		return e.listWorkEstimator.EstimateWork(r)
 	}
 
-	return WorkEstimate{Seats: minimumSeats}
+	return WorkEstimate{InitialSeats: minimumSeats}
 }

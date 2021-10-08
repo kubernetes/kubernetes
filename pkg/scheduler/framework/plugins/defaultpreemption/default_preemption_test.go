@@ -35,10 +35,10 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/events"
-	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
+	kubeschedulerconfigv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	configv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
+	configv1beta2 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -86,10 +86,10 @@ var (
 )
 
 func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
-	v1beta1dpa := &kubeschedulerconfigv1beta1.DefaultPreemptionArgs{}
-	configv1beta1.SetDefaults_DefaultPreemptionArgs(v1beta1dpa)
+	v1beta2dpa := &kubeschedulerconfigv1beta2.DefaultPreemptionArgs{}
+	configv1beta2.SetDefaults_DefaultPreemptionArgs(v1beta2dpa)
 	dpa := &config.DefaultPreemptionArgs{}
-	configv1beta1.Convert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(v1beta1dpa, dpa, nil)
+	configv1beta2.Convert_v1beta2_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(v1beta2dpa, dpa, nil)
 	return dpa
 }
 

@@ -17,34 +17,15 @@ limitations under the License.
 package main
 
 import (
-	"flag"
-	"math/rand"
 	"os"
-	"time"
 
-	"github.com/spf13/pflag"
-
-	cliflag "k8s.io/component-base/cli/flag"
-	"k8s.io/component-base/logs"
+	"k8s.io/component-base/cli"
 	_ "k8s.io/component-base/logs/json/register" // for JSON log format registration
-	"k8s.io/klog/v2"
 	"k8s.io/pod-security-admission/cmd/webhook/server"
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-
 	command := server.NewServerCommand()
-
-	logs.InitLogs()
-	defer logs.FlushLogs()
-	logFlags := flag.NewFlagSet("klog", flag.ContinueOnError)
-	klog.InitFlags(logFlags)
-	command.Flags().AddGoFlagSet(logFlags)
-
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }

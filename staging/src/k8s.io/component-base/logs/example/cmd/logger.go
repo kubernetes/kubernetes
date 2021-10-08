@@ -23,6 +23,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/component-base/cli"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 
@@ -31,12 +32,8 @@ import (
 
 func main() {
 	command := NewLoggerCommand()
-	logs.InitLogs()
-	defer logs.FlushLogs()
-
-	if err := command.Execute(); err != nil {
-		os.Exit(1)
-	}
+	code := cli.Run(command)
+	os.Exit(code)
 }
 
 func NewLoggerCommand() *cobra.Command {
@@ -64,6 +61,7 @@ func runLogger() {
 	klog.ErrorS(err, "Log using ErrorS")
 	data := SensitiveData{Key: "secret"}
 	klog.Infof("Log with sensitive key, data: %q", data)
+	klog.V(1).Info("Log less important message")
 }
 
 type SensitiveData struct {

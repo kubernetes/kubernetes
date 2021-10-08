@@ -78,6 +78,50 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			name: "test that a plugin does not execute over an existing command by the same name",
 			args: []string{"kubectl", "version"},
 		},
+		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
+		// See https://github.com/kubernetes/kubectl/issues/1116
+		{
+			name: "test that a plugin does not execute over Cobra's help command",
+			args: []string{"kubectl", "help"},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __complete command",
+			args: []string{"kubectl", cobra.ShellCompRequestCmd},
+		},
+		{
+			name: "test that a plugin does not execute over Cobra's __completeNoDesc command",
+			args: []string{"kubectl", cobra.ShellCompNoDescRequestCmd},
+		},
+		// The following tests make sure that commands added by Cobra cannot be shadowed by a plugin
+		// even when a flag is specified first.  This can happen when using aliases.
+		// See https://github.com/kubernetes/kubectl/issues/1119
+		{
+			name: "test that a flag does not break Cobra's help command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", "help"},
+		},
+		{
+			name: "test that a flag does not break Cobra's __complete command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompRequestCmd},
+		},
+		{
+			name: "test that a flag does not break Cobra's __completeNoDesc command",
+			args: []string{"kubectl", "--kubeconfig=/path/to/kubeconfig", cobra.ShellCompNoDescRequestCmd},
+		},
+		// As for the previous tests, an alias could add a flag without using the = form.
+		// We don't support this case as parsing the flags becomes quite complicated (flags
+		// that take a value, versus flags that don't)
+		// {
+		// 	name: "test that a flag with a space does not break Cobra's help command",
+		// 	args: []string{"kubectl", "--kubeconfig", "/path/to/kubeconfig", "help"},
+		// },
+		// {
+		// 	name: "test that a flag with a space does not break Cobra's __complete command",
+		// 	args: []string{"kubectl", "--kubeconfig", "/path/to/kubeconfig", cobra.ShellCompRequestCmd},
+		// },
+		// {
+		// 	name: "test that a flag with a space does not break Cobra's __completeNoDesc command",
+		// 	args: []string{"kubectl", "--kubeconfig", "/path/to/kubeconfig", cobra.ShellCompNoDescRequestCmd},
+		// },
 	}
 
 	for _, test := range tests {
@@ -92,6 +136,7 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			})
 
 			root := NewDefaultKubectlCommandWithArgs(pluginsHandler, test.args, in, out, errOut)
+			root.SetOut(out)
 			if err := root.Execute(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

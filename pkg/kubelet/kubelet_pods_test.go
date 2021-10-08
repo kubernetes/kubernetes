@@ -2596,6 +2596,95 @@ func Test_generateAPIPodStatus(t *testing.T) {
 			},
 		},
 		{
+			name: "terminal phase from previous status must remain terminal, restartAlways",
+			pod: &v1.Pod{
+				Spec: desiredState,
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{},
+			previousStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+				ContainerStatuses: []v1.ContainerStatus{
+					runningState("containerA"),
+					runningState("containerB"),
+				},
+				// Reason and message should be preserved
+				Reason:  "Test",
+				Message: "test",
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodSucceeded,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(waitingWithLastTerminationUnknown("containerA", 1)),
+					ready(waitingWithLastTerminationUnknown("containerB", 1)),
+				},
+				Reason:  "Test",
+				Message: "test",
+			},
+		},
+		{
+			name: "terminal phase from previous status must remain terminal, restartNever",
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					NodeName: "machine",
+					Containers: []v1.Container{
+						{Name: "containerA"},
+						{Name: "containerB"},
+					},
+					RestartPolicy: v1.RestartPolicyNever,
+				},
+				Status: v1.PodStatus{
+					Phase: v1.PodRunning,
+					ContainerStatuses: []v1.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
+					},
+				},
+			},
+			currentStatus: &kubecontainer.PodStatus{},
+			previousStatus: v1.PodStatus{
+				Phase: v1.PodSucceeded,
+				ContainerStatuses: []v1.ContainerStatus{
+					succeededState("containerA"),
+					succeededState("containerB"),
+				},
+				// Reason and message should be preserved
+				Reason:  "Test",
+				Message: "test",
+			},
+			expected: v1.PodStatus{
+				Phase:    v1.PodSucceeded,
+				HostIP:   "127.0.0.1",
+				QOSClass: v1.PodQOSBestEffort,
+				Conditions: []v1.PodCondition{
+					{Type: v1.PodInitialized, Status: v1.ConditionTrue, Reason: "PodCompleted"},
+					{Type: v1.PodReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.ContainersReady, Status: v1.ConditionFalse, Reason: "PodCompleted"},
+					{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+				},
+				ContainerStatuses: []v1.ContainerStatus{
+					ready(succeededState("containerA")),
+					ready(succeededState("containerB")),
+				},
+				Reason:  "Test",
+				Message: "test",
+			},
+		},
+		{
 			name: "running can revert to pending",
 			pod: &v1.Pod{
 				Spec: desiredState,
@@ -2889,13 +2978,16 @@ func TestGetPortForward(t *testing.T) {
 }
 
 func TestHasHostMountPVC(t *testing.T) {
-	tests := map[string]struct {
-		pvError       error
-		pvcError      error
-		expected      bool
-		podHasPVC     bool
-		pvcIsHostPath bool
-	}{
+	type testcase struct {
+		pvError          error
+		pvcError         error
+		expected         bool
+		podHasPVC        bool
+		pvcIsHostPath    bool
+		podHasEphemeral  bool
+		ephemeralEnabled bool
+	}
+	tests := map[string]testcase{
 		"no pvc": {podHasPVC: false, expected: false},
 		"error fetching pvc": {
 			podHasPVC: true,
@@ -2912,6 +3004,18 @@ func TestHasHostMountPVC(t *testing.T) {
 			pvcIsHostPath: true,
 			expected:      true,
 		},
+		"enabled ephemeral host path": {
+			podHasEphemeral:  true,
+			pvcIsHostPath:    true,
+			ephemeralEnabled: true,
+			expected:         true,
+		},
+		"disabled ephemeral host path": {
+			podHasEphemeral:  true,
+			pvcIsHostPath:    true,
+			ephemeralEnabled: false,
+			expected:         false,
+		},
 		"non host path pvc": {
 			podHasPVC:     true,
 			pvcIsHostPath: false,
@@ -2919,7 +3023,8 @@ func TestHasHostMountPVC(t *testing.T) {
 		},
 	}
 
-	for k, v := range tests {
+	run := func(t *testing.T, v testcase) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, v.ephemeralEnabled)()
 		testKubelet := newTestKubelet(t, false)
 		defer testKubelet.Cleanup()
 		pod := &v1.Pod{
@@ -2938,13 +3043,23 @@ func TestHasHostMountPVC(t *testing.T) {
 					},
 				},
 			}
+		}
 
-			if v.pvcIsHostPath {
-				volumeToReturn.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
-					HostPath: &v1.HostPathVolumeSource{},
-				}
+		if v.podHasEphemeral {
+			pod.Spec.Volumes = []v1.Volume{
+				{
+					Name: "xyz",
+					VolumeSource: v1.VolumeSource{
+						Ephemeral: &v1.EphemeralVolumeSource{},
+					},
+				},
 			}
+		}
 
+		if (v.podHasPVC || v.podHasEphemeral) && v.pvcIsHostPath {
+			volumeToReturn.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+				HostPath: &v1.HostPathVolumeSource{},
+			}
 		}
 
 		testKubelet.fakeKubeClient.AddReactor("get", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
@@ -2960,9 +3075,14 @@ func TestHasHostMountPVC(t *testing.T) {
 
 		actual := testKubelet.kubelet.hasHostMountPVC(pod)
 		if actual != v.expected {
-			t.Errorf("%s expected %t but got %t", k, v.expected, actual)
+			t.Errorf("expected %t but got %t", v.expected, actual)
 		}
+	}
 
+	for k, v := range tests {
+		t.Run(k, func(t *testing.T) {
+			run(t, v)
+		})
 	}
 }
 
@@ -3113,7 +3233,6 @@ func TestTruncatePodHostname(t *testing.T) {
 func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 	testcases := []struct {
 		name          string
-		dualStack     bool
 		nodeAddresses []v1.NodeAddress
 		criPodIPs     []string
 		podIPs        []v1.PodIP
@@ -3138,21 +3257,10 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			},
 		},
 		{
-			name: "Dual-stack addresses are ignored in single-stack cluster",
-			nodeAddresses: []v1.NodeAddress{
-				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
-				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
-			},
-			podIPs: []v1.PodIP{
-				{IP: "10.0.0.1"},
-			},
-		},
-		{
 			name: "Single-stack addresses in dual-stack cluster",
 			nodeAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 			},
-			dualStack: true,
 			podIPs: []v1.PodIP{
 				{IP: "10.0.0.1"},
 			},
@@ -3164,7 +3272,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.2"},
 				{Type: v1.NodeExternalIP, Address: "192.168.0.1"},
 			},
-			dualStack: true,
 			podIPs: []v1.PodIP{
 				{IP: "10.0.0.1"},
 			},
@@ -3175,7 +3282,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			podIPs: []v1.PodIP{
 				{IP: "10.0.0.1"},
 				{IP: "fd01::1234"},
@@ -3187,7 +3293,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			criPodIPs: []string{"192.168.0.1"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
@@ -3199,7 +3304,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			criPodIPs: []string{"192.168.0.1", "2001:db8::2"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
@@ -3213,7 +3317,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 				{Type: v1.NodeInternalIP, Address: "10.0.0.1"},
 				{Type: v1.NodeInternalIP, Address: "fd01::1234"},
 			},
-			dualStack: true,
 			criPodIPs: []string{"2001:db8::2", "192.168.0.1"},
 			podIPs: []v1.PodIP{
 				{IP: "192.168.0.1"},
@@ -3227,8 +3330,6 @@ func TestGenerateAPIPodStatusHostNetworkPodIPs(t *testing.T) {
 			testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 			defer testKubelet.Cleanup()
 			kl := testKubelet.kubelet
-
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.dualStack)()
 
 			kl.nodeLister = testNodeLister{nodes: []*v1.Node{
 				{

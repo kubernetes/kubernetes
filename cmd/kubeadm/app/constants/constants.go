@@ -627,9 +627,9 @@ func CreateTimestampDirForKubeadm(kubernetesDir, dirName string) (string, error)
 }
 
 // GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range
-func GetDNSIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
+func GetDNSIP(svcSubnetList string) (net.IP, error) {
 	// Get the service subnet CIDR
-	svcSubnetCIDR, err := GetKubernetesServiceCIDR(svcSubnetList, isDualStack)
+	svcSubnetCIDR, err := GetKubernetesServiceCIDR(svcSubnetList)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", svcSubnetList)
 	}
@@ -644,31 +644,23 @@ func GetDNSIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
 }
 
 // GetKubernetesServiceCIDR returns the default Service CIDR for the Kubernetes internal service
-func GetKubernetesServiceCIDR(svcSubnetList string, isDualStack bool) (*net.IPNet, error) {
-	if isDualStack {
-		// The default service address family for the cluster is the address family of the first
-		// service cluster IP range configured via the `--service-cluster-ip-range` flag
-		// of the kube-controller-manager and kube-apiserver.
-		svcSubnets, err := netutils.ParseCIDRs(strings.Split(svcSubnetList, ","))
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
-		}
-		if len(svcSubnets) == 0 {
-			return nil, errors.New("received empty ServiceSubnet for dual-stack")
-		}
-		return svcSubnets[0], nil
-	}
-	// internal IP address for the API server
-	_, svcSubnet, err := netutils.ParseCIDRSloppy(svcSubnetList)
+func GetKubernetesServiceCIDR(svcSubnetList string) (*net.IPNet, error) {
+	// The default service address family for the cluster is the address family of the first
+	// service cluster IP range configured via the `--service-cluster-ip-range` flag
+	// of the kube-controller-manager and kube-apiserver.
+	svcSubnets, err := netutils.ParseCIDRs(strings.Split(svcSubnetList, ","))
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
 	}
-	return svcSubnet, nil
+	if len(svcSubnets) == 0 {
+		return nil, errors.New("received empty ServiceSubnet")
+	}
+	return svcSubnets[0], nil
 }
 
 // GetAPIServerVirtualIP returns the IP of the internal Kubernetes API service
-func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
-	svcSubnet, err := GetKubernetesServiceCIDR(svcSubnetList, isDualStack)
+func GetAPIServerVirtualIP(svcSubnetList string) (net.IP, error) {
+	svcSubnet, err := GetKubernetesServiceCIDR(svcSubnetList)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
 	}

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/audit/policy"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	testingclock "k8s.io/utils/clock/testing"
@@ -410,7 +411,7 @@ func TestWithFailedRequestAudit(t *testing.T) {
 					t.Errorf("expected an http.ResponseWriter of type: %T but got: %T", &auditResponseWriter{}, rwGot)
 				}
 
-				auditEventGot := request.AuditEventFrom(requestGot.Context())
+				auditEventGot := audit.AuditEventFrom(requestGot.Context())
 				if auditEventGot == nil {
 					t.Fatal("expected an audit event object but got nil")
 				}

@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/mount-utils"
@@ -51,17 +52,20 @@ import (
 )
 
 func TestRunOnce(t *testing.T) {
-	cadvisor := &cadvisortest.Mock{}
-	cadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
-	cadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	cadvisor := cadvisortest.NewMockInterface(mockCtrl)
+	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).AnyTimes()
+	cadvisor.EXPECT().ImagesFsInfo().Return(cadvisorapiv2.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
 		Available: 600,
-	}, nil)
-	cadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{
+	}, nil).AnyTimes()
+	cadvisor.EXPECT().RootFsInfo().Return(cadvisorapiv2.FsInfo{
 		Usage:    9,
 		Capacity: 10,
-	}, nil)
+	}, nil).AnyTimes()
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(

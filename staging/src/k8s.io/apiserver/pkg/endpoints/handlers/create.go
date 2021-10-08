@@ -141,7 +141,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 		}
 		ctx = request.WithNamespace(ctx, namespace)
 
-		ae := request.AuditEventFrom(ctx)
+		ae := audit.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
 		audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 
@@ -195,7 +195,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 
 		code := http.StatusCreated
 		status, ok := result.(*metav1.Status)
-		if ok && err == nil && status.Code == 0 {
+		if ok && status.Code == 0 {
 			status.Code = int32(code)
 		}
 

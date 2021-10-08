@@ -18,6 +18,8 @@ package queueset
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"time"
 
 	genericrequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -60,7 +62,7 @@ type request struct {
 	arrivalTime time.Time
 
 	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
-	arrivalR float64
+	arrivalR SeatSeconds
 
 	// descr1 and descr2 are not used in any logic but they appear in
 	// log messages
@@ -82,9 +84,9 @@ type queue struct {
 	// The requests not yet executing in the real world are stored in a FIFO list.
 	requests fifo
 
-	// virtualStart is the "virtual time" (R progress meter reading) at
+	// nextDispatchR is the R progress meter reading at
 	// which the next request will be dispatched in the virtual world.
-	virtualStart float64
+	nextDispatchR SeatSeconds
 
 	// requestsExecuting is the count in the real world
 	requestsExecuting int
@@ -93,6 +95,22 @@ type queue struct {
 	// seatsInUse is the total number of "seats" currently occupied
 	// by all the requests that are currently executing in this queue.
 	seatsInUse int
+}
+
+// queueSum tracks the sum of initial seats, final seats, and
+// additional latency aggregated from all requests in a given queue
+type queueSum struct {
+	// InitialSeatsSum is the sum of InitialSeats
+	// associated with all requests in a given queue.
+	InitialSeatsSum int
+
+	// MaxSeatsSum is the sum of MaxSeats
+	// associated with all requests in a given queue.
+	MaxSeatsSum int
+
+	// AdditionalSeatSecondsSum is sum of AdditionalSeatsSeconds
+	// associated with all requests in a given queue.
+	AdditionalSeatSecondsSum SeatSeconds
 }
 
 // Enqueue enqueues a request into the queue and
@@ -127,10 +145,48 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 		i++
 		return true
 	})
+
+	// TODO: change QueueDump to include queueSum stats
 	return debug.QueueDump{
-		VirtualStart:      q.virtualStart,
+		VirtualStart:      q.nextDispatchR.ToFloat(), // TODO: change QueueDump to use SeatSeconds
 		Requests:          digest,
 		ExecutingRequests: q.requestsExecuting,
 		SeatsInUse:        q.seatsInUse,
 	}
 }
+
+// SeatSeconds is a measure of work, in units of seat-seconds, using a fixed-point representation.
+// `SeatSeconds(n)` represents `n/ssScale` seat-seconds.
+// The constants `ssScale` and `ssScaleDigits` are private to the implementation here,
+// no other code should use them.
+type SeatSeconds uint64
+
+// MaxSeatsSeconds is the maximum representable value of SeatSeconds
+const MaxSeatSeconds = SeatSeconds(math.MaxUint64)
+
+// MinSeatSeconds is the lowest representable value of SeatSeconds
+const MinSeatSeconds = SeatSeconds(0)
+
+// SeatsTimeDuration produces the SeatSeconds value for the given factors.
+// This is intended only to produce small values, increments in work
+// rather than amount of work done since process start.
+func SeatsTimesDuration(seats float64, duration time.Duration) SeatSeconds {
+	return SeatSeconds(math.Round(seats * float64(duration/time.Nanosecond) / (1e9 / ssScale)))
+}
+
+// ToFloat converts to a floating-point representation.
+// This conversion may lose precision.
+func (ss SeatSeconds) ToFloat() float64 {
+	return float64(ss) / ssScale
+}
+
+// String converts to a string.
+// This is suitable for large as well as small values.
+func (ss SeatSeconds) String() string {
+	const div = SeatSeconds(ssScale)
+	quo := ss / div
+	rem := ss - quo*div
+	return fmt.Sprintf("%d.%08dss", quo, rem)
+}
+
+const ssScale = 1e8

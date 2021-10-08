@@ -193,3 +193,137 @@ func Test_getGivingAndReceivingZones(t *testing.T) {
 		})
 	}
 }
+
+func Test_getHintsByZone(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		slice                discovery.EndpointSlice
+		allocatedHintsByZone EndpointZoneInfo
+		allocations          map[string]Allocation
+		expectedHintsByZone  map[string]int
+	}{{
+		name:                 "empty",
+		slice:                discovery.EndpointSlice{},
+		allocations:          map[string]Allocation{},
+		allocatedHintsByZone: EndpointZoneInfo{},
+		expectedHintsByZone:  map[string]int{},
+	}, {
+		name: "single zone hint",
+		slice: discovery.EndpointSlice{
+			Endpoints: []discovery.Endpoint{{
+				Zone:  utilpointer.StringPtr("zone-a"),
+				Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
+			}},
+		},
+		allocations: map[string]Allocation{
+			"zone-a": {Maximum: 3},
+		},
+		allocatedHintsByZone: EndpointZoneInfo{"zone-a": 1},
+		expectedHintsByZone: map[string]int{
+			"zone-a": 1,
+		},
+	}, {
+		name: "multiple zone hints",
+		slice: discovery.EndpointSlice{
+			Endpoints: []discovery.Endpoint{
+				{
+					Zone:  utilpointer.StringPtr("zone-a"),
+					Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
+				},
+				{
+					Zone:  utilpointer.StringPtr("zone-a"),
+					Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
+				},
+				{
+					Zone:  utilpointer.StringPtr("zone-b"),
+					Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-b"}}},
+				},
+			},
+		},
+		allocations: map[string]Allocation{
+			"zone-a": {Maximum: 3},
+			"zone-b": {Maximum: 3},
+			"zone-c": {Maximum: 3},
+		},
+		allocatedHintsByZone: EndpointZoneInfo{"zone-a": 1, "zone-b": 1, "zone-c": 1},
+		expectedHintsByZone: map[string]int{
+			"zone-a": 1,
+			"zone-b": 2,
+		},
+	}, {
+		name: "invalid by zones that no longer requires any allocations",
+		slice: discovery.EndpointSlice{
+			Endpoints: []discovery.Endpoint{
+				{
+					Zone:  utilpointer.StringPtr("zone-a"),
+					Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-non-existent"}}},
+				},
+			},
+		},
+		allocations: map[string]Allocation{
+			"zone-a": {Maximum: 3},
+		},
+		allocatedHintsByZone: EndpointZoneInfo{"zone-a": 1, "zone-b": 1, "zone-c": 1},
+		expectedHintsByZone:  nil,
+	}, {
+		name: "invalid by endpoints with nil hints",
+		slice: discovery.EndpointSlice{
+			Endpoints: []discovery.Endpoint{
+				{
+					Zone:  utilpointer.StringPtr("zone-a"),
+					Hints: nil,
+				},
+			},
+		},
+		allocations: map[string]Allocation{
+			"zone-a": {Maximum: 3},
+		},
+		allocatedHintsByZone: EndpointZoneInfo{},
+		expectedHintsByZone:  nil,
+	}, {
+		name: "invalid by endpoint with no hints",
+		slice: discovery.EndpointSlice{
+			Endpoints: []discovery.Endpoint{
+				{
+					Zone:  utilpointer.StringPtr("zone-a"),
+					Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{}},
+				},
+			},
+		},
+		allocations: map[string]Allocation{
+			"zone-a": {Maximum: 3},
+		},
+		allocatedHintsByZone: EndpointZoneInfo{},
+		expectedHintsByZone:  nil,
+	}, {
+		name: "invalid by hints that would make minimum allocations impossible",
+		slice: discovery.EndpointSlice{
+			Endpoints: []discovery.Endpoint{
+				{
+					Zone:  utilpointer.StringPtr("zone-a"),
+					Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
+				},
+				{
+					Zone:  utilpointer.StringPtr("zone-a"),
+					Hints: &discovery.EndpointHints{ForZones: []discovery.ForZone{{Name: "zone-a"}}},
+				},
+			},
+		},
+		allocations: map[string]Allocation{
+			"zone-a": {Maximum: 2},
+		},
+		allocatedHintsByZone: EndpointZoneInfo{"zone-a": 1},
+		expectedHintsByZone:  nil,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualHintsByZone := getHintsByZone(&tc.slice, tc.allocatedHintsByZone, tc.allocations)
+
+			if !reflect.DeepEqual(actualHintsByZone, tc.expectedHintsByZone) {
+				// %#v for distinguishing between nil and empty map
+				t.Errorf("Expected %#v hints by zones, got %#v", tc.expectedHintsByZone, actualHintsByZone)
+			}
+		})
+	}
+}
