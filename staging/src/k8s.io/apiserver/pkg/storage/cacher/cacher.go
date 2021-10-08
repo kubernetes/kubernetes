@@ -937,10 +937,21 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			// Make sure every watcher will try to send event without blocking first,
 			// even if the timer has already expired.
 			timer := c.timer
+			wg := sync.WaitGroup{}
+			resultCh := make(chan bool, len(c.blockedWatchers))
 			for _, watcher := range c.blockedWatchers {
-				if !watcher.add(event, timer) {
+				wg.Add(1)
+				go func(watcher *cacheWatcher) {
+					defer wg.Done()
+					resultCh <- watcher.add(event, timer)
+				}(watcher)
+			}
+			wg.Wait()
+			for result := range resultCh {
+				if !result {
 					// fired, clean the timer by set it to nil.
 					timer = nil
+					break
 				}
 			}
 
