@@ -43,3 +43,22 @@ func TestSeatSecondsString(t *testing.T) {
 		}
 	}
 }
+
+func TestSeatSecondsPerSeat(t *testing.T) {
+	testCases := []struct {
+		ss     SeatSeconds
+		seats  float64
+		expect time.Duration
+	}{
+		{ss: SeatsTimesDuration(10, time.Second), seats: 1, expect: 10 * time.Second},
+		{ss: SeatsTimesDuration(1, time.Second), seats: 10, expect: 100 * time.Millisecond},
+		{ss: SeatsTimesDuration(13, 5*time.Millisecond), seats: 5, expect: 13 * time.Millisecond},
+		{ss: SeatsTimesDuration(12, 0), seats: 10, expect: 0},
+	}
+	for _, testCase := range testCases {
+		actualDuration := testCase.ss.DurationPerSeat(testCase.seats)
+		if actualDuration != testCase.expect {
+			t.Errorf("DurationPerSeats returned %v rather than expected %q", actualDuration, testCase.expect)
+		}
+	}
+}
