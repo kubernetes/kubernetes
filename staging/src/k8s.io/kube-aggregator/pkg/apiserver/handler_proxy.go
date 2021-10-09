@@ -169,10 +169,9 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), user.GetGroups(), user.GetExtra(), proxyRoundTripper)
 
-	// if we are upgrading, then the upgrade path tries to use this request with the TLS config we provide, but it does
-	// NOT use the roundtripper.  Its a direct call that bypasses the round tripper.  This means that we have to
-	// attach the "correct" user headers to the request ahead of time.  After the initial upgrade, we'll be back
-	// at the roundtripper flow, so we only have to muck with this request, but we do have to do it.
+	// If we are upgrading, then the upgrade path tries to use this request with the TLS config we provide, but it does
+	// NOT use the proxyRoundTripper.  It's a direct dial that bypasses the proxyRoundTripper.  This means that we have to
+	// attach the "correct" user headers to the request ahead of time.
 	if upgrade {
 		transport.SetAuthProxyHeaders(newReq, user.GetName(), user.GetGroups(), user.GetExtra())
 	}
