@@ -269,6 +269,17 @@ type VolumeStats struct {
 	// Reference to the PVC, if one exists
 	// +optional
 	PVCRef *PVCReference `json:"pvcRef,omitempty"`
+
+	// VolumeHealthStats contains data about volume health
+	// +optional
+	VolumeHealthStats `json:"volumeHealthStats,omitempty"`
+}
+
+// VolumeHealthStats contains data about volume health.
+type VolumeHealthStats struct {
+	// Normal volumes are available for use and operating optimally.
+	// An abnormal volume does not meet these criteria.
+	Abnormal bool `json:"abnormal,omitempty"`
 }
 
 // PVCReference contains enough information to describe the referenced PVC.

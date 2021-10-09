@@ -283,6 +283,7 @@ func expectedBlockMetrics() *volume.Metrics {
 		Available: resource.NewQuantity(available, resource.BinarySI),
 		Capacity:  resource.NewQuantity(capacity, resource.BinarySI),
 		Used:      resource.NewQuantity(available-capacity, resource.BinarySI),
+		Abnormal:  &volumeCondition.Abnormal,
 	}
 }
 
