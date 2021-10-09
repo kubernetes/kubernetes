@@ -200,6 +200,9 @@ func (s *volumeStatCalculator) parsePodVolumeStats(podName string, pvcRef *stats
 	return stats.VolumeStats{
 		Name:   podName,
 		PVCRef: pvcRef,
+		VolumeHealthStats: stats.VolumeHealthStats{
+			Abnormal: *metric.Abnormal,
+		},
 		FsStats: stats.FsStats{Time: metric.Time, AvailableBytes: &available, CapacityBytes: &capacity,
 			UsedBytes: &used, Inodes: &inodes, InodesFree: &inodesFree, InodesUsed: &inodesUsed},
 	}
