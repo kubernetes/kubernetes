@@ -523,8 +523,7 @@ with the apiserver API to configure the proxy.`,
 	opts.AddFlags(fs)
 	fs.AddGoFlagSet(goflag.CommandLine) // for --boot-id-file and --machine-id-file
 
-	// TODO handle error
-	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
+	_ = cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
 	return cmd
 }
