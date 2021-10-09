@@ -414,6 +414,7 @@ func newBrokenDialerAndSelector() (*mockEgressDialer, *egressselector.EgressSele
 }
 
 func TestProxyUpgrade(t *testing.T) {
+	upgradeUser := "upgradeUser"
 	testcases := map[string]struct {
 		APIService        *apiregistration.APIService
 		NewEgressSelector func() (*mockEgressDialer, *egressselector.EgressSelector)
@@ -518,6 +519,11 @@ func TestProxyUpgrade(t *testing.T) {
 			backendHandler.Handle(path, websocket.Handler(func(ws *websocket.Conn) {
 				atomic.AddInt32(&timesCalled, 1)
 				defer ws.Close()
+				req := ws.Request()
+				user := req.Header.Get("X-Remote-User")
+				if user != upgradeUser {
+					t.Errorf("expected user %q, got %q", upgradeUser, user)
+				}
 				body := make([]byte, 5)
 				ws.Read(body)
 				ws.Write([]byte("hello " + string(body)))
@@ -554,7 +560,7 @@ func TestProxyUpgrade(t *testing.T) {
 			}
 
 			proxyHandler.updateAPIService(tc.APIService)
-			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
+			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: upgradeUser}))
 			defer aggregator.Close()
 
 			ws, err := websocket.Dial("ws://"+aggregator.Listener.Addr().String()+path, "", "http://127.0.0.1/")
