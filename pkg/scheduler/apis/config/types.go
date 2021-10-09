@@ -136,7 +136,7 @@ type Plugins struct {
 	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
 	Filter PluginSet
 
-	// PostFilter is a list of plugins that are invoked after filtering phase, no matter whether filtering succeeds or not.
+	// PostFilter is a list of plugins that are invoked after filtering phase, but only when no feasible nodes were found for the pod.
 	PostFilter PluginSet
 
 	// PreScore is a list of plugins that are invoked before scoring.
