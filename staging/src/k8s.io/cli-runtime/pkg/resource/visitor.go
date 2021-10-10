@@ -253,13 +253,15 @@ func (v *URLVisitor) Visit(fn VisitorFunc) error {
 // readHttpWithRetries tries to http.Get the v.URL retries times before giving up.
 func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts int) (io.ReadCloser, error) {
 	var err error
-	var body io.ReadCloser
 	if attempts <= 0 {
 		return nil, fmt.Errorf("http attempts must be greater than 0, was %d", attempts)
 	}
 	for i := 0; i < attempts; i++ {
-		var statusCode int
-		var status string
+		var (
+			statusCode int
+			status     string
+			body       io.ReadCloser
+		)
 		if i > 0 {
 			time.Sleep(duration)
 		}
@@ -272,10 +274,12 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 			continue
 		}
 
-		// Error - Set the error condition from the StatusCode
-		if statusCode != http.StatusOK {
-			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
+		if statusCode == http.StatusOK {
+			return body, nil
 		}
+		body.Close()
+		// Error - Set the error condition from the StatusCode
+		err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 
 		if statusCode >= 500 && statusCode < 600 {
 			// Retry 500's
@@ -285,7 +289,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 			break
 		}
 	}
-	return body, err
+	return nil, err
 }
 
 // httpget Defines function to retrieve a url and return the results.  Exists for unit test stubbing.
