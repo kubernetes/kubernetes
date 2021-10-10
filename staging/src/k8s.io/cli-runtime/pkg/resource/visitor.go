@@ -204,9 +204,9 @@ type EagerVisitorList []Visitor
 // Visit implements Visitor, and gathers errors that occur during processing until
 // all sub visitors have been visited.
 func (l EagerVisitorList) Visit(fn VisitorFunc) error {
-	errs := []error(nil)
+	var errs []error
 	for i := range l {
-		if err := l[i].Visit(func(info *Info, err error) error {
+		err := l[i].Visit(func(info *Info, err error) error {
 			if err != nil {
 				errs = append(errs, err)
 				return nil
@@ -215,7 +215,8 @@ func (l EagerVisitorList) Visit(fn VisitorFunc) error {
 				errs = append(errs, err)
 			}
 			return nil
-		}); err != nil {
+		})
+		if err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -350,7 +351,7 @@ type ContinueOnErrorVisitor struct {
 // returned by the visitor directly may still result in some items
 // not being visited.
 func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
-	errs := []error{}
+	var errs []error
 	err := v.Visitor.Visit(func(info *Info, err error) error {
 		if err != nil {
 			errs = append(errs, err)
@@ -424,7 +425,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
-		errs := []error{}
+		var errs []error
 		for i := range items {
 			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
 			if err != nil {
@@ -443,7 +444,6 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 			}
 		}
 		return utilerrors.NewAggregate(errs)
-
 	})
 }
 
