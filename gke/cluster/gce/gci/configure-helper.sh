@@ -224,6 +224,8 @@ function config-ip-firewall {
 
 function create-dirs {
   echo "Creating required directories"
+  mkdir -p /etc/srv/sshproxy
+  mkdir -p /etc/srv/kubernetes
   mkdir -p /var/lib/kubelet
   mkdir -p /etc/kubernetes/manifests
   if [[ "${KUBERNETES_MASTER:-}" == "false" ]]; then
@@ -621,13 +623,6 @@ function mount-master-pd {
   mkdir -p "${mount_point}/var/etcd"
   chmod 700 "${mount_point}/var/etcd"
   ln -s -f "${mount_point}/var/etcd" /var/etcd
-  mkdir -p /etc/srv
-  # Contains the dynamically generated apiserver auth certs and keys.
-  mkdir -p "${mount_point}/srv/kubernetes"
-  ln -s -f "${mount_point}/srv/kubernetes" /etc/srv/kubernetes
-  # Directory for kube-apiserver to store SSH key (if necessary).
-  mkdir -p "${mount_point}/srv/sshproxy"
-  ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
 
   chown -R etcd "${mount_point}/var/etcd"
   chgrp -R etcd "${mount_point}/var/etcd"
@@ -767,6 +762,9 @@ function create-master-auth {
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
   fi
+  if [[ -n "${OLD_KUBE_BEARER_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${OLD_KUBE_BEARER_TOKEN},"             "admin,admin,system:masters"
+  fi
   if [[ -n "${KUBE_BOOTSTRAP_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_BOOTSTRAP_TOKEN},"          "gcp:kube-bootstrap,uid:gcp:kube-bootstrap,system:masters"
   fi
@@ -782,8 +780,14 @@ function create-master-auth {
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
+  if [[ -n "${KUBE_PROXY_OLD_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_OLD_TOKEN},"          "system:kube-proxy,uid:kube_proxy"
+  fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
-    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"       "system:node-problem-detector,uid:node-problem-detector"
+  fi
+  if [[ -n "${NODE_PROBLEM_DETECTOR_OLD_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_OLD_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
   fi
   if [[ -n "${GCE_GLBC_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${GCE_GLBC_TOKEN},"                "system:controller:glbc,uid:system:controller:glbc"
