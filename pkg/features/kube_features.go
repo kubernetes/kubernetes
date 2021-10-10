@@ -498,6 +498,13 @@ const (
 	// Enable POD resources API to return allocatable resources
 	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
 
+	// owner: @sallyom
+	// kep: http://kep.k8s.io/2832
+	// alpha: v1.25
+	//
+	// Add support for distributed tracing in the kubelet
+	KubeletTracing featuregate.Feature = "KubeletTracing"
+
 	// owner: @zshihang
 	// kep: http://kep.k8s.io/2800
 	// beta: v1.24
@@ -960,6 +967,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResources: {Default: true, PreRelease: featuregate.Beta},
 
 	KubeletPodResourcesGetAllocatable: {Default: true, PreRelease: featuregate.Beta},
+
+	KubeletTracing: {Default: false, PreRelease: featuregate.Alpha},
 
 	LegacyServiceAccountTokenNoAutoGeneration: {Default: true, PreRelease: featuregate.Beta},
 
