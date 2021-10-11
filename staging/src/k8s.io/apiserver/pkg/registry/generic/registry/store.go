@@ -1126,14 +1126,22 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 	}
 	wg := sync.WaitGroup{}
 	toProcess := make(chan int, 2*workersNumber)
-	errs := make(chan error, workersNumber+1)
+	errs := make(chan error, workersNumber)
+	workersExited := make(chan struct{})
+	distributorExited := make(chan struct{})
 
 	go func() {
 		defer utilruntime.HandleCrash(func(panicReason interface{}) {
 			errs <- fmt.Errorf("DeleteCollection distributor panicked: %v", panicReason)
 		})
+		defer close(distributorExited)
 		for i := 0; i < len(items); i++ {
-			toProcess <- i
+			select {
+			case toProcess <- i:
+			case <-workersExited:
+				klog.V(4).InfoS("workers already exited, and there are some items waiting to be processed", "finished", i, "total", len(items))
+				return
+			}
 		}
 		close(toProcess)
 	}()
@@ -1166,6 +1174,9 @@ func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.Vali
 		}()
 	}
 	wg.Wait()
+	// notify distributor to exit
+	close(workersExited)
+	<-distributorExited
 	select {
 	case err := <-errs:
 		return nil, err
