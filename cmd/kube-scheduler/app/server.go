@@ -83,10 +83,7 @@ for more information about scheduling and the kube-scheduler component.`,
 			if err := opts.Complete(&namedFlagSets); err != nil {
 				return err
 			}
-			if err := runCommand(cmd, opts, registryOptions...); err != nil {
-				return err
-			}
-			return nil
+			return runCommand(cmd, opts, registryOptions...)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
