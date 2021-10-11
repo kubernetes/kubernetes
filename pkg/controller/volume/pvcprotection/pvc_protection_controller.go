@@ -56,18 +56,14 @@ type Controller struct {
 
 	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
 	storageObjectInUseProtectionEnabled bool
-
-	// allows overriding of GenericEphemeralVolume feature Enabled/Disabled for testing
-	genericEphemeralVolumeFeatureEnabled bool
 }
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
-func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled, genericEphemeralVolumeFeatureEnabled bool) (*Controller, error) {
+func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) (*Controller, error) {
 	e := &Controller{
-		client:                               cl,
-		queue:                                workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
-		storageObjectInUseProtectionEnabled:  storageObjectInUseProtectionFeatureEnabled,
-		genericEphemeralVolumeFeatureEnabled: genericEphemeralVolumeFeatureEnabled,
+		client:                              cl,
+		queue:                               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "pvcprotection"),
+		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("persistentvolumeclaim_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
@@ -85,7 +81,7 @@ func NewPVCProtectionController(pvcInformer coreinformers.PersistentVolumeClaimI
 	e.podLister = podInformer.Lister()
 	e.podListerSynced = podInformer.Informer().HasSynced
 	e.podIndexer = podInformer.Informer().GetIndexer()
-	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc(genericEphemeralVolumeFeatureEnabled)); err != nil {
+	if err := common.AddIndexerIfNotPresent(e.podIndexer, common.PodPVCIndex, common.PodPVCIndexFunc()); err != nil {
 		return nil, fmt.Errorf("could not initialize pvc protection controller: %w", err)
 	}
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -252,23 +248,12 @@ func (c *Controller) askInformer(pvc *v1.PersistentVolumeClaim) (bool, error) {
 			continue
 		}
 
-		if c.genericEphemeralVolumeFeatureEnabled {
-			// We still need to look at each volume: that's redundant for volume.PersistentVolumeClaim,
-			// but for volume.Ephemeral we need to be sure that this particular PVC is the one
-			// created for the ephemeral volume.
-			if c.podUsesPVC(pod, pvc) {
-				return true, nil
-			}
-			continue
-
+		// We still need to look at each volume: that's redundant for volume.PersistentVolumeClaim,
+		// but for volume.Ephemeral we need to be sure that this particular PVC is the one
+		// created for the ephemeral volume.
+		if c.podUsesPVC(pod, pvc) {
+			return true, nil
 		}
-
-		// This is the traditional behavior without GenericEphemeralVolume enabled.
-		if pod.Spec.NodeName == "" {
-			continue
-		}
-		// found a pod using this PVC
-		return true, nil
 	}
 
 	klog.V(4).InfoS("No Pod using PVC was found in the Informer's cache", "PVC", klog.KObj(pvc))
@@ -300,7 +285,7 @@ func (c *Controller) podUsesPVC(pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 	if pod.Spec.NodeName != "" {
 		for _, volume := range pod.Spec.Volumes {
 			if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name ||
-				c.genericEphemeralVolumeFeatureEnabled && !podIsShutDown(pod) && volume.Ephemeral != nil && ephemeral.VolumeClaimName(pod, &volume) == pvc.Name && ephemeral.VolumeIsForPod(pod, pvc) == nil {
+				!podIsShutDown(pod) && volume.Ephemeral != nil && ephemeral.VolumeClaimName(pod, &volume) == pvc.Name && ephemeral.VolumeIsForPod(pod, pvc) == nil {
 				klog.V(2).InfoS("Pod uses PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 				return true
 			}
@@ -407,7 +392,7 @@ func (c *Controller) enqueuePVCs(pod *v1.Pod, deleted bool) {
 		switch {
 		case volume.PersistentVolumeClaim != nil:
 			c.queue.Add(pod.Namespace + "/" + volume.PersistentVolumeClaim.ClaimName)
-		case c.genericEphemeralVolumeFeatureEnabled && volume.Ephemeral != nil:
+		case volume.Ephemeral != nil:
 			c.queue.Add(pod.Namespace + "/" + ephemeral.VolumeClaimName(pod, &volume))
 		}
 	}

@@ -833,9 +833,6 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		// If nil, makePod with podPVCs
 		pod *v1.Pod
 
-		// GenericEphemeralVolume feature enabled?
-		ephemeral bool
-
 		// Expected podBindingCache fields
 		expectedBindings []*BindingInfo
 
@@ -942,7 +939,6 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 				withNamespace("testns").
 				withNodeName("node1").
 				withGenericEphemeralVolume("no-such-pvc").Pod,
-			ephemeral:  true,
 			shouldFail: true,
 		},
 		"generic-ephemeral,with-pvc": {
@@ -952,7 +948,6 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 				withGenericEphemeralVolume("test-volume").Pod,
 			cachePVCs: []*v1.PersistentVolumeClaim{correctGenericPVC},
 			pvs:       []*v1.PersistentVolume{pvBoundGeneric},
-			ephemeral: true,
 		},
 		"generic-ephemeral,wrong-pvc": {
 			pod: makePod("test-pod").
@@ -961,17 +956,6 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 				withGenericEphemeralVolume("test-volume").Pod,
 			cachePVCs:  []*v1.PersistentVolumeClaim{conflictingGenericPVC},
 			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
-			ephemeral:  true,
-			shouldFail: true,
-		},
-		"generic-ephemeral,disabled": {
-			pod: makePod("test-pod").
-				withNamespace("testns").
-				withNodeName("node1").
-				withGenericEphemeralVolume("test-volume").Pod,
-			cachePVCs:  []*v1.PersistentVolumeClaim{correctGenericPVC},
-			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
-			ephemeral:  false,
 			shouldFail: true,
 		},
 	}
@@ -986,8 +970,6 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, scenario.ephemeral)()
-
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 

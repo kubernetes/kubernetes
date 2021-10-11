@@ -119,6 +119,9 @@ func (p *ephemeralTestSuite) DefineTests(driver storageframework.TestDriver, pat
 			eDriver, _ = driver.(storageframework.EphemeralTestDriver)
 		}
 		if pattern.VolType == storageframework.GenericEphemeralVolume {
+			// The GenericEphemeralVolume feature is GA, but
+			// perhaps this test is run against an older Kubernetes
+			// where the feature might be disabled.
 			enabled, err := GenericEphemeralVolumesEnabled(f.ClientSet, f.Timeouts, f.Namespace.Name)
 			framework.ExpectNoError(err, "check GenericEphemeralVolume feature")
 			if !enabled {

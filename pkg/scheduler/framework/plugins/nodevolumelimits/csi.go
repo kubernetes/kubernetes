@@ -56,8 +56,6 @@ type CSILimits struct {
 	randomVolumeIDPrefix string
 
 	translator InTreeToCSITranslator
-
-	enableGenericEphemeralVolume bool
 }
 
 var _ framework.FilterPlugin = &CSILimits{}
@@ -157,12 +155,6 @@ func (pl *CSILimits) filterAttachableVolumes(
 		case vol.PersistentVolumeClaim != nil:
 			pvcName = vol.PersistentVolumeClaim.ClaimName
 		case vol.Ephemeral != nil:
-			if newPod && !pl.enableGenericEphemeralVolume {
-				return fmt.Errorf(
-					"volume %s is a generic ephemeral volume, but that feature is disabled in kube-scheduler",
-					vol.Name,
-				)
-			}
 			// Generic ephemeral inline volumes also use a PVC,
 			// just with a computed name and certain ownership.
 			// That is checked below once the pvc object is
@@ -320,13 +312,12 @@ func NewCSI(_ runtime.Object, handle framework.Handle, fts feature.Features) (fr
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &CSILimits{
-		csiNodeLister:                csiNodesLister,
-		pvLister:                     pvLister,
-		pvcLister:                    pvcLister,
-		scLister:                     scLister,
-		randomVolumeIDPrefix:         rand.String(32),
-		translator:                   csitrans.New(),
-		enableGenericEphemeralVolume: fts.EnableGenericEphemeralVolume,
+		csiNodeLister:        csiNodesLister,
+		pvLister:             pvLister,
+		pvcLister:            pvcLister,
+		scLister:             scLister,
+		randomVolumeIDPrefix: rand.String(32),
+		translator:           csitrans.New(),
 	}, nil
 }
 

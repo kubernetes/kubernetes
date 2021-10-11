@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
@@ -94,9 +94,6 @@ var ValidatePodSecurityPolicyName = apimachineryvalidation.NameIsDNSSubdomain
 
 // PodSecurityPolicyValidationOptions contains additional parameters for ValidatePodSecurityPolicy.
 type PodSecurityPolicyValidationOptions struct {
-	// AllowEphemeralVolumeType determines whether Ephemeral is a valid entry
-	// in PodSecurityPolicySpec.Volumes.
-	AllowEphemeralVolumeType bool
 }
 
 // ValidatePodSecurityPolicy validates a PodSecurityPolicy and returns an ErrorList
@@ -332,10 +329,6 @@ func validatePodSecurityPolicyVolumes(opts PodSecurityPolicyValidationOptions, f
 	allowed := psputil.GetAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
 	allowed.Insert(string(policy.All))
-	// Ephemeral may or may not be allowed.
-	if !opts.AllowEphemeralVolumeType {
-		allowed.Delete(string(policy.Ephemeral))
-	}
 	for _, v := range volumes {
 		if !allowed.Has(string(v)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumes"), v, allowed.List()))

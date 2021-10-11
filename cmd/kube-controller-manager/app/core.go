@@ -368,18 +368,15 @@ func startVolumeExpandController(ctx context.Context, controllerContext Controll
 }
 
 func startEphemeralVolumeController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
-		ephemeralController, err := ephemeral.NewController(
-			controllerContext.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
-			controllerContext.InformerFactory.Core().V1().Pods(),
-			controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims())
-		if err != nil {
-			return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
-		}
-		go ephemeralController.Run(int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs), ctx.Done())
-		return nil, true, nil
+	ephemeralController, err := ephemeral.NewController(
+		controllerContext.ClientBuilder.ClientOrDie("ephemeral-volume-controller"),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims())
+	if err != nil {
+		return nil, true, fmt.Errorf("failed to start ephemeral volume controller: %v", err)
 	}
-	return nil, false, nil
+	go ephemeralController.Run(int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs), ctx.Done())
+	return nil, true, nil
 }
 
 func startEndpointController(ctx context.Context, controllerCtx ControllerContext) (controller.Interface, bool, error) {
@@ -554,7 +551,6 @@ func startPVCProtectionController(ctx context.Context, controllerContext Control
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.ClientBuilder.ClientOrDie("pvc-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
-		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("failed to start the pvc protection controller: %v", err)

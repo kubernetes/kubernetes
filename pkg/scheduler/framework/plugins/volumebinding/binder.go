@@ -692,12 +692,6 @@ func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, p
 	case vol.PersistentVolumeClaim != nil:
 		pvcName = vol.PersistentVolumeClaim.ClaimName
 	case vol.Ephemeral != nil:
-		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
-			return false, nil, fmt.Errorf(
-				"volume %s is a generic ephemeral volume, but that feature is disabled in kube-scheduler",
-				vol.Name,
-			)
-		}
 		// Generic ephemeral inline volumes also use a PVC,
 		// just with a computed name, and...
 		pvcName = ephemeral.VolumeClaimName(pod, vol)
