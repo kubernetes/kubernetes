@@ -103,6 +103,7 @@ func TestModifyCluster(t *testing.T) {
 	test.run(t)
 }
 
+// TestModifyClusterWithProxy tests setting proxy-url in kubeconfig
 func TestModifyClusterWithProxy(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
@@ -127,6 +128,8 @@ func TestModifyClusterWithProxy(t *testing.T) {
 	test.run(t)
 }
 
+// TestModifyClusterWithProxyOverride tests updating proxy-url
+// in kubeconfig which already exists
 func TestModifyClusterWithProxyOverride(t *testing.T) {
 	conf := clientcmdapi.Config{
 		Clusters: map[string]*clientcmdapi.Cluster{
