@@ -117,8 +117,6 @@ type nonCSILimits struct {
 	// It is used to prefix volumeID generated inside the predicate() method to
 	// avoid conflicts with any real volume.
 	randomVolumeIDPrefix string
-
-	enableGenericEphemeralVolume bool
 }
 
 var _ framework.FilterPlugin = &nonCSILimits{}
@@ -191,8 +189,6 @@ func newNonCSILimits(
 		pvcLister:            pvcLister,
 		scLister:             scLister,
 		randomVolumeIDPrefix: rand.String(32),
-
-		enableGenericEphemeralVolume: fts.EnableGenericEphemeralVolume,
 	}
 
 	return pl
@@ -293,12 +289,6 @@ func (pl *nonCSILimits) filterVolumes(pod *v1.Pod, newPod bool, filteredVolumes 
 		case vol.PersistentVolumeClaim != nil:
 			pvcName = vol.PersistentVolumeClaim.ClaimName
 		case vol.Ephemeral != nil:
-			if !pl.enableGenericEphemeralVolume {
-				return fmt.Errorf(
-					"volume %s is a generic ephemeral volume, but that feature is disabled in kube-scheduler",
-					vol.Name,
-				)
-			}
 			// Generic ephemeral inline volumes also use a PVC,
 			// just with a computed name and certain ownership.
 			// That is checked below once the pvc object is

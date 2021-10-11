@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -786,7 +786,7 @@ func TestValidatePSPVolumes(t *testing.T) {
 	for _, strVolume := range volumes.List() {
 		psp := validPSP()
 		psp.Spec.Volumes = []policy.FSType{policy.FSType(strVolume)}
-		errs := ValidatePodSecurityPolicy(psp, PodSecurityPolicyValidationOptions{AllowEphemeralVolumeType: true})
+		errs := ValidatePodSecurityPolicy(psp, PodSecurityPolicyValidationOptions{})
 		if len(errs) != 0 {
 			t.Errorf("%s validation expected no errors but received %v", strVolume, errs)
 		}
@@ -1118,34 +1118,26 @@ func TestAllowEphemeralVolumeType(t *testing.T) {
 		},
 	}
 
-	for _, allowed := range []bool{true, false} {
-		for _, oldPSPInfo := range pspInfo {
-			for _, newPSPInfo := range pspInfo {
-				oldPSP := oldPSPInfo.psp()
-				newPSP := newPSPInfo.psp()
-				if newPSP == nil {
-					continue
-				}
-
-				t.Run(fmt.Sprintf("feature enabled=%v, old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", allowed, oldPSPInfo.description, newPSPInfo.description), func(t *testing.T) {
-					opts := PodSecurityPolicyValidationOptions{
-						AllowEphemeralVolumeType: allowed,
-					}
-					var errs field.ErrorList
-					expectErrors := newPSPInfo.hasGenericVolume && !allowed
-					if oldPSP == nil {
-						errs = ValidatePodSecurityPolicy(newPSP, opts)
-					} else {
-						errs = ValidatePodSecurityPolicyUpdate(oldPSP, newPSP, opts)
-					}
-					if expectErrors && len(errs) == 0 {
-						t.Error("expected errors, got none")
-					}
-					if !expectErrors && len(errs) > 0 {
-						t.Errorf("expected no errors, got: %v", errs)
-					}
-				})
+	for _, oldPSPInfo := range pspInfo {
+		for _, newPSPInfo := range pspInfo {
+			oldPSP := oldPSPInfo.psp()
+			newPSP := newPSPInfo.psp()
+			if newPSP == nil {
+				continue
 			}
+
+			t.Run(fmt.Sprintf("old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", oldPSPInfo.description, newPSPInfo.description), func(t *testing.T) {
+				opts := PodSecurityPolicyValidationOptions{}
+				var errs field.ErrorList
+				if oldPSP == nil {
+					errs = ValidatePodSecurityPolicy(newPSP, opts)
+				} else {
+					errs = ValidatePodSecurityPolicyUpdate(oldPSP, newPSP, opts)
+				}
+				if len(errs) > 0 {
+					t.Errorf("expected no errors, got: %v", errs)
+				}
+			})
 		}
 	}
 }

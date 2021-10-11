@@ -54,7 +54,6 @@ func NewInTreeRegistry() runtime.Registry {
 		EnableReadWriteOncePod:             feature.DefaultFeatureGate.Enabled(features.ReadWriteOncePod),
 		EnableVolumeCapacityPriority:       feature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority),
 		EnableCSIStorageCapacity:           feature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity),
-		EnableGenericEphemeralVolume:       feature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
 	}
 
 	return runtime.Registry{

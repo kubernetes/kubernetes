@@ -170,6 +170,7 @@ const (
 	// owner: @pohly
 	// alpha: v1.19
 	// beta: v1.21
+	// GA: v1.23
 	//
 	// Enables generic ephemeral inline volume support for pods
 	GenericEphemeralVolume featuregate.Feature = "GenericEphemeralVolume"
@@ -810,7 +811,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIInlineVolume:                                {Default: true, PreRelease: featuregate.Beta},
 	CSIStorageCapacity:                             {Default: true, PreRelease: featuregate.Beta},
 	CSIServiceAccountToken:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.Beta},
+	GenericEphemeralVolume:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CSIVolumeFSGroupPolicy:                         {Default: true, PreRelease: featuregate.Beta},
 	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23

@@ -38,10 +38,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	netutils "k8s.io/utils/net"
 
 	// TODO: remove this import if
@@ -49,7 +47,6 @@ import (
 	// to "v1"?
 
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
@@ -2979,13 +2976,12 @@ func TestGetPortForward(t *testing.T) {
 
 func TestHasHostMountPVC(t *testing.T) {
 	type testcase struct {
-		pvError          error
-		pvcError         error
-		expected         bool
-		podHasPVC        bool
-		pvcIsHostPath    bool
-		podHasEphemeral  bool
-		ephemeralEnabled bool
+		pvError         error
+		pvcError        error
+		expected        bool
+		podHasPVC       bool
+		pvcIsHostPath   bool
+		podHasEphemeral bool
 	}
 	tests := map[string]testcase{
 		"no pvc": {podHasPVC: false, expected: false},
@@ -3005,16 +3001,9 @@ func TestHasHostMountPVC(t *testing.T) {
 			expected:      true,
 		},
 		"enabled ephemeral host path": {
-			podHasEphemeral:  true,
-			pvcIsHostPath:    true,
-			ephemeralEnabled: true,
-			expected:         true,
-		},
-		"disabled ephemeral host path": {
-			podHasEphemeral:  true,
-			pvcIsHostPath:    true,
-			ephemeralEnabled: false,
-			expected:         false,
+			podHasEphemeral: true,
+			pvcIsHostPath:   true,
+			expected:        true,
 		},
 		"non host path pvc": {
 			podHasPVC:     true,
@@ -3024,7 +3013,6 @@ func TestHasHostMountPVC(t *testing.T) {
 	}
 
 	run := func(t *testing.T, v testcase) {
-		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, v.ephemeralEnabled)()
 		testKubelet := newTestKubelet(t, false)
 		defer testKubelet.Cleanup()
 		pod := &v1.Pod{

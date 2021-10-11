@@ -556,7 +556,6 @@ func dropDisabledFields(
 	dropDisabledProcMountField(podSpec, oldPodSpec)
 
 	dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec)
-	dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) &&
 		!podPriorityInUse(oldPodSpec) {
@@ -601,16 +600,6 @@ func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) && !csiInUse(oldPodSpec) {
 		for i := range podSpec.Volumes {
 			podSpec.Volumes[i].CSI = nil
-		}
-	}
-}
-
-// dropDisabledEphemeralVolumeSourceAlphaFields removes disabled alpha fields from []EphemeralVolumeSource.
-// This should be called from PrepareForCreate/PrepareForUpdate for all pod specs resources containing a EphemeralVolumeSource
-func dropDisabledEphemeralVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) && !ephemeralInUse(oldPodSpec) {
-		for i := range podSpec.Volumes {
-			podSpec.Volumes[i].Ephemeral = nil
 		}
 	}
 }
@@ -789,19 +778,6 @@ func csiInUse(podSpec *api.PodSpec) bool {
 	}
 	for i := range podSpec.Volumes {
 		if podSpec.Volumes[i].CSI != nil {
-			return true
-		}
-	}
-	return false
-}
-
-// ephemeralInUse returns true if any pod's spec include inline CSI volumes.
-func ephemeralInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	for i := range podSpec.Volumes {
-		if podSpec.Volumes[i].Ephemeral != nil {
 			return true
 		}
 	}

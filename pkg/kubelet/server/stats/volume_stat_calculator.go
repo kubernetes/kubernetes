@@ -149,8 +149,7 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 				Name:      pvcSource.ClaimName,
 				Namespace: s.pod.GetNamespace(),
 			}
-		}
-		if volSpec.Ephemeral != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		} else if volSpec.Ephemeral != nil {
 			pvcRef = &stats.PVCReference{
 				Name:      ephemeral.VolumeClaimName(s.pod, &volSpec),
 				Namespace: s.pod.GetNamespace(),

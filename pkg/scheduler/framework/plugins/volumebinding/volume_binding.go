@@ -69,11 +69,10 @@ func (d *stateData) Clone() framework.StateData {
 // In the Filter phase, pod binding cache is created for the pod and used in
 // Reserve and PreBind phases.
 type VolumeBinding struct {
-	Binder                               SchedulerVolumeBinder
-	PVCLister                            corelisters.PersistentVolumeClaimLister
-	GenericEphemeralVolumeFeatureEnabled bool
-	scorer                               volumeCapacityScorer
-	fts                                  feature.Features
+	Binder    SchedulerVolumeBinder
+	PVCLister corelisters.PersistentVolumeClaimLister
+	scorer    volumeCapacityScorer
+	fts       feature.Features
 }
 
 var _ framework.PreFilterPlugin = &VolumeBinding{}
@@ -131,7 +130,7 @@ func (pl *VolumeBinding) podHasPVCs(pod *v1.Pod) (bool, error) {
 		switch {
 		case vol.PersistentVolumeClaim != nil:
 			pvcName = vol.PersistentVolumeClaim.ClaimName
-		case vol.Ephemeral != nil && pl.GenericEphemeralVolumeFeatureEnabled:
+		case vol.Ephemeral != nil:
 			pvcName = ephemeral.VolumeClaimName(pod, &vol)
 			isEphemeral = true
 		default:
@@ -402,10 +401,9 @@ func New(plArgs runtime.Object, fh framework.Handle, fts feature.Features) (fram
 		scorer = buildScorerFunction(shape)
 	}
 	return &VolumeBinding{
-		Binder:                               binder,
-		PVCLister:                            pvcInformer.Lister(),
-		GenericEphemeralVolumeFeatureEnabled: fts.EnableGenericEphemeralVolume,
-		scorer:                               scorer,
-		fts:                                  fts,
+		Binder:    binder,
+		PVCLister: pvcInformer.Lister(),
+		scorer:    scorer,
+		fts:       fts,
 	}, nil
 }
