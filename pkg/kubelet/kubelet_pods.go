@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-helpers/storage/ephemeral"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -2040,7 +2041,7 @@ func (kl *Kubelet) hasHostMountPVC(pod *v1.Pod) bool {
 			if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
 				continue
 			}
-			pvcName = pod.Name + "-" + volume.Name
+			pvcName = ephemeral.VolumeClaimName(pod, &volume)
 		default:
 			continue
 		}
