@@ -59,7 +59,7 @@ const (
 	minNodes            = 2
 )
 
-var _ = utils.SIGDescribe("Pod Disks", func() {
+var _ = utils.SIGDescribe("Pod Disks [Feature:StorageProvider]", func() {
 	var (
 		ns         string
 		cs         clientset.Interface
