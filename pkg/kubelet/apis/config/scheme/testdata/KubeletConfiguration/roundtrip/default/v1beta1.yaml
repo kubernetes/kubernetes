@@ -54,6 +54,9 @@ kubeAPIBurst: 10
 kubeAPIQPS: 5
 logging:
   format: text
+  options:
+    json:
+      infoBufferSize: "0"
 makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110

@@ -42,6 +42,7 @@ const deprecated = "will be removed in a future release, see https://github.com/
 var (
 	packageFlags = flag.NewFlagSet("logging", flag.ContinueOnError)
 	logFlushFreq time.Duration
+	logrFlush    func()
 )
 
 func init() {
@@ -128,6 +129,9 @@ func InitLogs() {
 // are printed before exiting the program.
 func FlushLogs() {
 	klog.Flush()
+	if logrFlush != nil {
+		logrFlush()
+	}
 }
 
 // NewLogger creates a new log.Logger which sends logs to klog.Info.
