@@ -27,6 +27,8 @@ import (
 
 	cadvisorfs "github.com/google/cadvisor/fs"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -131,7 +133,18 @@ func (p *criStatsProvider) listPodStats(updateCPUNanoCoreUsage bool) ([]statsapi
 	}
 
 	if p.podAndContainerStatsFromCRI {
-		return p.listPodStatsStrictlyFromCRI(updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
+		_, err := p.listPodStatsStrictlyFromCRI(updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
+		if err != nil {
+			s, ok := status.FromError(err)
+			// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
+			if !ok || s.Code() != codes.Unimplemented {
+				return nil, err
+			}
+			// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
+			klog.V(5).ErrorS(err,
+				"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
+			)
+		}
 	}
 	return p.listPodStatsPartiallyFromCRI(updateCPUNanoCoreUsage, containerMap, podSandboxMap, &rootFsInfo)
 }
@@ -259,20 +272,30 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats() ([]statsapi.PodStats, erro
 	result := make([]statsapi.PodStats, 0, len(podSandboxMap))
 	if p.podAndContainerStatsFromCRI {
 		criSandboxStats, err := p.runtimeService.ListPodSandboxStats(&runtimeapi.PodSandboxStatsFilter{})
-		if err != nil {
+		// Call succeeded
+		if err == nil {
+			for _, criSandboxStat := range criSandboxStats {
+				podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
+				if !found {
+					continue
+				}
+				ps := buildPodStats(podSandbox)
+				addCRIPodCPUStats(ps, criSandboxStat)
+				addCRIPodMemoryStats(ps, criSandboxStat)
+				result = append(result, *ps)
+			}
+			return result, err
+		}
+		// Call failed, why?
+		s, ok := status.FromError(err)
+		// Legitimate failure, rather than the CRI implementation does not support ListPodSandboxStats.
+		if !ok || s.Code() != codes.Unimplemented {
 			return nil, err
 		}
-		for _, criSandboxStat := range criSandboxStats {
-			podSandbox, found := podSandboxMap[criSandboxStat.Attributes.Id]
-			if !found {
-				continue
-			}
-			ps := buildPodStats(podSandbox)
-			addCRIPodCPUStats(ps, criSandboxStat)
-			addCRIPodMemoryStats(ps, criSandboxStat)
-			result = append(result, *ps)
-		}
-		return result, err
+		// CRI implementation doesn't support ListPodSandboxStats, warn and fallback.
+		klog.ErrorS(err,
+			"CRI implementation must be updated to support ListPodSandboxStats if PodAndContainerStatsFromCRI feature gate is enabled. Falling back to populating with cAdvisor; this call will fail in the future.",
+		)
 	}
 
 	resp, err := p.runtimeService.ListContainerStats(&runtimeapi.ContainerStatsFilter{})
