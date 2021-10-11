@@ -182,7 +182,7 @@ func (qsc *queueSetCompleter) Complete(dCfg fq.DispatchingConfig) fq.QueueSet {
 		}
 		qs.promiseFactory = qsc.factory.promiseFactoryFactory(qs)
 	}
-	qs.setConfiguration(qsc.qCfg, qsc.dealer, dCfg)
+	qs.setConfiguration(context.Background(), qsc.qCfg, qsc.dealer, dCfg)
 	return qs
 }
 
@@ -210,8 +210,8 @@ func (qs *queueSet) BeginConfigChange(qCfg fq.QueuingConfig) (fq.QueueSetComplet
 // Update handling for when fields are updated is handled here as well -
 // eg: if DesiredNum is increased, SetConfiguration reconciles by
 // adding more queues.
-func (qs *queueSet) setConfiguration(qCfg fq.QueuingConfig, dealer *shufflesharding.Dealer, dCfg fq.DispatchingConfig) {
-	qs.lockAndSyncTime()
+func (qs *queueSet) setConfiguration(ctx context.Context, qCfg fq.QueuingConfig, dealer *shufflesharding.Dealer, dCfg fq.DispatchingConfig) {
+	qs.lockAndSyncTime(ctx)
 	defer qs.lock.Unlock()
 
 	if qCfg.DesiredNumQueues > 0 {
@@ -260,7 +260,7 @@ const (
 // The queueSet's promiseFactory is invoked once if the returns Request is non-nil,
 // not invoked if the Request is nil.
 func (qs *queueSet) StartRequest(ctx context.Context, workEstimate *fqrequest.WorkEstimate, hashValue uint64, flowDistinguisher, fsName string, descr1, descr2 interface{}, queueNoteFn fq.QueueNoteFn) (fq.Request, bool) {
-	qs.lockAndSyncTime()
+	qs.lockAndSyncTime(ctx)
 	defer qs.lock.Unlock()
 	var req *request
 
@@ -355,7 +355,7 @@ func (req *request) wait() (bool, bool) {
 	// The final step is to wait on a decision from
 	// somewhere and then act on it.
 	decisionAny := req.decision.Get()
-	qs.lockAndSyncTime()
+	qs.lockAndSyncTime(req.ctx)
 	defer qs.lock.Unlock()
 	if req.waitStarted {
 		// This can not happen, because the client is forbidden to
@@ -401,25 +401,72 @@ func (qs *queueSet) isIdleLocked() bool {
 // lockAndSyncTime acquires the lock and updates the virtual time.
 // Doing them together avoids the mistake of modify some queue state
 // before calling syncTimeLocked.
-func (qs *queueSet) lockAndSyncTime() {
+func (qs *queueSet) lockAndSyncTime(ctx context.Context) {
 	qs.lock.Lock()
-	qs.syncTimeLocked()
+	qs.syncTimeLocked(ctx)
 }
 
 // syncTimeLocked updates the virtual time based on the assumption
 // that the current state of the queues has been in effect since
 // `qs.lastRealTime`.  Thus, it should be invoked after acquiring the
 // lock and before modifying the state of any queue.
-func (qs *queueSet) syncTimeLocked() {
+func (qs *queueSet) syncTimeLocked(ctx context.Context) {
 	realNow := qs.clock.Now()
 	timeSinceLast := realNow.Sub(qs.lastRealTime)
 	qs.lastRealTime = realNow
 	prevR := qs.currentR
-	qs.currentR += SeatsTimesDuration(qs.getVirtualTimeRatioLocked(), timeSinceLast)
-	if qs.currentR < prevR {
-		klog.ErrorS(errors.New("progress meter wrapped around"), "Wrap", "QS", qs.qCfg.Name, "prevR", prevR, "currentR", qs.currentR)
+	incrR := SeatsTimesDuration(qs.getVirtualTimeRatioLocked(), timeSinceLast)
+	qs.currentR = prevR + incrR
+	switch {
+	case prevR > qs.currentR:
+		klog.ErrorS(errors.New("queueset::currentR overflow"), "Overflow", "QS", qs.qCfg.Name, "when", realNow.Format(nsTimeFmt), "prevR", prevR, "incrR", incrR, "currentR", qs.currentR)
+	case qs.currentR >= highR:
+		qs.advanceEpoch(ctx, realNow, incrR)
 	}
 	metrics.SetCurrentR(qs.qCfg.Name, qs.currentR.ToFloat())
+}
+
+// rDecrement is the amount by which the progress meter R is wound backwards
+// when needed to avoid overflow.
+const rDecrement = MaxSeatSeconds / 2
+
+// highR is the threshold that triggers advance of the epoch.
+// That is, decrementing the global progress meter R by rDecrement.
+const highR = rDecrement + rDecrement/2
+
+// advanceEpoch subtracts rDecrement from the global progress meter R
+// and all the readings that have been taked from that meter.
+// The now and incrR parameters are only used to add info to the log messages.
+func (qs *queueSet) advanceEpoch(ctx context.Context, now time.Time, incrR SeatSeconds) {
+	oldR := qs.currentR
+	qs.currentR -= rDecrement
+	klog.InfoS("Advancing epoch", "QS", qs.qCfg.Name, "when", now.Format(nsTimeFmt), "oldR", oldR, "newR", qs.currentR, "incrR", incrR)
+	success := true
+	for qIdx, queue := range qs.queues {
+		if queue.requests.Length() == 0 && queue.requestsExecuting == 0 {
+			// Do not just decrement, the value could be quite outdated.
+			// It is safe to reset to zero in this case, because the next request
+			// will overwrite the zero with `qs.currentR`.
+			queue.nextDispatchR = 0
+			continue
+		}
+		oldNextDispatchR := queue.nextDispatchR
+		queue.nextDispatchR -= rDecrement
+		if queue.nextDispatchR > oldNextDispatchR {
+			klog.ErrorS(errors.New("queue::nextDispatchR underflow"), "Underflow", "QS", qs.qCfg.Name, "queue", qIdx, "oldNextDispatchR", oldNextDispatchR, "newNextDispatchR", queue.nextDispatchR, "incrR", incrR)
+			success = false
+		}
+		queue.requests.Walk(func(req *request) bool {
+			oldArrivalR := req.arrivalR
+			req.arrivalR -= rDecrement
+			if req.arrivalR > oldArrivalR {
+				klog.ErrorS(errors.New("request::arrivalR underflow"), "Underflow", "QS", qs.qCfg.Name, "queue", qIdx, "request", *req, "oldArrivalR", oldArrivalR, "incrR", incrR)
+				success = false
+			}
+			return true
+		})
+	}
+	metrics.AddEpochAdvance(ctx, qs.qCfg.Name, success)
 }
 
 // getVirtualTimeRatio calculates the rate at which virtual time has
@@ -780,7 +827,7 @@ func ssMax(a, b SeatSeconds) SeatSeconds {
 // once a request finishes execution or is canceled.  This returns a bool
 // indicating whether the QueueSet is now idle.
 func (qs *queueSet) finishRequestAndDispatchAsMuchAsPossible(req *request) bool {
-	qs.lockAndSyncTime()
+	qs.lockAndSyncTime(req.ctx)
 	defer qs.lock.Unlock()
 
 	qs.finishRequestLocked(req)
@@ -841,7 +888,7 @@ func (qs *queueSet) finishRequestLocked(r *request) {
 		// AdditionalLatency elapses, this ensures that the additional
 		// latency has no impact on the user experience.
 		qs.clock.EventAfterDuration(func(_ time.Time) {
-			qs.lockAndSyncTime()
+			qs.lockAndSyncTime(r.ctx)
 			defer qs.lock.Unlock()
 			now := qs.clock.Now()
 			releaseSeatsLocked()
