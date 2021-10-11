@@ -368,6 +368,16 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 	var gracePeriod int64 = 1
 	var command string
 
+	/**
+	This condition fixes running storage e2e tests in SELinux environment.
+	HostPath Volume Plugin creates a directory within /tmp on host machine, to be mounted as volume.
+	Inject-pod writes content to the volume, and a client-pod tries the read the contents and verify.
+	When SELinux is enabled on the host, client-pod can not read the content, with permission denied.
+	Invoking client-pod as privileged, so that it can access the volume content, even when SELinux is enabled on the host.
+	*/
+	if config.Prefix == "hostpathsymlink" || config.Prefix == "hostpath" {
+		privileged = true
+	}
 	command = "while true ; do sleep 2; done "
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
 	clientPod := &v1.Pod{
