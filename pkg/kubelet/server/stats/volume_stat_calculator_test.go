@@ -49,6 +49,7 @@ const (
 	vol0          = "vol0"
 	vol1          = "vol1"
 	vol2          = "vol2"
+	vol3          = "vol3"
 	pvcClaimName0 = "pvc-fake0"
 	pvcClaimName1 = "pvc-fake1"
 )
@@ -81,6 +82,12 @@ var (
 				},
 			},
 		},
+		{
+			Name: vol3,
+			VolumeSource: k8sv1.VolumeSource{
+				Ephemeral: &k8sv1.EphemeralVolumeSource{},
+			},
+		},
 	}
 
 	fakePod = &k8sv1.Pod{
@@ -98,12 +105,13 @@ var (
 )
 
 func TestPVCRef(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	// Setup mock stats provider
 	mockStats := statstest.NewMockProvider(mockCtrl)
-	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}}
+	volumes := map[string]volume.Volume{vol0: &fakeVolume{}, vol1: &fakeVolume{}, vol3: &fakeVolume{}}
 	mockStats.EXPECT().ListVolumesForPod(fakePod.UID).Return(volumes, true)
 	blockVolumes := map[string]volume.BlockVolume{vol2: &fakeBlockVolume{}}
 	mockStats.EXPECT().ListBlockVolumesForPod(fakePod.UID).Return(blockVolumes, true)
@@ -118,7 +126,7 @@ func TestPVCRef(t *testing.T) {
 	statsCalculator.calcAndStoreStats()
 	vs, _ := statsCalculator.GetLatest()
 
-	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 3)
+	assert.Len(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), 4)
 	// Verify 'vol0' doesn't have a PVC reference
 	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
 		Name:    vol0,
@@ -141,6 +149,15 @@ func TestPVCRef(t *testing.T) {
 			Namespace: namespace0,
 		},
 		FsStats: expectedBlockStats(),
+	})
+	// Verify 'vol3' has a PVC reference
+	assert.Contains(t, append(vs.EphemeralVolumes, vs.PersistentVolumes...), kubestats.VolumeStats{
+		Name: vol3,
+		PVCRef: &kubestats.PVCReference{
+			Name:      pName0 + "-" + vol3,
+			Namespace: namespace0,
+		},
+		FsStats: expectedFSStats(),
 	})
 }
 

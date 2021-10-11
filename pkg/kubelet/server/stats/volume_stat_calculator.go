@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
@@ -146,6 +147,12 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		if pvcSource := volSpec.PersistentVolumeClaim; pvcSource != nil {
 			pvcRef = &stats.PVCReference{
 				Name:      pvcSource.ClaimName,
+				Namespace: s.pod.GetNamespace(),
+			}
+		}
+		if volSpec.Ephemeral != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+			pvcRef = &stats.PVCReference{
+				Name:      ephemeral.VolumeClaimName(s.pod, &volSpec),
 				Namespace: s.pod.GetNamespace(),
 			}
 		}
