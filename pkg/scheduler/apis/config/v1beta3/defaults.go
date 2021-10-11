@@ -42,6 +42,7 @@ func pluginsNames(p *v1beta3.Plugins) []string {
 		return nil
 	}
 	extensions := []v1beta3.PluginSet{
+		p.MultiPoint,
 		p.PreFilter,
 		p.Filter,
 		p.PostFilter,
@@ -66,7 +67,6 @@ func pluginsNames(p *v1beta3.Plugins) []string {
 func setDefaults_KubeSchedulerProfile(prof *v1beta3.KubeSchedulerProfile) {
 	// Set default plugins.
 	prof.Plugins = mergePlugins(getDefaultPlugins(), prof.Plugins)
-
 	// Set default plugin configs.
 	scheme := GetPluginArgConversionScheme()
 	existingConfigs := sets.NewString()

@@ -1259,6 +1259,11 @@ func TestBindPlugin(t *testing.T) {
 		Profiles: []v1beta3.KubeSchedulerProfile{{
 			SchedulerName: pointer.StringPtr(v1.DefaultSchedulerName),
 			Plugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
+						{Name: defaultbinder.Name},
+					},
+				},
 				Reserve: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{{Name: reservePlugin.Name()}},
 				},

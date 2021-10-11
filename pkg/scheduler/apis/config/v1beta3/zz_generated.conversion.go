@@ -747,6 +747,9 @@ func autoConvert_v1beta3_Plugins_To_config_Plugins(in *v1beta3.Plugins, out *con
 	if err := Convert_v1beta3_PluginSet_To_config_PluginSet(&in.PostBind, &out.PostBind, s); err != nil {
 		return err
 	}
+	if err := Convert_v1beta3_PluginSet_To_config_PluginSet(&in.MultiPoint, &out.MultiPoint, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -787,6 +790,9 @@ func autoConvert_config_Plugins_To_v1beta3_Plugins(in *config.Plugins, out *v1be
 		return err
 	}
 	if err := Convert_config_PluginSet_To_v1beta3_PluginSet(&in.PostBind, &out.PostBind, s); err != nil {
+		return err
+	}
+	if err := Convert_config_PluginSet_To_v1beta3_PluginSet(&in.MultiPoint, &out.MultiPoint, s); err != nil {
 		return err
 	}
 	return nil

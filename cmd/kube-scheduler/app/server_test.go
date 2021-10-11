@@ -82,8 +82,46 @@ users:
 	}
 
 	// plugin config
-	pluginConfigFile := filepath.Join(tmpDir, "plugin.yaml")
-	if err := ioutil.WriteFile(pluginConfigFile, []byte(fmt.Sprintf(`
+	pluginConfigFilev1beta3 := filepath.Join(tmpDir, "pluginv1beta3.yaml")
+	if err := ioutil.WriteFile(pluginConfigFilev1beta3, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1beta3
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+profiles:
+- plugins:
+    multiPoint:
+      enabled:
+      - name: DefaultBinder
+      - name: PrioritySort
+      - name: DefaultPreemption
+      - name: VolumeBinding
+      - name: NodeResourcesFit
+      - name: NodePorts
+      - name: InterPodAffinity
+      - name: TaintToleration
+      disabled:
+      - name: "*"
+    preFilter:
+      disabled:
+      - name: VolumeBinding
+      - name: InterPodAffinity
+    filter:
+      disabled:
+      - name: VolumeBinding
+      - name: InterPodAffinity
+      - name: TaintToleration
+    score:
+      disabled:
+      - name: VolumeBinding
+      - name: NodeResourcesFit
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	// plugin config
+	pluginConfigFilev1beta2 := filepath.Join(tmpDir, "pluginv1beta2.yaml")
+	if err := ioutil.WriteFile(pluginConfigFilev1beta2, []byte(fmt.Sprintf(`
 apiVersion: kubescheduler.config.k8s.io/v1beta2
 kind: KubeSchedulerConfiguration
 clientConnection:
@@ -188,20 +226,19 @@ leaderElection:
 			wantPlugins: map[string]*config.Plugins{
 				"default-scheduler": func() *config.Plugins {
 					plugins := &config.Plugins{
-						QueueSort:  defaults.PluginsV1beta3.QueueSort,
-						PreFilter:  defaults.PluginsV1beta3.PreFilter,
-						Filter:     defaults.PluginsV1beta3.Filter,
-						PostFilter: defaults.PluginsV1beta3.PostFilter,
-						PreScore:   defaults.PluginsV1beta3.PreScore,
-						Score:      defaults.PluginsV1beta3.Score,
-						Bind:       defaults.PluginsV1beta3.Bind,
-						PreBind:    defaults.PluginsV1beta3.PreBind,
-						Reserve:    defaults.PluginsV1beta3.Reserve,
+						QueueSort:  defaults.ExpandedPluginsV1beta3.QueueSort,
+						PreFilter:  defaults.ExpandedPluginsV1beta3.PreFilter,
+						Filter:     defaults.ExpandedPluginsV1beta3.Filter,
+						PostFilter: defaults.ExpandedPluginsV1beta3.PostFilter,
+						PreScore:   defaults.ExpandedPluginsV1beta3.PreScore,
+						Score:      defaults.ExpandedPluginsV1beta3.Score,
+						Bind:       defaults.ExpandedPluginsV1beta3.Bind,
+						PreBind:    defaults.ExpandedPluginsV1beta3.PreBind,
+						Reserve:    defaults.ExpandedPluginsV1beta3.Reserve,
 					}
 					plugins.PreScore.Enabled = append(plugins.PreScore.Enabled, config.Plugin{Name: names.SelectorSpread, Weight: 0})
 					plugins.Score.Enabled = append(
 						plugins.Score.Enabled,
-						config.Plugin{Name: names.VolumeBinding, Weight: 1},
 						config.Plugin{Name: names.SelectorSpread, Weight: 1},
 					)
 					return plugins
@@ -218,13 +255,53 @@ leaderElection:
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
-				"default-scheduler": defaults.PluginsV1beta3,
+				"default-scheduler": defaults.ExpandedPluginsV1beta3,
 			},
 		},
 		{
-			name: "component configuration",
+			name: "component configuration v1beta2",
 			flags: []string{
-				"--config", pluginConfigFile,
+				"--config", pluginConfigFilev1beta2,
+				"--kubeconfig", configKubeconfig,
+			},
+			wantPlugins: map[string]*config.Plugins{
+				"default-scheduler": {
+					Bind: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultBinder"}}},
+					Filter: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "NodeResourcesFit"},
+							{Name: "NodePorts"},
+						},
+					},
+					PreFilter: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "NodeResourcesFit"},
+							{Name: "NodePorts"},
+						},
+					},
+					PostFilter: config.PluginSet{Enabled: []config.Plugin{{Name: "DefaultPreemption"}}},
+					PreScore: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "InterPodAffinity"},
+							{Name: "TaintToleration"},
+						},
+					},
+					QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: "PrioritySort"}}},
+					Score: config.PluginSet{
+						Enabled: []config.Plugin{
+							{Name: "InterPodAffinity", Weight: 1},
+							{Name: "TaintToleration", Weight: 1},
+						},
+					},
+					Reserve: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
+					PreBind: config.PluginSet{Enabled: []config.Plugin{{Name: "VolumeBinding"}}},
+				},
+			},
+		},
+		{
+			name: "component configuration v1beta3",
+			flags: []string{
+				"--config", pluginConfigFilev1beta3,
 				"--kubeconfig", configKubeconfig,
 			},
 			wantPlugins: map[string]*config.Plugins{
