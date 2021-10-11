@@ -38,30 +38,15 @@ func TestApplyFeatureGates(t *testing.T) {
 		{
 			name: "Feature gates disabled",
 			wantConfig: &v1beta3.Plugins{
-				QueueSort: v1beta3.PluginSet{
+				MultiPoint: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
 						{Name: names.PrioritySort},
-					},
-				},
-				PreFilter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.NodeResourcesFit},
-						{Name: names.NodePorts},
-						{Name: names.VolumeRestrictions},
-						{Name: names.PodTopologySpread},
-						{Name: names.InterPodAffinity},
-						{Name: names.VolumeBinding},
-						{Name: names.NodeAffinity},
-					},
-				},
-				Filter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
 						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
-						{Name: names.TaintToleration},
-						{Name: names.NodeAffinity},
+						{Name: names.TaintToleration, Weight: pointer.Int32(3)},
+						{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
 						{Name: names.NodePorts},
-						{Name: names.NodeResourcesFit},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
 						{Name: names.VolumeRestrictions},
 						{Name: names.EBSLimits},
 						{Name: names.GCEPDLimits},
@@ -69,46 +54,11 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.AzureDiskLimits},
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
-						{Name: names.PodTopologySpread},
-						{Name: names.InterPodAffinity},
-					},
-				},
-				PostFilter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+						{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
 						{Name: names.DefaultPreemption},
-					},
-				},
-				PreScore: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.InterPodAffinity},
-						{Name: names.PodTopologySpread},
-						{Name: names.TaintToleration},
-						{Name: names.NodeAffinity},
-					},
-				},
-				Score: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
-						{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
-						{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
-						{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(2)},
-						{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(2)},
-						{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
-						{Name: names.TaintToleration, Weight: pointer.Int32Ptr(3)},
-					},
-				},
-				Reserve: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.VolumeBinding},
-					},
-				},
-				PreBind: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.VolumeBinding},
-					},
-				},
-				Bind: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 						{Name: names.DefaultBinder},
 					},
 				},
@@ -120,30 +70,15 @@ func TestApplyFeatureGates(t *testing.T) {
 				features.DefaultPodTopologySpread: false,
 			},
 			wantConfig: &v1beta3.Plugins{
-				QueueSort: v1beta3.PluginSet{
+				MultiPoint: v1beta3.PluginSet{
 					Enabled: []v1beta3.Plugin{
 						{Name: names.PrioritySort},
-					},
-				},
-				PreFilter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.NodeResourcesFit},
-						{Name: names.NodePorts},
-						{Name: names.VolumeRestrictions},
-						{Name: names.PodTopologySpread},
-						{Name: names.InterPodAffinity},
-						{Name: names.VolumeBinding},
-						{Name: names.NodeAffinity},
-					},
-				},
-				Filter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
 						{Name: names.NodeUnschedulable},
 						{Name: names.NodeName},
-						{Name: names.TaintToleration},
-						{Name: names.NodeAffinity},
+						{Name: names.TaintToleration, Weight: pointer.Int32(3)},
+						{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
 						{Name: names.NodePorts},
-						{Name: names.NodeResourcesFit},
+						{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
 						{Name: names.VolumeRestrictions},
 						{Name: names.EBSLimits},
 						{Name: names.GCEPDLimits},
@@ -151,49 +86,13 @@ func TestApplyFeatureGates(t *testing.T) {
 						{Name: names.AzureDiskLimits},
 						{Name: names.VolumeBinding},
 						{Name: names.VolumeZone},
-						{Name: names.PodTopologySpread},
-						{Name: names.InterPodAffinity},
-					},
-				},
-				PostFilter: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+						{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+						{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
 						{Name: names.DefaultPreemption},
-					},
-				},
-				PreScore: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.InterPodAffinity},
-						{Name: names.PodTopologySpread},
-						{Name: names.TaintToleration},
-						{Name: names.NodeAffinity},
-						{Name: names.SelectorSpread},
-					},
-				},
-				Score: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
-						{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
-						{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
-						{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(2)},
-						{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(2)},
-						{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
-						{Name: names.TaintToleration, Weight: pointer.Int32Ptr(3)},
-						{Name: names.SelectorSpread, Weight: pointer.Int32Ptr(1)},
-					},
-				},
-				Reserve: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.VolumeBinding},
-					},
-				},
-				PreBind: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
-						{Name: names.VolumeBinding},
-					},
-				},
-				Bind: v1beta3.PluginSet{
-					Enabled: []v1beta3.Plugin{
+						{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+						{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 						{Name: names.DefaultBinder},
+						{Name: names.SelectorSpread, Weight: pointer.Int32(1)},
 					},
 				},
 			},
@@ -276,6 +175,9 @@ func TestMergePlugins(t *testing.T) {
 						{Name: "CustomPlugin"},
 						{Name: "DefaultPlugin2"},
 					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin2"},
+					},
 				},
 			},
 		},
@@ -308,6 +210,9 @@ func TestMergePlugins(t *testing.T) {
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
 					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "*"},
+					},
 				},
 			},
 		},
@@ -337,6 +242,9 @@ func TestMergePlugins(t *testing.T) {
 					Enabled: []v1beta3.Plugin{
 						{Name: "DefaultPlugin2"},
 						{Name: "DefaultPlugin1"},
+					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "*"},
 					},
 				},
 			},
@@ -451,12 +359,197 @@ func TestMergePlugins(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Append custom MultiPoint plugin",
+			customPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "CustomPlugin"},
+					},
+				},
+			},
+			defaultPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+						{Name: "CustomPlugin"},
+					},
+				},
+			},
+		},
+		{
+			name: "Append disabled Multipoint plugins",
+			customPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "CustomPlugin"},
+						{Name: "CustomPlugin2"},
+					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin2"},
+					},
+				},
+				Score: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
+						{Name: "CustomPlugin2"},
+					},
+				},
+			},
+			defaultPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin1"},
+						{Name: "CustomPlugin"},
+						{Name: "CustomPlugin2"},
+					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin2"},
+					},
+				},
+				Score: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
+						{Name: "CustomPlugin2"},
+					},
+				},
+			},
+		},
+		{
+			name: "override default MultiPoint plugins with custom value",
+			customPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin", Weight: pointer.Int32(5)},
+					},
+				},
+			},
+			defaultPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin", Weight: pointer.Int32(5)},
+					},
+				},
+			},
+		},
+		{
+			name: "disabled MultiPoint plugin in default set",
+			defaultPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			customPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "CustomPlugin"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+						{Name: "CustomPlugin"},
+					},
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+		},
+		{
+			name: "disabled MultiPoint plugin in default set for specific extension point",
+			defaultPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+				},
+				Score: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+			customPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "CustomPlugin"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+						{Name: "CustomPlugin"},
+					},
+				},
+				Score: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin2"},
+					},
+				},
+			},
+		},
+		{
+			name: "multipoint with only disabled gets merged",
+			defaultPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Enabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+				},
+			},
+			customPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+				},
+			},
+			expectedPlugins: &v1beta3.Plugins{
+				MultiPoint: v1beta3.PluginSet{
+					Disabled: []v1beta3.Plugin{
+						{Name: "DefaultPlugin"},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			test.defaultPlugins = mergePlugins(test.defaultPlugins, test.customPlugins)
-			if d := cmp.Diff(test.expectedPlugins, test.defaultPlugins); d != "" {
+			gotPlugins := mergePlugins(test.defaultPlugins, test.customPlugins)
+			if d := cmp.Diff(test.expectedPlugins, gotPlugins); d != "" {
 				t.Fatalf("plugins mismatch (-want +got):\n%s", d)
 			}
 		})

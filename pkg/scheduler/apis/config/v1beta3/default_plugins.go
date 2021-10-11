@@ -29,30 +29,15 @@ import (
 // getDefaultPlugins returns the default set of plugins.
 func getDefaultPlugins() *v1beta3.Plugins {
 	plugins := &v1beta3.Plugins{
-		QueueSort: v1beta3.PluginSet{
+		MultiPoint: v1beta3.PluginSet{
 			Enabled: []v1beta3.Plugin{
 				{Name: names.PrioritySort},
-			},
-		},
-		PreFilter: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
-				{Name: names.NodeResourcesFit},
-				{Name: names.NodePorts},
-				{Name: names.VolumeRestrictions},
-				{Name: names.PodTopologySpread},
-				{Name: names.InterPodAffinity},
-				{Name: names.VolumeBinding},
-				{Name: names.NodeAffinity},
-			},
-		},
-		Filter: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
 				{Name: names.NodeUnschedulable},
 				{Name: names.NodeName},
-				{Name: names.TaintToleration},
-				{Name: names.NodeAffinity},
+				{Name: names.TaintToleration, Weight: pointer.Int32(3)},
+				{Name: names.NodeAffinity, Weight: pointer.Int32(2)},
 				{Name: names.NodePorts},
-				{Name: names.NodeResourcesFit},
+				{Name: names.NodeResourcesFit, Weight: pointer.Int32(1)},
 				{Name: names.VolumeRestrictions},
 				{Name: names.EBSLimits},
 				{Name: names.GCEPDLimits},
@@ -60,57 +45,11 @@ func getDefaultPlugins() *v1beta3.Plugins {
 				{Name: names.AzureDiskLimits},
 				{Name: names.VolumeBinding},
 				{Name: names.VolumeZone},
-				{Name: names.PodTopologySpread},
-				{Name: names.InterPodAffinity},
-			},
-		},
-		PostFilter: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
+				{Name: names.PodTopologySpread, Weight: pointer.Int32(2)},
+				{Name: names.InterPodAffinity, Weight: pointer.Int32(2)},
 				{Name: names.DefaultPreemption},
-			},
-		},
-		PreScore: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
-				{Name: names.InterPodAffinity},
-				{Name: names.PodTopologySpread},
-				{Name: names.TaintToleration},
-				{Name: names.NodeAffinity},
-			},
-		},
-		Score: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
-				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
-				{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
-				{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
-				// Weight is doubled because:
-				// - This is a score coming from user preference.
-				{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(2)},
-				// Weight is doubled because:
-				// - This is a score coming from user preference.
-				{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(2)},
-				// Weight is doubled because:
-				// - This is a score coming from user preference.
-				// - It makes its signal comparable to NodeResourcesFit.LeastAllocated.
-				{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
-				// Weight is tripled because:
-				// - This is a score coming from user preference.
-				// - Usage of node tainting to group nodes in the cluster is becoming a valid use-case more often
-				//	 for many user workloads
-				{Name: names.TaintToleration, Weight: pointer.Int32Ptr(3)},
-			},
-		},
-		Reserve: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
-				{Name: names.VolumeBinding},
-			},
-		},
-		PreBind: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
-				{Name: names.VolumeBinding},
-			},
-		},
-		Bind: v1beta3.PluginSet{
-			Enabled: []v1beta3.Plugin{
+				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32(1)},
+				{Name: names.ImageLocality, Weight: pointer.Int32(1)},
 				{Name: names.DefaultBinder},
 			},
 		},
@@ -121,18 +60,12 @@ func getDefaultPlugins() *v1beta3.Plugins {
 }
 
 func applyFeatureGates(config *v1beta3.Plugins) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
-		config.Score.Enabled = append(config.Score.Enabled, v1beta3.Plugin{Name: names.VolumeBinding, Weight: pointer.Int32Ptr(1)})
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
 		// When feature is enabled, the default spreading is done by
 		// PodTopologySpread plugin, which is enabled by default.
 		klog.InfoS("Registering SelectorSpread plugin")
-		s := v1beta3.Plugin{Name: names.SelectorSpread}
-		config.PreScore.Enabled = append(config.PreScore.Enabled, s)
-		s.Weight = pointer.Int32Ptr(1)
-		config.Score.Enabled = append(config.Score.Enabled, s)
+		s := v1beta3.Plugin{Name: names.SelectorSpread, Weight: pointer.Int32Ptr(1)}
+		config.MultiPoint.Enabled = append(config.MultiPoint.Enabled, s)
 	}
 }
 
@@ -142,6 +75,7 @@ func mergePlugins(defaultPlugins, customPlugins *v1beta3.Plugins) *v1beta3.Plugi
 		return defaultPlugins
 	}
 
+	defaultPlugins.MultiPoint = mergePluginSet(defaultPlugins.MultiPoint, customPlugins.MultiPoint)
 	defaultPlugins.QueueSort = mergePluginSet(defaultPlugins.QueueSort, customPlugins.QueueSort)
 	defaultPlugins.PreFilter = mergePluginSet(defaultPlugins.PreFilter, customPlugins.PreFilter)
 	defaultPlugins.Filter = mergePluginSet(defaultPlugins.Filter, customPlugins.Filter)
@@ -166,9 +100,22 @@ func mergePluginSet(defaultPluginSet, customPluginSet v1beta3.PluginSet) v1beta3
 	enabledCustomPlugins := make(map[string]pluginIndex)
 	// replacedPluginIndex is a set of index of plugins, which have replaced the default plugins.
 	replacedPluginIndex := sets.NewInt()
+	var disabled []v1beta3.Plugin
 	for _, disabledPlugin := range customPluginSet.Disabled {
+		// if the user is manually disabling any (or all, with "*") default plugins for an extension point,
+		// we need to track that so that the MultiPoint extension logic in the framework can know to skip
+		// inserting unspecified default plugins to this point.
+		disabled = append(disabled, v1beta3.Plugin{Name: disabledPlugin.Name})
 		disabledPlugins.Insert(disabledPlugin.Name)
 	}
+
+	// With MultiPoint, we may now have some disabledPlugins in the default registry
+	// For example, we enable PluginX with Filter+Score through MultiPoint but disable its Score plugin by default.
+	for _, disabledPlugin := range defaultPluginSet.Disabled {
+		disabled = append(disabled, v1beta3.Plugin{Name: disabledPlugin.Name})
+		disabledPlugins.Insert(disabledPlugin.Name)
+	}
+
 	for index, enabledPlugin := range customPluginSet.Enabled {
 		enabledCustomPlugins[enabledPlugin.Name] = pluginIndex{index, enabledPlugin}
 	}
@@ -197,5 +144,5 @@ func mergePluginSet(defaultPluginSet, customPluginSet v1beta3.PluginSet) v1beta3
 			enabledPlugins = append(enabledPlugins, plugin)
 		}
 	}
-	return v1beta3.PluginSet{Enabled: enabledPlugins}
+	return v1beta3.PluginSet{Enabled: enabledPlugins, Disabled: disabled}
 }
