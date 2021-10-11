@@ -398,7 +398,7 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 // The returned response may be shared between evaluations and must not be mutated.
 func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, attrs api.Attributes, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
-	var decision metrics.Decision
+	var decision metrics.Decision = metrics.DecisionAllow
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
 		return sharedAllowedResponse()
 	}
