@@ -2124,6 +2124,37 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 	}
 }
 
+func TestStoreDeleteCollectionWorkDistributorExited(t *testing.T) {
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+
+	for i := 0; i < 100; i++ {
+		if _, err := registry.Create(
+			testContext,
+			&example.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("foo-%d", i),
+				},
+			},
+			rest.ValidateAllObjectFunc,
+			&metav1.CreateOptions{},
+		); err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+	}
+
+	expectErr := fmt.Errorf("validate object failed")
+
+	_, err := registry.DeleteCollection(testContext, func(ctx context.Context, obj runtime.Object) error {
+		return expectErr
+	}, nil, &metainternalversion.ListOptions{})
+	if err != expectErr {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
 // Test whether objects deleted with DeleteCollection are correctly delivered
 // to watchers.
 func TestStoreDeleteCollectionWithWatch(t *testing.T) {
