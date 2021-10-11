@@ -119,7 +119,7 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 				case *v1.ConfigMap:
 					return t.Name == options.ConfigMapName && t.Namespace == options.ConfigMapNamespace
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", t, &v1.ConfigMap{}))
 					return false
 				}
 			},
@@ -138,7 +138,7 @@ func NewSigner(cl clientset.Interface, secrets informers.SecretInformer, configM
 				case *v1.Secret:
 					return t.Type == bootstrapapi.SecretTypeBootstrapToken && t.Namespace == e.secretNamespace
 				default:
-					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", e, obj))
+					utilruntime.HandleError(fmt.Errorf("object passed to %T that is not expected: %T", t, &v1.Secret{}))
 					return false
 				}
 			},
