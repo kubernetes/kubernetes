@@ -38,7 +38,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	Version "k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	"k8s.io/pod-security-admission/admission"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
@@ -260,7 +259,7 @@ func Setup(c *Config) (*Server, error) {
 	s.delegate = &admission.Admission{
 		Configuration:    c.PodSecurityConfig,
 		Evaluator:        evaluator,
-		Metrics:          metrics.NewPrometheusRecorder(api.MajorMinorVersion(getAPIVersion())),
+		Metrics:          metrics.NewPrometheusRecorder(api.GetAPIVersion()),
 		PodSpecExtractor: admission.DefaultPodSpecExtractor{},
 		PodLister:        admission.PodListerFromClient(client),
 		NamespaceGetter:  admission.NamespaceGetterFromListerAndClient(namespaceLister, client),
@@ -303,19 +302,3 @@ func parseTimeout(req *http.Request) (time.Duration, bool, error) {
 
 	return timeout, true, nil
 }
-
-// getAPIVersion get the version of apiServer and return the version major and minor
-func getAPIVersion() (major int, minor int) {
-	var err error
-	apiVersion := Version.Get()
-	major, err = strconv.Atoi(apiVersion.Major)
-	if err != nil {
-		return
-	}
-	minor, err = strconv.Atoi(apiVersion.Minor)
-	if err != nil {
-		return
-	}
-	return major, minor
-}
-

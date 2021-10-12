@@ -45,8 +45,7 @@ var (
 type Decision string
 type Mode string
 
-type EvaluationRecorder interface {
-	// TODO: fill in args required to record https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/2579-psp-replacemenonitoring
+type Recorder interface {
 	RecordEvaluation(decision Decision, policy api.LevelVersion, evalMode Mode, attrs api.Attributes)
 }
 

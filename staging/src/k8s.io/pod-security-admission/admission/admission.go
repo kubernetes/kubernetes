@@ -53,7 +53,7 @@ type Admission struct {
 	Evaluator policy.Evaluator
 
 	// Metrics
-	Metrics metrics.EvaluationRecorder
+	Metrics metrics.Recorder
 
 	// Arbitrary object --> PodSpec
 	PodSpecExtractor PodSpecExtractor
@@ -172,7 +172,9 @@ func (a *Admission) ValidateConfiguration() error {
 			return fmt.Errorf("default policy does not match; CompleteConfiguration() was not called before ValidateConfiguration()")
 		}
 	}
-	// TODO: check metrics is non-nil?
+	if a.Metrics == nil {
+		return fmt.Errorf("Recorder required")
+	}
 	if a.PodSpecExtractor == nil {
 		return fmt.Errorf("PodSpecExtractor required")
 	}
@@ -344,7 +346,6 @@ func (a *Admission) ValidatePod(ctx context.Context, attrs api.Attributes) *admi
 		}
 		if !isSignificantPodUpdate(pod, oldPod) {
 			// Nothing we care about changed, so always allow the update.
-			a.RecordEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 			return sharedAllowedResponse()
 		}
 	}
@@ -371,7 +372,6 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	}
 	nsPolicy, nsPolicyErr := a.PolicyToEvaluate(namespace.Labels)
 	if nsPolicyErr == nil && nsPolicy.Warn.Level == api.LevelPrivileged && nsPolicy.Audit.Level == api.LevelPrivileged {
-		a.RecordEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 
@@ -387,7 +387,6 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 	}
 	if podMetadata == nil && podSpec == nil {
 		// if a controller with an optional pod spec does not contain a pod spec, skip validation
-		a.RecordEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 		return sharedAllowedResponse()
 	}
 	return a.EvaluatePod(ctx, nsPolicy, nsPolicyErr, podMetadata, podSpec, attrs, false)
@@ -498,18 +497,16 @@ func sharedAllowedResponse() *admissionv1.AdmissionResponse {
 }
 
 func (a *Admission) RecordEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
-	if a.Metrics != nil {
-		if decision == metrics.DecisionDeny {
-			if policy.Audit.Valid() {
-				a.Metrics.RecordEvaluation(decision, policy.Audit, metrics.ModeAudit, attrs)
-			}
-			if policy.Warn.Valid() {
-				a.Metrics.RecordEvaluation(decision, policy.Warn, metrics.ModeWarn, attrs)
-			}
+	if decision == metrics.DecisionDeny {
+		if policy.Audit.Valid() {
+			a.Metrics.RecordEvaluation(decision, policy.Audit, metrics.ModeAudit, attrs)
 		}
-		if policy.Enforce.Valid() {
-			a.Metrics.RecordEvaluation(decision, policy.Enforce, metrics.ModeEnforce, attrs)
+		if policy.Warn.Valid() {
+			a.Metrics.RecordEvaluation(decision, policy.Warn, metrics.ModeWarn, attrs)
 		}
+	}
+	if policy.Enforce.Valid() {
+		a.Metrics.RecordEvaluation(decision, policy.Enforce, metrics.ModeEnforce, attrs)
 	}
 }
 
