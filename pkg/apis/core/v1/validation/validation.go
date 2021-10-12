@@ -158,7 +158,6 @@ func checkPortConflicts(containers []v1.Container, fldPath *field.Path) field.Er
 			idxPath := portsPath.Index(pi)
 
 			// Check for duplicate port
-
 			port := ctr.Ports[pi].HostPort
 			if port == 0 {
 				continue
@@ -172,7 +171,6 @@ func checkPortConflicts(containers []v1.Container, fldPath *field.Path) field.Er
 			}
 
 			// Check for duplicate named ports
-
 			name := ctr.Ports[pi].Name
 			// Don't error on no name.
 			if name == "" {
