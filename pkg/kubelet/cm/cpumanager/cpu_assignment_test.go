@@ -506,7 +506,7 @@ func TestCPUAccumulatorTake(t *testing.T) {
 	}
 }
 
-func TestTakeByTopology(t *testing.T) {
+func TestTakeByTopologyNUMAPacked(t *testing.T) {
 	testCases := []struct {
 		description   string
 		topo          *topology.CPUTopology
@@ -631,7 +631,7 @@ func TestTakeByTopology(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopology(tc.topo, tc.availableCPUs, tc.numCPUs)
+			result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs)
 			if tc.expErr != "" && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
 			}
