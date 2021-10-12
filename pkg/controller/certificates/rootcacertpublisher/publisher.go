@@ -237,7 +237,7 @@ func convertToCM(obj interface{}) (*v1.ConfigMap, error) {
 		}
 		cm, ok = tombstone.Obj.(*v1.ConfigMap)
 		if !ok {
-			return nil, fmt.Errorf("tombstone contained object that is not a ConfigMap %#v", obj)
+			return nil, fmt.Errorf("tombstone contained object that is not a ConfigMap %#v", tombstone.Obj)
 		}
 	}
 	return cm, nil

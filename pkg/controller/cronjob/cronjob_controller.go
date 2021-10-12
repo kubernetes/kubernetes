@@ -113,7 +113,7 @@ func (jm *Controller) syncAll() {
 	err := pager.New(pager.SimplePageFunc(jobListFunc)).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
 		jobTmp, ok := object.(*batchv1.Job)
 		if !ok {
-			return fmt.Errorf("expected type *batchv1.Job, got type %T", jobTmp)
+			return fmt.Errorf("expected type *batchv1.Job, got type %T", object)
 		}
 		js = append(js, *jobTmp)
 		return nil
@@ -132,7 +132,7 @@ func (jm *Controller) syncAll() {
 	}).EachListItem(context.Background(), metav1.ListOptions{}, func(object runtime.Object) error {
 		cj, ok := object.(*batchv1.CronJob)
 		if !ok {
-			return fmt.Errorf("expected type *batchv1.CronJob, got type %T", cj)
+			return fmt.Errorf("expected type *batchv1.CronJob, got type %T", object)
 		}
 		syncOne(cj, jobsByCj[cj.UID], time.Now(), jm.jobControl, jm.cjControl, jm.recorder)
 		cleanupFinishedJobs(cj, jobsByCj[cj.UID], jm.jobControl, jm.cjControl, jm.recorder)
