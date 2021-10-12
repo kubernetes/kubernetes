@@ -518,7 +518,7 @@ const (
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
 	// owner: @andrewsykim
-	// alpha: v1.20
+	// beta: v1.23
 	//
 	// Enable kubelet exec plugins for image pull credentials.
 	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
@@ -836,7 +836,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	HPAContainerMetrics:                            {Default: false, PreRelease: featuregate.Alpha},
 	SizeMemoryBackedVolumes:                        {Default: true, PreRelease: featuregate.Beta},
 	ExecProbeTimeout:                               {Default: true, PreRelease: featuregate.GA}, // lock to default and remove after v1.22 based on KEP #1972 update
-	KubeletCredentialProviders:                     {Default: false, PreRelease: featuregate.Alpha},
+	KubeletCredentialProviders:                     {Default: true, PreRelease: featuregate.Beta},
 	GracefulNodeShutdown:                           {Default: true, PreRelease: featuregate.Beta},
 	ServiceLBNodePortControl:                       {Default: true, PreRelease: featuregate.Beta},
 	MixedProtocolLBService:                         {Default: false, PreRelease: featuregate.Alpha},
@@ -857,7 +857,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
 	WindowsHostProcessContainers:                   {Default: false, PreRelease: featuregate.Alpha},
 	DisableCloudProviders:                          {Default: false, PreRelease: featuregate.Alpha},
-	DisableKubeletCloudCredentialProviders:         {Default: false, PreRelease: featuregate.Alpha},
+	DisableKubeletCloudCredentialProviders:         {Default: true, PreRelease: featuregate.Beta},
 	StatefulSetMinReadySeconds:                     {Default: true, PreRelease: featuregate.Beta},
 	ExpandedDNSConfig:                              {Default: false, PreRelease: featuregate.Alpha},
 	SeccompDefault:                                 {Default: false, PreRelease: featuregate.Alpha},
