@@ -173,7 +173,7 @@ func (a *Admission) ValidateConfiguration() error {
 		}
 	}
 	if a.Metrics == nil {
-		return fmt.Errorf("Recorder required")
+		return fmt.Errorf("Metrics recorder required")
 	}
 	if a.PodSpecExtractor == nil {
 		return fmt.Errorf("PodSpecExtractor required")
@@ -397,7 +397,6 @@ func (a *Admission) ValidatePodController(ctx context.Context, attrs api.Attribu
 // The returned response may be shared between evaluations and must not be mutated.
 func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPolicyErr error, podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, attrs api.Attributes, enforce bool) *admissionv1.AdmissionResponse {
 	// short-circuit on exempt runtimeclass
-	var decision metrics.Decision = metrics.DecisionAllow
 	if a.exemptRuntimeClass(podSpec.RuntimeClassName) {
 		return sharedAllowedResponse()
 	}
@@ -416,13 +415,14 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	if enforce {
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
 			response = forbiddenResponse(result.ForbiddenDetail())
-			decision = metrics.DecisionDeny
+			a.RecordEnforceEvaluation(nsPolicy, metrics.DecisionDeny, attrs)
 		}
 	}
 
 	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
 	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
 		auditAnnotations["audit"] = result.ForbiddenDetail()
+		a.RecordAuditEvaluation(nsPolicy, metrics.DecisionDeny, attrs)
 	}
 
 	// avoid adding warnings to a request we're already going to reject with an error
@@ -436,10 +436,11 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 				nsPolicy.Warn.Level,
 				result.ForbiddenDetail(),
 			))
+			a.RecordWarnEvaluation(nsPolicy, metrics.DecisionDeny, attrs)
 		}
+		a.RecordEnforceEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 	}
 
-	a.RecordEvaluation(nsPolicy, decision, attrs)
 	response.AuditAnnotations = auditAnnotations
 	return response
 }
@@ -496,18 +497,16 @@ func sharedAllowedResponse() *admissionv1.AdmissionResponse {
 	return _sharedAllowedResponse
 }
 
-func (a *Admission) RecordEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
-	if decision == metrics.DecisionDeny {
-		if policy.Audit.Valid() {
-			a.Metrics.RecordEvaluation(decision, policy.Audit, metrics.ModeAudit, attrs)
-		}
-		if policy.Warn.Valid() {
-			a.Metrics.RecordEvaluation(decision, policy.Warn, metrics.ModeWarn, attrs)
-		}
-	}
-	if policy.Enforce.Valid() {
-		a.Metrics.RecordEvaluation(decision, policy.Enforce, metrics.ModeEnforce, attrs)
-	}
+func (a *Admission) RecordEnforceEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
+	a.Metrics.RecordEvaluation(decision, policy.Enforce, metrics.ModeEnforce, attrs)
+}
+
+func (a *Admission) RecordAuditEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
+	a.Metrics.RecordEvaluation(decision, policy.Audit, metrics.ModeAudit, attrs)
+}
+
+func (a *Admission) RecordWarnEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
+	a.Metrics.RecordEvaluation(decision, policy.Warn, metrics.ModeWarn, attrs)
 }
 
 // allowedResponse is the response used when the admission decision is allow.

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	"k8s.io/pod-security-admission/api"
+	"k8s.io/pod-security-admission/metrics"
 	"k8s.io/pod-security-admission/policy"
 	"k8s.io/utils/pointer"
 )
@@ -436,6 +437,7 @@ func TestValidateNamespace(t *testing.T) {
 						RuntimeClasses: tc.exemptRuntimeClasses,
 					},
 				},
+				Metrics:       NewMockRecorder(),
 				defaultPolicy: defaultPolicy,
 			}
 			result := a.ValidateNamespace(context.TODO(), attrs)
@@ -622,6 +624,7 @@ func TestValidatePodController(t *testing.T) {
 						Usernames:      tc.exemptUsers,
 					},
 				},
+				Metrics:         NewMockRecorder(),
 				defaultPolicy:   defaultPolicy,
 				NamespaceGetter: nsGetter,
 			}
@@ -639,4 +642,14 @@ func TestValidatePodController(t *testing.T) {
 			assert.Equal(t, tc.expectWarnings, result.Warnings, "unexpected Warnings")
 		})
 	}
+}
+
+type MockRecorder struct {
+}
+
+func NewMockRecorder() *MockRecorder {
+	return &MockRecorder{}
+}
+
+func (r MockRecorder) RecordEvaluation(decision metrics.Decision, policy api.LevelVersion, evalMode metrics.Mode, attrs api.Attributes) {
 }

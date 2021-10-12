@@ -22,11 +22,11 @@ import (
 )
 
 const (
-	ModeAudit      = "audit"
-	ModeEnforce    = "enforce"
-	ModeWarn       = "warn"
-	DecisionAllow  = "allow"  // Policy evaluated, request allowed
-	DecisionDeny   = "deny"   // Policy evaluated, request denied
+	ModeAudit     = "audit"
+	ModeEnforce   = "enforce"
+	ModeWarn      = "warn"
+	DecisionAllow = "allow" // Policy evaluated, request allowed
+	DecisionDeny  = "deny"  // Policy evaluated, request denied
 )
 
 var (
@@ -53,8 +53,11 @@ type PrometheusRecorder struct {
 	apiVersion api.Version
 }
 
-func NewPrometheusRecorder(version api.Version) *PrometheusRecorder {
+func init() {
 	Registry.MustRegister(SecurityEvaluation)
+}
+
+func NewPrometheusRecorder(version api.Version) *PrometheusRecorder {
 	return &PrometheusRecorder{apiVersion: version}
 }
 
@@ -78,4 +81,3 @@ func (r PrometheusRecorder) RecordEvaluation(decision Decision, policy api.Level
 			version, string(evalMode), operation, resource, subresource).Inc()
 	}
 }
-

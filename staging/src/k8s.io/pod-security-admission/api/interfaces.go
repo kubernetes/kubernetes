@@ -46,4 +46,3 @@ type Attributes interface {
 	// GetUserName is the requesting user's authenticated name.
 	GetUserName() string
 }
-
