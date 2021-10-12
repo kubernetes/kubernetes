@@ -48,11 +48,35 @@ func GetCgroupSubsystems(includedMetrics container.MetricSet) (CgroupSubsystems,
 
 	disableCgroups := map[string]struct{}{}
 
-	//currently we only support disable blkio subsystem
 	if !includedMetrics.Has(container.DiskIOMetrics) {
 		disableCgroups["blkio"] = struct{}{}
 		disableCgroups["io"] = struct{}{}
 	}
+
+	if !includedMetrics.Has(container.CpuUsageMetrics) {
+		disableCgroups["cpu"] = struct{}{}
+	}
+
+	if !includedMetrics.Has(container.CPUSetMetrics) {
+		disableCgroups["cpuset"] = struct{}{}
+	}
+
+	if !includedMetrics.Has(container.HugetlbUsageMetrics) {
+		disableCgroups["hugetlb"] = struct{}{}
+	}
+
+	if !includedMetrics.Has(container.MemoryUsageMetrics) {
+		disableCgroups["memory"] = struct{}{}
+	}
+
+	if !includedMetrics.Has(container.PerfMetrics) {
+		disableCgroups["perf_event"] = struct{}{}
+	}
+
+	if !includedMetrics.Has(container.ProcessMetrics) {
+		disableCgroups["pids"] = struct{}{}
+	}
+
 	return getCgroupSubsystemsHelper(allCgroups, disableCgroups)
 }
 

@@ -64,13 +64,11 @@ func (f *crioFactory) String() string {
 	return CrioNamespace
 }
 
-func (f *crioFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
+func (f *crioFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
 	client, err := Client()
 	if err != nil {
 		return
 	}
-	// TODO are there any env vars we need to white list, if so, do it here...
-	metadataEnvs := []string{}
 	handler, err = newCrioContainerHandler(
 		client,
 		name,
@@ -80,7 +78,7 @@ func (f *crioFactory) NewContainerHandler(name string, inHostNamespace bool) (ha
 		f.storageDir,
 		&f.cgroupSubsystems,
 		inHostNamespace,
-		metadataEnvs,
+		metadataEnvAllowList,
 		f.includedMetrics,
 	)
 	return

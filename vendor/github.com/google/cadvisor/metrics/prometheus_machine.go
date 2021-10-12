@@ -334,6 +334,14 @@ func getCaches(machineInfo *info.MachineInfo) metricValues {
 						timestamp: machineInfo.Timestamp,
 					})
 			}
+			for _, cache := range core.UncoreCaches {
+				mValues = append(mValues,
+					metricValue{
+						value:     float64(cache.Size),
+						labels:    []string{nodeID, coreID, cache.Type, strconv.Itoa(cache.Level)},
+						timestamp: machineInfo.Timestamp,
+					})
+			}
 		}
 
 		for _, cache := range node.Caches {

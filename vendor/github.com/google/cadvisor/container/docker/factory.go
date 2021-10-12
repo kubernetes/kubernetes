@@ -47,20 +47,20 @@ var ArgDockerCert = flag.String("docker-tls-cert", "cert.pem", "path to client c
 var ArgDockerKey = flag.String("docker-tls-key", "key.pem", "path to private key")
 var ArgDockerCA = flag.String("docker-tls-ca", "ca.pem", "path to trusted CA")
 
+var dockerEnvMetadataWhiteList = flag.String("docker_env_metadata_whitelist", "", "DEPRECATED: this flag will be removed, please use `env_metadata_whitelist`. A comma-separated list of environment variable keys matched with specified prefix that needs to be collected for docker containers")
+
 // The namespace under which Docker aliases are unique.
 const DockerNamespace = "docker"
 
 // The retry times for getting docker root dir
 const rootDirRetries = 5
 
-//The retry period for getting docker root dir, Millisecond
+// The retry period for getting docker root dir, Millisecond
 const rootDirRetryPeriod time.Duration = 1000 * time.Millisecond
 
 // Regexp that identifies docker cgroups, containers started with
 // --cgroup-parent have another prefix than 'docker'
 var dockerCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
-
-var dockerEnvWhitelist = flag.String("docker_env_metadata_whitelist", "", "a comma-separated list of environment variable keys matched with specified prefix that needs to be collected for docker containers")
 
 var (
 	// Basepath to all container specific information that libcontainer stores.
@@ -136,13 +136,18 @@ func (f *dockerFactory) String() string {
 	return DockerNamespace
 }
 
-func (f *dockerFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
+func (f *dockerFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
 	client, err := Client()
 	if err != nil {
 		return
 	}
 
-	metadataEnvs := strings.Split(*dockerEnvWhitelist, ",")
+	dockerMetadataEnvAllowList := strings.Split(*dockerEnvMetadataWhiteList, ",")
+
+	// prefer using the unified metadataEnvAllowList
+	if len(metadataEnvAllowList) != 0 {
+		dockerMetadataEnvAllowList = metadataEnvAllowList
+	}
 
 	handler, err = newDockerContainerHandler(
 		client,
@@ -153,7 +158,7 @@ func (f *dockerFactory) NewContainerHandler(name string, inHostNamespace bool) (
 		f.storageDir,
 		&f.cgroupSubsystems,
 		inHostNamespace,
-		metadataEnvs,
+		dockerMetadataEnvAllowList,
 		f.dockerVersion,
 		f.includedMetrics,
 		f.thinPoolName,

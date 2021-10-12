@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package containerd.services.snapshots.v1;
+
+import weak "gogoproto/gogo.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/timestamp.proto";
+import "github.com/containerd/containerd/api/types/mount.proto";
+
+option go_package = "github.com/containerd/containerd/api/services/snapshots/v1;snapshots";
+
+// Snapshot service manages snapshots
+service Snapshots {
+	rpc Prepare(PrepareSnapshotRequest) returns (PrepareSnapshotResponse);
+	rpc View(ViewSnapshotRequest) returns (ViewSnapshotResponse);
+	rpc Mounts(MountsRequest) returns (MountsResponse);
+	rpc Commit(CommitSnapshotRequest) returns (google.protobuf.Empty);
+	rpc Remove(RemoveSnapshotRequest) returns (google.protobuf.Empty);
+	rpc Stat(StatSnapshotRequest) returns (StatSnapshotResponse);
+	rpc Update(UpdateSnapshotRequest) returns (UpdateSnapshotResponse);
+	rpc List(ListSnapshotsRequest) returns (stream ListSnapshotsResponse);
+	rpc Usage(UsageRequest) returns (UsageResponse);
+	rpc Cleanup(CleanupRequest) returns (google.protobuf.Empty);
+}
+
+message PrepareSnapshotRequest {
+	string snapshotter = 1;
+	string key = 2;
+	string parent = 3;
+
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels  = 4;
+}
+
+message PrepareSnapshotResponse {
+	repeated containerd.types.Mount mounts = 1;
+}
+
+message ViewSnapshotRequest {
+	string snapshotter = 1;
+	string key = 2;
+	string parent = 3;
+
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels  = 4;
+}
+
+message ViewSnapshotResponse {
+	repeated containerd.types.Mount mounts = 1;
+}
+
+message MountsRequest {
+	string snapshotter = 1;
+	string key = 2;
+}
+
+message MountsResponse {
+	repeated containerd.types.Mount mounts = 1;
+}
+
+message RemoveSnapshotRequest {
+	string snapshotter = 1;
+	string key = 2;
+}
+
+message CommitSnapshotRequest {
+	string snapshotter = 1;
+	string name = 2;
+	string key = 3;
+
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels  = 4;
+}
+
+message StatSnapshotRequest {
+	string snapshotter = 1;
+	string key = 2;
+}
+
+enum Kind {
+	option (gogoproto.goproto_enum_prefix) = false;
+	option (gogoproto.enum_customname) = "Kind";
+
+	UNKNOWN = 0 [(gogoproto.enumvalue_customname) = "KindUnknown"];
+	VIEW = 1 [(gogoproto.enumvalue_customname) = "KindView"];
+	ACTIVE = 2 [(gogoproto.enumvalue_customname) = "KindActive"];
+	COMMITTED = 3 [(gogoproto.enumvalue_customname) = "KindCommitted"];
+}
+
+message Info {
+	string name = 1;
+	string parent = 2;
+	Kind kind = 3;
+
+	// CreatedAt provides the time at which the snapshot was created.
+	google.protobuf.Timestamp created_at = 4 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// UpdatedAt provides the time the info was last updated.
+	google.protobuf.Timestamp updated_at = 5 [(gogoproto.stdtime) = true, (gogoproto.nullable) = false];
+
+	// Labels are arbitrary data on snapshots.
+	//
+	// The combined size of a key/value pair cannot exceed 4096 bytes.
+	map<string, string> labels  = 6;
+}
+
+message StatSnapshotResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message UpdateSnapshotRequest {
+	string snapshotter = 1;
+	Info info = 2 [(gogoproto.nullable) = false];
+
+	// UpdateMask specifies which fields to perform the update on. If empty,
+	// the operation applies to all fields.
+	//
+	// In info, Name, Parent, Kind, Created are immutable,
+	// other field may be updated using this mask.
+	// If no mask is provided, all mutable field are updated.
+	google.protobuf.FieldMask update_mask = 3;
+}
+
+message UpdateSnapshotResponse {
+	Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message ListSnapshotsRequest{
+	string snapshotter = 1;
+
+	// Filters contains one or more filters using the syntax defined in the
+	// containerd filter package.
+	//
+	// The returned result will be those that match any of the provided
+	// filters. Expanded, images that match the following will be
+	// returned:
+	//
+	//   filters[0] or filters[1] or ... or filters[n-1] or filters[n]
+	//
+	// If filters is zero-length or nil, all items will be returned.
+	repeated string filters = 2;
+}
+
+message ListSnapshotsResponse {
+	repeated Info info = 1 [(gogoproto.nullable) = false];
+}
+
+message UsageRequest {
+	string snapshotter = 1;
+	string key = 2;
+}
+
+message UsageResponse {
+	int64 size = 1;
+	int64 inodes = 2;
+}
+
+message CleanupRequest {
+	string snapshotter = 1;
+}

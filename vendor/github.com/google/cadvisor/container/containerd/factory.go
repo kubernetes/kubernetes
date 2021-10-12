@@ -34,6 +34,8 @@ import (
 var ArgContainerdEndpoint = flag.String("containerd", "/run/containerd/containerd.sock", "containerd endpoint")
 var ArgContainerdNamespace = flag.String("containerd-namespace", "k8s.io", "containerd namespace")
 
+var containerdEnvMetadataWhiteList = flag.String("containerd_env_metadata_whitelist", "", "DEPRECATED: this flag will be removed, please use `env_metadata_whitelist`. A comma-separated list of environment variable keys matched with specified prefix that needs to be collected for containerd containers")
+
 // The namespace under which containerd aliases are unique.
 const k8sContainerdNamespace = "containerd"
 
@@ -56,13 +58,19 @@ func (f *containerdFactory) String() string {
 	return k8sContainerdNamespace
 }
 
-func (f *containerdFactory) NewContainerHandler(name string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
+func (f *containerdFactory) NewContainerHandler(name string, metadataEnvAllowList []string, inHostNamespace bool) (handler container.ContainerHandler, err error) {
 	client, err := Client(*ArgContainerdEndpoint, *ArgContainerdNamespace)
 	if err != nil {
 		return
 	}
 
-	metadataEnvs := []string{}
+	containerdMetadataEnvAllowList := strings.Split(*containerdEnvMetadataWhiteList, ",")
+
+	// prefer using the unified metadataEnvAllowList
+	if len(metadataEnvAllowList) != 0 {
+		containerdMetadataEnvAllowList = metadataEnvAllowList
+	}
+
 	return newContainerdContainerHandler(
 		client,
 		name,
@@ -70,7 +78,7 @@ func (f *containerdFactory) NewContainerHandler(name string, inHostNamespace boo
 		f.fsInfo,
 		&f.cgroupSubsystems,
 		inHostNamespace,
-		metadataEnvs,
+		containerdMetadataEnvAllowList,
 		f.includedMetrics,
 	)
 }

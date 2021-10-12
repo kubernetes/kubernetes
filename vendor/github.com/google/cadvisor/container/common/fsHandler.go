@@ -37,15 +37,21 @@ type FsUsage struct {
 	InodeUsage      uint64
 }
 
+type FsUsageProvider interface {
+	// Usage returns the fs usage
+	Usage() (*FsUsage, error)
+	// Targets returns where the fs usage metric is collected,it maybe a directory, a file or some
+	// information about the snapshotter(for containerd)
+	Targets() []string
+}
+
 type realFsHandler struct {
 	sync.RWMutex
-	lastUpdate time.Time
-	usage      FsUsage
-	period     time.Duration
-	minPeriod  time.Duration
-	rootfs     string
-	extraDir   string
-	fsInfo     fs.FsInfo
+	lastUpdate    time.Time
+	usage         FsUsage
+	period        time.Duration
+	minPeriod     time.Duration
+	usageProvider FsUsageProvider
 	// Tells the container to stop.
 	stopChan chan struct{}
 }
@@ -58,51 +64,33 @@ const DefaultPeriod = time.Minute
 
 var _ FsHandler = &realFsHandler{}
 
-func NewFsHandler(period time.Duration, rootfs, extraDir string, fsInfo fs.FsInfo) FsHandler {
+func NewFsHandler(period time.Duration, provider FsUsageProvider) FsHandler {
 	return &realFsHandler{
-		lastUpdate: time.Time{},
-		usage:      FsUsage{},
-		period:     period,
-		minPeriod:  period,
-		rootfs:     rootfs,
-		extraDir:   extraDir,
-		fsInfo:     fsInfo,
-		stopChan:   make(chan struct{}, 1),
+		lastUpdate:    time.Time{},
+		usage:         FsUsage{},
+		period:        period,
+		minPeriod:     period,
+		usageProvider: provider,
+		stopChan:      make(chan struct{}, 1),
 	}
 }
 
 func (fh *realFsHandler) update() error {
-	var (
-		rootUsage, extraUsage fs.UsageInfo
-		rootErr, extraErr     error
-	)
-	// TODO(vishh): Add support for external mounts.
-	if fh.rootfs != "" {
-		rootUsage, rootErr = fh.fsInfo.GetDirUsage(fh.rootfs)
+
+	usage, err := fh.usageProvider.Usage()
+
+	if err != nil {
+		return err
 	}
 
-	if fh.extraDir != "" {
-		extraUsage, extraErr = fh.fsInfo.GetDirUsage(fh.extraDir)
-	}
-
-	// Wait to handle errors until after all operartions are run.
-	// An error in one will not cause an early return, skipping others
 	fh.Lock()
 	defer fh.Unlock()
 	fh.lastUpdate = time.Now()
-	if fh.rootfs != "" && rootErr == nil {
-		fh.usage.InodeUsage = rootUsage.Inodes
-		fh.usage.BaseUsageBytes = rootUsage.Bytes
-		fh.usage.TotalUsageBytes = rootUsage.Bytes
-	}
-	if fh.extraDir != "" && extraErr == nil {
-		fh.usage.TotalUsageBytes += extraUsage.Bytes
-	}
 
-	// Combine errors into a single error to return
-	if rootErr != nil || extraErr != nil {
-		return fmt.Errorf("rootDiskErr: %v, extraDiskErr: %v", rootErr, extraErr)
-	}
+	fh.usage.InodeUsage = usage.InodeUsage
+	fh.usage.BaseUsageBytes = usage.BaseUsageBytes
+	fh.usage.TotalUsageBytes = usage.TotalUsageBytes
+
 	return nil
 }
 
@@ -125,7 +113,8 @@ func (fh *realFsHandler) trackUsage() {
 			// if the long duration is persistent either because of slow
 			// disk or lots of containers.
 			longOp = longOp + time.Second
-			klog.V(2).Infof("fs: disk usage and inodes count on following dirs took %v: %v; will not log again for this container unless duration exceeds %v", duration, []string{fh.rootfs, fh.extraDir}, longOp)
+			klog.V(2).Infof(`fs: disk usage and inodes count on targets took %v: %v; `+
+				`will not log again for this container unless duration exceeds %v`, duration, fh.usageProvider.Targets(), longOp)
 		}
 		select {
 		case <-fh.stopChan:
@@ -147,4 +136,57 @@ func (fh *realFsHandler) Usage() FsUsage {
 	fh.RLock()
 	defer fh.RUnlock()
 	return fh.usage
+}
+
+type fsUsageProvider struct {
+	fsInfo fs.FsInfo
+	rootFs string
+	// The directory consumed by the container but outside rootFs, e.g. directory of saving logs
+	extraDir string
+}
+
+func NewGeneralFsUsageProvider(fsInfo fs.FsInfo, rootFs, extraDir string) FsUsageProvider {
+	return &fsUsageProvider{
+		fsInfo:   fsInfo,
+		rootFs:   rootFs,
+		extraDir: extraDir,
+	}
+}
+
+func (f *fsUsageProvider) Targets() []string {
+	return []string{f.rootFs, f.extraDir}
+}
+
+func (f *fsUsageProvider) Usage() (*FsUsage, error) {
+	var (
+		rootUsage, extraUsage fs.UsageInfo
+		rootErr, extraErr     error
+	)
+
+	if f.rootFs != "" {
+		rootUsage, rootErr = f.fsInfo.GetDirUsage(f.rootFs)
+	}
+
+	if f.extraDir != "" {
+		extraUsage, extraErr = f.fsInfo.GetDirUsage(f.extraDir)
+	}
+
+	usage := &FsUsage{}
+
+	if f.rootFs != "" && rootErr == nil {
+		usage.InodeUsage = rootUsage.Inodes
+		usage.BaseUsageBytes = rootUsage.Bytes
+		usage.TotalUsageBytes = rootUsage.Bytes
+	}
+
+	if f.extraDir != "" && extraErr == nil {
+		usage.TotalUsageBytes += extraUsage.Bytes
+	}
+
+	// Combine errors into a single error to return
+	if rootErr != nil || extraErr != nil {
+		return nil, fmt.Errorf("failed to obtain filesystem usage; rootDiskErr: %v, extraDiskErr: %v", rootErr, extraErr)
+	}
+
+	return usage, nil
 }

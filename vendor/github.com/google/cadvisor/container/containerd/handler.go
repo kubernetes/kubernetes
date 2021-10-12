@@ -18,11 +18,14 @@ package containerd
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd/errdefs"
+	criapi "github.com/google/cadvisor/cri-api/pkg/apis/runtime/v1alpha2"
 	"golang.org/x/net/context"
+	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/common"
@@ -32,12 +35,26 @@ import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
+type fsUsageProvider struct {
+	ctx         context.Context
+	containerID string
+	client      ContainerdClient
+	fsInfo      fs.FsInfo
+	logPath     string
+}
+
 type containerdContainerHandler struct {
 	machineInfoFactory info.MachineInfoFactory
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
-	cgroupPaths map[string]string
-	fsInfo      fs.FsInfo
+	cgroupPaths   map[string]string
+	fsInfo        fs.FsInfo
+	fsHandler     common.FsHandler
+	fsLimit       uint64
+	fsTotalInodes uint64
+	fsType        string
+	device        string
+
 	// Metadata associated with the container.
 	reference info.ContainerReference
 	envs      map[string]string
@@ -60,7 +77,7 @@ func newContainerdContainerHandler(
 	fsInfo fs.FsInfo,
 	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
-	metadataEnvs []string,
+	metadataEnvAllowList []string,
 	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
@@ -112,11 +129,35 @@ func newContainerdContainerHandler(
 		rootfs = "/rootfs"
 	}
 
+	// For sandbox container (pause), the restart is hardcoded to "0"
+	var restart uint32 = 0
+	// Special container name for sandbox(pause)
+	// It is defined in https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/dockershim/naming.go#L50-L52
+	containerName := "POD"
+	var status *criapi.ContainerStatus
+	if cntr.Labels["io.cri-containerd.kind"] != "sandbox" {
+		status, err = client.ContainerStatus(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		restart = status.Metadata.Attempt
+		containerName = cntr.Labels["io.kubernetes.container.name"]
+	}
+
+	// The "io.kubernetes" labels are defined in https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/types/labels.go
+	containerNameConcat := strings.Join([]string{
+		"k8s",
+		containerName,
+		cntr.Labels["io.kubernetes.pod.name"],
+		cntr.Labels["io.kubernetes.pod.namespace"],
+		cntr.Labels["io.kubernetes.pod.uid"],
+		fmt.Sprint(restart)}, "_")
+
 	containerReference := info.ContainerReference{
 		Id:        id,
 		Name:      name,
 		Namespace: k8sContainerdNamespace,
-		Aliases:   []string{id, name},
+		Aliases:   []string{containerNameConcat, id, name},
 	}
 
 	libcontainerHandler := containerlibcontainer.NewHandler(cgroupManager, rootfs, int(taskPid), includedMetrics)
@@ -133,16 +174,96 @@ func newContainerdContainerHandler(
 	}
 	// Add the name and bare ID as aliases of the container.
 	handler.image = cntr.Image
-	for _, envVar := range spec.Process.Env {
-		if envVar != "" {
-			splits := strings.SplitN(envVar, "=", 2)
-			if len(splits) == 2 {
-				handler.envs[splits[0]] = splits[1]
+
+	if includedMetrics.Has(container.DiskUsageMetrics) && cntr.Labels["io.cri-containerd.kind"] != "sandbox" {
+		err = handler.fillDiskUsageInfo(ctx, client, machineInfoFactory, fsInfo, cntr.Snapshotter, cntr.SnapshotKey, rootfs, status.LogPath)
+		if err != nil {
+			klog.Errorf("error occured while filling disk usage info for container %s: %s", name, err)
+		}
+	}
+
+	for _, exposedEnv := range metadataEnvAllowList {
+		if exposedEnv == "" {
+			// if no containerdEnvWhitelist provided, len(metadataEnvAllowList) == 1, metadataEnvAllowList[0] == ""
+			continue
+		}
+
+		for _, envVar := range spec.Process.Env {
+			if envVar != "" {
+				splits := strings.SplitN(envVar, "=", 2)
+				if len(splits) == 2 && strings.HasPrefix(splits[0], exposedEnv) {
+					handler.envs[splits[0]] = splits[1]
+				}
 			}
 		}
 	}
 
 	return handler, nil
+}
+
+func (h *containerdContainerHandler) fillDiskUsageInfo(
+	ctx context.Context,
+	client ContainerdClient,
+	machineInfoFactory info.MachineInfoFactory,
+	fsInfo fs.FsInfo,
+	snapshotter, snapshotKey, rootfs, logPath string) error {
+	mounts, err := client.SnapshotMounts(ctx, snapshotter, snapshotKey)
+	if err != nil {
+		return fmt.Errorf("failed to obtain containerd snapshot mounts for disk usage metrics: %v", err)
+	}
+
+	// Default to top directory
+	snapshotDir := "/var/lib/containerd"
+	// TODO: only overlay snapshotters is handled as of now.
+	// Note: overlay returns single mount. https://github.com/containerd/containerd/blob/main/snapshots/overlay/overlay.go
+	if len(mounts) > 0 && mounts[0].Type == "overlay" {
+		for _, option := range mounts[0].Options {
+			// Example: upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/5001/fs
+			if strings.HasPrefix(option, "upperdir=") {
+				snapshotDir = option[len("upperdir="):]
+				break
+			}
+		}
+	}
+	deviceInfo, err := fsInfo.GetDirFsDevice(path.Join(rootfs, snapshotDir))
+	if err != nil {
+		return err
+	}
+
+	mi, err := machineInfoFactory.GetMachineInfo()
+	if err != nil {
+		return err
+	}
+
+	var (
+		fsLimit       uint64
+		fsType        string
+		fsTotalInodes uint64
+	)
+	// Containerd does not impose any filesystem limits for containers. So use capacity as limit.
+	for _, fs := range mi.Filesystems {
+		if fs.Device == deviceInfo.Device {
+			fsLimit = fs.Capacity
+			fsType = fs.Type
+			fsTotalInodes = fs.Inodes
+			break
+		}
+	}
+
+	h.fsLimit = fsLimit
+	h.fsType = fsType
+	h.fsTotalInodes = fsTotalInodes
+	h.device = deviceInfo.Device
+
+	h.fsHandler = common.NewFsHandler(common.DefaultPeriod, &fsUsageProvider{
+		ctx:         ctx,
+		client:      client,
+		containerID: h.reference.Id,
+		// Path of logs, e.g. /var/log/pods/XXX
+		logPath: path.Join(rootfs, logPath),
+		fsInfo:  fsInfo,
+	})
+	return nil
 }
 
 func (h *containerdContainerHandler) ContainerReference() (info.ContainerReference, error) {
@@ -181,6 +302,27 @@ func (h *containerdContainerHandler) getFsStats(stats *info.ContainerStats) erro
 	if h.includedMetrics.Has(container.DiskIOMetrics) {
 		common.AssignDeviceNamesToDiskStats((*common.MachineInfoNamer)(mi), &stats.DiskIo)
 	}
+
+	if !h.includedMetrics.Has(container.DiskUsageMetrics) || h.fsHandler == nil || h.labels["io.cri-containerd.kind"] == "sandbox" {
+		return nil
+	}
+
+	fsStat := info.FsStats{}
+	usage := h.fsHandler.Usage()
+	fsStat.BaseUsage = usage.BaseUsageBytes
+	fsStat.Usage = usage.TotalUsageBytes
+	// By definition, "Inodes" is supposed to be the total number of inodes of a filesystem.
+	// Set to the number of used inodes to be back-compatible with docker
+	fsStat.Inodes = usage.InodeUsage
+	// This is not accurate because it ignores inodes used by everything else.
+	fsStat.InodesFree = h.fsTotalInodes - usage.InodeUsage
+
+	fsStat.Device = h.device
+	fsStat.Limit = h.fsLimit
+	fsStat.Type = h.fsType
+
+	stats.Filesystem = append(stats.Filesystem, fsStat)
+
 	return nil
 }
 
@@ -231,12 +373,42 @@ func (h *containerdContainerHandler) Type() container.ContainerType {
 }
 
 func (h *containerdContainerHandler) Start() {
+	if h.fsHandler != nil {
+		h.fsHandler.Start()
+	}
 }
 
 func (h *containerdContainerHandler) Cleanup() {
+	if h.fsHandler != nil {
+		h.fsHandler.Stop()
+	}
 }
 
 func (h *containerdContainerHandler) GetContainerIPAddress() string {
 	// containerd doesnt take care of networking.So it doesnt maintain networking states
 	return ""
+}
+
+func (f *fsUsageProvider) Usage() (*common.FsUsage, error) {
+	stats, err := f.client.ContainerStats(f.ctx, f.containerID)
+	if err != nil {
+		return nil, err
+	}
+	var logUsedBytes uint64
+	if f.logPath != "" {
+		logUsage, err := f.fsInfo.GetDirUsage(f.logPath)
+		if err != nil {
+			return nil, err
+		}
+		logUsedBytes = logUsage.Bytes
+	}
+	return &common.FsUsage{
+		BaseUsageBytes:  stats.WritableLayer.UsedBytes.Value,
+		TotalUsageBytes: stats.WritableLayer.UsedBytes.Value + logUsedBytes,
+		InodeUsage:      stats.WritableLayer.InodesUsed.Value,
+	}, nil
+}
+
+func (f *fsUsageProvider) Targets() []string {
+	return []string{f.containerID}
 }

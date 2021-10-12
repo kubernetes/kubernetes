@@ -85,7 +85,7 @@ func newCrioContainerHandler(
 	storageDir string,
 	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
-	metadataEnvs []string,
+	metadataEnvAllowList []string,
 	includedMetrics container.MetricSet,
 ) (container.ContainerHandler, error) {
 	// Create the cgroup paths.
@@ -183,10 +183,11 @@ func newCrioContainerHandler(
 
 	// we optionally collect disk usage metrics
 	if includedMetrics.Has(container.DiskUsageMetrics) {
-		handler.fsHandler = common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, storageLogDir, fsInfo)
+		handler.fsHandler = common.NewFsHandler(common.DefaultPeriod, common.NewGeneralFsUsageProvider(
+			fsInfo, rootfsStorageDir, storageLogDir))
 	}
 	// TODO for env vars we wanted to show from container.Config.Env from whitelist
-	//for _, exposedEnv := range metadataEnvs {
+	//for _, exposedEnv := range metadataEnvAllowList {
 	//klog.V(4).Infof("TODO env whitelist: %v", exposedEnv)
 	//}
 

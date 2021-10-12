@@ -123,7 +123,7 @@ func newDockerContainerHandler(
 	storageDir string,
 	cgroupSubsystems *containerlibcontainer.CgroupSubsystems,
 	inHostNamespace bool,
-	metadataEnvs []string,
+	metadataEnvAllowList []string,
 	dockerVersion []int,
 	includedMetrics container.MetricSet,
 	thinPoolName string,
@@ -240,7 +240,8 @@ func newDockerContainerHandler(
 
 	if includedMetrics.Has(container.DiskUsageMetrics) {
 		handler.fsHandler = &dockerFsHandler{
-			fsHandler:       common.NewFsHandler(common.DefaultPeriod, rootfsStorageDir, otherStorageDir, fsInfo),
+			fsHandler: common.NewFsHandler(common.DefaultPeriod, common.NewGeneralFsUsageProvider(
+				fsInfo, rootfsStorageDir, otherStorageDir)),
 			thinPoolWatcher: thinPoolWatcher,
 			zfsWatcher:      zfsWatcher,
 			deviceID:        ctnr.GraphDriver.Data["DeviceId"],
@@ -249,9 +250,9 @@ func newDockerContainerHandler(
 	}
 
 	// split env vars to get metadata map.
-	for _, exposedEnv := range metadataEnvs {
+	for _, exposedEnv := range metadataEnvAllowList {
 		if exposedEnv == "" {
-			// if no dockerEnvWhitelist provided, len(metadataEnvs) == 1, metadataEnvs[0] == ""
+			// if no dockerEnvWhitelist provided, len(metadataEnvAllowList) == 1, metadataEnvAllowList[0] == ""
 			continue
 		}
 
