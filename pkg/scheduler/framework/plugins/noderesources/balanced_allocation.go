@@ -88,43 +88,44 @@ func NewBalancedAllocation(baArgs runtime.Object, h framework.Handle, fts featur
 		handle: h,
 		resourceAllocationScorer: resourceAllocationScorer{
 			Name:                BalancedAllocationName,
-			scorer:              balancedResourceScorer,
+			scorer:              balancedResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
 			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
 
-func balancedResourceScorer(requested, allocable resourceToValueMap) int64 {
-	var resourceToFractions []float64
-	var totalFraction float64
-	for name, value := range requested {
-		fraction := float64(value) / float64(allocable[name])
-		if fraction > 1 {
-			fraction = 1
+func balancedResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allocable resourceToValueMap) int64 {
+	return func(requested, allocable resourceToValueMap) int64 {
+		var resourceToFractions []float64
+		var resourceWeights []float64
+		var totalFraction float64
+		var totalWeight float64
+
+		for name, value := range requested {
+			fraction := float64(value) / float64(allocable[name])
+			if fraction > 1 {
+				fraction = 1
+			}
+			totalFraction += fraction
+			resourceToFractions = append(resourceToFractions, fraction)
+			totalWeight += float64(resToWeightMap[name])
+			resourceWeights = append(resourceWeights, float64(resToWeightMap[name]))
 		}
-		totalFraction += fraction
-		resourceToFractions = append(resourceToFractions, fraction)
-	}
 
-	std := 0.0
+		std := 0.0
 
-	// For most cases, resources are limited to cpu and memory, the std could be simplified to std := (fraction1-fraction2)/2
-	// len(fractions) > 2: calculate std based on the well-known formula - root square of Σ((fraction(i)-mean)^2)/len(fractions)
-	// Otherwise, set the std to zero is enough.
-	if len(resourceToFractions) == 2 {
-		std = math.Abs((resourceToFractions[0] - resourceToFractions[1]) / 2)
-
-	} else if len(resourceToFractions) > 2 {
-		mean := totalFraction / float64(len(resourceToFractions))
-		var sum float64
-		for _, fraction := range resourceToFractions {
-			sum = sum + (fraction-mean)*(fraction-mean)
+		if len(resourceToFractions) > 1 {
+			mean := totalFraction / float64(len(resourceToFractions))
+			var sum float64
+			for i, fraction := range resourceToFractions {
+				sum = sum + resourceWeights[i]*(fraction-mean)*(fraction-mean)
+			}
+			std = math.Sqrt(sum / totalWeight)
 		}
-		std = math.Sqrt(sum / float64(len(resourceToFractions)))
-	}
 
-	// STD (standard deviation) is always a positive value. 1-deviation lets the score to be higher for node which has least deviation and
-	// multiplying it with `MaxNodeScore` provides the scaling factor needed.
-	return int64((1 - std) * float64(framework.MaxNodeScore))
+		// STD (standard deviation) is always a positive value. 1-deviation lets the score to be higher for node which has least deviation and
+		// multiplying it with `MaxNodeScore` provides the scaling factor needed.
+		return int64((1 - std) * float64(framework.MaxNodeScore))
+	}
 }
