@@ -359,21 +359,21 @@ func (s *Server) InstallDefaultHandlers() {
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := compbasemetrics.NewKubeRegistry()
 
-	includedMetrics := cadvisormetrics.MetricSet{
-		cadvisormetrics.CpuUsageMetrics:     struct{}{},
-		cadvisormetrics.MemoryUsageMetrics:  struct{}{},
-		cadvisormetrics.CpuLoadMetrics:      struct{}{},
-		cadvisormetrics.DiskIOMetrics:       struct{}{},
-		cadvisormetrics.DiskUsageMetrics:    struct{}{},
-		cadvisormetrics.NetworkUsageMetrics: struct{}{},
-		cadvisormetrics.AppMetrics:          struct{}{},
-		cadvisormetrics.ProcessMetrics:      struct{}{},
-	}
+	var includedMetrics map[cadvisormetrics.MetricKind]struct{}
+
+	includedMetrics[cadvisormetrics.CpuUsageMetrics] = struct{}{}
+	includedMetrics[cadvisormetrics.MemoryUsageMetrics] = struct{}{}
+	includedMetrics[cadvisormetrics.CpuLoadMetrics] = struct{}{}
+	includedMetrics[cadvisormetrics.DiskIOMetrics] = struct{}{}
+	includedMetrics[cadvisormetrics.DiskUsageMetrics] = struct{}{}
+	includedMetrics[cadvisormetrics.NetworkUsageMetrics] = struct{}{}
+	includedMetrics[cadvisormetrics.AppMetrics] = struct{}{}
+	includedMetrics[cadvisormetrics.ProcessMetrics] = struct{}{}
 
 	// Only add the Accelerator metrics if the feature is inactive
 	// Note: Accelerator metrics will be removed in the future, hence the feature gate.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics) {
-		includedMetrics.Add(cadvisormetrics.MetricKind(cadvisormetrics.AcceleratorUsageMetrics))
+		includedMetrics[cadvisormetrics.AcceleratorUsageMetrics] = struct{}{}
 	}
 
 	cadvisorOpts := cadvisorv2.RequestOptions{
