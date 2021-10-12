@@ -1072,14 +1072,9 @@ func TestPDBInPreemption(t *testing.T) {
 		v1.ResourceMemory: "500",
 	}
 
-	type nodeConfig struct {
-		name string
-		res  map[v1.ResourceName]string
-	}
-
 	tests := []struct {
 		name                string
-		nodes               []*nodeConfig
+		nodeCnt             int
 		pdbs                []*policy.PodDisruptionBudget
 		pdbPodNum           []int32
 		existingPods        []*v1.Pod
@@ -1087,8 +1082,8 @@ func TestPDBInPreemption(t *testing.T) {
 		preemptedPodIndexes map[int]struct{}
 	}{
 		{
-			name:  "A non-PDB violating pod is preempted despite its higher priority",
-			nodes: []*nodeConfig{{name: "node-1", res: defaultNodeRes}},
+			name:    "A non-PDB violating pod is preempted despite its higher priority",
+			nodeCnt: 1,
 			pdbs: []*policy.PodDisruptionBudget{
 				mkMinAvailablePDB("pdb-1", testCtx.NS.Name, types.UID("pdb-1-uid"), 2, map[string]string{"foo": "bar"}),
 			},
@@ -1127,11 +1122,8 @@ func TestPDBInPreemption(t *testing.T) {
 			preemptedPodIndexes: map[int]struct{}{2: {}},
 		},
 		{
-			name: "A node without any PDB violating pods is preferred for preemption",
-			nodes: []*nodeConfig{
-				{name: "node-1", res: defaultNodeRes},
-				{name: "node-2", res: defaultNodeRes},
-			},
+			name:    "A node without any PDB violating pods is preferred for preemption",
+			nodeCnt: 2,
 			pdbs: []*policy.PodDisruptionBudget{
 				mkMinAvailablePDB("pdb-1", testCtx.NS.Name, types.UID("pdb-1-uid"), 2, map[string]string{"foo": "bar"}),
 			},
@@ -1165,12 +1157,8 @@ func TestPDBInPreemption(t *testing.T) {
 			preemptedPodIndexes: map[int]struct{}{1: {}},
 		},
 		{
-			name: "A node with fewer PDB violating pods is preferred for preemption",
-			nodes: []*nodeConfig{
-				{name: "node-1", res: defaultNodeRes},
-				{name: "node-2", res: defaultNodeRes},
-				{name: "node-3", res: defaultNodeRes},
-			},
+			name:    "A node with fewer PDB violating pods is preferred for preemption",
+			nodeCnt: 3,
 			pdbs: []*policy.PodDisruptionBudget{
 				mkMinAvailablePDB("pdb-1", testCtx.NS.Name, types.UID("pdb-1-uid"), 2, map[string]string{"foo1": "bar"}),
 				mkMinAvailablePDB("pdb-2", testCtx.NS.Name, types.UID("pdb-2-uid"), 2, map[string]string{"foo2": "bar"}),
@@ -1249,10 +1237,11 @@ func TestPDBInPreemption(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			for _, nodeConf := range test.nodes {
-				_, err := createNode(cs, st.MakeNode().Name(nodeConf.name).Capacity(nodeConf.res).Obj())
+			for i := 1; i <= test.nodeCnt; i++ {
+				nodeName := fmt.Sprintf("node-%v", i)
+				_, err := createNode(cs, st.MakeNode().Name(nodeName).Capacity(defaultNodeRes).Obj())
 				if err != nil {
-					t.Fatalf("Error creating node %v: %v", nodeConf.name, err)
+					t.Fatalf("Error creating node %v: %v", nodeName, err)
 				}
 			}
 
