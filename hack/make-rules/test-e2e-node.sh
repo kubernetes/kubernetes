@@ -47,6 +47,8 @@ timeout_arg=""
 system_spec_name=${SYSTEM_SPEC_NAME:-}
 extra_envs=${EXTRA_ENVS:-}
 runtime_config=${RUNTIME_CONFIG:-}
+ssh_user=${SSH_USER:-}
+ssh_key=${SSH_KEY:-}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
@@ -170,6 +172,7 @@ if [ "${remote}" = true ] ; then
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
     --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
+    --ssh-user="${ssh_user}" --ssh-key="${ssh_key}" \
     --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
     "${timeout_arg}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
