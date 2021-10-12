@@ -126,6 +126,22 @@ write_files:
       [Install]
       WantedBy=kubernetes.target
 
+  - path: /etc/systemd/system/networkd-monitor.service
+    permissions: 0644
+    owner: root
+    content: |
+      [Unit]
+      Description=Health monitoring for networkd
+      After=kube-master-configuration.service
+      [Service]
+      Restart=always
+      RestartSec=10
+      RemainAfterExit=yes
+      ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/networkd-monitor.sh
+      ExecStart=/home/kubernetes/bin/networkd-monitor.sh
+      [Install]
+      WantedBy=kubernetes.target
+
   - path: /etc/systemd/system/kube-logrotate.timer
     permissions: 0644
     owner: root
@@ -172,6 +188,7 @@ runcmd:
  - systemctl enable kube-master-configuration.service
  - systemctl enable kube-container-runtime-monitor.service
  - systemctl enable kubelet-monitor.service
+ - systemctl enable networkd-monitor.service
  - systemctl enable kube-logrotate.timer
  - systemctl enable kube-logrotate.service
  - systemctl enable kubernetes.target
