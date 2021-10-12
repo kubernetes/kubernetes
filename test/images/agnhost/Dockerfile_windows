@@ -46,7 +46,7 @@ FROM $BASEIMAGE
 # install necessary packages: iperf
 COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
 COPY --from=prep /coredns.exe /coredns.exe
-COPY --from=prep /iperf /iperf
+COPY --from=prep /iperf/* /bin
 COPY --from=prep /wincoreutils/sync.exe /bin/sync.exe
 
 # NOTE(claudiub): docker buildx sets the PATH env variable to a Linux-like PATH, which is not desirable.
