@@ -214,9 +214,8 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return admission.NewForbidden(attr, fmt.Errorf("%s the cluster does not have any nodes", PluginName))
 	}
 
-	// probably the workload feature disabled, because some of cluster nodes do not have workload resource
+	// probably the workload feature disabled, because some cluster nodes do not have workload resource
 	if err := isManagementResourceAvailableForAllNodes(nodes, workloadType); err != nil {
-		pod.Annotations[workloadAdmissionWarning] = err.Error()
 		return nil
 	}
 

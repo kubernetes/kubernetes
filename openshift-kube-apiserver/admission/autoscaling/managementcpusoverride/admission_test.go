@@ -277,11 +277,8 @@ func TestAdmit(t *testing.T) {
 			pod:                testManagedPod("500m", "250m", "500Mi", "250Mi"),
 			expectedCpuRequest: resource.MustParse("250m"),
 			namespace:          testManagedNamespace(),
-			expectedAnnotations: map[string]string{
-				workloadAdmissionWarning: fmt.Sprintf("the node %q does not have resource %q", "node", managedCapacityLabel),
-			},
-			nodes: []*corev1.Node{testNode()},
-			infra: testClusterSNOInfra(),
+			nodes:              []*corev1.Node{testNode()},
+			infra:              testClusterSNOInfra(),
 		},
 		{
 			name:               "should return admission error when the cluster does not have any nodes",
