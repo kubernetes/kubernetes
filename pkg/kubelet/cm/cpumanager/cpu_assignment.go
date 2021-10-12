@@ -318,7 +318,7 @@ func (a *cpuAccumulator) isFailed() bool {
 	return a.numCPUsNeeded > a.details.CPUs().Size()
 }
 
-func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+func takeByTopologyNUMAPacked(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
 	acc := newCPUAccumulator(topo, availableCPUs, numCPUs)
 	if acc.isSatisfied() {
 		return acc.result, nil
@@ -357,4 +357,8 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	}
 
 	return cpuset.NewCPUSet(), fmt.Errorf("failed to allocate cpus")
+}
+
+func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
+	return cpuset.NewCPUSet(), fmt.Errorf("unimplemented")
 }
