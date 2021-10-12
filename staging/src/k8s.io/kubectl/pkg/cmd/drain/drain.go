@@ -319,12 +319,12 @@ func (o *DrainCmdOptions) RunDrain() error {
 
 			continue
 		}
+	}
 
-		if len(remainingNodes) > 0 {
-			fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
-			for _, nodeName := range remainingNodes {
-				fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
-			}
+	if len(remainingNodes) > 0 {
+		fmt.Fprintf(o.ErrOut, "There are pending nodes to be drained:\n")
+		for _, nodeName := range remainingNodes {
+			fmt.Fprintf(o.ErrOut, " %s\n", nodeName)
 		}
 	}
 
