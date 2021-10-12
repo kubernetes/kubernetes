@@ -443,6 +443,7 @@ func TestGenerateService(t *testing.T) {
 		name 	 		string
 		port     		string
 		protocol    	string
+		protocols		string
 		targetPort  	string
 		clusterIP   	string
 		labels			string
@@ -471,6 +472,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "TCP",
 							TargetPort: intstr.FromInt(1234),
@@ -496,6 +498,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: intstr.FromString("foobar"),
@@ -526,6 +529,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "TCP",
 							TargetPort: intstr.FromInt(1234),
@@ -552,6 +556,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: intstr.FromString("foobar"),
@@ -580,6 +585,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: intstr.FromString("foobar"),
@@ -595,6 +601,7 @@ func TestGenerateService(t *testing.T) {
 			name:           "test",
 			port:           "80",
 			protocol:       "UDP",
+			targetPort:		"foobar",
 			serviceType:     string(corev1.ServiceTypeNodePort),
 			expected: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -607,6 +614,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: intstr.FromString("foobar"),
@@ -634,6 +642,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "UDP",
 							TargetPort: intstr.FromString("foobar"),
@@ -715,6 +724,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "TCP",
 							TargetPort: intstr.FromInt(1234),
@@ -742,6 +752,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "TCP",
 							TargetPort: intstr.FromInt(1234),
@@ -962,6 +973,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "SCTP",
 							TargetPort: intstr.FromInt(1234),
@@ -992,6 +1004,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "SCTP",
 							TargetPort: intstr.FromInt(1234),
@@ -1072,6 +1085,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "SCTP",
 							TargetPort: intstr.FromInt(1234),
@@ -1099,6 +1113,7 @@ func TestGenerateService(t *testing.T) {
 					},
 					Ports: []corev1.ServicePort{
 						{
+							Name:		"default",
 							Port:       80,
 							Protocol:   "SCTP",
 							TargetPort: intstr.FromInt(1234),
@@ -1174,7 +1189,6 @@ func TestGenerateService(t *testing.T) {
 			name:      "test",
 			port:      "80,8080",
 			protocol:  "8080/SCTP",
-			targetPort:"foobar",
 			expected: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test",
@@ -1287,10 +1301,17 @@ func TestGenerateService(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			var service *corev1.Service = nil
+
+			if strings.Contains(test.protocol,"/") {
+				test.protocols = test.protocol
+				test.protocol = ""
+			}
+
 			exposeServiceOptions := ExposeServiceOptions{
 				Selector:		 test.selector,
 				Name:			 test.name,
 				Protocol:		 test.protocol,
+				Protocols:		 test.protocols,
 				Port:			 test.port,
 				ClusterIP:		 test.clusterIP,
 				TargetPort: 	 test.targetPort,
@@ -1298,12 +1319,6 @@ func TestGenerateService(t *testing.T) {
 				ExternalIP: 	 test.externalIP,
 				Type:			 test.serviceType,
 				SessionAffinity: test.sessionAffinity,
-			}
-	
-			if test.setup != nil {
-				if teardown := test.setup(t, &exposeServiceOptions); teardown != nil {
-					defer teardown()
-				}
 			}
 
 			err := exposeServiceOptions.Validate()
