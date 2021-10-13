@@ -335,6 +335,10 @@ func (l *errorRestMapper) RESTMapping(gk schema.GroupKind, versions ...string) (
 	return nil, l.err
 }
 
+func (l *errorRestMapper) Reset() {
+	meta.MaybeResetRESTMapper(l.RESTMapper)
+}
+
 func newDefaultBuilderWithMapperError(fakeClientFn FakeClientFunc, err error) *Builder {
 	return NewFakeBuilder(
 		fakeClientFn,

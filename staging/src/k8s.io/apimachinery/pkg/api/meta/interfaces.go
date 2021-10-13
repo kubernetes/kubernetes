@@ -132,3 +132,12 @@ type RESTMapper interface {
 
 	ResourceSingularizer(resource string) (singular string, err error)
 }
+
+// ResettableRESTMapper is a RESTMapper which is capable of resetting itself
+// from discovery.
+// All rest mappers that delegate to other rest mappers must implement this interface and dynamically
+// check if the delegate mapper supports the Reset() operation.
+type ResettableRESTMapper interface {
+	RESTMapper
+	Reset()
+}
