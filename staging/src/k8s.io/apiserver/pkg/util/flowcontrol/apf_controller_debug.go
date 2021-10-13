@@ -103,7 +103,7 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 		"Index",             // 2
 		"PendingRequests",   // 3
 		"ExecutingRequests", // 4
-		"VirtualStart",      // 5
+		"NextDispatchR",     // 5
 		"InitialSeatsSum",   // 6
 		"MaxSeatsSum",       // 7
 		"TotalWorkSum",      // 8
@@ -132,7 +132,7 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 				i,                   // 2
 				len(q.Requests),     // 3
 				q.ExecutingRequests, // 4
-				q.VirtualStart,      // 5
+				q.NextDispatchR,     // 5
 				q.QueueSum,          // 6, 7, 8
 			))
 			endLine(tabWriter)
@@ -237,13 +237,13 @@ func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bo
 	)
 }
 
-func rowForQueue(plName string, index, waitingRequests, executingRequests int, virtualStart float64, sum debug.QueueSum) string {
+func rowForQueue(plName string, index, waitingRequests, executingRequests int, nextDispatchR string, sum debug.QueueSum) string {
 	return row(
 		plName,
 		strconv.Itoa(index),
 		strconv.Itoa(waitingRequests),
 		strconv.Itoa(executingRequests),
-		fmt.Sprintf("%.4f", virtualStart),
+		nextDispatchR,
 		strconv.Itoa(sum.InitialSeatsSum),
 		strconv.Itoa(sum.MaxSeatsSum),
 		sum.TotalWorkSum,
