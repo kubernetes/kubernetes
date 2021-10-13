@@ -185,6 +185,13 @@ const (
 	//
 	// Enables expression validation for Custom Resource
 	CustomResourceValidationExpressions featuregate.Feature = "CustomResourceValidationExpressions"
+
+	// owner: @jefftree
+	// kep: http://kep.k8s.io/2896
+	// alpha: v1.23
+	//
+	// Enables kubernetes to publish OpenAPI v3
+	OpenAPIV3 featuregate.Feature = "OpenAPIV3"
 )
 
 func init() {
@@ -215,4 +222,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIServerTracing:                    {Default: false, PreRelease: featuregate.Alpha},
 	OpenAPIEnums:                        {Default: false, PreRelease: featuregate.Alpha},
 	CustomResourceValidationExpressions: {Default: false, PreRelease: featuregate.Alpha},
+	OpenAPIV3:                           {Default: false, PreRelease: featuregate.Alpha},
 }
