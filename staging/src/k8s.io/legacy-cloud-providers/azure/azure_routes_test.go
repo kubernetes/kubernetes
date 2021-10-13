@@ -178,7 +178,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("CreateOrUpdate error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: CreateOrUpdate error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("CreateOrUpdate error")),
 		},
 		{
 			name:           "CreateRoute should do nothing if route already exists",
@@ -197,7 +197,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("CreateOrUpdate error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: CreateOrUpdate error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("CreateOrUpdate error")),
 		},
 		{
 			name:           "CreateRoute should report error if error occurs when invoke getRouteTable for the second time",
@@ -210,7 +210,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("Get error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: Get error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("Get error")),
 		},
 		{
 			name:           "CreateRoute should report error if error occurs when invoke routeTableClient.Get",
@@ -219,7 +219,7 @@ func TestCreateRoute(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("Get error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: Get error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("Get error")),
 		},
 		{
 			name:           "CreateRoute should report error if error occurs when invoke GetIPByNodeName",
@@ -628,7 +628,7 @@ func TestListRoutes(t *testing.T) {
 				HTTPStatusCode: http.StatusInternalServerError,
 				RawError:       fmt.Errorf("Get error"),
 			},
-			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: Get error"),
+			expectedErrMsg: fmt.Errorf("Retriable: false, RetryAfter: 0s, HTTPStatusCode: 500, RawError: %w", fmt.Errorf("Get error")),
 		},
 		{
 			name:                  "ListRoutes should report error if node informer is not synced",

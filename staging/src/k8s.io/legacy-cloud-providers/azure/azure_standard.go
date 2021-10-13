@@ -458,6 +458,7 @@ func (as *availabilitySet) GetInstanceIDByNodeName(name string) (string, error) 
 
 	machine, err = as.getVirtualMachine(types.NodeName(name), azcache.CacheReadTypeUnsafe)
 	if err == cloudprovider.InstanceNotFound {
+		klog.Warningf("Unable to find node %s: %v", name, cloudprovider.InstanceNotFound)
 		return "", cloudprovider.InstanceNotFound
 	}
 	if err != nil {
@@ -965,13 +966,16 @@ func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backend
 		}
 	}
 	nicUpdaters := make([]func() error, 0)
-	errors := make([]error, 0)
+	allErrs := make([]error, 0)
 	for i := range ipConfigurationIDs {
 		ipConfigurationID := ipConfigurationIDs[i]
 		nodeName, _, err := as.GetNodeNameByIPConfigurationID(ipConfigurationID)
-		if err != nil {
+		if err != nil && !errors.Is(err, cloudprovider.InstanceNotFound) {
 			klog.Errorf("Failed to GetNodeNameByIPConfigurationID(%s): %v", ipConfigurationID, err)
-			errors = append(errors, err)
+			allErrs = append(allErrs, err)
+			continue
+		}
+		if nodeName == "" {
 			continue
 		}
 
@@ -1038,9 +1042,9 @@ func (as *availabilitySet) EnsureBackendPoolDeleted(service *v1.Service, backend
 	if errs != nil {
 		return utilerrors.Flatten(errs)
 	}
-	// Fail if there are other errors.
-	if len(errors) > 0 {
-		return utilerrors.Flatten(utilerrors.NewAggregate(errors))
+	// Fail if there are other allErrs.
+	if len(allErrs) > 0 {
+		return utilerrors.Flatten(utilerrors.NewAggregate(allErrs))
 	}
 
 	isOperationSucceeded = true
@@ -1104,7 +1108,8 @@ func (as *availabilitySet) GetNodeNameByIPConfigurationID(ipConfigurationID stri
 
 	vm, err := as.getVirtualMachine(types.NodeName(vmName), azcache.CacheReadTypeDefault)
 	if err != nil {
-		return "", "", fmt.Errorf("cannot get the virtual machine by node name %s", vmName)
+		klog.Errorf("Unable to get the virtual machine by node name %s: %v", vmName, err)
+		return "", "", err
 	}
 	asID := ""
 	if vm.VirtualMachineProperties != nil && vm.AvailabilitySet != nil {
@@ -1116,7 +1121,7 @@ func (as *availabilitySet) GetNodeNameByIPConfigurationID(ipConfigurationID stri
 
 	asName, err := getAvailabilitySetNameByID(asID)
 	if err != nil {
-		return "", "", fmt.Errorf("cannot get the availability set name by the availability set ID %s", asID)
+		return "", "", fmt.Errorf("cannot get the availability set name by the availability set ID %s: %v", asID, err)
 	}
 	return vmName, strings.ToLower(asName), nil
 }
