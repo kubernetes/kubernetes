@@ -102,7 +102,11 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 		"Index",             // 2
 		"PendingRequests",   // 3
 		"ExecutingRequests", // 4
-		"VirtualStart",      // 5
+		"SeatsInUse",        // 5
+		"NextDispatchR",     // 6
+		"InitialSeatsSum",   // 7
+		"MaxSeatsSum",       // 8
+		"TotalWorkSum",      // 9
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
@@ -114,18 +118,26 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 				"<none>",        // 3
 				"<none>",        // 4
 				"<none>",        // 5
+				"<none>",        // 6
+				"<none>",        // 7
+				"<none>",        // 8
+				"<none>",        // 9
 			))
 			endLine(tabWriter)
 			continue
 		}
 		queueSetDigest := plState.queues.Dump(false)
 		for i, q := range queueSetDigest.Queues {
-			tabPrint(tabWriter, rowForQueue(
-				plState.pl.Name,     // 1
-				i,                   // 2
-				len(q.Requests),     // 3
-				q.ExecutingRequests, // 4
-				q.VirtualStart,      // 5
+			tabPrint(tabWriter, row(
+				plState.pl.Name,                          // 1 - "PriorityLevelName"
+				strconv.Itoa(i),                          // 2 - "Index"
+				strconv.Itoa(len(q.Requests)),            // 3 - "PendingRequests"
+				strconv.Itoa(q.ExecutingRequests),        // 4 - "ExecutingRequests"
+				strconv.Itoa(q.SeatsInUse),               // 5 - "SeatsInUse"
+				q.NextDispatchR,                          // 6 - "NextDispatchR"
+				strconv.Itoa(q.QueueSum.InitialSeatsSum), // 7 - "InitialSeatsSum"
+				strconv.Itoa(q.QueueSum.MaxSeatsSum),     // 8 - "MaxSeatsSum"
+				q.QueueSum.TotalWorkSum,                  // 9 - "TotalWorkSum"
 			))
 			endLine(tabWriter)
 		}
@@ -226,16 +238,6 @@ func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bo
 		strconv.FormatBool(isQuiescing),
 		strconv.Itoa(waitingRequests),
 		strconv.Itoa(executingRequests),
-	)
-}
-
-func rowForQueue(plName string, index, waitingRequests, executingRequests int, virtualStart float64) string {
-	return row(
-		plName,
-		strconv.Itoa(index),
-		strconv.Itoa(waitingRequests),
-		strconv.Itoa(executingRequests),
-		fmt.Sprintf("%.4f", virtualStart),
 	)
 }
 
