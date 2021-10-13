@@ -34,7 +34,7 @@ type QueueSetDump struct {
 type QueueDump struct {
 	QueueSum          QueueSum
 	Requests          []RequestDump
-	VirtualStart      float64
+	NextDispatchR     string
 	ExecutingRequests int
 	SeatsInUse        int
 }

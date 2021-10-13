@@ -181,7 +181,7 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 	}
 
 	return debug.QueueDump{
-		VirtualStart:      q.nextDispatchR.ToFloat(), // TODO: change QueueDump to use SeatSeconds
+		NextDispatchR:     q.nextDispatchR.String(),
 		Requests:          digest,
 		ExecutingRequests: q.requestsExecuting,
 		SeatsInUse:        q.seatsInUse,
