@@ -19,6 +19,7 @@ package flowcontrol
 import (
 	"fmt"
 	"io"
+	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	"net/http"
 	"strconv"
 	"strings"
@@ -103,6 +104,9 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 		"PendingRequests",   // 3
 		"ExecutingRequests", // 4
 		"VirtualStart",      // 5
+		"InitialSeatsSum",   // 6
+		"MaxSeatsSum",       // 7
+		"TotalWorkSum",      // 8
 	}
 	tabPrint(tabWriter, rowForHeaders(columnHeaders))
 	endLine(tabWriter)
@@ -114,6 +118,9 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 				"<none>",        // 3
 				"<none>",        // 4
 				"<none>",        // 5
+				"<none>",        // 6
+				"<none>",        // 7
+				"<none>",        // 8
 			))
 			endLine(tabWriter)
 			continue
@@ -126,6 +133,7 @@ func (cfgCtlr *configController) dumpQueues(w http.ResponseWriter, r *http.Reque
 				len(q.Requests),     // 3
 				q.ExecutingRequests, // 4
 				q.VirtualStart,      // 5
+				q.QueueSum,          // 6, 7, 8
 			))
 			endLine(tabWriter)
 		}
@@ -229,13 +237,16 @@ func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bo
 	)
 }
 
-func rowForQueue(plName string, index, waitingRequests, executingRequests int, virtualStart float64) string {
+func rowForQueue(plName string, index, waitingRequests, executingRequests int, virtualStart float64, sum debug.QueueSum) string {
 	return row(
 		plName,
 		strconv.Itoa(index),
 		strconv.Itoa(waitingRequests),
 		strconv.Itoa(executingRequests),
 		fmt.Sprintf("%.4f", virtualStart),
+		strconv.Itoa(sum.InitialSeatsSum),
+		strconv.Itoa(sum.MaxSeatsSum),
+		sum.TotalWorkSum,
 	)
 }
 
