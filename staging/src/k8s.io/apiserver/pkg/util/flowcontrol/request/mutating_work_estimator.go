@@ -41,6 +41,12 @@ const (
 )
 
 func (e *mutatingWorkEstimator) estimate(r *http.Request) WorkEstimate {
+	// TODO(wojtekt): Remove once we tune the algorithm to not fail
+	// scalability tests.
+	return WorkEstimate{
+		InitialSeats: 1,
+	}
+
 	requestInfo, ok := apirequest.RequestInfoFrom(r.Context())
 	if !ok {
 		// no RequestInfo should never happen, but to be on the safe side
@@ -51,7 +57,6 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request) WorkEstimate {
 			AdditionalLatency: eventAdditionalDuration,
 		}
 	}
-
 	watchCount := e.countFn(requestInfo)
 
 	// The cost of the request associated with the watchers of that event
