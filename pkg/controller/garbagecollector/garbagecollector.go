@@ -24,8 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -45,6 +43,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/controller"
 	"k8s.io/controller-manager/pkg/informerfactory"
+	"k8s.io/klog/v2"
 	c "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
 
@@ -67,7 +66,7 @@ const ResourceResyncTime time.Duration = 0
 // ensures that the garbage collector operates with a graph that is at least as
 // up to date as the notification is sent.
 type GarbageCollector struct {
-	restMapper     resettableRESTMapper
+	restMapper     meta.ResettableRESTMapper
 	metadataClient metadata.Interface
 	// garbage collector attempts to delete the items in attemptToDelete queue when the time is ripe.
 	attemptToDelete workqueue.RateLimitingInterface
@@ -87,7 +86,7 @@ var _ controller.Debuggable = (*GarbageCollector)(nil)
 func NewGarbageCollector(
 	kubeClient clientset.Interface,
 	metadataClient metadata.Interface,
-	mapper resettableRESTMapper,
+	mapper meta.ResettableRESTMapper,
 	ignoredResources map[schema.GroupResource]struct{},
 	sharedInformers informerfactory.InformerFactory,
 	informersStarted <-chan struct{},
@@ -162,13 +161,6 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 	}
 
 	<-ctx.Done()
-}
-
-// resettableRESTMapper is a RESTMapper which is capable of resetting itself
-// from discovery.
-type resettableRESTMapper interface {
-	meta.RESTMapper
-	Reset()
 }
 
 // Sync periodically resyncs the garbage collector when new resources are
