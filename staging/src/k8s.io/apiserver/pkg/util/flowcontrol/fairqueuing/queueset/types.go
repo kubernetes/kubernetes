@@ -173,12 +173,19 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 		return true
 	})
 
-	// TODO: change QueueDump to include queueSum stats
+	sum := q.requests.QueueSum()
+	queueSum := debug.QueueSum{
+		InitialSeatsSum: sum.InitialSeatsSum,
+		MaxSeatsSum:     sum.MaxSeatsSum,
+		TotalWorkSum:    sum.TotalWorkSum.String(),
+	}
+
 	return debug.QueueDump{
 		VirtualStart:      q.nextDispatchR.ToFloat(), // TODO: change QueueDump to use SeatSeconds
 		Requests:          digest,
 		ExecutingRequests: q.requestsExecuting,
 		SeatsInUse:        q.seatsInUse,
+		QueueSum:          queueSum,
 	}
 }
 

@@ -32,10 +32,17 @@ type QueueSetDump struct {
 
 // QueueDump is an instant dump of one queue in a queue-set.
 type QueueDump struct {
+	QueueSum          QueueSum
 	Requests          []RequestDump
 	VirtualStart      float64
 	ExecutingRequests int
 	SeatsInUse        int
+}
+
+type QueueSum struct {
+	InitialSeatsSum int
+	MaxSeatsSum     int
+	TotalWorkSum    string
 }
 
 // RequestDump is an instant dump of one requests pending in the queue.
