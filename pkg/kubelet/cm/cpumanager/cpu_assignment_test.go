@@ -506,15 +506,17 @@ func TestCPUAccumulatorTake(t *testing.T) {
 	}
 }
 
-func TestTakeByTopologyNUMAPacked(t *testing.T) {
-	testCases := []struct {
-		description   string
-		topo          *topology.CPUTopology
-		availableCPUs cpuset.CPUSet
-		numCPUs       int
-		expErr        string
-		expResult     cpuset.CPUSet
-	}{
+type takeByTopologyTestCase struct {
+	description   string
+	topo          *topology.CPUTopology
+	availableCPUs cpuset.CPUSet
+	numCPUs       int
+	expErr        string
+	expResult     cpuset.CPUSet
+}
+
+func commonTakeByTopologyTestCases(t *testing.T) []takeByTopologyTestCase {
+	return []takeByTopologyTestCase{
 		{
 			"take more cpus than are available from single socket with HT",
 			topoSingleSocketHT,
@@ -628,10 +630,28 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 			mustParseCPUSet(t, "10-39,50-79"),
 		},
 	}
+}
 
+func TestTakeByTopologyNUMAPacked(t *testing.T) {
+	testCases := commonTakeByTopologyTestCases(t)
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			result, err := takeByTopologyNUMAPacked(tc.topo, tc.availableCPUs, tc.numCPUs)
+			if tc.expErr != "" && err.Error() != tc.expErr {
+				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+			}
+			if !result.Equals(tc.expResult) {
+				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
+			}
+		})
+	}
+}
+
+func TestTakeByTopologyNUMADistributed(t *testing.T) {
+	testCases := commonTakeByTopologyTestCases(t)
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			result, err := takeByTopologyNUMADistributed(tc.topo, tc.availableCPUs, tc.numCPUs)
 			if tc.expErr != "" && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
 			}
