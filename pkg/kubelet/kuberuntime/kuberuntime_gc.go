@@ -151,8 +151,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 	return containers[:numToKeep]
 }
 
-// removeOldestNSandboxes removes the oldest inactive toRemove sandboxes and
-// returns the resulting slice.
+// removeOldestNSandboxes removes the oldest inactive toRemove sandboxes.
 func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) {
 	numToKeep := len(sandboxes) - toRemove
 	if numToKeep > 0 {
@@ -174,7 +173,6 @@ func (cgc *containerGC) removeSandbox(sandboxID string) {
 	// stopping the sandbox before removing it.
 	if err := cgc.client.StopPodSandbox(sandboxID); err != nil {
 		klog.ErrorS(err, "Failed to stop sandbox before removing", "sandboxID", sandboxID)
-		return
 	}
 	if err := cgc.client.RemovePodSandbox(sandboxID); err != nil {
 		klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandboxID)
