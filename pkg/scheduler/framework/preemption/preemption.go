@@ -560,9 +560,7 @@ func (ev *Evaluator) DryRunPreemption(ctx context.Context, pod *v1.Pod, potentia
 			if nvcSize > 0 && nvcSize+vcSize >= numCandidates {
 				cancel()
 			}
-			return
-		}
-		if status.IsSuccess() && len(pods) == 0 {
+		} else if status.IsSuccess() && len(pods) == 0 {
 			status = framework.AsStatus(fmt.Errorf("expected at least one victim pod on node %q", nodeInfoCopy.Node().Name))
 		}
 		statusesLock.Lock()
