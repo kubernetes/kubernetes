@@ -63,7 +63,9 @@ func (o *Options) Apply() {
 	if factory == nil {
 		klog.ClearLogger()
 	} else {
-		klog.SetLogger(factory.Create())
+		log, flush := factory.Create(o.Config.Options)
+		klog.SetLogger(log)
+		logrFlush = flush
 	}
 	if o.Config.Sanitization {
 		klog.SetLogFilter(&sanitization.SanitizingFilter{})

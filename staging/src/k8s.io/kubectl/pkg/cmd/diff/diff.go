@@ -160,6 +160,14 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		},
 	}
 
+	// Flag errors exit with code 1, however according to the diff
+	// command it means changes were found.
+	// Thus, it should return status code greater than 1.
+	cmd.SetFlagErrorFunc(func(command *cobra.Command, err error) error {
+		cmdutil.CheckDiffErr(cmdutil.UsageErrorf(cmd, err.Error()))
+		return nil
+	})
+
 	usage := "contains the configuration to diff"
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", options.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)

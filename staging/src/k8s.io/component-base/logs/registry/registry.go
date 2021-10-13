@@ -21,6 +21,8 @@ import (
 	"sort"
 
 	"github.com/go-logr/logr"
+
+	"k8s.io/component-base/config"
 )
 
 // LogRegistry is new init LogFormatRegistry struct
@@ -35,8 +37,11 @@ type LogFormatRegistry struct {
 // LogFormatFactory provides support for a certain additional,
 // non-default log format.
 type LogFormatFactory interface {
-	// Create returns a logger.
-	Create() logr.Logger
+	// Create returns a logger with the requested configuration.
+	// Returning a flush function for the logger is optional.
+	// If provided, the caller must ensure that it is called
+	// periodically (if desired) and at program exit.
+	Create(options config.FormatOptions) (log logr.Logger, flush func())
 }
 
 // NewLogFormatRegistry return new init LogFormatRegistry struct

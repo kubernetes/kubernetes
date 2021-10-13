@@ -20,18 +20,22 @@ import (
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
 
 func TestWorkEstimator(t *testing.T) {
 	tests := []struct {
-		name                 string
-		requestURI           string
-		requestInfo          *apirequest.RequestInfo
-		counts               map[string]int64
-		countErr             error
-		initialSeatsExpected uint
+		name                      string
+		requestURI                string
+		requestInfo               *apirequest.RequestInfo
+		counts                    map[string]int64
+		countErr                  error
+		watchCount                int
+		initialSeatsExpected      uint
+		finalSeatsExpected        uint
+		additionalLatencyExpected time.Duration
 	}{
 		{
 			name:                 "request has no RequestInfo",
@@ -248,6 +252,136 @@ func TestWorkEstimator(t *testing.T) {
 			countErr:             errors.New("unknown error"),
 			initialSeatsExpected: maximumSeats,
 		},
+		// TODO(wojtekt): Reenable these tests after tuning algorithm to
+		// not fail scalability tests.
+		/*
+			{
+				name:       "request verb is create, no watches",
+				requestURI: "http://server/apis/foo.bar/v1/foos",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "create",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        0,
+				additionalLatencyExpected: 0,
+			},
+			{
+				name:       "request verb is create, watches registered",
+				requestURI: "http://server/apis/foo.bar/v1/foos",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "create",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				watchCount:                29,
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        3,
+				additionalLatencyExpected: 5 * time.Millisecond,
+			},
+			{
+				name:       "request verb is create, watches registered, no additional latency",
+				requestURI: "http://server/apis/foo.bar/v1/foos",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "create",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				watchCount:                5,
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        0,
+				additionalLatencyExpected: 0,
+			},
+			{
+				name:       "request verb is create, watches registered, maximum is exceeded",
+				requestURI: "http://server/apis/foo.bar/v1/foos",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "create",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				watchCount:                199,
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        20,
+				additionalLatencyExpected: 5 * time.Millisecond,
+			},
+			{
+				name:       "request verb is update, no watches",
+				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "update",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        0,
+				additionalLatencyExpected: 0,
+			},
+			{
+				name:       "request verb is update, watches registered",
+				requestURI: "http://server/apis/foor.bar/v1/foos/myfoo",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "update",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				watchCount:                29,
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        3,
+				additionalLatencyExpected: 5 * time.Millisecond,
+			},
+			{
+				name:       "request verb is patch, no watches",
+				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "patch",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        0,
+				additionalLatencyExpected: 0,
+			},
+			{
+				name:       "request verb is patch, watches registered",
+				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "patch",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				watchCount:                29,
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        3,
+				additionalLatencyExpected: 5 * time.Millisecond,
+			},
+			{
+				name:       "request verb is delete, no watches",
+				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "delete",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        0,
+				additionalLatencyExpected: 0,
+			},
+			{
+				name:       "request verb is delete, watches registered",
+				requestURI: "http://server/apis/foo.bar/v1/foos/myfoo",
+				requestInfo: &apirequest.RequestInfo{
+					Verb:     "delete",
+					APIGroup: "foo.bar",
+					Resource: "foos",
+				},
+				watchCount:                29,
+				initialSeatsExpected:      1,
+				finalSeatsExpected:        3,
+				additionalLatencyExpected: 5 * time.Millisecond,
+			},
+		*/
 	}
 
 	for _, test := range tests {
@@ -259,7 +393,10 @@ func TestWorkEstimator(t *testing.T) {
 			countsFn := func(key string) (int64, error) {
 				return counts[key], test.countErr
 			}
-			estimator := NewWorkEstimator(countsFn)
+			watchCountsFn := func(_ *apirequest.RequestInfo) int {
+				return test.watchCount
+			}
+			estimator := NewWorkEstimator(countsFn, watchCountsFn)
 
 			req, err := http.NewRequest("GET", test.requestURI, nil)
 			if err != nil {
@@ -272,7 +409,13 @@ func TestWorkEstimator(t *testing.T) {
 
 			workestimateGot := estimator.EstimateWork(req)
 			if test.initialSeatsExpected != workestimateGot.InitialSeats {
-				t.Errorf("Expected work estimate to match: %d seats, but got: %d seats", test.initialSeatsExpected, workestimateGot.InitialSeats)
+				t.Errorf("Expected work estimate to match: %d initial seats, but got: %d", test.initialSeatsExpected, workestimateGot.InitialSeats)
+			}
+			if test.finalSeatsExpected != workestimateGot.FinalSeats {
+				t.Errorf("Expected work estimate to match: %d final seats, but got: %d", test.finalSeatsExpected, workestimateGot.FinalSeats)
+			}
+			if test.additionalLatencyExpected != workestimateGot.AdditionalLatency {
+				t.Errorf("Expected work estimate to match additional latency: %v, but got: %v", test.additionalLatencyExpected, workestimateGot.AdditionalLatency)
 			}
 		})
 	}

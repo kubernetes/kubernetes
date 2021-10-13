@@ -25,11 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/pointer"
 )
 
@@ -886,24 +884,22 @@ func TestValidateCronJob(t *testing.T) {
 			},
 		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-		errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "mycronjob",
-				Namespace: metav1.NamespaceDefault,
-				UID:       types.UID("1a2b3c"),
-			},
-			Spec: batch.CronJobSpec{
-				Schedule:          "* * * * ?",
-				ConcurrencyPolicy: batch.AllowConcurrent,
-				JobTemplate: batch.JobTemplateSpec{
-					Spec: batch.JobSpec{
-						TTLSecondsAfterFinished: &negative,
-						Template:                validPodTemplateSpec,
-					},
+	errorCases["spec.jobTemplate.spec.ttlSecondsAfterFinished:must be greater than or equal to 0"] = batch.CronJob{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "mycronjob",
+			Namespace: metav1.NamespaceDefault,
+			UID:       types.UID("1a2b3c"),
+		},
+		Spec: batch.CronJobSpec{
+			Schedule:          "* * * * ?",
+			ConcurrencyPolicy: batch.AllowConcurrent,
+			JobTemplate: batch.JobTemplateSpec{
+				Spec: batch.JobSpec{
+					TTLSecondsAfterFinished: &negative,
+					Template:                validPodTemplateSpec,
 				},
 			},
-		}
+		},
 	}
 
 	for k, v := range errorCases {

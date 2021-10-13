@@ -19,15 +19,12 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
-	"os"
 	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -98,7 +95,6 @@ type Scheduler struct {
 type schedulerOptions struct {
 	componentConfigVersion   string
 	kubeConfig               *restclient.Config
-	legacyPolicySource       *schedulerapi.SchedulerPolicySource
 	percentageOfNodesToScore int32
 	podInitialBackoffSeconds int64
 	podMaxBackoffSeconds     int64
@@ -144,13 +140,6 @@ func WithProfiles(p ...schedulerapi.KubeSchedulerProfile) Option {
 func WithParallelism(threads int32) Option {
 	return func(o *schedulerOptions) {
 		o.parallelism = threads
-	}
-}
-
-// WithLegacyPolicySource sets legacy policy config file source.
-func WithLegacyPolicySource(source *schedulerapi.SchedulerPolicySource) Option {
-	return func(o *schedulerOptions) {
-		o.legacyPolicySource = source
 	}
 }
 
@@ -271,36 +260,10 @@ func New(client clientset.Interface,
 
 	metrics.Register()
 
-	var sched *Scheduler
-	if options.legacyPolicySource == nil {
-		// Create the config from component config
-		sc, err := configurator.create()
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler: %v", err)
-		}
-		sched = sc
-	} else {
-		// Create the config from a user specified policy source.
-		policy := &schedulerapi.Policy{}
-		switch {
-		case options.legacyPolicySource.File != nil:
-			if err := initPolicyFromFile(options.legacyPolicySource.File.Path, policy); err != nil {
-				return nil, err
-			}
-		case options.legacyPolicySource.ConfigMap != nil:
-			if err := initPolicyFromConfigMap(client, options.legacyPolicySource.ConfigMap, policy); err != nil {
-				return nil, err
-			}
-		}
-		// Set extenders on the configurator now that we've decoded the policy
-		// In this case, c.extenders should be nil since we're using a policy (and therefore not componentconfig,
-		// which would have set extenders in the above instantiation of Configurator from CC options)
-		configurator.extenders = policy.Extenders
-		sc, err := configurator.createFromPolicy(*policy)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
-		}
-		sched = sc
+	// Create the config from component config
+	sched, err := configurator.create()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create scheduler: %v", err)
 	}
 
 	// Additional tweaks to the config produced by the configurator.
@@ -322,42 +285,6 @@ func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]fra
 		}
 	}
 	return gvkMap
-}
-
-// initPolicyFromFile initialize policy from file
-func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
-	// Use a policy serialized in a file.
-	_, err := os.Stat(policyFile)
-	if err != nil {
-		return fmt.Errorf("missing policy config file %s", policyFile)
-	}
-	data, err := ioutil.ReadFile(policyFile)
-	if err != nil {
-		return fmt.Errorf("couldn't read policy config: %v", err)
-	}
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
-	if err != nil {
-		return fmt.Errorf("invalid policy: %v", err)
-	}
-	return nil
-}
-
-// initPolicyFromConfigMap initialize policy from configMap
-func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi.SchedulerPolicyConfigMapSource, policy *schedulerapi.Policy) error {
-	// Use a policy serialized in a config map value.
-	policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(context.TODO(), policyRef.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
-	}
-	data, found := policyConfigMap.Data[schedulerapi.SchedulerPolicyConfigMapKey]
-	if !found {
-		return fmt.Errorf("missing policy config map value at key %q", schedulerapi.SchedulerPolicyConfigMapKey)
-	}
-	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
-	if err != nil {
-		return fmt.Errorf("invalid policy: %v", err)
-	}
-	return nil
 }
 
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.

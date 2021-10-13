@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -88,4 +89,25 @@ type LoggingConfiguration struct {
 	// [Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 	// Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
 	Sanitization bool
+	// [Experimental] Options holds additional parameters that are specific
+	// to the different logging formats. Only the options for the selected
+	// format get used, but all of them get validated.
+	Options FormatOptions
+}
+
+// FormatOptions contains options for the different logging formats.
+type FormatOptions struct {
+	// [Experimental] JSON contains options for logging format "json".
+	JSON JSONOptions
+}
+
+// JSONOptions contains options for logging format "json".
+type JSONOptions struct {
+	// [Experimental] SplitStream redirects error messages to stderr while
+	// info messages go to stdout, with buffering. The default is to write
+	// both to stdout, without buffering.
+	SplitStream bool
+	// [Experimental] InfoBufferSize sets the size of the info stream when
+	// using split streams. The default is zero, which disables buffering.
+	InfoBufferSize resource.QuantityValue
 }

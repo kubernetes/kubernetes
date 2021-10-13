@@ -33,6 +33,8 @@ const (
 	maximumSeats = 10
 )
 
+// WorkEstimate carries three of the four parameters that determine the work in a request.
+// The fourth parameter is the duration of the initial phase of execution.
 type WorkEstimate struct {
 	// InitialSeats is the number of seats occupied while the server is
 	// executing this request.
@@ -49,8 +51,8 @@ type WorkEstimate struct {
 	AdditionalLatency time.Duration
 }
 
-// MaxSeats returns the number of seats this request requires, it is the maximum
-// of the two, WorkEstimate.InitialSeats and WorkEstimate.FinalSeats.
+// MaxSeats returns the maximum number of seats the request occupies over the
+// phases of being served.
 func (we *WorkEstimate) MaxSeats() int {
 	if we.InitialSeats >= we.FinalSeats {
 		return int(we.InitialSeats)
@@ -63,12 +65,17 @@ func (we *WorkEstimate) MaxSeats() int {
 // number of objects for a given resource.
 type objectCountGetterFunc func(string) (int64, error)
 
+// watchCountGetterFunc represents a function that gets the total
+// number of watchers potentially interested in a given request.
+type watchCountGetterFunc func(*apirequest.RequestInfo) int
+
 // NewWorkEstimator estimates the work that will be done by a given request,
 // if no WorkEstimatorFunc matches the given request then the default
 // work estimate of 1 seat is allocated to the request.
-func NewWorkEstimator(countFn objectCountGetterFunc) WorkEstimatorFunc {
+func NewWorkEstimator(objectCountFn objectCountGetterFunc, watchCountFn watchCountGetterFunc) WorkEstimatorFunc {
 	estimator := &workEstimator{
-		listWorkEstimator: newListWorkEstimator(countFn),
+		listWorkEstimator:     newListWorkEstimator(objectCountFn),
+		mutatingWorkEstimator: newMutatingWorkEstimator(watchCountFn),
 	}
 	return estimator.estimate
 }
@@ -85,6 +92,8 @@ func (e WorkEstimatorFunc) EstimateWork(r *http.Request) WorkEstimate {
 type workEstimator struct {
 	// listWorkEstimator estimates work for list request(s)
 	listWorkEstimator WorkEstimatorFunc
+	// mutatingWorkEstimator calculates the width of mutating request(s)
+	mutatingWorkEstimator WorkEstimatorFunc
 }
 
 func (e *workEstimator) estimate(r *http.Request) WorkEstimate {
@@ -98,6 +107,8 @@ func (e *workEstimator) estimate(r *http.Request) WorkEstimate {
 	switch requestInfo.Verb {
 	case "list":
 		return e.listWorkEstimator.EstimateWork(r)
+	case "create", "update", "patch", "delete":
+		return e.mutatingWorkEstimator.EstimateWork(r)
 	}
 
 	return WorkEstimate{InitialSeats: minimumSeats}

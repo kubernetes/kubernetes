@@ -83,10 +83,7 @@ for more information about scheduling and the kube-scheduler component.`,
 			if err := opts.Complete(&namedFlagSets); err != nil {
 				return err
 			}
-			if err := runCommand(cmd, opts, registryOptions...); err != nil {
-				return err
-			}
-			return nil
+			return runCommand(cmd, opts, registryOptions...)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -316,7 +313,6 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		scheduler.WithComponentConfigVersion(cc.ComponentConfig.TypeMeta.APIVersion),
 		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
-		scheduler.WithLegacyPolicySource(cc.LegacyPolicySource),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),

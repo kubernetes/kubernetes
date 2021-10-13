@@ -1121,45 +1121,6 @@ profiles:
 			},
 		},
 		{
-			name: "Attempting to set Component Config Profiles and Policy config",
-			options: &Options{
-				ConfigFile: pluginConfigFile,
-				Deprecated: &DeprecatedOptions{
-					PolicyConfigMapName: "bar",
-				},
-				Logs: logs.NewOptions(),
-			},
-			expectedUsername: "config",
-			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: v1beta3.SchemeGroupVersion.String(),
-				},
-				Parallelism: 16,
-				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
-					EnableProfiling:           true,
-					EnableContentionProfiling: true,
-				},
-				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					LeaderElect:       true,
-					LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-					RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-					RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-					ResourceLock:      "leases",
-					ResourceNamespace: "kube-system",
-					ResourceName:      "kube-scheduler",
-				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					Kubeconfig:  configKubeconfig,
-					QPS:         50,
-					Burst:       100,
-					ContentType: "application/vnd.kubernetes.protobuf",
-				},
-				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
-				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
-			},
-		},
-		{
 			name: "no config",
 			options: &Options{
 				Logs: logs.NewOptions(),

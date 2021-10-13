@@ -121,31 +121,6 @@ type KubeSchedulerProfile struct {
 	PluginConfig []PluginConfig
 }
 
-// SchedulerPolicySource configures a means to obtain a scheduler Policy. One
-// source field must be specified, and source fields are mutually exclusive.
-type SchedulerPolicySource struct {
-	// File is a file policy source.
-	File *SchedulerPolicyFileSource
-	// ConfigMap is a config map policy source.
-	ConfigMap *SchedulerPolicyConfigMapSource
-}
-
-// SchedulerPolicyFileSource is a policy serialized to disk and accessed via
-// path.
-type SchedulerPolicyFileSource struct {
-	// Path is the location of a serialized policy.
-	Path string
-}
-
-// SchedulerPolicyConfigMapSource is a policy serialized into a config map value
-// under the SchedulerPolicyConfigMapKey key.
-type SchedulerPolicyConfigMapSource struct {
-	// Namespace is the namespace of the policy config map.
-	Namespace string
-	// Name is the name of the policy config map.
-	Name string
-}
-
 // Plugins include multiple extension points. When specified, the list of plugins for
 // a particular extension point are the only ones enabled. If an extension point is
 // omitted from the config, then the default set of plugins is used for that extension point.

@@ -93,10 +93,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	job.Generation = 1
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
-		job.Spec.TTLSecondsAfterFinished = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) {
 		job.Spec.CompletionMode = nil
 	}
@@ -140,10 +136,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) && oldJob.Spec.TTLSecondsAfterFinished == nil {
-		newJob.Spec.TTLSecondsAfterFinished = nil
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == nil {
 		newJob.Spec.CompletionMode = nil

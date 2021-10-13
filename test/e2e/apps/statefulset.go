@@ -1113,6 +1113,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working zookeeper cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &zookeeperTester{client: c}
 			appTester.run()
 		})
@@ -1120,6 +1121,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working redis cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &redisTester{client: c}
 			appTester.run()
 		})
@@ -1127,6 +1129,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working mysql cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &mysqlGaleraTester{client: c}
 			appTester.run()
 		})
@@ -1134,6 +1137,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// Do not mark this as Conformance.
 		// StatefulSet Conformance should not be dependent on specific applications.
 		ginkgo.It("should creating a working CockroachDB cluster", func() {
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			appTester.statefulPod = &cockroachDBTester{client: c}
 			appTester.run()
 		})

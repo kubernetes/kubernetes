@@ -42,15 +42,11 @@ var ignoreErrValueDetail = cmpopts.IgnoreFields(field.Error{}, "BadValue", "Deta
 
 func TestJobStrategy(t *testing.T) {
 	cases := map[string]struct {
-		ttlEnabled                    bool
 		indexedJobEnabled             bool
 		suspendJobEnabled             bool
 		trackingWithFinalizersEnabled bool
 	}{
 		"features disabled": {},
-		"ttl enabled": {
-			ttlEnabled: true,
-		},
 		"indexed job enabled": {
 			indexedJobEnabled: true,
 		},
@@ -63,7 +59,6 @@ func TestJobStrategy(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, tc.ttlEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.JobTrackingWithFinalizers, tc.trackingWithFinalizersEnabled)()
@@ -73,7 +68,6 @@ func TestJobStrategy(t *testing.T) {
 }
 
 func testJobStrategy(t *testing.T) {
-	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
 	indexedJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob)
 	suspendJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob)
 	trackingWithFinalizersEnabled := utilfeature.DefaultFeatureGate.Enabled(features.JobTrackingWithFinalizers)
@@ -133,9 +127,6 @@ func testJobStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
-	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil) {
-		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished only when %v feature is enabled", features.TTLAfterFinished)
-	}
 	if indexedJobEnabled != (job.Spec.CompletionMode != nil) {
 		t.Errorf("Job should allow setting .spec.completionMode only when %v feature is enabled", features.IndexedJob)
 	}
@@ -190,9 +181,6 @@ func testJobStrategy(t *testing.T) {
 	}
 	if updatedJob.Generation != 2 {
 		t.Errorf("expected Generation=2, got %d", updatedJob.Generation)
-	}
-	if ttlEnabled != (updatedJob.Spec.TTLSecondsAfterFinished != nil) {
-		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
 	}
 	wantAnnotations = make(map[string]string)
 	if trackingWithFinalizersEnabled {

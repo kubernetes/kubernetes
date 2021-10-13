@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/config"
 	"k8s.io/component-base/logs"
@@ -42,6 +43,14 @@ func TestJSONFlag(t *testing.T) {
 }
 
 func TestJSONFormatRegister(t *testing.T) {
+	defaultOptions := config.FormatOptions{
+		JSON: config.JSONOptions{
+			InfoBufferSize: resource.QuantityValue{
+				Quantity: *resource.NewQuantity(0, resource.DecimalSI),
+			},
+		},
+	}
+	_ = defaultOptions.JSON.InfoBufferSize.String()
 	testcases := []struct {
 		name string
 		args []string
@@ -53,7 +62,8 @@ func TestJSONFormatRegister(t *testing.T) {
 			args: []string{"--logging-format=json"},
 			want: &logs.Options{
 				Config: config.LoggingConfiguration{
-					Format: logs.JSONLogFormat,
+					Format:  logs.JSONLogFormat,
+					Options: defaultOptions,
 				},
 			},
 		},
@@ -62,7 +72,8 @@ func TestJSONFormatRegister(t *testing.T) {
 			args: []string{"--logging-format=test"},
 			want: &logs.Options{
 				Config: config.LoggingConfiguration{
-					Format: "test",
+					Format:  "test",
+					Options: defaultOptions,
 				},
 			},
 			errs: field.ErrorList{&field.Error{

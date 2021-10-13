@@ -67,6 +67,13 @@ func BindLoggingFlags(c *config.LoggingConfiguration, fs *pflag.FlagSet) {
 	registry.LogRegistry.Freeze()
 	fs.BoolVar(&c.Sanitization, "experimental-logging-sanitization", c.Sanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
 Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
+
+	// JSON options. We only register them if "json" is a valid format. The
+	// config file API however always has them.
+	if _, err := registry.LogRegistry.Get("json"); err == nil {
+		fs.BoolVar(&c.Options.JSON.SplitStream, "log-json-split-stream", false, "[Experimental] In JSON format, write error messages to stderr and info messages to stdout. The default is to write a single stream to stdout.")
+		fs.Var(&c.Options.JSON.InfoBufferSize, "log-json-info-buffer-size", "[Experimental] In JSON format with split output streams, the info messages can be buffered for a while to increase performance. The default value of zero bytes disables buffering. The size can be specified as number of bytes (512), multiples of 1000 (1K), multiples of 1024 (2Ki), or powers of those (3M, 4G, 5Mi, 6Gi).")
+	}
 }
 
 // UnsupportedLoggingFlags lists unsupported logging flags. The normalize

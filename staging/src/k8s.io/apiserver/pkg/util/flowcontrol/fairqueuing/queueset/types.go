@@ -47,7 +47,7 @@ type request struct {
 	startTime time.Time
 
 	// estimated amount of work of the request
-	workEstimate fcrequest.WorkEstimate
+	workEstimate completedWorkEstimate
 
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request
@@ -62,6 +62,7 @@ type request struct {
 	arrivalTime time.Time
 
 	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
+	// This field is meaningful only while the request is waiting in the virtual world.
 	arrivalR SeatSeconds
 
 	// descr1 and descr2 are not used in any logic but they appear in
@@ -76,6 +77,12 @@ type request struct {
 	// Removes this request from its queue. If the request is not put into a
 	// a queue it will be nil.
 	removeFromQueueFn removeFromFIFOFunc
+}
+
+type completedWorkEstimate struct {
+	fcrequest.WorkEstimate
+	totalWork SeatSeconds // initial plus final work
+	finalWork SeatSeconds // only final work
 }
 
 // queue is an array of requests with additional metadata required for
@@ -97,8 +104,8 @@ type queue struct {
 	seatsInUse int
 }
 
-// queueSum tracks the sum of initial seats, final seats, and
-// additional latency aggregated from all requests in a given queue
+// queueSum tracks the sum of initial seats, max seats, and
+// totalWork from all requests in a given queue
 type queueSum struct {
 	// InitialSeatsSum is the sum of InitialSeats
 	// associated with all requests in a given queue.
@@ -108,9 +115,29 @@ type queueSum struct {
 	// associated with all requests in a given queue.
 	MaxSeatsSum int
 
-	// AdditionalSeatSecondsSum is sum of AdditionalSeatsSeconds
-	// associated with all requests in a given queue.
-	AdditionalSeatSecondsSum SeatSeconds
+	// TotalWorkSum is the sum of totalWork of the waiting requests
+	TotalWorkSum SeatSeconds
+}
+
+func (req *request) totalWork() SeatSeconds {
+	return req.workEstimate.totalWork
+}
+
+func (qs *queueSet) completeWorkEstimate(we *fcrequest.WorkEstimate) completedWorkEstimate {
+	finalWork := qs.computeFinalWork(we)
+	return completedWorkEstimate{
+		WorkEstimate: *we,
+		totalWork:    qs.computeInitialWork(we) + finalWork,
+		finalWork:    finalWork,
+	}
+}
+
+func (qs *queueSet) computeInitialWork(we *fcrequest.WorkEstimate) SeatSeconds {
+	return SeatsTimesDuration(float64(we.InitialSeats), qs.estimatedServiceDuration)
+}
+
+func (qs *queueSet) computeFinalWork(we *fcrequest.WorkEstimate) SeatSeconds {
+	return SeatsTimesDuration(float64(we.FinalSeats), we.AdditionalLatency)
 }
 
 // Enqueue enqueues a request into the queue and
@@ -178,6 +205,12 @@ func SeatsTimesDuration(seats float64, duration time.Duration) SeatSeconds {
 // This conversion may lose precision.
 func (ss SeatSeconds) ToFloat() float64 {
 	return float64(ss) / ssScale
+}
+
+// DurationPerSeat returns duration per seat.
+// This division may lose precision.
+func (ss SeatSeconds) DurationPerSeat(seats float64) time.Duration {
+	return time.Duration(float64(ss) / seats * (float64(time.Second) / ssScale))
 }
 
 // String converts to a string.
