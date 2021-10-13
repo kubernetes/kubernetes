@@ -104,7 +104,6 @@ type crdHandler struct {
 	customStorage atomic.Value
 
 	crdLister listers.CustomResourceDefinitionLister
-	hasSynced func() bool
 
 	delegate          http.Handler
 	restOptionsGetter generic.RESTOptionsGetter
@@ -192,7 +191,6 @@ func NewCustomResourceDefinitionHandler(
 		groupDiscoveryHandler:   groupDiscoveryHandler,
 		customStorage:           atomic.Value{},
 		crdLister:               crdInformer.Lister(),
-		hasSynced:               crdInformer.Informer().HasSynced,
 		delegate:                delegate,
 		restOptionsGetter:       restOptionsGetter,
 		admission:               admission,
@@ -246,19 +244,11 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// only match /apis/<group>/<version>
 		// only registered under /apis
 		if len(pathParts) == 3 {
-			if !r.hasSynced() {
-				responsewriters.ErrorNegotiated(serverStartingError(), Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
-				return
-			}
 			r.versionDiscoveryHandler.ServeHTTP(w, req)
 			return
 		}
 		// only match /apis/<group>
 		if len(pathParts) == 2 {
-			if !r.hasSynced() {
-				responsewriters.ErrorNegotiated(serverStartingError(), Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
-				return
-			}
 			r.groupDiscoveryHandler.ServeHTTP(w, req)
 			return
 		}
@@ -270,11 +260,6 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	crdName := requestInfo.Resource + "." + requestInfo.APIGroup
 	crd, err := r.crdLister.Get(crdName)
 	if apierrors.IsNotFound(err) {
-		if !r.hasSynced() {
-			responsewriters.ErrorNegotiated(serverStartingError(), Codecs, schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}, w, req)
-			return
-		}
-
 		r.delegate.ServeHTTP(w, req)
 		return
 	}
@@ -1360,18 +1345,6 @@ func hasServedCRDVersion(spec *apiextensionsv1.CustomResourceDefinitionSpec, ver
 		}
 	}
 	return false
-}
-
-// serverStartingError returns a ServiceUnavailble error with a retry-after time
-func serverStartingError() error {
-	err := apierrors.NewServiceUnavailable("server is starting")
-	if err.ErrStatus.Details == nil {
-		err.ErrStatus.Details = &metav1.StatusDetails{}
-	}
-	if err.ErrStatus.Details.RetryAfterSeconds == 0 {
-		err.ErrStatus.Details.RetryAfterSeconds = int32(10)
-	}
-	return err
 }
 
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
