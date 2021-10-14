@@ -26,9 +26,8 @@ import (
 	"sync"
 	"time"
 
-	//lint:ignore SA1019 Keep using module since it's still being maintained and the api of google.golang.org/protobuf/proto differs
-	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	"google.golang.org/protobuf/proto"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
