@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -202,8 +203,8 @@ func Test_Discover(t *testing.T) {
 				}
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Discover() = %v, want %v", got, tt.want)
+			if diff := cmp.Diff(got, tt.want); diff != "" {
+				t.Errorf("Discover() = %v, want %v diff=%s", got, tt.want, diff)
 			}
 		})
 	}
