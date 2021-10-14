@@ -782,6 +782,16 @@ func TestControllerSyncJob(t *testing.T) {
 				}
 				if tc.completionMode == batch.IndexedCompletion {
 					checkIndexedJobPods(t, &fakePodControl, tc.expectedCreatedIndexes, job.Name)
+				} else {
+					for _, p := range fakePodControl.Templates {
+						// Fake pod control doesn't add generate name from the owner reference.
+						if p.GenerateName != "" {
+							t.Errorf("Got pod generate name %s, want %s", p.GenerateName, "")
+						}
+						if p.Spec.Hostname != "" {
+							t.Errorf("Got pod hostname %q, want none", p.Spec.Hostname)
+						}
+					}
 				}
 				if int32(len(fakePodControl.DeletePodName)) != tc.expectedDeletions {
 					t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", tc.expectedDeletions, len(fakePodControl.DeletePodName))
@@ -872,8 +882,12 @@ func checkIndexedJobPods(t *testing.T, control *controller.FakePodControl, wantI
 			gotIndexes.Insert(ix)
 		}
 		expectedName := fmt.Sprintf("%s-%d", jobName, ix)
-		if diff := cmp.Equal(expectedName, p.Spec.Hostname); !diff {
+		if expectedName != p.Spec.Hostname {
 			t.Errorf("Got pod hostname %s, want %s", p.Spec.Hostname, expectedName)
+		}
+		expectedName += "-"
+		if expectedName != p.GenerateName {
+			t.Errorf("Got pod generate name %s, want %s", p.GenerateName, expectedName)
 		}
 	}
 	if diff := cmp.Diff(wantIndexes.List(), gotIndexes.List()); diff != "" {
