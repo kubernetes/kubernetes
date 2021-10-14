@@ -690,6 +690,13 @@ const (
 	// StatefulSetMinReadySeconds allows minReadySeconds to be respected by StatefulSet controller
 	StatefulSetMinReadySeconds featuregate.Feature = "StatefulSetMinReadySeconds"
 
+	// owner: @ravig
+	// alpha: v1.23
+	//
+	// IdentifyPodOS allows user to specify OS on which they'd like the Pod run. The user should still set the nodeSelector
+	// with appropriate `kubernetes.io/os` label for scheduler to identify appropriate node for the pod to run.
+	IdentifyPodOS featuregate.Feature = "IdentifyPodOS"
+
 	// owner: @gjkim42
 	// kep: http://kep.k8s.io/2595
 	// alpha: v1.22
@@ -899,6 +906,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUManagerPolicyAlphaOptions:                   {Default: false, PreRelease: featuregate.Alpha},
 	CPUManagerPolicyBetaOptions:                    {Default: true, PreRelease: featuregate.Beta},
 	JobMutableNodeSchedulingDirectives:             {Default: true, PreRelease: featuregate.Beta},
+	IdentifyPodOS:                                  {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
