@@ -3872,7 +3872,7 @@ func TestEnsurePIPTagged(t *testing.T) {
 		service := v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Annotations: map[string]string{
-					ServiceAnnotationAzurePIPTags: "a=b,c=d,e=,=f,ghi",
+					ServiceAnnotationAzurePIPTags: "A=b,c=d,e=,=f,ghi",
 				},
 			},
 		}
