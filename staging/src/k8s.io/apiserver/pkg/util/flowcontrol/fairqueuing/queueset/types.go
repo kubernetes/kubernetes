@@ -161,6 +161,7 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 		digest[i].FlowDistinguisher = r.flowDistinguisher
 		digest[i].ArriveTime = r.arrivalTime
 		digest[i].StartTime = r.startTime
+		digest[i].WorkEstimate = r.workEstimate.WorkEstimate
 		if includeDetails {
 			userInfo, _ := genericrequest.UserFrom(r.ctx)
 			digest[i].UserName = userInfo.GetName()
