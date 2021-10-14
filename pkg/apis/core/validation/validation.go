@@ -416,9 +416,12 @@ func IsMatchedVolume(name string, volumes map[string]core.VolumeSource) bool {
 	return false
 }
 
-func isMatchedDevice(name string, volumes map[string]core.VolumeSource) (bool, bool) {
+// isMatched checks whether the volume with the given name is used by a
+// container and if so, if it involves a PVC.
+func isMatchedDevice(name string, volumes map[string]core.VolumeSource) (isMatched bool, isPVC bool) {
 	if source, ok := volumes[name]; ok {
-		if source.PersistentVolumeClaim != nil {
+		if source.PersistentVolumeClaim != nil ||
+			source.Ephemeral != nil {
 			return true, true
 		}
 		return true, false
@@ -2609,9 +2612,9 @@ func ValidateVolumeDevices(devices []core.VolumeDevice, volmounts map[string]str
 		if devicename.Has(devName) {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "must be unique"))
 		}
-		// Must be PersistentVolumeClaim volume source
+		// Must be based on PersistentVolumeClaim (PVC reference or generic ephemeral inline volume)
 		if didMatch && !isPVC {
-			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "can only use volume source type of PersistentVolumeClaim for block mode"))
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), devName, "can only use volume source type of PersistentVolumeClaim or Ephemeral for block mode"))
 		}
 		if !didMatch {
 			allErrs = append(allErrs, field.NotFound(idxPath.Child("name"), devName))
