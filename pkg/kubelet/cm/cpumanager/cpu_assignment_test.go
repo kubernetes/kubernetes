@@ -666,14 +666,39 @@ func TestTakeByTopologyNUMAPacked(t *testing.T) {
 	}
 }
 
-func TestTakeByTopologyNUMADistributed(t *testing.T) {
+type takeByTopologyExtendedTestCase struct {
+	description   string
+	topo          *topology.CPUTopology
+	availableCPUs cpuset.CPUSet
+	numCPUs       int
+	cpuGroupSize  int
+	expErr        string
+	expResult     cpuset.CPUSet
+}
+
+func commonTakeByTopologyExtendedTestCases(t *testing.T) []takeByTopologyExtendedTestCase {
+	var extendedTestCases []takeByTopologyExtendedTestCase
+
 	testCases := commonTakeByTopologyTestCases(t)
-	testCases = append(testCases, []takeByTopologyTestCase{
+	for _, tc := range testCases {
+		extendedTestCases = append(extendedTestCases, takeByTopologyExtendedTestCase{
+			tc.description,
+			tc.topo,
+			tc.availableCPUs,
+			tc.numCPUs,
+			1,
+			tc.expErr,
+			tc.expResult,
+		})
+	}
+
+	extendedTestCases = append(extendedTestCases, []takeByTopologyExtendedTestCase{
 		{
 			"allocate 4 full cores with 2 distributed across each NUMA node",
 			topoDualSocketHT,
 			mustParseCPUSet(t, "0-11"),
 			8,
+			1,
 			"",
 			mustParseCPUSet(t, "0,6,2,8,1,7,3,9"),
 		},
@@ -682,6 +707,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-79"),
 			64,
+			1,
 			"",
 			mustParseCPUSet(t, "0-7,10-17,20-27,30-37,40-47,50-57,60-67,70-77"),
 		},
@@ -690,6 +716,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-79"),
 			48,
+			1,
 			"",
 			mustParseCPUSet(t, "0-7,10-17,20-27,40-47,50-57,60-67"),
 		},
@@ -698,6 +725,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "2-39,42-79"),
 			48,
+			1,
 			"",
 			mustParseCPUSet(t, "2-9,10-17,20-27,42-49,50-57,60-67"),
 		},
@@ -706,6 +734,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "3-39,43-79"),
 			48,
+			1,
 			"",
 			mustParseCPUSet(t, "10-17,20-27,30-37,50-57,60-67,70-77"),
 		},
@@ -714,6 +743,7 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-2,10-12,20-22,30-32,40-41,50-51,60-61,70-71"),
 			16,
+			1,
 			"",
 			mustParseCPUSet(t, "0-1,10-11,20-21,30-31,40-41,50-51,60-61,70-71"),
 		},
@@ -722,38 +752,77 @@ func TestTakeByTopologyNUMADistributed(t *testing.T) {
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-2,10-12,20-22,30-32,40-41,50-51,60-61,70-71"),
 			16,
+			1,
 			"",
 			mustParseCPUSet(t, "0-1,10-11,20-21,30-31,40-41,50-51,60-61,70-71"),
 		},
+	}...)
+
+	return extendedTestCases
+}
+
+func TestTakeByTopologyNUMADistributed(t *testing.T) {
+	testCases := commonTakeByTopologyExtendedTestCases(t)
+	testCases = append(testCases, []takeByTopologyExtendedTestCase{
 		{
 			"allocate 13 full cores distributed across the first 2 NUMA nodes",
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-79"),
 			26,
+			1,
 			"",
 			mustParseCPUSet(t, "0-6,10-16,40-45,50-55"),
+		},
+		{
+			"allocate 13 full cores distributed across the first 2 NUMA nodes (cpuGroupSize 2)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			26,
+			2,
+			"",
+			mustParseCPUSet(t, "0-6,10-15,40-46,50-55"),
 		},
 		{
 			"allocate 31 full cores with 15 CPUs distributed across each NUMA node and 1 CPU spilling over to each of NUMA 0, 1",
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-79"),
 			62,
+			1,
 			"",
 			mustParseCPUSet(t, "0-7,10-17,20-27,30-37,40-47,50-57,60-66,70-76"),
+		},
+		{
+			"allocate 31 full cores with 14 CPUs distributed across each NUMA node and 2 CPUs spilling over to each of NUMA 0, 1, 2 (cpuGroupSize 2)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			62,
+			2,
+			"",
+			mustParseCPUSet(t, "0-7,10-17,20-27,30-36,40-47,50-57,60-67,70-76"),
 		},
 		{
 			"allocate 31 full cores with 15 CPUs distributed across each NUMA node and 1 CPU spilling over to each of NUMA 2, 3 (to keep balance)",
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "0-8,10-18,20-39,40-48,50-58,60-79"),
 			62,
+			1,
 			"",
 			mustParseCPUSet(t, "0-7,10-17,20-27,30-37,40-46,50-56,60-67,70-77"),
+		},
+		{
+			"allocate 31 full cores with 14 CPUs distributed across each NUMA node and 2 CPUs spilling over to each of NUMA 0, 2, 3 (to keep balance with cpuGroupSize 2)",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-8,10-18,20-39,40-48,50-58,60-79"),
+			62,
+			2,
+			"",
+			mustParseCPUSet(t, "0-7,10-16,20-27,30-37,40-47,50-56,60-67,70-77"),
 		},
 	}...)
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			result, err := takeByTopologyNUMADistributed(tc.topo, tc.availableCPUs, tc.numCPUs)
+			result, err := takeByTopologyNUMADistributed(tc.topo, tc.availableCPUs, tc.numCPUs, tc.cpuGroupSize)
 			if tc.expErr != "" && err.Error() != tc.expErr {
 				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
 			}
