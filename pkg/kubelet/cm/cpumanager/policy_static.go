@@ -385,7 +385,11 @@ func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 
 func (p *staticPolicy) takeByTopology(availableCPUs cpuset.CPUSet, numCPUs int) (cpuset.CPUSet, error) {
 	if p.options.DistributeCPUsAcrossNUMA {
-		return takeByTopologyNUMADistributed(p.topology, availableCPUs, numCPUs)
+		cpuGroupSize := 1
+		if p.options.FullPhysicalCPUsOnly {
+			cpuGroupSize = p.topology.CPUsPerCore()
+		}
+		return takeByTopologyNUMADistributed(p.topology, availableCPUs, numCPUs, cpuGroupSize)
 	}
 	return takeByTopologyNUMAPacked(p.topology, availableCPUs, numCPUs)
 }
