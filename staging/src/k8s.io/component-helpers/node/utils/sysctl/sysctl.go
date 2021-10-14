@@ -18,7 +18,6 @@ package sysctl
 
 import (
 	"io/ioutil"
-	"math"
 	"path"
 	"strconv"
 	"strings"
@@ -86,6 +85,10 @@ type SysfsInterface interface {
 	ReadBool(sysPath string) (bool, error)
 
 	WriteBool(sysPath string, newVal bool) error
+
+	ReadFloat(sysPath string) (float64, error)
+
+	WriteFloat(sysPath string, newVal float64) error
 }
 
 // New returns a new Interface for accessing sysctl,to use
@@ -157,7 +160,6 @@ func (*sysfsCtl) WriteStr(sysPath string, newVal string) error {
 	return ioutil.WriteFile(sysPath, []byte(newVal), 0640)
 }
 
-
 func (*sysfsCtl)  ReadBool(sysPath string) (bool, error) {
 	data, err := ioutil.ReadFile(sysPath)
 	if err != nil {
@@ -172,5 +174,25 @@ func (*sysfsCtl)  ReadBool(sysPath string) (bool, error) {
 }
 
 func (*sysfsCtl)  WriteBool(sysPath string, newVal bool) error {
-	return ioutil.WriteFile(sysPath, newVal.([]byte), 0640)
+	if newVal {
+		return ioutil.WriteFile(sysPath, []byte("1"), 0640)
+	}
+	return ioutil.WriteFile(sysPath, []byte("0"), 0640)
+}
+
+func (*sysfsCtl)  ReadFloat(sysPath string) (float64, error) {
+	data, err := ioutil.ReadFile(sysPath)
+	if err != nil {
+		return -1, err
+	}
+
+	val, err := strconv.ParseFloat(strings.Trim(string(data), " \n"), 64)
+	if err != nil {
+		return -1, err
+	}
+	return val, nil
+}
+
+func (*sysfsCtl)  WriteFloat(sysPath string, newVal float64) error {
+	return ioutil.WriteFile(sysPath, []byte(strconv.FormatFloat(newVal,'E', -1, 64)), 0640)
 }
