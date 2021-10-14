@@ -2137,15 +2137,13 @@ func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lb
 
 //  ensurePIPTagged ensures the public IP of the service is tagged as configured
 func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddress) bool {
-	changed := false
 	configTags := parseTags(az.Tags)
 	annotationTags := make(map[string]*string)
 	if _, ok := service.Annotations[ServiceAnnotationAzurePIPTags]; ok {
 		annotationTags = parseTags(service.Annotations[ServiceAnnotationAzurePIPTags])
 	}
-	for k, v := range annotationTags {
-		configTags[k] = v
-	}
+	configTags, _ = reconcileTags(configTags, annotationTags)
+
 	// include the cluster name and service names tags when comparing
 	var clusterName, serviceNames *string
 	if v, ok := pip.Tags[clusterNameKey]; ok {
@@ -2160,12 +2158,10 @@ func (az *Cloud) ensurePIPTagged(service *v1.Service, pip *network.PublicIPAddre
 	if serviceNames != nil {
 		configTags[serviceTagKey] = serviceNames
 	}
-	for k, v := range configTags {
-		if vv, ok := pip.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			pip.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(pip.Tags, configTags)
+	pip.Tags = tags
+
 	return changed
 }
 
@@ -2726,7 +2722,6 @@ func unbindServiceFromPIP(pip *network.PublicIPAddress, serviceName string) erro
 
 // ensureLoadBalancerTagged ensures every load balancer in the resource group is tagged as configured
 func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
-	changed := false
 	if az.Tags == "" {
 		return false
 	}
@@ -2734,18 +2729,15 @@ func (az *Cloud) ensureLoadBalancerTagged(lb *network.LoadBalancer) bool {
 	if lb.Tags == nil {
 		lb.Tags = make(map[string]*string)
 	}
-	for k, v := range tags {
-		if vv, ok := lb.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			lb.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(lb.Tags, tags)
+	lb.Tags = tags
+
 	return changed
 }
 
 // ensureSecurityGroupTagged ensures the security group is tagged as configured
 func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
-	changed := false
 	if az.Tags == "" {
 		return false
 	}
@@ -2753,11 +2745,9 @@ func (az *Cloud) ensureSecurityGroupTagged(sg *network.SecurityGroup) bool {
 	if sg.Tags == nil {
 		sg.Tags = make(map[string]*string)
 	}
-	for k, v := range tags {
-		if vv, ok := sg.Tags[k]; !ok || !strings.EqualFold(to.String(v), to.String(vv)) {
-			sg.Tags[k] = v
-			changed = true
-		}
-	}
+
+	tags, changed := reconcileTags(sg.Tags, tags)
+	sg.Tags = tags
+
 	return changed
 }
