@@ -642,7 +642,7 @@ const (
 
 	// owner: @fromanirh
 	// alpha: v1.21
-	//
+	// beta: v1.23
 	// Enable POD resources API to return allocatable resources
 	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
 
@@ -852,7 +852,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceInternalTrafficPolicy:                   {Default: true, PreRelease: featuregate.Beta},
 	LogarithmicScaleDown:                           {Default: true, PreRelease: featuregate.Beta},
 	SuspendJob:                                     {Default: true, PreRelease: featuregate.Beta},
-	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResourcesGetAllocatable:              {Default: true, PreRelease: featuregate.Beta},
 	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
 	WindowsHostProcessContainers:                   {Default: false, PreRelease: featuregate.Alpha},
