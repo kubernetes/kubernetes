@@ -27,8 +27,10 @@ function install-m4a-apparmor-profile {
   if type apparmor_parser; then
     echo "Downloading ${profile}."
     download-or-bust "${hash}" "${release_path}/artifacts/${profile}"
-
-    sudo apparmor_parser --remove ${KUBE_HOME}/${profile} || true
+    # This call is expected to fail as the profile is likely not installed.
+    # we are only using this as a safety measure against changes in Ubuntu
+    # image and  installing a clean one
+    sudo apparmor_parser --remove ${KUBE_HOME}/${profile} > /dev/null 2>&1 || true
     sudo apparmor_parser ${KUBE_HOME}/${profile}
   else
     echo "No apparmor_parser found, cannot install M4A apparmor profile"
