@@ -1345,13 +1345,14 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 				}
 				go func() {
 					template := podTemplate
+					generateName := ""
 					if completionIndex != unknownCompletionIndex {
 						template = podTemplate.DeepCopy()
 						addCompletionIndexAnnotation(template, completionIndex)
 						template.Spec.Hostname = fmt.Sprintf("%s-%d", job.Name, completionIndex)
+						generateName = podGenerateNameWithIndex(job.Name, completionIndex)
 					}
 					defer wait.Done()
-					generateName := podGenerateNameWithIndex(job.Name, completionIndex)
 					err := jm.podControl.CreatePodsWithGenerateName(job.Namespace, template, job, metav1.NewControllerRef(job, controllerKind), generateName)
 					if err != nil {
 						if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
