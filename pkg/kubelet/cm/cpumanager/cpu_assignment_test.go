@@ -61,6 +61,24 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			cpuset.NewCPUSet(0, 2, 3, 4, 5, 6, 7, 8, 9, 11),
 			[]int{},
 		},
+		{
+			"dual socket, multi numa per socket, HT, 2 sockets free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			[]int{0, 1},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 1 sockets free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-79"),
+			[]int{1},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 0 sockets free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-78"),
+			[]int{},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -70,6 +88,139 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
 
+			}
+		})
+	}
+}
+
+func TestCPUAccumulatorFreeNUMANodes(t *testing.T) {
+	testCases := []struct {
+		description   string
+		topo          *topology.CPUTopology
+		availableCPUs cpuset.CPUSet
+		expect        []int
+	}{
+		{
+			"single socket HT, 1 NUMA node free",
+			topoSingleSocketHT,
+			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			[]int{0},
+		},
+		{
+			"single socket HT, 0 NUMA Node free",
+			topoSingleSocketHT,
+			cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7),
+			[]int{},
+		},
+		{
+			"dual socket HT, 2 NUMA Node free",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
+			[]int{0, 1},
+		},
+		{
+			"dual socket HT, 1 NUMA Node free",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11),
+			[]int{1},
+		},
+		{
+			"dual socket HT, 0 NUMA node free",
+			topoDualSocketHT,
+			cpuset.NewCPUSet(0, 2, 3, 4, 5, 6, 7, 8, 9, 11),
+			[]int{},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 4 NUMA Node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			[]int{0, 1, 2, 3},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 3 NUMA node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-79"),
+			[]int{1, 2, 3},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 2 NUMA node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-9,11-79"),
+			[]int{2, 3},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 1 NUMA node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-9,11-59,61-79"),
+			[]int{3},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 0 NUMA node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-9,11-59,61-78"),
+			[]int{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
+			result := acc.freeNUMANodes()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
+	}
+}
+
+func TestCPUAccumulatorFreeSocketsAndNUMANodes(t *testing.T) {
+	testCases := []struct {
+		description     string
+		topo            *topology.CPUTopology
+		availableCPUs   cpuset.CPUSet
+		expectSockets   []int
+		expectNUMANodes []int
+	}{
+		{
+			"dual socket, multi numa per socket, HT, 2 Socket/4 NUMA Node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			[]int{0, 1},
+			[]int{0, 1, 2, 3},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 1 Socket/3 NUMA node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-79"),
+			[]int{1},
+			[]int{1, 2, 3},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 1 Socket/ 2 NUMA node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-9,11-79"),
+			[]int{1},
+			[]int{2, 3},
+		},
+		{
+			"dual socket, multi numa per socket, HT, 0 Socket/ 2 NUMA node free",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-59,61-79"),
+			[]int{},
+			[]int{1, 3},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
+			resultNUMANodes := acc.freeNUMANodes()
+			if !reflect.DeepEqual(resultNUMANodes, tc.expectNUMANodes) {
+				t.Errorf("expected NUMA Nodes %v to equal %v", resultNUMANodes, tc.expectNUMANodes)
+			}
+			resultSockets := acc.freeSockets()
+			if !reflect.DeepEqual(resultSockets, tc.expectSockets) {
+				t.Errorf("expected Sockets %v to equal %v", resultSockets, tc.expectSockets)
 			}
 		})
 	}
@@ -386,6 +537,46 @@ func TestTakeByTopology(t *testing.T) {
 			"",
 			cpuset.NewCPUSet(0, 2, 4, 6, 8, 10),
 		},
+		{
+			"take a socket of cpus from dual socket with multi-numa-per-socket with HT",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			40,
+			"",
+			mustParseCPUSet(t, "0-19,40-59"),
+		},
+		{
+			"take a NUMA node of cpus from dual socket with multi-numa-per-socket with HT",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			20,
+			"",
+			mustParseCPUSet(t, "0-9,40-49"),
+		},
+		{
+			"take a NUMA node of cpus from dual socket with multi-numa-per-socket with HT, with 1 NUMA node already taken",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "10-39,50-79"),
+			20,
+			"",
+			mustParseCPUSet(t, "10-19,50-59"),
+		},
+		{
+			"take a socket and a NUMA node of cpus from dual socket with multi-numa-per-socket with HT",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "0-79"),
+			60,
+			"",
+			mustParseCPUSet(t, "0-29,40-69"),
+		},
+		{
+			"take a socket and a NUMA node of cpus from dual socket with multi-numa-per-socket with HT, a core taken",
+			topoDualSocketMultiNumaPerSocketHT,
+			mustParseCPUSet(t, "1-39,41-79"), // reserve the first (phys) core (0,40)
+			60,
+			"",
+			mustParseCPUSet(t, "10-39,50-79"),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -399,4 +590,12 @@ func TestTakeByTopology(t *testing.T) {
 			}
 		})
 	}
+}
+
+func mustParseCPUSet(t *testing.T, s string) cpuset.CPUSet {
+	cpus, err := cpuset.Parse(s)
+	if err != nil {
+		t.Errorf("parsing %q: %v", s, err)
+	}
+	return cpus
 }
