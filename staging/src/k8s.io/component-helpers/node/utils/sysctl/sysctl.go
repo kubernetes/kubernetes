@@ -18,6 +18,7 @@ package sysctl
 
 import (
 	"io/ioutil"
+	"math"
 	"path"
 	"strconv"
 	"strings"
@@ -72,11 +73,19 @@ type Interface interface {
 	SetSysctl(sysctl string, newVal int) error
 }
 
-type FsInterface interface {
+type SysfsInterface interface {
 
 	ReadInt(sysPath string) (int, error)
 
 	WriteInt(sysPath string, newVal int) error
+
+	ReadStr(sysPath string) (string, error)
+
+	WriteStr(sysPath string, newVal string) error
+
+	ReadBool(sysPath string) (bool, error)
+
+	WriteBool(sysPath string, newVal bool) error
 }
 
 // New returns a new Interface for accessing sysctl,to use
@@ -111,15 +120,15 @@ func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
 
 
 // fsSysCtl implements Interface by reading and writing files
-type fsSysCtl struct {
+type sysfsCtl struct {
 
 }
 
-func NewFs()  FsInterface {
-	return &fsSysCtl{}
+func NewFs()  SysfsInterface {
+	return &sysfsCtl{}
 }
 
-func (*fsSysCtl) ReadInt(sysPath string) (int, error) {
+func (*sysfsCtl) ReadInt(sysPath string) (int, error) {
 	data, err := ioutil.ReadFile(sysPath)
 	if err != nil {
 		return -1, err
@@ -131,6 +140,37 @@ func (*fsSysCtl) ReadInt(sysPath string) (int, error) {
 	return val, nil
 }
 
-func (*fsSysCtl) WriteInt(sysPath string, newVal int) error {
+func (*sysfsCtl) WriteInt(sysPath string, newVal int) error {
 	return ioutil.WriteFile(sysPath, []byte(strconv.Itoa(newVal)), 0640)
+}
+
+func (*sysfsCtl) ReadStr(sysPath string) (string, error) {
+	data, err := ioutil.ReadFile(sysPath)
+	if err != nil {
+		return "", err
+	}
+
+	return string(data), nil
+}
+
+func (*sysfsCtl) WriteStr(sysPath string, newVal string) error {
+	return ioutil.WriteFile(sysPath, []byte(newVal), 0640)
+}
+
+
+func (*sysfsCtl)  ReadBool(sysPath string) (bool, error) {
+	data, err := ioutil.ReadFile(sysPath)
+	if err != nil {
+		return false, err
+	}
+
+	val, err := strconv.ParseBool(strings.Trim(string(data), " \n"))
+	if err != nil {
+		return false, err
+	}
+	return val, nil
+}
+
+func (*sysfsCtl)  WriteBool(sysPath string, newVal bool) error {
+	return ioutil.WriteFile(sysPath, newVal.([]byte), 0640)
 }
