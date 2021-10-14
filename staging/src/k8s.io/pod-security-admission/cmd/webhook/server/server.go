@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -44,6 +45,8 @@ import (
 	"k8s.io/pod-security-admission/cmd/webhook/server/options"
 	"k8s.io/pod-security-admission/policy"
 )
+
+const maxRequestSize = int64(3 * 1024 * 1024)
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewServerCommand() *cobra.Command {
@@ -153,9 +156,15 @@ func (s *Server) HandleValidate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close()
-	if body, err = ioutil.ReadAll(r.Body); err != nil {
+	limitedReader := &io.LimitedReader{R: r.Body, N: maxRequestSize}
+	if body, err = ioutil.ReadAll(limitedReader); err != nil {
 		klog.ErrorS(err, "unable to read the body from the incoming request")
 		http.Error(w, "unable to read the body from the incoming request", http.StatusBadRequest)
+		return
+	}
+	if limitedReader.N <= 0 {
+		klog.ErrorS(err, "unable to read the body from the incoming request; limit reached")
+		http.Error(w, fmt.Sprintf("request entity is too large; limit is %d bytes", maxRequestSize), http.StatusRequestEntityTooLarge)
 		return
 	}
 
