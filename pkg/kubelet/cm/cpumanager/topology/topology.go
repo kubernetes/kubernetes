@@ -34,7 +34,8 @@ type CPUDetails map[int]CPUInfo
 // CPUTopology contains details of node cpu, where :
 // CPU  - logical CPU, cadvisor - thread
 // Core - physical CPU, cadvisor - Core
-// Socket - socket, cadvisor - Node
+// Socket - socket, cadvisor - Socket
+// NUMA Node - NUMA cell, cadvisor - Node
 type CPUTopology struct {
 	NumCPUs      int
 	NumCores     int
@@ -254,7 +255,7 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 
 // getUniqueCoreID computes coreId as the lowest cpuID
 // for a given Threads []int slice. This will assure that coreID's are
-// platform unique (opposite to what cAdvisor reports - socket unique)
+// platform unique (opposite to what cAdvisor reports)
 func getUniqueCoreID(threads []int) (coreID int, err error) {
 	if len(threads) == 0 {
 		return 0, fmt.Errorf("no cpus provided")
