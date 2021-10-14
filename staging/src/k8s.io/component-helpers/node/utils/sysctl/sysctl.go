@@ -72,12 +72,21 @@ type Interface interface {
 	SetSysctl(sysctl string, newVal int) error
 }
 
-// New returns a new Interface for accessing sysctl
+type FsInterface interface {
+
+	ReadInt(sysPath string) (int, error)
+
+	WriteInt(sysPath string, newVal int) error
+}
+
+// New returns a new Interface for accessing sysctl,to use
+// Deprecated
 func New() Interface {
 	return &procSysctl{}
 }
 
-// procSysctl implements Interface by reading and writing files under /proc/sys
+// procSysctl implements Interface by reading and writing files under /proc/sys fsSysCtl
+// Deprecated
 type procSysctl struct {
 }
 
@@ -97,4 +106,31 @@ func (*procSysctl) GetSysctl(sysctl string) (int, error) {
 // SetSysctl modifies the specified sysctl flag to the new value
 func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
 	return ioutil.WriteFile(path.Join(sysctlBase, sysctl), []byte(strconv.Itoa(newVal)), 0640)
+}
+
+
+
+// fsSysCtl implements Interface by reading and writing files
+type fsSysCtl struct {
+
+}
+
+func NewFs()  FsInterface {
+	return &fsSysCtl{}
+}
+
+func (*fsSysCtl) ReadInt(sysPath string) (int, error) {
+	data, err := ioutil.ReadFile(sysPath)
+	if err != nil {
+		return -1, err
+	}
+	val, err := strconv.Atoi(strings.Trim(string(data), " \n"))
+	if err != nil {
+		return -1, err
+	}
+	return val, nil
+}
+
+func (*fsSysCtl) WriteInt(sysPath string, newVal int) error {
+	return ioutil.WriteFile(sysPath, []byte(strconv.Itoa(newVal)), 0640)
 }
