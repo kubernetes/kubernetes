@@ -18,6 +18,8 @@ package kuberuntime
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -420,5 +422,47 @@ func TestStartSpec(t *testing.T) {
 				t.Errorf("%v: getTargetID got: %v, wanted nil", t.Name(), got)
 			}
 		})
+	}
+}
+
+func TestRestartCountByLogDir(t *testing.T) {
+	for _, tc := range []struct {
+		filenames    []string
+		restartCount int
+	}{
+		{
+			filenames:    []string{"0.log.rotated-log"},
+			restartCount: 1,
+		},
+		{
+			filenames:    []string{"0.log"},
+			restartCount: 1,
+		},
+		{
+			filenames:    []string{"0.log", "1.log", "2.log"},
+			restartCount: 3,
+		},
+		{
+			filenames:    []string{"0.log.rotated", "1.log", "2.log"},
+			restartCount: 3,
+		},
+		{
+			filenames:    []string{"5.log.rotated", "6.log.rotated"},
+			restartCount: 7,
+		},
+		{
+			filenames:    []string{"5.log.rotated", "6.log", "7.log"},
+			restartCount: 8,
+		},
+	} {
+		tempDirPath, err := ioutil.TempDir("", "test-restart-count-")
+		assert.NoError(t, err, "create tempdir error")
+		defer os.RemoveAll(tempDirPath)
+		for _, filename := range tc.filenames {
+			err = ioutil.WriteFile(filepath.Join(tempDirPath, filename), []byte("a log line"), 0600)
+			assert.NoError(t, err, "could not write log file")
+		}
+		count, _ := calcRestartCountByLogDir(tempDirPath)
+		assert.Equal(t, count, tc.restartCount, "count %v should equal restartCount %v", count, tc.restartCount)
 	}
 }
