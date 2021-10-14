@@ -223,6 +223,7 @@ const (
 
 	// owner: @alculquicondor
 	// alpha: v1.22
+	// beta: v1.23
 	//
 	// Track Job completion without relying on Pod remaining in the cluster
 	// indefinitely. Pod finalizers, in addition to a field in the Job status
@@ -826,7 +827,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	IndexedJob:                                     {Default: true, PreRelease: featuregate.Beta},
-	JobTrackingWithFinalizers:                      {Default: false, PreRelease: featuregate.Alpha},
+	JobTrackingWithFinalizers:                      {Default: true, PreRelease: featuregate.Beta},
 	KubeletPodResources:                            {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: true, PreRelease: featuregate.Beta},
