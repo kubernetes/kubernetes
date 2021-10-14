@@ -54,14 +54,14 @@ func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[s
 func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, nodeLabels map[string]string) []Endpoint {
 	if hintsAnnotation != "Auto" && hintsAnnotation != "auto" {
 		if hintsAnnotation != "" && hintsAnnotation != "Disabled" && hintsAnnotation != "disabled" {
-			klog.Warningf("Skipping topology aware endpoint filtering since Service has unexpected value for %s annotation: %s", v1.AnnotationTopologyAwareHints, hintsAnnotation)
+			klog.InfoS("Skipping topology aware endpoint filtering since Service has unexpected value", "annotationTopologyAwareHints", v1.AnnotationTopologyAwareHints, "hints", hintsAnnotation)
 		}
 		return endpoints
 	}
 
 	zone, ok := nodeLabels[v1.LabelTopologyZone]
 	if !ok || zone == "" {
-		klog.Warningf("Skipping topology aware endpoint filtering since node is missing %s label", v1.LabelTopologyZone)
+		klog.InfoS("Skipping topology aware endpoint filtering since node is missing label", "label", v1.LabelTopologyZone)
 		return endpoints
 	}
 
@@ -69,7 +69,7 @@ func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, node
 
 	for _, endpoint := range endpoints {
 		if endpoint.GetZoneHints().Len() == 0 {
-			klog.Warningf("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
+			klog.InfoS("Skipping topology aware endpoint filtering since one or more endpoints is missing a zone hint")
 			return endpoints
 		}
 		if endpoint.GetZoneHints().Has(zone) {
@@ -78,7 +78,7 @@ func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, node
 	}
 
 	if len(filteredEndpoints) == 0 {
-		klog.Warningf("Skipping topology aware endpoint filtering since no hints were provided for zone %s", zone)
+		klog.InfoS("Skipping topology aware endpoint filtering since no hints were provided for zone", "zone", zone)
 		return endpoints
 	}
 
