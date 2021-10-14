@@ -17,10 +17,12 @@ limitations under the License.
 package apiserver
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
@@ -38,10 +40,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -379,11 +383,43 @@ func TestProxyHandler(t *testing.T) {
 	}
 }
 
+type mockEgressDialer struct {
+	called int
+}
+
+func (m *mockEgressDialer) dial(ctx context.Context, net, addr string) (net.Conn, error) {
+	m.called++
+	return http.DefaultTransport.(*http.Transport).DialContext(ctx, net, addr)
+}
+
+func (m *mockEgressDialer) dialBroken(ctx context.Context, net, addr string) (net.Conn, error) {
+	m.called++
+	return nil, fmt.Errorf("Broken dialer")
+}
+
+func newDialerAndSelector() (*mockEgressDialer, *egressselector.EgressSelector) {
+	dialer := &mockEgressDialer{}
+	m := make(map[egressselector.EgressType]utilnet.DialFunc)
+	m[egressselector.Cluster] = dialer.dial
+	es := egressselector.NewEgressSelectorWithMap(m)
+	return dialer, es
+}
+
+func newBrokenDialerAndSelector() (*mockEgressDialer, *egressselector.EgressSelector) {
+	dialer := &mockEgressDialer{}
+	m := make(map[egressselector.EgressType]utilnet.DialFunc)
+	m[egressselector.Cluster] = dialer.dialBroken
+	es := egressselector.NewEgressSelectorWithMap(m)
+	return dialer, es
+}
+
 func TestProxyUpgrade(t *testing.T) {
+	upgradeUser := "upgradeUser"
 	testcases := map[string]struct {
-		APIService   *apiregistration.APIService
-		ExpectError  bool
-		ExpectCalled bool
+		APIService        *apiregistration.APIService
+		NewEgressSelector func() (*mockEgressDialer, *egressselector.EgressSelector)
+		ExpectError       bool
+		ExpectCalled      bool
 	}{
 		"valid hostname + CABundle": {
 			APIService: &apiregistration.APIService{
@@ -436,18 +472,58 @@ func TestProxyUpgrade(t *testing.T) {
 			ExpectError:  true,
 			ExpectCalled: false,
 		},
+		"valid hostname + CABundle + egress selector": {
+			APIService: &apiregistration.APIService{
+				Spec: apiregistration.APIServiceSpec{
+					CABundle: testCACrt,
+					Group:    "mygroup",
+					Version:  "v1",
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			NewEgressSelector: newDialerAndSelector,
+			ExpectError:       false,
+			ExpectCalled:      true,
+		},
+		"valid hostname + CABundle + egress selector non working": {
+			APIService: &apiregistration.APIService{
+				Spec: apiregistration.APIServiceSpec{
+					CABundle: testCACrt,
+					Group:    "mygroup",
+					Version:  "v1",
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
+				},
+				Status: apiregistration.APIServiceStatus{
+					Conditions: []apiregistration.APIServiceCondition{
+						{Type: apiregistration.Available, Status: apiregistration.ConditionTrue},
+					},
+				},
+			},
+			NewEgressSelector: newBrokenDialerAndSelector,
+			ExpectError:       true,
+			ExpectCalled:      false,
+		},
 	}
 
 	for k, tc := range testcases {
 		tcName := k
-		path := "/apis/" + tc.APIService.Spec.Group + "/" + tc.APIService.Spec.Version + "/foo"
-		timesCalled := int32(0)
-
-		func() { // Cleanup after each test case.
+		t.Run(tcName, func(t *testing.T) {
+			path := "/apis/" + tc.APIService.Spec.Group + "/" + tc.APIService.Spec.Version + "/foo"
+			timesCalled := int32(0)
 			backendHandler := http.NewServeMux()
 			backendHandler.Handle(path, websocket.Handler(func(ws *websocket.Conn) {
 				atomic.AddInt32(&timesCalled, 1)
 				defer ws.Close()
+				req := ws.Request()
+				user := req.Header.Get("X-Remote-User")
+				if user != upgradeUser {
+					t.Errorf("expected user %q, got %q", upgradeUser, user)
+				}
 				body := make([]byte, 5)
 				ws.Read(body)
 				ws.Write([]byte("hello " + string(body)))
@@ -475,8 +551,16 @@ func TestProxyUpgrade(t *testing.T) {
 				proxyTransport:             &http.Transport{},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
 			}
+
+			var dialer *mockEgressDialer
+			var selector *egressselector.EgressSelector
+			if tc.NewEgressSelector != nil {
+				dialer, selector = tc.NewEgressSelector()
+				proxyHandler.egressSelector = selector
+			}
+
 			proxyHandler.updateAPIService(tc.APIService)
-			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: "username"}))
+			aggregator := httptest.NewServer(contextHandler(proxyHandler, &user.DefaultInfo{Name: upgradeUser}))
 			defer aggregator.Close()
 
 			ws, err := websocket.Dial("ws://"+aggregator.Listener.Addr().String()+path, "", "http://127.0.0.1/")
@@ -487,6 +571,12 @@ func TestProxyUpgrade(t *testing.T) {
 				return
 			}
 			defer ws.Close()
+
+			// if the egressselector is configured assume it has to be called
+			if dialer != nil && dialer.called != 1 {
+				t.Errorf("expect egress dialer gets called %d times, got %d", 1, dialer.called)
+			}
+
 			if tc.ExpectError {
 				t.Errorf("%s: expected websocket error, got none", tcName)
 				return
@@ -507,7 +597,7 @@ func TestProxyUpgrade(t *testing.T) {
 				t.Errorf("%s: expected '%#v', got '%#v'", tcName, e, a)
 				return
 			}
-		}()
+		})
 	}
 }
 
