@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -73,7 +74,7 @@ func TestClaimPods(t *testing.T) {
 				&v1.ReplicationController{},
 				productionLabelSelector,
 				controllerKind,
-				func() error { return nil }),
+				func(ctx context.Context) error { return nil }),
 			pods:    []*v1.Pod{newPod("pod1", productionLabel, nil), newPod("pod2", testLabel, nil)},
 			claimed: []*v1.Pod{newPod("pod1", productionLabel, nil)},
 			patches: 1,
@@ -89,7 +90,7 @@ func TestClaimPods(t *testing.T) {
 					&controller,
 					productionLabelSelector,
 					controllerKind,
-					func() error { return nil }),
+					func(ctx context.Context) error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, nil), newPod("pod2", productionLabel, nil)},
 				claimed: nil,
 			}
@@ -105,7 +106,7 @@ func TestClaimPods(t *testing.T) {
 					&controller,
 					productionLabelSelector,
 					controllerKind,
-					func() error { return nil }),
+					func(ctx context.Context) error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", productionLabel, nil)},
 				claimed: []*v1.Pod{newPod("pod1", productionLabel, &controller)},
 			}
@@ -121,7 +122,7 @@ func TestClaimPods(t *testing.T) {
 					&controller,
 					productionLabelSelector,
 					controllerKind,
-					func() error { return nil }),
+					func(ctx context.Context) error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", productionLabel, &controller2)},
 				claimed: []*v1.Pod{newPod("pod1", productionLabel, &controller)},
 			}
@@ -135,7 +136,7 @@ func TestClaimPods(t *testing.T) {
 					&controller,
 					productionLabelSelector,
 					controllerKind,
-					func() error { return nil }),
+					func(ctx context.Context) error { return nil }),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller)},
 				claimed: []*v1.Pod{newPod("pod1", productionLabel, &controller)},
 				patches: 1,
@@ -156,7 +157,7 @@ func TestClaimPods(t *testing.T) {
 					&controller,
 					productionLabelSelector,
 					controllerKind,
-					func() error { return nil }),
+					func(ctx context.Context) error { return nil }),
 				pods:    []*v1.Pod{podToDelete1, podToDelete2},
 				claimed: []*v1.Pod{podToDelete1},
 			}
@@ -170,7 +171,7 @@ func TestClaimPods(t *testing.T) {
 					&controller,
 					productionLabelSelector,
 					controllerKind,
-					func() error { return nil },
+					func(ctx context.Context) error { return nil },
 					"foo-finalizer", "bar-finalizer"),
 				pods:    []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod2", testLabel, &controller), newPod("pod3", productionLabel, nil)},
 				claimed: []*v1.Pod{newPod("pod1", productionLabel, &controller), newPod("pod3", productionLabel, nil)},
@@ -180,7 +181,7 @@ func TestClaimPods(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			claimed, err := test.manager.ClaimPods(test.pods)
+			claimed, err := test.manager.ClaimPods(context.TODO(), test.pods)
 			if err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}

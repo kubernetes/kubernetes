@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"sort"
 	"testing"
@@ -106,7 +107,7 @@ func TestStatefulSetControllerRespectsTermination(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	ssc.syncStatefulSet(set, pods)
+	ssc.syncStatefulSet(context.TODO(), set, pods)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		t.Error(err)
@@ -555,7 +556,7 @@ func TestGetPodsForStatefulSetAdopt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	pods, err := ssc.getPodsForStatefulSet(context.TODO(), set, selector)
 	if err != nil {
 		t.Fatalf("getPodsForStatefulSet() error: %v", err)
 	}
@@ -592,7 +593,7 @@ func TestAdoptOrphanRevisions(t *testing.T) {
 	spc.revisionsIndexer.Add(ss1Rev1)
 	spc.revisionsIndexer.Add(ss1Rev2)
 
-	err = ssc.adoptOrphanRevisions(ss1)
+	err = ssc.adoptOrphanRevisions(context.TODO(), ss1)
 	if err != nil {
 		t.Errorf("adoptOrphanRevisions() error: %v", err)
 	}
@@ -634,7 +635,7 @@ func TestGetPodsForStatefulSetRelease(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pods, err := ssc.getPodsForStatefulSet(set, selector)
+	pods, err := ssc.getPodsForStatefulSet(context.TODO(), set, selector)
 	if err != nil {
 		t.Fatalf("getPodsForStatefulSet() error: %v", err)
 	}
@@ -673,7 +674,7 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 
 func fakeWorker(ssc *StatefulSetController) {
 	if obj, done := ssc.queue.Get(); !done {
-		ssc.sync(obj.(string))
+		ssc.sync(context.TODO(), obj.(string))
 		ssc.queue.Done(obj)
 	}
 }
