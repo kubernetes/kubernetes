@@ -58,7 +58,8 @@ var _ = SIGDescribe("[Feature:Windows] Kubelet-Stats [Serial]", func() {
 				e2epod.WaitForPodsRunningReady(f.ClientSet, f.Namespace.Name, 10, 0, timeout, make(map[string]string))
 
 				ginkgo.By("Getting kubelet stats 5 times and checking average duration")
-				iterations := 5
+				timesKubeletStatsCollected := 5
+				iterations := timesKubeletStatsCollected
 				var totalDurationMs int64
 
 				for i := 0; i < iterations; i++ {
