@@ -64,11 +64,14 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
-		result := acc.freeSockets()
-		if !reflect.DeepEqual(result, tc.expect) {
-			t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expect)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
+			result := acc.freeSockets()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+
+			}
+		})
 	}
 }
 
@@ -130,11 +133,13 @@ func TestCPUAccumulatorFreeCores(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
-		result := acc.freeCores()
-		if !reflect.DeepEqual(result, tc.expect) {
-			t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expect)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
+			result := acc.freeCores()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
 	}
 }
 
@@ -184,11 +189,13 @@ func TestCPUAccumulatorFreeCPUs(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
-		result := acc.freeCPUs()
-		if !reflect.DeepEqual(result, tc.expect) {
-			t.Errorf("[%s] expected %v to equal %v", tc.description, result, tc.expect)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
+			result := acc.freeCPUs()
+			if !reflect.DeepEqual(result, tc.expect) {
+				t.Errorf("expected %v to equal %v", result, tc.expect)
+			}
+		})
 	}
 }
 
@@ -268,31 +275,33 @@ func TestCPUAccumulatorTake(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		acc := newCPUAccumulator(tc.topo, tc.availableCPUs, tc.numCPUs)
-		totalTaken := 0
-		for _, cpus := range tc.takeCPUs {
-			acc.take(cpus)
-			totalTaken += cpus.Size()
-		}
-		if tc.expectSatisfied != acc.isSatisfied() {
-			t.Errorf("[%s] expected acc.isSatisfied() to be %t", tc.description, tc.expectSatisfied)
-		}
-		if tc.expectFailed != acc.isFailed() {
-			t.Errorf("[%s] expected acc.isFailed() to be %t", tc.description, tc.expectFailed)
-		}
-		for _, cpus := range tc.takeCPUs {
-			availableCPUs := acc.details.CPUs()
-			if cpus.Intersection(availableCPUs).Size() > 0 {
-				t.Errorf("[%s] expected intersection of taken cpus [%s] and acc.details.CPUs() [%s] to be empty", tc.description, cpus, availableCPUs)
+		t.Run(tc.description, func(t *testing.T) {
+			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, tc.numCPUs)
+			totalTaken := 0
+			for _, cpus := range tc.takeCPUs {
+				acc.take(cpus)
+				totalTaken += cpus.Size()
 			}
-			if !cpus.IsSubsetOf(acc.result) {
-				t.Errorf("[%s] expected [%s] to be a subset of acc.result [%s]", tc.description, cpus, acc.result)
+			if tc.expectSatisfied != acc.isSatisfied() {
+				t.Errorf("expected acc.isSatisfied() to be %t", tc.expectSatisfied)
 			}
-		}
-		expNumCPUsNeeded := tc.numCPUs - totalTaken
-		if acc.numCPUsNeeded != expNumCPUsNeeded {
-			t.Errorf("[%s] expected acc.numCPUsNeeded to be %d (got %d)", tc.description, expNumCPUsNeeded, acc.numCPUsNeeded)
-		}
+			if tc.expectFailed != acc.isFailed() {
+				t.Errorf("expected acc.isFailed() to be %t", tc.expectFailed)
+			}
+			for _, cpus := range tc.takeCPUs {
+				availableCPUs := acc.details.CPUs()
+				if cpus.Intersection(availableCPUs).Size() > 0 {
+					t.Errorf("expected intersection of taken cpus [%s] and acc.details.CPUs() [%s] to be empty", cpus, availableCPUs)
+				}
+				if !cpus.IsSubsetOf(acc.result) {
+					t.Errorf("expected [%s] to be a subset of acc.result [%s]", cpus, acc.result)
+				}
+			}
+			expNumCPUsNeeded := tc.numCPUs - totalTaken
+			if acc.numCPUsNeeded != expNumCPUsNeeded {
+				t.Errorf("expected acc.numCPUsNeeded to be %d (got %d)", expNumCPUsNeeded, acc.numCPUsNeeded)
+			}
+		})
 	}
 }
 
@@ -380,12 +389,14 @@ func TestTakeByTopology(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		result, err := takeByTopology(tc.topo, tc.availableCPUs, tc.numCPUs)
-		if tc.expErr != "" && err.Error() != tc.expErr {
-			t.Errorf("expected error to be [%v] but it was [%v] in test \"%s\"", tc.expErr, err, tc.description)
-		}
-		if !result.Equals(tc.expResult) {
-			t.Errorf("expected result [%s] to equal [%s] in test \"%s\"", result, tc.expResult, tc.description)
-		}
+		t.Run(tc.description, func(t *testing.T) {
+			result, err := takeByTopology(tc.topo, tc.availableCPUs, tc.numCPUs)
+			if tc.expErr != "" && err.Error() != tc.expErr {
+				t.Errorf("expected error to be [%v] but it was [%v]", tc.expErr, err)
+			}
+			if !result.Equals(tc.expResult) {
+				t.Errorf("expected result [%s] to equal [%s]", result, tc.expResult)
+			}
+		})
 	}
 }
