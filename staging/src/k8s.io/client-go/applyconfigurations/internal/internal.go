@@ -5226,6 +5226,13 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: ip
       type:
         scalar: string
+- name: io.k8s.api.core.v1.PodOS
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.core.v1.PodReadinessGate
   map:
     fields:
@@ -5354,6 +5361,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: os
+      type:
+        namedType: io.k8s.api.core.v1.PodOS
     - name: overhead
       type:
         map:
