@@ -78,7 +78,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.5.0
+    version: 3.5.1
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -93,7 +93,7 @@ dependencies:
       match: const etcdImage
 
   - name: "etcd-image"
-    version: 3.5.0
+    version: 3.5.1
     refPaths:
     - path: cluster/images/etcd/Makefile
       match: BUNDLED_ETCD_VERSIONS\?|LATEST_ETCD_VERSION\?
