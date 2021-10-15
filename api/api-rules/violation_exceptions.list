@@ -377,7 +377,6 @@ API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Pre
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,Policy,Priorities
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Resources
 API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,RequestedToCapacityRatioArguments,Shape
-API rule violation: list_type_missing,k8s.io/kube-scheduler/config/v1,ServiceAffinity,Labels
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,Args
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,Env
 API rule violation: list_type_missing,k8s.io/kubelet/config/v1alpha1,CredentialProvider,MatchImages
