@@ -18,6 +18,7 @@ package cpumanager
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
@@ -79,12 +80,43 @@ func TestCPUAccumulatorFreeSockets(t *testing.T) {
 			mustParseCPUSet(t, "1-78"),
 			[]int{},
 		},
+		{
+			"dual numa, multi socket per per socket, HT, 4 sockets free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "0-79"),
+			[]int{0, 1, 2, 3},
+		},
+		{
+			"dual numa, multi socket per per socket, HT, 3 sockets free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "0-19,21-79"),
+			[]int{0, 1, 3},
+		},
+		{
+			"dual numa, multi socket per per socket, HT, 2 sockets free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "0-59,61-78"),
+			[]int{0, 1},
+		},
+		{
+			"dual numa, multi socket per per socket, HT, 1 sockets free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "1-19,21-38,41-60,61-78"),
+			[]int{1},
+		},
+		{
+			"dual numa, multi socket per per socket, HT, 0 sockets free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "0-40,42-49,51-68,71-79"),
+			[]int{},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			acc := newCPUAccumulator(tc.topo, tc.availableCPUs, 0)
 			result := acc.freeSockets()
+			sort.Ints(result)
 			if !reflect.DeepEqual(result, tc.expect) {
 				t.Errorf("expected %v to equal %v", result, tc.expect)
 
@@ -158,6 +190,24 @@ func TestCPUAccumulatorFreeNUMANodes(t *testing.T) {
 			"dual socket, multi numa per socket, HT, 0 NUMA node free",
 			topoDualSocketMultiNumaPerSocketHT,
 			mustParseCPUSet(t, "1-9,11-59,61-78"),
+			[]int{},
+		},
+		{
+			"dual numa, multi socket per per socket, HT, 2 NUMA node free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "0-79"),
+			[]int{0, 1},
+		},
+		{
+			"dual numa, multi socket per per socket, HT, 1 NUMA node free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "0-9,11-79"),
+			[]int{1},
+		},
+		{
+			"dual numa, multi socket per per socket, HT, 0 sockets free",
+			fakeTopoMultiSocketDualSocketPerNumaHT,
+			mustParseCPUSet(t, "0-9,11-59,61-79"),
 			[]int{},
 		},
 	}
