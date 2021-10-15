@@ -65,8 +65,8 @@ func allPrimitiveFieldPaths(t *testing.T, tp reflect.Type, path *field.Path) set
 		paths.Insert(allPrimitiveFieldPaths(t, tp.Elem(), path).List()...)
 	case reflect.Struct:
 		for i := 0; i < tp.NumField(); i++ {
-			field := tp.Field(i)
-			paths.Insert(allPrimitiveFieldPaths(t, field.Type, path.Child(field.Name)).List()...)
+			structField := tp.Field(i)
+			paths.Insert(allPrimitiveFieldPaths(t, structField.Type, path.Child(structField.Name)).List()...)
 		}
 	case reflect.Map, reflect.Slice:
 		paths.Insert(allPrimitiveFieldPaths(t, tp.Elem(), path.Key("*")).List()...)
