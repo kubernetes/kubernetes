@@ -379,6 +379,47 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 	}()
 }
 
+func TestMuxComplete(t *testing.T) {
+	// setup
+	testSignal := make(chan struct{})
+	testSignal2 := make(chan struct{})
+	s := newGenericAPIServer(t, true)
+	s.muxCompleteSignals["TestSignal"] = testSignal
+	s.muxCompleteSignals["TestSignal2"] = testSignal2
+	doer := setupDoer(t, s.SecureServingInfo)
+	isChanClosed := func(ch <-chan struct{}, delay time.Duration) bool {
+		time.Sleep(delay)
+		select {
+		case <-ch:
+			return true
+		default:
+			return false
+		}
+	}
+
+	// start the API server
+	stopCh, runCompletedCh := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(runCompletedCh)
+		s.PrepareRun().Run(stopCh)
+	}()
+	waitForAPIServerStarted(t, doer)
+
+	// act
+	if isChanClosed(s.lifecycleSignals.MuxComplete.Signaled(), 1*time.Second) {
+		t.Fatalf("%s is closed whereas the TestSignal is still open", s.lifecycleSignals.MuxComplete.Name())
+	}
+
+	close(testSignal)
+	if isChanClosed(s.lifecycleSignals.MuxComplete.Signaled(), 1*time.Second) {
+		t.Fatalf("%s is closed whereas the TestSignal2 is still open", s.lifecycleSignals.MuxComplete.Name())
+	}
+
+	close(testSignal2)
+	if !isChanClosed(s.lifecycleSignals.MuxComplete.Signaled(), 1*time.Second) {
+		t.Fatalf("%s wasn't closed", s.lifecycleSignals.MuxComplete.Name())
+	}
+}
 func shouldReuseConnection(t *testing.T) func(httptrace.GotConnInfo) {
 	return func(ci httptrace.GotConnInfo) {
 		if !ci.Reused {
