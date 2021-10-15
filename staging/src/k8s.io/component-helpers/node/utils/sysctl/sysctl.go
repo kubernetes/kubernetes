@@ -73,21 +73,21 @@ type Interface interface {
 }
 
 type SysfsInterface interface {
-
+	// ReadInt returns the int value for the specified sysctl setting
 	ReadInt(sysPath string) (int, error)
-
+	// WriteInt modifies the specified sysctl flag to the new value of int
 	WriteInt(sysPath string, newVal int) error
-
+	// ReadStr returns the string value for the specified sysctl setting
 	ReadStr(sysPath string) (string, error)
-
+	// WriteStr modifies the specified sysctl flag to the new value of string
 	WriteStr(sysPath string, newVal string) error
-
+	// ReadBool returns the bool value for the specified sysctl setting
 	ReadBool(sysPath string) (bool, error)
-
+	// WriteBool modifies the specified sysctl flag to the new value of bool
 	WriteBool(sysPath string, newVal bool) error
-
+	// ReadFloat returns the float value for the specified sysctl setting
 	ReadFloat(sysPath string) (float64, error)
-
+	// WriteFloat modifies the specified sysctl flag to the new value of float
 	WriteFloat(sysPath string, newVal float64) error
 }
 
@@ -122,7 +122,7 @@ func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
 
 
 
-// fsSysCtl implements Interface by reading and writing files
+// sysfsCtl implements SysfsInterface by reading and writing files
 type sysfsCtl struct {
 
 }
@@ -131,6 +131,7 @@ func NewFs()  SysfsInterface {
 	return &sysfsCtl{}
 }
 
+// ReadInt returns the int value for the specified sysctl setting
 func (*sysfsCtl) ReadInt(sysPath string) (int, error) {
 	data, err := ioutil.ReadFile(sysPath)
 	if err != nil {
@@ -143,10 +144,12 @@ func (*sysfsCtl) ReadInt(sysPath string) (int, error) {
 	return val, nil
 }
 
+// WriteInt modifies the specified sysctl flag to the new value of int
 func (*sysfsCtl) WriteInt(sysPath string, newVal int) error {
 	return ioutil.WriteFile(sysPath, []byte(strconv.Itoa(newVal)), 0640)
 }
 
+// ReadStr returns the string value for the specified sysctl setting
 func (*sysfsCtl) ReadStr(sysPath string) (string, error) {
 	data, err := ioutil.ReadFile(sysPath)
 	if err != nil {
@@ -156,10 +159,12 @@ func (*sysfsCtl) ReadStr(sysPath string) (string, error) {
 	return string(data), nil
 }
 
+// WriteStr modifies the specified sysctl flag to the new value of string
 func (*sysfsCtl) WriteStr(sysPath string, newVal string) error {
 	return ioutil.WriteFile(sysPath, []byte(newVal), 0640)
 }
 
+// ReadBool returns the bool value for the specified sysctl setting
 func (*sysfsCtl)  ReadBool(sysPath string) (bool, error) {
 	data, err := ioutil.ReadFile(sysPath)
 	if err != nil {
@@ -173,6 +178,7 @@ func (*sysfsCtl)  ReadBool(sysPath string) (bool, error) {
 	return val, nil
 }
 
+// WriteBool modifies the specified sysctl flag to the new value of bool
 func (*sysfsCtl)  WriteBool(sysPath string, newVal bool) error {
 	if newVal {
 		return ioutil.WriteFile(sysPath, []byte("1"), 0640)
@@ -180,6 +186,7 @@ func (*sysfsCtl)  WriteBool(sysPath string, newVal bool) error {
 	return ioutil.WriteFile(sysPath, []byte("0"), 0640)
 }
 
+// ReadFloat returns the float value for the specified sysctl setting
 func (*sysfsCtl)  ReadFloat(sysPath string) (float64, error) {
 	data, err := ioutil.ReadFile(sysPath)
 	if err != nil {
@@ -193,6 +200,7 @@ func (*sysfsCtl)  ReadFloat(sysPath string) (float64, error) {
 	return val, nil
 }
 
+// WriteFloat modifies the specified sysctl flag to the new value of float
 func (*sysfsCtl)  WriteFloat(sysPath string, newVal float64) error {
 	return ioutil.WriteFile(sysPath, []byte(strconv.FormatFloat(newVal,'E', -1, 64)), 0640)
 }
