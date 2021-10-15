@@ -184,11 +184,14 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 		Long:                  applyLong,
 		Example:               applyExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			// apply subcommands
+			cmd.AddCommand(NewCmdApplyViewLastApplied(flags.Factory, flags.IOStreams))
+			cmd.AddCommand(NewCmdApplySetLastApplied(flags.Factory, flags.IOStreams))
+			cmd.AddCommand(NewCmdApplyEditLastApplied(flags.Factory, flags.IOStreams))
+
 			o, err := flags.ToOptions(cmd, baseName, args)
-			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(validateArgs(cmd, args))
-			cmdutil.CheckErr(validatePruneAll(o.Prune, o.All, o.Selector))
 			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(o.Validate(cmd, args))
 			cmdutil.CheckErr(o.Run())
 		},
 	}
@@ -216,11 +219,6 @@ func (flags *ApplyFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVar(&flags.All, "all", flags.All, "Select all resources in the namespace of the specified resource types.")
 	cmd.Flags().StringArrayVar(&flags.PruneWhitelist, "prune-whitelist", flags.PruneWhitelist, "Overwrite the default whitelist with <group/version/kind> for --prune")
 	cmd.Flags().BoolVar(&flags.OpenAPIPatch, "openapi-patch", flags.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
-
-	// apply subcommands
-	cmd.AddCommand(NewCmdApplyViewLastApplied(flags.Factory, flags.IOStreams))
-	cmd.AddCommand(NewCmdApplySetLastApplied(flags.Factory, flags.IOStreams))
-	cmd.AddCommand(NewCmdApplyEditLastApplied(flags.Factory, flags.IOStreams))
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -332,7 +330,11 @@ func (flags *ApplyFlags) ToOptions(cmd *cobra.Command, baseName string, args []s
 }
 
 // Validate verifies if ApplyOptions are valid and without conflicts.
-func (o *ApplyOptions) Validate() error {
+func (o *ApplyOptions) Validate(cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+	}
+
 	if o.ForceConflicts && !o.ServerSideApply {
 		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
@@ -349,23 +351,14 @@ func (o *ApplyOptions) Validate() error {
 		return fmt.Errorf("--dry-run=server cannot be used with --force")
 	}
 
-	return nil
-}
-
-func validateArgs(cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
-	}
-	return nil
-}
-
-func validatePruneAll(prune, all bool, selector string) error {
-	if all && len(selector) > 0 {
+	if o.All && len(o.Selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
-	if prune && !all && selector == "" {
+
+	if o.Prune && !o.All && o.Selector == "" {
 		return fmt.Errorf("all resources selected for prune without explicitly passing --all. To prune all resources, pass the --all flag. If you did not mean to prune all resources, specify a label selector")
 	}
+
 	return nil
 }
 
