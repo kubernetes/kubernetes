@@ -680,6 +680,12 @@ const (
 	// Enable POD resources API to return allocatable resources
 	KubeletPodResourcesGetAllocatable featuregate.Feature = "KubeletPodResourcesGetAllocatable"
 
+	// owner: @swatisehgal
+	// alpha: v1.24
+	//
+	// Enable POD resources API to return taskset of a container
+	KubeletPodResourcesGetCPUAffinity featuregate.Feature = "KubeletPodResourcesGetCPUAffinity"
+
 	// owner: @fengzixu
 	// alpha: v1.21
 	//
@@ -931,6 +937,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	LogarithmicScaleDown:                           {Default: true, PreRelease: featuregate.Beta},
 	SuspendJob:                                     {Default: true, PreRelease: featuregate.Beta},
 	KubeletPodResourcesGetAllocatable:              {Default: true, PreRelease: featuregate.Beta},
+	KubeletPodResourcesGetCPUAffinity:              {Default: true, PreRelease: featuregate.Alpha},
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
 	WindowsHostProcessContainers:                   {Default: true, PreRelease: featuregate.Beta},
 	DisableCloudProviders:                          {Default: false, PreRelease: featuregate.Alpha},

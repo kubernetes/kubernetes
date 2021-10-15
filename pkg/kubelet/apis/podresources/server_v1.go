@@ -64,11 +64,13 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *v1.ListPodResource
 
 		for j, container := range pod.Spec.Containers {
 			pRes.Containers[j] = &v1.ContainerResources{
-				Name:        container.Name,
-				Devices:     p.devicesProvider.GetDevices(string(pod.UID), container.Name),
-				CpuIds:      p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
-				Memory:      p.memoryProvider.GetMemory(string(pod.UID), container.Name),
-				CpuAffinity: p.cpusProvider.GetCPUAffinity(string(pod.UID), container.Name),
+				Name:    container.Name,
+				Devices: p.devicesProvider.GetDevices(string(pod.UID), container.Name),
+				CpuIds:  p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
+				Memory:  p.memoryProvider.GetMemory(string(pod.UID), container.Name),
+			}
+			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesGetCPUAffinity) {
+				pRes.Containers[j].CpuAffinity = p.cpusProvider.GetCPUAffinity(string(pod.UID), container.Name)
 			}
 		}
 		podResources[i] = &pRes
