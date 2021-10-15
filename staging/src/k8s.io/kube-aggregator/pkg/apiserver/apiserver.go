@@ -117,6 +117,9 @@ type preparedAPIAggregator struct {
 type APIAggregator struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 
+	// provided for easier embedding
+	APIRegistrationInformers informers.SharedInformerFactory
+
 	delegateHandler http.Handler
 
 	// proxyCurrentCertKeyContent holds he client cert used to identify this proxy. Backing APIServices use this to confirm the proxy's identity
@@ -131,9 +134,6 @@ type APIAggregator struct {
 	// lister is used to add group handling for /apis/<group> aggregator lookups based on
 	// controller state
 	lister listers.APIServiceLister
-
-	// provided for easier embedding
-	APIRegistrationInformers informers.SharedInformerFactory
 
 	// Information needed to determine routing for the aggregator
 	serviceResolver ServiceResolver
@@ -180,6 +180,16 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		apiregistrationClient,
 		5*time.Minute, // this is effectively used as a refresh interval right now.  Might want to do something nicer later on.
 	)
+
+	// apiServiceRegistrationControllerInitiated is closed when APIServiceRegistrationController has finished "installing" all known APIServices.
+	// At this point we know that the proxy handler knows about APIServices and can handle client requests.
+	// Before it might have resulted in a 404 response which could have serious consequences for some controllers like  GC and NS
+	//
+	// Note that the APIServiceRegistrationController waits for APIServiceInformer to synced before doing its work.
+	apiServiceRegistrationControllerInitiated := make(chan struct{})
+	if err := genericServer.RegisterMuxCompleteSignal("APIServiceRegistrationControllerInitiated", apiServiceRegistrationControllerInitiated); err != nil {
+		return nil, err
+	}
 
 	s := &APIAggregator{
 		GenericAPIServer:           genericServer,
@@ -265,6 +275,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		select {
 		case <-context.StopCh:
 		case <-handlerSyncedCh:
+			close(apiServiceRegistrationControllerInitiated)
 		}
 
 		return nil
