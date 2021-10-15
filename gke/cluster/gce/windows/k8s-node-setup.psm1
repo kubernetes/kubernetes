@@ -2804,7 +2804,7 @@ function DownloadAndInstall-AntreaBinaries {
     Log-Output "Found ANTREA_BINARY_STORAGE_PATH in kube_env, using it to download antrea binaries"
     $antrea_release_url = ${kube_env}['ANTREA_BINARY_STORAGE_PATH']
   } else {
-    $output = $(& "${env:NODE_DIR}\kubectl.exe" -n kube-system -l component=antrea-controller get pods -o yaml | Select-String -Pattern image: | Out-String)
+    $output = $(& "${env:NODE_DIR}\kubectl.exe" -n kube-system get deploy antrea-controller -o=jsonpath='{.spec.template.spec.containers[0].image}')
     Log-Output $output
     if ($output -match "v\d*\.\d*\.\d*-gke\.\d*") {
       $version = $Matches[0]
