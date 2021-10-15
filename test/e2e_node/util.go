@@ -396,8 +396,11 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 	return r, i, nil
 }
 
+// findKubeletServiceName searches the unit name among the services known to systemd.
+// if the `running` parameter is true, restricts the search among currently running services;
+// otherwise, also stopped, failed, exited (non-running in general) services are also considered.
 // TODO: Find a uniform way to deal with systemctl/initctl/service operations. #34494
-func findKubletServiceName(running bool) string {
+func findKubeletServiceName(running bool) string {
 	cmdLine := []string{
 		"systemctl", "list-units", "*kubelet*",
 	}
@@ -414,8 +417,16 @@ func findKubletServiceName(running bool) string {
 	return kubeletServiceName
 }
 
+// restartKubelet restarts the current kubelet service.
+// the "current" kubelet service is the instance managed by the current e2e_node test run.
+// If `running` is true, restarts only if the current kubelet is actually running. In some cases,
+// the kubelet may have exited or can be stopped, typically because it was intentionally stopped
+// earlier during a test, or, sometimes, because it just crashed.
+// Warning: the "current" kubelet is poorly defined. The "current" kubelet is assumed to be the most
+// recent kubelet service unit, IOW there is not a unique ID we use to bind explicitly a kubelet
+// instance to a test run.
 func restartKubelet(running bool) {
-	kubeletServiceName := findKubletServiceName(running)
+	kubeletServiceName := findKubeletServiceName(running)
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to reset kubelet start-limit-hit with systemctl: %v, %s", err, string(stdout))
@@ -426,7 +437,7 @@ func restartKubelet(running bool) {
 
 // stopKubelet will kill the running kubelet, and returns a func that will restart the process again
 func stopKubelet() func() {
-	kubeletServiceName := findKubletServiceName(true)
+	kubeletServiceName := findKubeletServiceName(true)
 
 	// reset the kubelet service start-limit-hit
 	stdout, err := exec.Command("sudo", "systemctl", "reset-failed", kubeletServiceName).CombinedOutput()
