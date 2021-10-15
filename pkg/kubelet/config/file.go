@@ -18,9 +18,9 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
-	"path/filepath"
-	"sort"
+	"regexp"
 	"strings"
 	"time"
 
@@ -43,6 +43,8 @@ const (
 
 	eventBufferLen = 10
 )
+
+var tempfileMatcher = regexp.MustCompile(".*(~|\\.bak)$")
 
 type watchEvent struct {
 	fileName  string
@@ -159,7 +161,7 @@ func (s *sourceFile) listConfig() error {
 // prevented us from reading anything at all. Do not return an error if only some files
 // were problematic.
 func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
-	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
+	dirents, err := ioutil.ReadDir(name)
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
@@ -169,14 +171,11 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 		return pods, nil
 	}
 
-	sort.Strings(dirents)
-	for _, path := range dirents {
-		statInfo, err := os.Stat(path)
-		if err != nil {
-			klog.ErrorS(err, "Could not get metadata", "path", path)
+	for _, statInfo := range dirents {
+		path := statInfo.Name()
+		if s.isTempFile(path) {
 			continue
 		}
-
 		switch {
 		case statInfo.Mode().IsDir():
 			klog.ErrorS(nil, "Provided manifest path is a directory, not recursing into manifest path", "path", path)
@@ -194,6 +193,10 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 		}
 	}
 	return pods, nil
+}
+
+func (s *sourceFile) isTempFile(path string) bool {
+	return tempfileMatcher.MatchString(path)
 }
 
 // extractFromFile parses a file for Pod configuration information.

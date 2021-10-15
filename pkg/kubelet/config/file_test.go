@@ -73,6 +73,27 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	}
 }
 
+func TestIsTempFile(t *testing.T) {
+	tmp := sourceFile{}
+
+	testCases := []struct {
+		filename string
+		expected bool
+	}{
+		{"manifest.yaml", false},
+		{"manifest.yaml~", true},
+		{"etcd", false},
+		{"etcd.bak", true},
+	}
+
+	for _, tt := range testCases {
+		actual := tmp.isTempFile(tt.filename)
+		if actual != tt.expected {
+			t.Fatalf("expected %#v, got %#v for %#v", tt.expected, actual, tt.filename)
+		}
+	}
+}
+
 func mkTempDir(prefix string) (string, error) {
 	return ioutil.TempDir(os.TempDir(), prefix)
 }
