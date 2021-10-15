@@ -88,8 +88,29 @@ run_kubectl_diff_tests() {
     output_message=$(kubectl diff --server-side -f hack/testdata/pod-changed.yaml || test $? -eq 1)
     kube::test::if_has_string "${output_message}" 'k8s.gcr.io/pause:3.4'
 
+    ## kubectl diff --prune
+    kubectl create ns nsb
+    kubectl apply --namespace nsb -l prune-group=true -f hack/testdata/prune/a.yaml
+    kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
+    # Make sure that kubectl diff does not return pod 'a' without prune flag
+    output_message=$(kubectl diff -l prune-group=true -f hack/testdata/prune/b.yaml || test $? -eq 1)
+    kube::test::if_has_not_string "${output_message}" "name: a"
+    # Make sure that for kubectl diff --prune:
+    # 1. the exit code for diff is 1 because it found a difference
+    # 2. the difference contains the pruned pod
+    output_message=$(kubectl diff --prune -l prune-group=true -f hack/testdata/prune/b.yaml || test $? -eq 1)
+    # pod 'a' should be in output, it is pruned
+    kube::test::if_has_string "${output_message}" 'name: a'
+    # apply b with namespace
+    kubectl apply --prune --namespace nsb -l prune-group=true -f hack/testdata/prune/b.yaml
+    # check right pod exists and wrong pod doesn't exist
+    kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
+    # Make sure that diff --prune returns nothing (0 exit code) for 'b'.
+    kubectl diff --prune -l prune-group=true -f hack/testdata/prune/b.yaml
+
     # Cleanup
     kubectl delete -f hack/testdata/pod.yaml
+    kubectl delete -f hack/testdata/prune/b.yaml
 
     set +o nounset
     set +o errexit
