@@ -25,6 +25,9 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -319,5 +322,42 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+func TestDifferenceFunc(t *testing.T) {
+	tests := []struct {
+		name      string
+		fullArray []string
+		subArray  []string
+		expected  []string
+	}{
+		{
+			name:      "remove some",
+			fullArray: []string{"a", "b", "c", "d"},
+			subArray:  []string{"c", "b"},
+			expected:  []string{"a", "d"},
+		},
+		{
+			name:      "remove all",
+			fullArray: []string{"a", "b", "c", "d"},
+			subArray:  []string{"b", "d", "a", "c"},
+			expected:  nil,
+		},
+		{
+			name:      "remove none",
+			fullArray: []string{"a", "b", "c", "d"},
+			subArray:  nil,
+			expected:  []string{"a", "b", "c", "d"},
+		},
+	}
+
+	for _, tc := range tests {
+		result := Difference(tc.fullArray, tc.subArray)
+		if !cmp.Equal(tc.expected, result, cmpopts.SortSlices(func(x, y string) bool {
+			return x < y
+		})) {
+			t.Errorf("%s -> Expected: %v, but got: %v", tc.name, tc.expected, result)
+		}
 	}
 }
