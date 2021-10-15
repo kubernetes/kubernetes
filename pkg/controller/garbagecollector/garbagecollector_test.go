@@ -2266,6 +2266,8 @@ func TestConflictingData(t *testing.T) {
 			attemptToOrphan := newTrackingWorkqueue()
 			graphChanges := newTrackingWorkqueue()
 
+			errorRecorder := newErrorRecorder()
+
 			gc := &GarbageCollector{
 				metadataClient:   metadataClient,
 				restMapper:       restMapper,
@@ -2284,6 +2286,7 @@ func TestConflictingData(t *testing.T) {
 					attemptToDelete:  attemptToDelete,
 					absentOwnerCache: absentOwnerCache,
 				},
+				errorRecorder: errorRecorder,
 			}
 
 			ctx := stepContext{

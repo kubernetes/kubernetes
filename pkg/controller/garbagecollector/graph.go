@@ -27,7 +27,7 @@ import (
 type objectReference struct {
 	metav1.OwnerReference
 	// This is needed by the dynamic client
-	Namespace string
+	Namespace string `json:"namespace"`
 }
 
 func (s objectReference) String() string {

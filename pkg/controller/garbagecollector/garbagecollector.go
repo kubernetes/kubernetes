@@ -76,6 +76,8 @@ type GarbageCollector struct {
 	dependencyGraphBuilder *GraphBuilder
 	// GC caches the owners that do not exist according to the API server.
 	absentOwnerCache *ReferenceCache
+	// errorRecorder records various types of errors for later debugging
+	errorRecorder *errorRecorder
 
 	workerLock sync.RWMutex
 }
@@ -101,12 +103,14 @@ func NewGarbageCollector(
 	attemptToDelete := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_delete")
 	attemptToOrphan := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "garbage_collector_attempt_to_orphan")
 	absentOwnerCache := NewReferenceCache(500)
+	errorRecorder := newErrorRecorder()
 	gc := &GarbageCollector{
 		metadataClient:   metadataClient,
 		restMapper:       mapper,
 		attemptToDelete:  attemptToDelete,
 		attemptToOrphan:  attemptToOrphan,
 		absentOwnerCache: absentOwnerCache,
+		errorRecorder:    errorRecorder,
 	}
 	gc.dependencyGraphBuilder = &GraphBuilder{
 		eventRecorder:    eventRecorder,
@@ -176,6 +180,7 @@ func (gc *GarbageCollector) Run(ctx context.Context, workers int) {
 func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterface, period time.Duration, stopCh <-chan struct{}) {
 	oldResources := make(map[schema.GroupVersionResource]struct{})
 	wait.Until(func() {
+		gc.errorRecorder.ClearSyncError()
 		// Get the current resource list from discovery.
 		newResources := GetDeletableResources(discoveryClient)
 
@@ -183,6 +188,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		if len(newResources) == 0 {
 			klog.V(2).Infof("no resources reported by discovery, skipping garbage collector sync")
 			metrics.GarbageCollectorResourcesSyncError.Inc()
+			gc.errorRecorder.SetSyncError(goerrors.New("no resources reported by discovery"))
 			return
 		}
 
@@ -206,8 +212,10 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			if attempt > 1 {
 				newResources = GetDeletableResources(discoveryClient)
 				if len(newResources) == 0 {
-					klog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
+					msg := fmt.Sprintf("no resources reported by discovery (attempt %d)", attempt)
+					klog.V(2).Infof(msg)
 					metrics.GarbageCollectorResourcesSyncError.Inc()
+					gc.errorRecorder.SetSyncError(goerrors.New(msg))
 					return false, nil
 				}
 			}
@@ -230,8 +238,10 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// case, the restMapper will fail to map some of newResources until the next
 			// attempt.
 			if err := gc.resyncMonitors(newResources); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err))
+				resyncErr := fmt.Errorf("failed to sync resource monitors (attempt %d): %v", attempt, err)
+				utilruntime.HandleError(resyncErr)
 				metrics.GarbageCollectorResourcesSyncError.Inc()
+				gc.errorRecorder.SetSyncError(resyncErr)
 				return false, nil
 			}
 			klog.V(4).Infof("resynced monitors")
@@ -242,8 +252,10 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
 			// note that workers stay paused until we successfully resync.
 			if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
-				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt))
+				err := fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt)
+				utilruntime.HandleError(err)
 				metrics.GarbageCollectorResourcesSyncError.Inc()
+				gc.errorRecorder.SetSyncError(err)
 				return false, nil
 			}
 
@@ -255,6 +267,8 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 		// have succeeded to ensure we'll retry on subsequent syncs if an error
 		// occurred.
 		oldResources = newResources
+		// success: clear transient sync error
+		gc.errorRecorder.ClearSyncError()
 		klog.V(2).Infof("synced garbage collector")
 	}, period, stopCh)
 }
@@ -336,6 +350,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 		return forgetItem
 	}
+	gc.errorRecorder.ClearAttemptToDeleteError(n)
 
 	if !n.isObserved() {
 		nodeFromGraph, existsInGraph := gc.dependencyGraphBuilder.uidToNode.Read(n.identity.UID)
@@ -373,6 +388,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
+		gc.errorRecorder.SetAttemptToDeleteError(n, err)
 		// retry if garbage collection of an object failed.
 		return requeueItem
 	} else if !n.isObserved() {
@@ -702,6 +718,7 @@ func (gc *GarbageCollector) attemptToOrphanWorker(item interface{}) workQueueIte
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", item))
 		return forgetItem
 	}
+	gc.errorRecorder.ClearAttemptToOrphanError(owner)
 	// we don't need to lock each element, because they never get updated
 	owner.dependentsLock.RLock()
 	dependents := make([]*node, 0, len(owner.dependents))
@@ -713,12 +730,14 @@ func (gc *GarbageCollector) attemptToOrphanWorker(item interface{}) workQueueIte
 	err := gc.orphanDependents(owner.identity, dependents)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("orphanDependents for %s failed with %v", owner.identity, err))
+		gc.errorRecorder.SetAttemptToOrphanError(owner, err)
 		return requeueItem
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeFinalizer(owner, metav1.FinalizerOrphanDependents)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("removeOrphanFinalizer for %s failed with %v", owner.identity, err))
+		gc.errorRecorder.SetAttemptToOrphanError(owner, err)
 		return requeueItem
 	}
 	return forgetItem

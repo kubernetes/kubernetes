@@ -254,11 +254,18 @@ type debugHTTPHandler struct {
 }
 
 func (h *debugHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if req.URL.Path != "/graph" {
+	switch req.URL.Path {
+	case "/graph":
+		h.serveHTTPGraph(w, req)
+	case "/status":
+		h.serveHTTPStatus(w, req)
+	default:
 		http.Error(w, "", http.StatusNotFound)
-		return
 	}
+}
 
+// serveHTTPGraph responds to an HTTP request on /graph endpoint.
+func (h *debugHTTPHandler) serveHTTPGraph(w http.ResponseWriter, req *http.Request) {
 	var graph graph.Directed
 	if uidStrings := req.URL.Query()["uid"]; len(uidStrings) > 0 {
 		uids := []types.UID{}
