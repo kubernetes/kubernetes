@@ -45,7 +45,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodeResourcesFitArgs{},
 		&PodTopologySpreadArgs{},
 		&RequestedToCapacityRatioArgs{},
-		&ServiceAffinityArgs{},
 		&VolumeBindingArgs{},
 		&NodeResourcesLeastAllocatedArgs{},
 		&NodeResourcesMostAllocatedArgs{},

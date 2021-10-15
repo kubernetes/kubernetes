@@ -363,10 +363,6 @@ func validateCustomPriorities(priorities map[string]config.PriorityPolicy, prior
 			if err := verifyDifferentWeights("LabelPreference"); err != nil {
 				return err
 			}
-		} else if priority.Argument.ServiceAntiAffinity != nil {
-			if err := verifyDifferentWeights("ServiceAntiAffinity"); err != nil {
-				return err
-			}
 		} else if priority.Argument.RequestedToCapacityRatioArguments != nil {
 			if err := verifyRedeclaration("RequestedToCapacityRatio"); err != nil {
 				return err

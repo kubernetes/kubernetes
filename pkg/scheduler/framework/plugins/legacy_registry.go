@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -106,8 +105,6 @@ const (
 	CheckNodeUnschedulablePred = "CheckNodeUnschedulable"
 	// CheckNodeLabelPresencePred defines the name of predicate CheckNodeLabelPresence.
 	CheckNodeLabelPresencePred = "CheckNodeLabelPresence"
-	// CheckServiceAffinityPred defines the name of predicate checkServiceAffinity.
-	CheckServiceAffinityPred = "CheckServiceAffinity"
 	// MaxEBSVolumeCountPred defines the name of predicate MaxEBSVolumeCount.
 	// DEPRECATED
 	// All cloudprovider specific predicates are deprecated in favour of MaxCSIVolumeCountPred.
@@ -138,7 +135,7 @@ var predicateOrdering = []string{
 	GeneralPred, HostNamePred, PodFitsHostPortsPred,
 	MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 	PodToleratesNodeTaintsPred, CheckNodeLabelPresencePred,
-	CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
+	MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
 	MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
 	EvenPodsSpreadPred, MatchInterPodAffinityPred,
 }
@@ -166,8 +163,6 @@ type ConfigProducerArgs struct {
 	NodeLabelArgs *config.NodeLabelArgs
 	// RequestedToCapacityRatioArgs is the args for the RequestedToCapacityRatio plugin.
 	RequestedToCapacityRatioArgs *config.RequestedToCapacityRatioArgs
-	// ServiceAffinityArgs is the args for the ServiceAffinity plugin.
-	ServiceAffinityArgs *config.ServiceAffinityArgs
 	// NodeResourcesFitArgs is the args for the NodeResources fit filter.
 	NodeResourcesFitArgs *config.NodeResourcesFitArgs
 	// InterPodAffinityArgs is the args for InterPodAffinity plugin
@@ -315,15 +310,6 @@ func NewLegacyRegistry() *LegacyRegistry {
 					config.PluginConfig{Name: nodelabel.Name, Args: args.NodeLabelArgs})
 			}
 		})
-	registry.registerPredicateConfigProducer(CheckServiceAffinityPred,
-		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
-			plugins.Filter = appendToPluginSet(plugins.Filter, serviceaffinity.Name, nil)
-			if args.ServiceAffinityArgs != nil {
-				*pluginConfig = append(*pluginConfig,
-					config.PluginConfig{Name: serviceaffinity.Name, Args: args.ServiceAffinityArgs})
-			}
-			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, serviceaffinity.Name, nil)
-		})
 	registry.registerPredicateConfigProducer(EvenPodsSpreadPred,
 		func(_ ConfigProducerArgs, plugins *config.Plugins, _ *[]config.PluginConfig) {
 			plugins.PreFilter = appendToPluginSet(plugins.PreFilter, podtopologyspread.Name, nil)
@@ -428,18 +414,6 @@ func NewLegacyRegistry() *LegacyRegistry {
 			if args.NodeLabelArgs != nil {
 				*pluginConfig = append(*pluginConfig,
 					config.PluginConfig{Name: nodelabel.Name, Args: args.NodeLabelArgs})
-			}
-		})
-	registry.registerPriorityConfigProducer(serviceaffinity.Name,
-		func(args ConfigProducerArgs, plugins *config.Plugins, pluginConfig *[]config.PluginConfig) {
-			// If there are n ServiceAffinity priorities in the policy, the weight for the corresponding
-			// score plugin is n*weight (note that the validation logic verifies that all ServiceAffinity
-			// priorities specified in Policy have the same weight).
-			weight := args.Weight * int32(len(args.ServiceAffinityArgs.AntiAffinityLabelsPreference))
-			plugins.Score = appendToPluginSet(plugins.Score, serviceaffinity.Name, &weight)
-			if args.ServiceAffinityArgs != nil {
-				*pluginConfig = append(*pluginConfig,
-					config.PluginConfig{Name: serviceaffinity.Name, Args: args.ServiceAffinityArgs})
 			}
 		})
 	registry.registerPriorityConfigProducer(EvenPodsSpreadPriority,
@@ -579,23 +553,8 @@ func (lr *LegacyRegistry) ProcessPredicatePolicy(policy config.PredicatePolicy, 
 		return predicateName, nil
 	}
 
-	if policy.Argument == nil || (policy.Argument.ServiceAffinity == nil &&
-		policy.Argument.LabelsPresence == nil) {
+	if policy.Argument == nil || policy.Argument.LabelsPresence == nil {
 		return "", fmt.Errorf("predicate type not found for %q", predicateName)
-	}
-
-	// generate the predicate function, if a custom type is requested
-	if policy.Argument.ServiceAffinity != nil {
-		// map LabelsPresence policy to ConfigProducerArgs that's used to configure the ServiceAffinity plugin.
-		if pluginArgs.ServiceAffinityArgs == nil {
-			pluginArgs.ServiceAffinityArgs = &config.ServiceAffinityArgs{}
-		}
-		pluginArgs.ServiceAffinityArgs.AffinityLabels = append(pluginArgs.ServiceAffinityArgs.AffinityLabels, policy.Argument.ServiceAffinity.Labels...)
-
-		// We use the ServiceAffinity predicate name for all ServiceAffinity custom predicates.
-		// It may get called multiple times but we essentially only register one instance of ServiceAffinity predicate.
-		// This name is then used to find the registered plugin and run the plugin instead of the predicate.
-		predicateName = CheckServiceAffinityPred
 	}
 
 	if policy.Argument.LabelsPresence != nil {
@@ -638,25 +597,9 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 
 	// generate the priority function, if a custom priority is requested
 	if policy.Argument == nil ||
-		(policy.Argument.ServiceAntiAffinity == nil &&
-			policy.Argument.RequestedToCapacityRatioArguments == nil &&
+		(policy.Argument.RequestedToCapacityRatioArguments == nil &&
 			policy.Argument.LabelPreference == nil) {
 		return "", fmt.Errorf("priority type not found for %q", priorityName)
-	}
-
-	if policy.Argument.ServiceAntiAffinity != nil {
-		// We use the ServiceAffinity plugin name for all ServiceAffinity custom priorities.
-		// It may get called multiple times but we essentially only register one instance of
-		// ServiceAffinity priority.
-		// This name is then used to find the registered plugin and run the plugin instead of the priority.
-		priorityName = serviceaffinity.Name
-		if configProducerArgs.ServiceAffinityArgs == nil {
-			configProducerArgs.ServiceAffinityArgs = &config.ServiceAffinityArgs{}
-		}
-		configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference = append(
-			configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference,
-			policy.Argument.ServiceAntiAffinity.Label,
-		)
 	}
 
 	if policy.Argument.LabelPreference != nil {
@@ -712,9 +655,6 @@ func (lr *LegacyRegistry) ProcessPriorityPolicy(policy config.PriorityPolicy, co
 func validatePredicate(predicate config.PredicatePolicy) error {
 	if predicate.Argument != nil {
 		numArgs := 0
-		if predicate.Argument.ServiceAffinity != nil {
-			numArgs++
-		}
 		if predicate.Argument.LabelsPresence != nil {
 			numArgs++
 		}
@@ -728,9 +668,6 @@ func validatePredicate(predicate config.PredicatePolicy) error {
 func validatePriority(priority config.PriorityPolicy) error {
 	if priority.Argument != nil {
 		numArgs := 0
-		if priority.Argument.ServiceAntiAffinity != nil {
-			numArgs++
-		}
 		if priority.Argument.LabelPreference != nil {
 			numArgs++
 		}

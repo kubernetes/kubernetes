@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -81,7 +80,6 @@ func NewInTreeRegistry() runtime.Registry {
 		nodevolumelimits.CinderName:                runtime.FactoryAdapter(fts, nodevolumelimits.NewCinder),
 		interpodaffinity.Name:                      runtime.FactoryAdapter(fts, interpodaffinity.New),
 		nodelabel.Name:                             nodelabel.New,
-		serviceaffinity.Name:                       serviceaffinity.New,
 		queuesort.Name:                             queuesort.New,
 		defaultbinder.Name:                         defaultbinder.New,
 		defaultpreemption.Name:                     runtime.FactoryAdapter(fts, defaultpreemption.New),

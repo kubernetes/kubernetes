@@ -502,7 +502,7 @@ func TestValidateKubeSchedulerConfigurationV1beta3(t *testing.T) {
 	badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins1.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
 
 	badRemovedPlugins2 := validConfig.DeepCopy()
-	badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "ServiceAffinity", Weight: 2})
+	badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins2.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "RequestedToCapacityRatio", Weight: 2})
 
 	badRemovedPlugins3 := validConfig.DeepCopy()
 	badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled = append(badRemovedPlugins3.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "NodeResourcesMostAllocated", Weight: 2})
@@ -730,16 +730,6 @@ func TestValidatePolicy(t *testing.T) {
 				},
 			},
 			expected: errors.New("LabelPreference  priority \"customPriority2\" has a different weight with \"customPriority1\""),
-		},
-		{
-			name: "different weights for ServiceAntiAffinity custom priority",
-			policy: config.Policy{
-				Priorities: []config.PriorityPolicy{
-					{Name: "customPriority1", Weight: 1, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{}}},
-					{Name: "customPriority2", Weight: 2, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{}}},
-				},
-			},
-			expected: errors.New("ServiceAntiAffinity  priority \"customPriority2\" has a different weight with \"customPriority1\""),
 		},
 		{
 			name: "invalid hardPodAffinitySymmetricWeight, above the range",
