@@ -3180,14 +3180,15 @@ type EphemeralContainerCommon struct {
 // these two types.
 var _ = Container(EphemeralContainerCommon{})
 
-// An EphemeralContainer is a temporary container that may be added to an existing pod for
+// An EphemeralContainer is a temporary container that you may add to an existing Pod for
 // user-initiated activities such as debugging. Ephemeral containers have no resource or
-// scheduling guarantees, and they will not be restarted when they exit or when a pod is
-// removed or restarted. If an ephemeral container causes a pod to exceed its resource
-// allocation, the pod may be evicted.
-// Ephemeral containers may not be added by directly updating the pod spec. They must be added
-// via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
-// once added.
+// scheduling guarantees, and they will not be restarted when they exit or when a Pod is
+// removed or restarted. The kubelet may evict a Pod if an ephemeral container causes the
+// Pod to exceed its resource allocation.
+//
+// To add an ephemeral container, use the ephemeralcontainers subresource of an existing
+// Pod. Ephemeral containers may not be removed or restarted.
+//
 // This is a beta feature available on clusters that haven't disabled the EphemeralContainers feature gate.
 type EphemeralContainer struct {
 	// Ephemeral containers have all of the fields of Container, plus additional fields
@@ -3198,8 +3199,10 @@ type EphemeralContainer struct {
 
 	// If set, the name of the container from PodSpec that this ephemeral container targets.
 	// The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container.
-	// If not set then the ephemeral container is run in whatever namespaces are shared
-	// for the pod. Note that the container runtime must support this feature.
+	// If not set then the ephemeral container uses the namespaces configured in the Pod spec.
+	//
+	// The container runtime must implement support for this feature. If the runtime does not
+	// support namespace targeting then the result of setting this field is undefined.
 	// +optional
 	TargetContainerName string
 }
