@@ -76,6 +76,39 @@ func (d *testDecodable) DeepCopyInto(out *testDecodable) {
 	return
 }
 
+type testDecodeCoercion struct {
+	metav1.TypeMeta `json:",inline"`
+
+	Bool bool `json:"bool"`
+
+	Int   int `json:"int"`
+	Int32 int `json:"int32"`
+	Int64 int `json:"int64"`
+
+	Float32 float32 `json:"float32"`
+	Float64 float64 `json:"float64"`
+
+	String string `json:"string"`
+
+	Struct testDecodable `json:"struct"`
+
+	Array []string          `json:"array"`
+	Map   map[string]string `json:"map"`
+}
+
+func (d *testDecodeCoercion) DeepCopyObject() runtime.Object {
+	if d == nil {
+		return nil
+	}
+	out := new(testDecodeCoercion)
+	d.DeepCopyInto(out)
+	return out
+}
+func (d *testDecodeCoercion) DeepCopyInto(out *testDecodeCoercion) {
+	*out = *d
+	return
+}
+
 func TestDecode(t *testing.T) {
 	testCases := []struct {
 		creater runtime.ObjectCreater
@@ -357,6 +390,115 @@ func TestDecode(t *testing.T) {
 			},
 			yaml:   true,
 			strict: true,
+		},
+
+		// coerce from null
+		{
+			data:           []byte(`{"bool":null,"int":null,"int32":null,"int64":null,"float32":null,"float64":null,"string":null,"array":null,"map":null,"struct":null}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{},
+			strict:         true,
+		},
+		{
+			data:           []byte(`{"bool":null,"int":null,"int32":null,"int64":null,"float32":null,"float64":null,"string":null,"array":null,"map":null,"struct":null}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{},
+			yaml:           true,
+			strict:         true,
+		},
+		// coerce from string
+		{
+			data:           []byte(`{"string":""}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{},
+			strict:         true,
+		},
+		{
+			data:           []byte(`{"string":""}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{},
+			yaml:           true,
+			strict:         true,
+		},
+		// coerce from array
+		{
+			data:           []byte(`{"array":[]}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Array: []string{}},
+			strict:         true,
+		},
+		{
+			data:           []byte(`{"array":[]}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Array: []string{}},
+			yaml:           true,
+			strict:         true,
+		},
+		// coerce from map
+		{
+			data:           []byte(`{"map":{},"struct":{}}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Map: map[string]string{}},
+			strict:         true,
+		},
+		{
+			data:           []byte(`{"map":{},"struct":{}}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Map: map[string]string{}},
+			yaml:           true,
+			strict:         true,
+		},
+		// coerce from int
+		{
+			data:           []byte(`{"int":1,"int32":1,"int64":1,"float32":1,"float64":1}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Int: 1, Int32: 1, Int64: 1, Float32: 1, Float64: 1},
+			strict:         true,
+		},
+		{
+			data:           []byte(`{"int":1,"int32":1,"int64":1,"float32":1,"float64":1}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Int: 1, Int32: 1, Int64: 1, Float32: 1, Float64: 1},
+			yaml:           true,
+			strict:         true,
+		},
+		// coerce from float
+		{
+			data:           []byte(`{"float32":1.0,"float64":1.0}`),
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Float32: 1, Float64: 1},
+			strict:         true,
+		},
+		{
+			data:           []byte(`{"int":1.0,"int32":1.0,"int64":1.0,"float32":1.0,"float64":1.0}`), // floating point gets dropped in yaml -> json step
+			into:           &testDecodeCoercion{},
+			typer:          &mockTyper{gvk: &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"}},
+			expectedGVK:    &schema.GroupVersionKind{Kind: "Test", Group: "other", Version: "blah"},
+			expectedObject: &testDecodeCoercion{Int: 1, Int32: 1, Int64: 1, Float32: 1, Float64: 1},
+			yaml:           true,
+			strict:         true,
 		},
 	}
 
