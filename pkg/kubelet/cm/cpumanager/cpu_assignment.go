@@ -27,6 +27,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
+type LoopControl int
+
+const (
+	Continue LoopControl = iota
+	Break
+)
+
 type mapIntInt map[int]int
 
 func (m mapIntInt) Clone() mapIntInt {
@@ -68,6 +75,13 @@ func standardDeviation(xs []int) float64 {
 		sum += (float64(x) - m) * (float64(x) - m)
 	}
 	return math.Sqrt(sum / float64(len(xs)))
+}
+
+func min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }
 
 type numaOrSocketsFirstFuncs interface {
@@ -350,6 +364,31 @@ func (a *cpuAccumulator) takeRemainingCPUs() {
 	}
 }
 
+func (a *cpuAccumulator) rangeNUMANodesNeededToSatisfy(cpuGroupSize int) (int, int) {
+	// Get the total number of NUMA nodes that have CPUs available on them.
+	numNUMANodesAvailable := a.details.NUMANodes().Size()
+
+	// Get the total number of CPUs available across all NUMA nodes.
+	numCPUsAvailable := a.details.CPUs().Size()
+
+	// Calculate the number of available 'cpuGroups' across all NUMA nodes as
+	// well as the number of 'cpuGroups' that need to be allocated (rounding up).
+	numCPUGroupsAvailable := (numCPUsAvailable-1)/cpuGroupSize + 1
+	numCPUGroupsNeeded := (a.numCPUsNeeded-1)/cpuGroupSize + 1
+
+	// Calculate the number of available 'cpuGroups' per NUMA Node (rounding up).
+	numCPUGroupsPerNUMANode := (numCPUGroupsAvailable-1)/numNUMANodesAvailable + 1
+
+	// Calculate the minimum number of numa nodes required to satisfy the
+	// allocation (rounding up).
+	minNUMAs := (numCPUGroupsNeeded-1)/numCPUGroupsPerNUMANode + 1
+
+	// Calculate the maximum number of numa nodes required to satisfy the allocation.
+	maxNUMAs := min(numCPUGroupsNeeded, numNUMANodesAvailable)
+
+	return minNUMAs, maxNUMAs
+}
+
 func (a *cpuAccumulator) needs(n int) bool {
 	return a.numCPUsNeeded >= n
 }
@@ -364,21 +403,25 @@ func (a *cpuAccumulator) isFailed() bool {
 
 // iterateCombinations walks through all n-choose-k subsets of size k in n and
 // calls function 'f()' on each subset. For example, if n={0,1,2}, and k=2,
-// then f() will be called on the subsets {0,1}, {0,2}. and {1,2}.
-func (a *cpuAccumulator) iterateCombinations(n []int, k int, f func([]int)) {
+// then f() will be called on the subsets {0,1}, {0,2}. and {1,2}. If f() ever
+// returns 'Break', we break early and exit the loop.
+func (a *cpuAccumulator) iterateCombinations(n []int, k int, f func([]int) LoopControl) {
 	if k < 1 {
 		return
 	}
 
-	var helper func(n []int, k int, start int, accum []int, f func([]int))
-	helper = func(n []int, k int, start int, accum []int, f func([]int)) {
+	var helper func(n []int, k int, start int, accum []int, f func([]int) LoopControl) LoopControl
+	helper = func(n []int, k int, start int, accum []int, f func([]int) LoopControl) LoopControl {
 		if k == 0 {
-			f(accum)
-			return
+			return f(accum)
 		}
 		for i := start; i <= len(n)-k; i++ {
-			helper(n, k-1, i+1, append(accum, n[i]), f)
+			control := helper(n, k-1, i+1, append(accum, n[i]), f)
+			if control == Break {
+				return Break
+			}
 		}
+		return Continue
 	}
 
 	helper(n, k, 0, []int{}, f)
@@ -500,29 +543,34 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 	// Get the list of NUMA nodes represented by the set of CPUs in 'availableCPUs'.
 	numas := acc.sortAvailableNUMANodes()
 
+	// Calculate the minimum and maximum possible number of NUMA nodes that
+	// could satisfy this request. This is used to optimize how many iterations
+	// of the loop we need to go through below.
+	minNUMAs, maxNUMAs := acc.rangeNUMANodesNeededToSatisfy(cpuGroupSize)
+
 	// Try combinations of 1,2,3,... NUMA nodes until we find a combination
-	// where we can evenly distribute CPUs across them.
-	for i := range numas {
-		// Iterate through the various n-choose-k NUMA node combinations (where
-		// k=i+1 for this iteration of the loop), looking for the combination
-		// of NUMA nodes that can best have CPUs distributed across them.
+	// where we can evenly distribute CPUs across them. To optimize things, we
+	// don't always start at 1 and end at len(numas). Instead, we use the
+	// values of 'minNUMAs' and 'maxNUMAs' calculated above.
+	for k := minNUMAs; k <= maxNUMAs; k++ {
+		// Iterate through the various n-choose-k NUMA node combinations,
+		// looking for the combination of NUMA nodes that can best have CPUs
+		// distributed across them.
 		var bestBalance float64 = math.MaxFloat64
 		var bestRemainder []int = nil
 		var bestCombo []int = nil
-		acc.iterateCombinations(numas, i+1, func(combo []int) {
+		acc.iterateCombinations(numas, k, func(combo []int) LoopControl {
 			// If we've already found a combo with a balance of 0 in a
 			// different iteration, then don't bother checking any others.
-			// TODO: Add a way to just short circuit iterateCombinations() so
-			// we don't keep looping once such a combo is found.
 			if bestBalance == 0 {
-				return
+				return Break
 			}
 
 			// Check that this combination of NUMA nodes has enough CPUs to
 			// satisfy the allocation overall.
 			cpus := acc.details.CPUsInNUMANodes(combo...)
 			if cpus.Size() < numCPUs {
-				return
+				return Continue
 			}
 
 			// Check that CPUs can be handed out in groups of size
@@ -532,7 +580,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 				numCPUGroups += (acc.details.CPUsInNUMANodes(numa).Size() / cpuGroupSize)
 			}
 			if (numCPUGroups * cpuGroupSize) < numCPUs {
-				return
+				return Continue
 			}
 
 			// Check that each NUMA node in this combination can allocate an
@@ -542,7 +590,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			for _, numa := range combo {
 				cpus := acc.details.CPUsInNUMANodes(numa)
 				if cpus.Size() < distribution {
-					return
+					return Continue
 				}
 			}
 
@@ -578,7 +626,7 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 			// Otherwise, find the best "balance score" when allocating the
 			// remainder CPUs across different subsets of NUMA nodes in 'combo'.
 			// These remainder CPUs are handed out in groups of size 'cpuGroupSize'.
-			acc.iterateCombinations(combo, remainder/cpuGroupSize, func(subset []int) {
+			acc.iterateCombinations(combo, remainder/cpuGroupSize, func(subset []int) LoopControl {
 				// Make a local copy of 'availableAfterAllocation'.
 				availableAfterAllocation := availableAfterAllocation.Clone()
 
@@ -598,6 +646,8 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 					bestLocalBalance = balance
 					bestLocalRemainder = subset
 				}
+
+				return Continue
 			})
 
 			// If the best "balance score" for this combo is less than the
@@ -608,6 +658,8 @@ func takeByTopologyNUMADistributed(topo *topology.CPUTopology, availableCPUs cpu
 				bestRemainder = bestLocalRemainder
 				bestCombo = combo
 			}
+
+			return Continue
 		})
 
 		// If we made it through all of the iterations above without finding a
