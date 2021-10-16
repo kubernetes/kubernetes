@@ -5294,12 +5294,10 @@ type PodExecOptions struct {
 	Stdin bool `json:"stdin,omitempty" protobuf:"varint,1,opt,name=stdin"`
 
 	// Redirect the standard output stream of the pod for this call.
-	// Defaults to true.
 	// +optional
 	Stdout bool `json:"stdout,omitempty" protobuf:"varint,2,opt,name=stdout"`
 
 	// Redirect the standard error stream of the pod for this call.
-	// Defaults to true.
 	// +optional
 	Stderr bool `json:"stderr,omitempty" protobuf:"varint,3,opt,name=stderr"`
 
