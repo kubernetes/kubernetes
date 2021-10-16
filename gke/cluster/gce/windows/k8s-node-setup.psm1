@@ -1954,9 +1954,9 @@ function Install-Pigz {
 
 # Node Problem Detector Resources
 $NPD_SERVICE = "node-problem-detector"
-$DEFAULT_NPD_VERSION = '0.8.9'
-$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/kubernetes-release'
-$DEFAULT_NPD_HASH = 'f87a01d344e16d16511c5160d7d0f3b8a694e00452f50ffbb550deb10460a1ffa7e170233401ae11df5d58cf070e746feea3bd0407af95ba00d6362630da620c'
+$DEFAULT_NPD_VERSION = '0.8.10-gke0.1'
+$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/gke-release/winnode'
+$DEFAULT_NPD_HASH = '97ddfe3544da9e02a1cfb55d24f329eb29d606fca7fbbf800415d5de9dbc29a00563f8e0d1919595c8e316fd989d45b09b13c07be528841fc5fd37e21d016a2d'
 
 # Install Node Problem Detector (NPD).
 # NPD analyzes the host for problems that can disrupt workloads.
