@@ -6386,6 +6386,42 @@ func TestValidateEphemeralContainers(t *testing.T) {
 			},
 			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resources"},
 		},
+		{
+			"Container uses disallowed field: VolumeMount.SubPath",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol", MountPath: "/vol"},
+							{Name: "vol", MountPath: "/volsub", SubPath: "foo"},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPath"},
+		},
+		{
+			"Container uses disallowed field: VolumeMount.SubPathExpr",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol", MountPath: "/vol"},
+							{Name: "vol", MountPath: "/volsub", SubPathExpr: "$(POD_NAME)"},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPathExpr"},
+		},
 	}
 
 	for _, tc := range tcs {

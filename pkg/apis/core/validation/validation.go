@@ -2876,6 +2876,18 @@ func validateEphemeralContainers(ephemeralContainers []core.EphemeralContainer, 
 		// Lifecycle, probes, resources and ports should be disallowed. This is implemented as a list
 		// of allowed fields so that new fields will be given consideration prior to inclusion in Ephemeral Containers.
 		allErrs = append(allErrs, validateFieldAllowList(ec.EphemeralContainerCommon, allowedEphemeralContainerFields, "cannot be set for an Ephemeral Container", idxPath)...)
+
+		// VolumeMount subpaths have the potential to leak resources since they're implemented with bind mounts
+		// that aren't cleaned up until the pod exits. Since they also imply that the container is being used
+		// as part of the workload, they're disallowed entirely.
+		for i, vm := range ec.VolumeMounts {
+			if vm.SubPath != "" {
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("volumeMounts").Index(i).Child("subPath"), "cannot be set for an Ephemeral Container"))
+			}
+			if vm.SubPathExpr != "" {
+				allErrs = append(allErrs, field.Forbidden(idxPath.Child("volumeMounts").Index(i).Child("subPathExpr"), "cannot be set for an Ephemeral Container"))
+			}
+		}
 	}
 
 	return allErrs
