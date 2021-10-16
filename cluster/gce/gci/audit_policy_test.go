@@ -18,7 +18,7 @@ package gci
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -40,7 +40,7 @@ func init() {
 }
 
 func TestCreateMasterAuditPolicy(t *testing.T) {
-	baseDir, err := ioutil.TempDir("", "configure-helper-test") // cleaned up by c.tearDown()
+	baseDir, err := os.MkdirTemp("", "configure-helper-test") // cleaned up by c.tearDown()
 	require.NoError(t, err, "Failed to create temp directory")
 
 	policyFile := filepath.Join(baseDir, "audit_policy.yaml")

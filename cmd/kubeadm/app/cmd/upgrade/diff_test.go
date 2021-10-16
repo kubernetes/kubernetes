@@ -18,7 +18,7 @@ package upgrade
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -29,7 +29,7 @@ import (
 )
 
 func createTestRunDiffFile(contents []byte) (string, error) {
-	file, err := ioutil.TempFile("", "kubeadm-upgrade-diff-config-*.yaml")
+	file, err := os.CreateTemp("", "kubeadm-upgrade-diff-config-*.yaml")
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create temporary test file")
 	}
@@ -65,7 +65,7 @@ func TestRunDiff(t *testing.T) {
 
 	flags := &diffFlags{
 		cfgPath: "",
-		out:     ioutil.Discard,
+		out:     io.Discard,
 	}
 
 	// TODO: Add test cases for empty cfgPath, it should automatically fetch cfg from cluster
