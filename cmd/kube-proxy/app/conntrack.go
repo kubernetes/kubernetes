@@ -89,7 +89,7 @@ func (rct realConntracker) SetTCPCloseWaitTimeout(seconds int) error {
 func (realConntracker) setIntSysCtl(name string, value int) error {
 	entry := "net/netfilter/" + name
 
-	sys := sysctl.NewFssys()
+	sys := sysctl.New()
 	if val, _ := sys.GetSysctl(entry); val != value && val < value {
 		klog.InfoS("Set sysctl", "entry", entry, "value", value)
 		if err := sys.SetSysctl(entry, value); err != nil {
