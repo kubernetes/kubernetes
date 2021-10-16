@@ -98,3 +98,27 @@ func (*procSysctl) GetSysctl(sysctl string) (int, error) {
 func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
 	return ioutil.WriteFile(path.Join(sysctlBase, sysctl), []byte(strconv.Itoa(newVal)), 0640)
 }
+
+type fsSysctl struct {
+
+}
+
+func NewFssys() Interface {
+	return &fsSysctl{}
+}
+
+func (*fsSysctl) GetSysctl(sysctl string) (int, error) {
+	data, err := ioutil.ReadFile(sysctl)
+	if err != nil {
+		return -1, err
+	}
+	val, err := strconv.Atoi(strings.Trim(string(data), " \n"))
+	if err != nil {
+		return -1, err
+	}
+	return val, nil
+}
+
+func (*fsSysctl) SetSysctl(sysctl string, newVal int) error {
+	return ioutil.WriteFile(sysctl,[]byte(strconv.Itoa(newVal)), 0640)
+}
