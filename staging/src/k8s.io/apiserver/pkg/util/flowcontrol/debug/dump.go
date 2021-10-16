@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"k8s.io/apiserver/pkg/endpoints/request"
+	flowcontrolrequest "k8s.io/apiserver/pkg/util/flowcontrol/request"
 )
 
 // QueueSetDump is an instant dump of queue-set.
@@ -51,6 +52,7 @@ type RequestDump struct {
 	FlowDistinguisher string
 	ArriveTime        time.Time
 	StartTime         time.Time
+	WorkEstimate      flowcontrolrequest.WorkEstimate
 	// request details
 	UserName    string
 	RequestInfo request.RequestInfo

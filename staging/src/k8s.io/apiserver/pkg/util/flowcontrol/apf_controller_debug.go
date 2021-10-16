@@ -159,18 +159,21 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 		"RequestIndexInQueue", // 4
 		"FlowDistingsher",     // 5
 		"ArriveTime",          // 6
+		"InitialSeats",        // 7
+		"FinalSeats",          // 8
+		"AdditionalLatency",   // 9
 	}))
 	if includeRequestDetails {
 		continueLine(tabWriter)
 		tabPrint(tabWriter, rowForHeaders([]string{
-			"UserName",    // 7
-			"Verb",        // 8
-			"APIPath",     // 9
-			"Namespace",   // 10
-			"Name",        // 11
-			"APIVersion",  // 12
-			"Resource",    // 13
-			"SubResource", // 14
+			"UserName",    // 10
+			"Verb",        // 11
+			"APIPath",     // 12
+			"Namespace",   // 13
+			"Name",        // 14
+			"APIVersion",  // 15
+			"Resource",    // 16
+			"SubResource", // 17
 		}))
 	}
 	endLine(tabWriter)
@@ -181,28 +184,31 @@ func (cfgCtlr *configController) dumpRequests(w http.ResponseWriter, r *http.Req
 		queueSetDigest := plState.queues.Dump(includeRequestDetails)
 		for iq, q := range queueSetDigest.Queues {
 			for ir, r := range q.Requests {
-				tabPrint(tabWriter, rowForRequest(
+				tabPrint(tabWriter, row(
 					plState.pl.Name,     // 1
 					r.MatchedFlowSchema, // 2
-					iq,                  // 3
-					ir,                  // 4
+					strconv.Itoa(iq),    // 3
+					strconv.Itoa(ir),    // 4
 					r.FlowDistinguisher, // 5
-					r.ArriveTime,        // 6
+					r.ArriveTime.UTC().Format(time.RFC3339Nano),    // 6
+					strconv.Itoa(int(r.WorkEstimate.InitialSeats)), // 7
+					strconv.Itoa(int(r.WorkEstimate.FinalSeats)),   // 8
+					r.WorkEstimate.AdditionalLatency.String(),      // 9
 				))
 				if includeRequestDetails {
 					continueLine(tabWriter)
 					tabPrint(tabWriter, rowForRequestDetails(
-						r.UserName,              // 7
-						r.RequestInfo.Verb,      // 8
-						r.RequestInfo.Path,      // 9
-						r.RequestInfo.Namespace, // 10
-						r.RequestInfo.Name,      // 11
+						r.UserName,              // 10
+						r.RequestInfo.Verb,      // 11
+						r.RequestInfo.Path,      // 12
+						r.RequestInfo.Namespace, // 13
+						r.RequestInfo.Name,      // 14
 						schema.GroupVersion{
 							Group:   r.RequestInfo.APIGroup,
 							Version: r.RequestInfo.APIVersion,
-						}.String(), // 12
-						r.RequestInfo.Resource,    // 13
-						r.RequestInfo.Subresource, // 14
+						}.String(), // 15
+						r.RequestInfo.Resource,    // 16
+						r.RequestInfo.Subresource, // 17
 					))
 				}
 				endLine(tabWriter)
@@ -238,17 +244,6 @@ func rowForPriorityLevel(plName string, activeQueues int, isIdle, isQuiescing bo
 		strconv.FormatBool(isQuiescing),
 		strconv.Itoa(waitingRequests),
 		strconv.Itoa(executingRequests),
-	)
-}
-
-func rowForRequest(plName, fsName string, queueIndex, requestIndex int, flowDistinguisher string, arriveTime time.Time) string {
-	return row(
-		plName,
-		fsName,
-		strconv.Itoa(queueIndex),
-		strconv.Itoa(requestIndex),
-		flowDistinguisher,
-		arriveTime.UTC().Format(time.RFC3339Nano),
 	)
 }
 
