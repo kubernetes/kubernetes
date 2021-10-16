@@ -100,7 +100,6 @@ func (*procSysctl) SetSysctl(sysctl string, newVal int) error {
 }
 
 type fsSysctl struct {
-
 }
 
 func NewFssys() Interface {
@@ -120,5 +119,5 @@ func (*fsSysctl) GetSysctl(sysctl string) (int, error) {
 }
 
 func (*fsSysctl) SetSysctl(sysctl string, newVal int) error {
-	return ioutil.WriteFile(sysctl,[]byte(strconv.Itoa(newVal)), 0640)
+	return ioutil.WriteFile(sysctl, []byte(strconv.Itoa(newVal)), 0640)
 }
