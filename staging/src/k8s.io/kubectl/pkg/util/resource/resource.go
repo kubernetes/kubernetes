@@ -37,11 +37,6 @@ func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
 		addResourceList(reqs, container.Resources.Requests)
 		addResourceList(limits, container.Resources.Limits)
 	}
-	// init containers define the minimum of any resource
-	for _, container := range pod.Spec.InitContainers {
-		maxResourceList(reqs, container.Resources.Requests)
-		maxResourceList(limits, container.Resources.Limits)
-	}
 
 	// Add overhead for running a pod to the sum of requests and to non-zero limits:
 	if pod.Spec.Overhead != nil {
@@ -65,21 +60,6 @@ func addResourceList(list, new corev1.ResourceList) {
 		} else {
 			value.Add(quantity)
 			list[name] = value
-		}
-	}
-}
-
-// maxResourceList sets list to the greater of list/newList for every resource
-// either list
-func maxResourceList(list, new corev1.ResourceList) {
-	for name, quantity := range new {
-		if value, ok := list[name]; !ok {
-			list[name] = quantity.DeepCopy()
-			continue
-		} else {
-			if quantity.Cmp(value) > 0 {
-				list[name] = quantity.DeepCopy()
-			}
 		}
 	}
 }
