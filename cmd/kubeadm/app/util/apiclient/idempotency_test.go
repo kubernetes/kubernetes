@@ -74,11 +74,12 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
 			}
+			var lastError error
 			conditionFunction := PatchNodeOnce(client, tc.lookupName, func(node *v1.Node) {
 				node.Annotations = map[string]string{
 					"updatedBy": "test",
 				}
-			})
+			}, &lastError)
 			success, err := conditionFunction()
 			if err != nil {
 				t.Fatalf("did not expect error: %v", err)
