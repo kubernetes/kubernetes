@@ -800,7 +800,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 	defer cancel()
 
 	informers.Start(ctx.Done())
-	go dc.Run(5, ctx.Done())
+	go dc.Run(ctx, 5)
 
 	// Start Scheduler
 	setupScheduler(ctx, t, clientset, informers)
