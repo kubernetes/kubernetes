@@ -375,16 +375,11 @@ func (dsc *DaemonSetsController) dedupCurHistories(ctx context.Context, ds *apps
 						},
 					},
 				}
-<<<<<<< HEAD
-				toUpdate.Labels[apps.DefaultDaemonSetUniqueLabelKey] = keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Update(ctx, toUpdate, metav1.UpdateOptions{})
-=======
 				patchJson, err := json.Marshal(patchRaw)
 				if err != nil {
 					return nil, err
 				}
-				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Patch(context, pod.Name, types.MergePatchType, patchJson, metav1.PatchOptions{})
->>>>>>> fix_dsc_rbac_pod_update
+				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Patch(ctx, pod.Name, types.MergePatchType, patchJson, metav1.PatchOptions{})
 				if err != nil {
 					return nil, err
 				}
