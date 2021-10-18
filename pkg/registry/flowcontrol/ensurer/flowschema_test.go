@@ -27,44 +27,41 @@ import (
 	"k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/client-go/kubernetes/fake"
 	flowcontrolclient "k8s.io/client-go/kubernetes/typed/flowcontrol/v1beta2"
+	flowcontrollisters "k8s.io/client-go/listers/flowcontrol/v1beta2"
+	"k8s.io/client-go/tools/cache"
 	flowcontrolapisv1beta2 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta2"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEnsureFlowSchema(t *testing.T) {
 	tests := []struct {
 		name      string
-		strategy  func(flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer
+		strategy  func(flowcontrolclient.FlowSchemaInterface, flowcontrollisters.FlowSchemaLister) FlowSchemaEnsurer
 		current   *flowcontrolv1beta2.FlowSchema
 		bootstrap *flowcontrolv1beta2.FlowSchema
 		expected  *flowcontrolv1beta2.FlowSchema
 	}{
 		// for suggested configurations
 		{
-			name: "suggested flow schema does not exist - the object should always be re-created",
-			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewSuggestedFlowSchemaEnsurer(client)
-			},
+			name:      "suggested flow schema does not exist - the object should always be re-created",
+			strategy:  NewSuggestedFlowSchemaEnsurer,
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   nil,
 			expected:  newFlowSchema("fs1", "pl1", 100).Object(),
 		},
 		{
-			name: "suggested flow schema exists, auto update is enabled, spec does not match - current object should be updated",
-			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewSuggestedFlowSchemaEnsurer(client)
-			},
+			name:      "suggested flow schema exists, auto update is enabled, spec does not match - current object should be updated",
+			strategy:  NewSuggestedFlowSchemaEnsurer,
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("true").Object(),
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
-			name: "suggested flow schema exists, auto update is disabled, spec does not match - current object should not be updated",
-			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewSuggestedFlowSchemaEnsurer(client)
-			},
+			name:      "suggested flow schema exists, auto update is disabled, spec does not match - current object should not be updated",
+			strategy:  NewSuggestedFlowSchemaEnsurer,
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("false").Object(),
 			expected:  newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("false").Object(),
@@ -72,28 +69,22 @@ func TestEnsureFlowSchema(t *testing.T) {
 
 		// for mandatory configurations
 		{
-			name: "mandatory flow schema does not exist - new object should be created",
-			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewMandatoryFlowSchemaEnsurer(client)
-			},
+			name:      "mandatory flow schema does not exist - new object should be created",
+			strategy:  NewMandatoryFlowSchemaEnsurer,
 			bootstrap: newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 			current:   nil,
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
-			name: "mandatory flow schema exists, annotation is missing - annotation should be added",
-			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewMandatoryFlowSchemaEnsurer(client)
-			},
+			name:      "mandatory flow schema exists, annotation is missing - annotation should be added",
+			strategy:  NewMandatoryFlowSchemaEnsurer,
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 100).Object(),
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
 		},
 		{
-			name: "mandatory flow schema exists, auto update is disabled, spec does not match - current object should be updated",
-			strategy: func(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
-				return NewMandatoryFlowSchemaEnsurer(client)
-			},
+			name:      "mandatory flow schema exists, auto update is disabled, spec does not match - current object should be updated",
+			strategy:  NewMandatoryFlowSchemaEnsurer,
 			bootstrap: newFlowSchema("fs1", "pl1", 100).Object(),
 			current:   newFlowSchema("fs1", "pl1", 200).WithAutoUpdateAnnotation("false").Object(),
 			expected:  newFlowSchema("fs1", "pl1", 100).WithAutoUpdateAnnotation("true").Object(),
@@ -103,11 +94,13 @@ func TestEnsureFlowSchema(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset().FlowcontrolV1beta2().FlowSchemas()
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
+				indexer.Add(test.current)
 			}
 
-			ensurer := test.strategy(client)
+			ensurer := test.strategy(client, flowcontrollisters.NewFlowSchemaLister(indexer))
 
 			err := ensurer.Ensure([]*flowcontrolv1beta2.FlowSchema{test.bootstrap})
 			if err != nil {
@@ -322,11 +315,13 @@ func TestRemoveFlowSchema(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset().FlowcontrolV1beta2().FlowSchemas()
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			if test.current != nil {
 				client.Create(context.TODO(), test.current, metav1.CreateOptions{})
+				indexer.Add(test.current)
 			}
 
-			remover := NewFlowSchemaRemover(client)
+			remover := NewFlowSchemaRemover(client, flowcontrollisters.NewFlowSchemaLister(indexer))
 			err := remover.Remove([]string{test.bootstrapName})
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
@@ -409,17 +404,20 @@ func TestGetFlowSchemaRemoveCandidate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset().FlowcontrolV1beta2().FlowSchemas()
+			indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 			for i := range test.current {
-				client.Create(context.TODO(), test.current[i], metav1.CreateOptions{})
+				indexer.Add(test.current[i])
 			}
 
-			removeListGot, err := GetFlowSchemaRemoveCandidate(client, test.bootstrap)
+			lister := flowcontrollisters.NewFlowSchemaLister(indexer)
+			removeListGot, err := GetFlowSchemaRemoveCandidate(lister, test.bootstrap)
 			if err != nil {
 				t.Fatalf("Expected no error, but got: %v", err)
 			}
 
-			if !cmp.Equal(test.expected, removeListGot) {
+			if !cmp.Equal(test.expected, removeListGot, cmpopts.SortSlices(func(a string, b string) bool {
+				return a < b
+			})) {
 				t.Errorf("Remove candidate list does not match - diff: %s", cmp.Diff(test.expected, removeListGot))
 			}
 		})
