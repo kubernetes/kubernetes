@@ -412,22 +412,28 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 		klog.InfoS("Pod Security evaluation", "policy", fmt.Sprintf("%v", nsPolicy), "op", attrs.GetOperation(), "resource", attrs.GetResource(), "namespace", attrs.GetNamespace(), "name", attrs.GetName())
 	}
 
+	var result policy.AggregateCheckResult
 	response := allowedResponse()
 	if enforce {
-		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
+		result = policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec))
+		if !result.Allowed {
 			response = forbiddenResponse(result.ForbiddenDetail())
 		}
 	}
 
-	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
-	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
+	if !enforce || nsPolicy.Audit.String() != nsPolicy.Enforce.String() {
+		result = policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec))
+	}
+	if !result.Allowed {
 		auditAnnotations["audit"] = result.ForbiddenDetail()
 	}
 
 	// avoid adding warnings to a request we're already going to reject with an error
 	if response.Allowed {
-		// TODO: reuse previous evaluation if warn level+version is the same as audit or enforce level+version
-		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec)); !result.Allowed {
+		if !enforce || nsPolicy.Warn.String() != nsPolicy.Enforce.String() || nsPolicy.Warn.String() != nsPolicy.Audit.String() {
+			result = policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec))
+		}
+		if !result.Allowed {
 			// TODO: Craft a better user-facing warning message
 			response.Warnings = append(response.Warnings, fmt.Sprintf(
 				"would violate %q version of %q PodSecurity profile: %s",
