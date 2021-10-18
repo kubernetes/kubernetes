@@ -388,6 +388,7 @@ func (req *request) wait() (bool, bool) {
 	// remove the request from the queue as it has timed out
 	if req.removeFromQueueLocked() != nil {
 		qs.totRequestsWaiting--
+		metrics.AddReject(req.ctx, qs.qCfg.Name, req.fsName, "cancelled")
 		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
 		req.NoteQueued(false)
 		qs.obsPair.RequestsWaiting.Add(-1)
