@@ -240,9 +240,17 @@ func TestManager(t *testing.T) {
 			proberManager := probetest.FakeManager{}
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-
-			manager, _ := NewManager(proberManager, fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, tc.shutdownGracePeriodCriticalPods)
-			manager.clock = testingclock.NewFakeClock(time.Now())
+			manager, _ := NewManager(&Config{
+				ProbeManager:                    proberManager,
+				Recorder:                        fakeRecorder,
+				NodeRef:                         nodeRef,
+				GetPodsFunc:                     activePodsFunc,
+				KillPodFunc:                     killPodsFunc,
+				SyncNodeStatusFunc:              func() {},
+				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
+				ShutdownGracePeriodCriticalPods: tc.shutdownGracePeriodCriticalPods,
+				Clock:                           testingclock.NewFakeClock(time.Now()),
+			})
 
 			err := manager.Start()
 			lock.Unlock()
@@ -321,10 +329,18 @@ func TestFeatureEnabled(t *testing.T) {
 			fakeRecorder := &record.FakeRecorder{}
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
-			manager, _ := NewManager(proberManager, fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, 0 /*shutdownGracePeriodCriticalPods*/)
-			manager.clock = testingclock.NewFakeClock(time.Now())
+			manager, _ := NewManager(&Config{
+				ProbeManager:                    proberManager,
+				Recorder:                        fakeRecorder,
+				NodeRef:                         nodeRef,
+				GetPodsFunc:                     activePodsFunc,
+				KillPodFunc:                     killPodsFunc,
+				SyncNodeStatusFunc:              func() {},
+				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
+				ShutdownGracePeriodCriticalPods: 0,
+			})
 
-			assert.Equal(t, tc.expectEnabled, manager.isFeatureEnabled())
+			assert.Equal(t, tc.expectEnabled, manager != managerStub{})
 		})
 	}
 }
@@ -367,7 +383,17 @@ func TestRestart(t *testing.T) {
 	proberManager := probetest.FakeManager{}
 	fakeRecorder := &record.FakeRecorder{}
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
-	manager, _ := NewManager(proberManager, fakeRecorder, nodeRef, activePodsFunc, killPodsFunc, syncNodeStatus, shutdownGracePeriodRequested, shutdownGracePeriodCriticalPods)
+	manager, _ := NewManager(&Config{
+		ProbeManager:                    proberManager,
+		Recorder:                        fakeRecorder,
+		NodeRef:                         nodeRef,
+		GetPodsFunc:                     activePodsFunc,
+		KillPodFunc:                     killPodsFunc,
+		SyncNodeStatusFunc:              syncNodeStatus,
+		ShutdownGracePeriodRequested:    shutdownGracePeriodRequested,
+		ShutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
+	})
+
 	err := manager.Start()
 	lock.Unlock()
 
