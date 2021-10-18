@@ -88,16 +88,22 @@ func TestFIFOWithRemoveMultipleRequestsInArrivalOrder(t *testing.T) {
 		removeFn = append(removeFn, list.Enqueue(arrival[i]))
 	}
 
-	dequeued := make([]*request, 0)
-	for _, f := range removeFn {
-		dequeued = append(dequeued, f())
+	expected := append([]*request{}, arrival...)
+	for idx, f := range removeFn {
+		if a := f(); a != arrival[idx] {
+			t.Errorf("Removal %d returned %v instead of expected pointer", idx, a)
+		}
+		if a := f(); a != nil {
+			t.Errorf("Redundant removal %d returned %v instead of expected nil", idx, a)
+		}
+		expected = expected[1:]
+		actual := walkAll(list)
+		verifyOrder(t, expected, actual)
 	}
 
 	if list.Length() != 0 {
 		t.Errorf("Expected length: %d, but got: %d)", 0, list.Length())
 	}
-
-	verifyOrder(t, arrival, dequeued)
 }
 
 func TestFIFORemoveFromFIFOFunc(t *testing.T) {
@@ -124,19 +130,25 @@ func TestFIFOWithRemoveMultipleRequestsInRandomOrder(t *testing.T) {
 		removeFn = append(removeFn, list.Enqueue(arrival[i]))
 	}
 
-	dequeued := make([]*request, 0)
+	expected := append([]*request{}, arrival...)
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	randomIndices := r.Perm(len(removeFn))
-	t.Logf("Random remove order: %v", randomIndices)
-	for i := range randomIndices {
-		dequeued = append(dequeued, removeFn[i]())
+	for range arrival {
+		idx := r.Intn(len(expected))
+		t.Logf("Removing random index %d", idx)
+		if e, a := expected[idx], removeFn[idx](); e != a {
+			t.Errorf("Removal of %d returned %v instead of expected pointer %v", idx, a, e)
+		}
+		if e, a := (*request)(nil), removeFn[idx](); e != a {
+			t.Errorf("Redundant removal of %d returned %v instead of expected nil pointer", idx, a)
+		}
+		expected = append(expected[:idx], expected[idx+1:]...)
+		actual := walkAll(list)
+		verifyOrder(t, expected, actual)
+		removeFn = append(removeFn[:idx], removeFn[idx+1:]...)
 	}
-
 	if list.Length() != 0 {
 		t.Errorf("Expected length: %d, but got: %d)", 0, list.Length())
 	}
-
-	verifyOrder(t, arrival, dequeued)
 }
 
 func TestFIFOWithRemoveIsIdempotent(t *testing.T) {

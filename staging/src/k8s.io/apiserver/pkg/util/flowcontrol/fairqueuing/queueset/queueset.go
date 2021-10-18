@@ -582,31 +582,24 @@ func (qs *queueSet) removeTimedOutRequestsFromQueueLocked(queue *queue, fsName s
 	// can short circuit loop (break) if oldest requests are not timing out
 	// as newer requests also will not have timed out
 
-	// now - requestWaitLimit = waitLimit
-	waitLimit := now.Add(-qs.qCfg.RequestWaitLimit)
+	// now - requestWaitLimit = arrivalLimit
+	arrivalLimit := now.Add(-qs.qCfg.RequestWaitLimit)
 	reqs.Walk(func(req *request) bool {
-		if waitLimit.After(req.arrivalTime) {
-			req.decision.Set(decisionReject)
-			timeoutCount++
-			metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
-			req.NoteQueued(false)
-
+		if arrivalLimit.After(req.arrivalTime) {
+			if req.decision.Set(decisionReject) && req.removeFromQueueLocked() != nil {
+				timeoutCount++
+				req.NoteQueued(false)
+				metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+			}
 			// we need to check if the next request has timed out.
 			return true
 		}
-
 		// since reqs are sorted oldest -> newest, we are done here.
 		return false
 	})
 
 	// remove timed out requests from queue
 	if timeoutCount > 0 {
-		// The number of requests we have timed out is timeoutCount,
-		// so, let's dequeue the exact number of requests for this queue.
-		for i := 0; i < timeoutCount; i++ {
-			queue.requests.Dequeue()
-		}
-		// decrement the # of requestsEnqueued
 		qs.totRequestsWaiting -= timeoutCount
 		qs.obsPair.RequestsWaiting.Add(float64(-timeoutCount))
 	}
@@ -647,18 +640,9 @@ func (qs *queueSet) enqueueLocked(request *request) {
 	qs.obsPair.RequestsWaiting.Add(1)
 }
 
-// dispatchAsMuchAsPossibleLocked runs a loop, as long as there
-// are non-empty queues and the number currently executing is less than the
-// assured concurrency value.  The body of the loop uses the fair queuing
-// technique to pick a queue, dequeue the request at the head of that
-// queue, increment the count of the number executing, and send true
-// to the request's channel.
+// dispatchAsMuchAsPossibleLocked does as many dispatches as possible now.
 func (qs *queueSet) dispatchAsMuchAsPossibleLocked() {
-	for qs.totRequestsWaiting != 0 && qs.totSeatsInUse < qs.dCfg.ConcurrencyLimit {
-		ok := qs.dispatchLocked()
-		if !ok {
-			break
-		}
+	for qs.totRequestsWaiting != 0 && qs.totSeatsInUse < qs.dCfg.ConcurrencyLimit && qs.dispatchLocked() {
 	}
 }
 
@@ -691,8 +675,9 @@ func (qs *queueSet) dispatchSansQueueLocked(ctx context.Context, workEstimate *f
 
 // dispatchLocked uses the Fair Queuing for Server Requests method to
 // select a queue and dispatch the oldest request in that queue.  The
-// return value indicates whether a request was dispatched; this will
-// be false when there are no requests waiting in any queue.
+// return value indicates whether a request was dequeued; this will
+// be false when either all queues are empty or the request at the head
+// of the next queue cannot be dispatched.
 func (qs *queueSet) dispatchLocked() bool {
 	queue, request := qs.findDispatchQueueLocked()
 	if queue == nil {
@@ -701,22 +686,26 @@ func (qs *queueSet) dispatchLocked() bool {
 	if request == nil { // This should never happen.  But if it does...
 		return false
 	}
+	qs.totRequestsWaiting--
+	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
+	request.NoteQueued(false)
+	qs.obsPair.RequestsWaiting.Add(-1)
+	defer qs.boundNextDispatchLocked(queue)
+	if !request.decision.Set(decisionExecute) {
+		return true
+	}
 	request.startTime = qs.clock.Now()
 	// At this moment the request leaves its queue and starts
 	// executing.  We do not recognize any interim state between
 	// "queued" and "executing".  While that means "executing"
 	// includes a little overhead from this package, this is not a
 	// problem because other overhead is also included.
-	qs.totRequestsWaiting--
 	qs.totRequestsExecuting++
 	qs.totSeatsInUse += request.MaxSeats()
 	queue.requestsExecuting++
 	queue.seatsInUse += request.MaxSeats()
-	metrics.AddRequestsInQueues(request.ctx, qs.qCfg.Name, request.fsName, -1)
-	request.NoteQueued(false)
 	metrics.AddRequestsExecuting(request.ctx, qs.qCfg.Name, request.fsName, 1)
 	metrics.AddRequestConcurrencyInUse(qs.qCfg.Name, request.fsName, request.MaxSeats())
-	qs.obsPair.RequestsWaiting.Add(-1)
 	qs.obsPair.RequestsExecuting.Add(1)
 	if klog.V(6).Enabled() {
 		klog.Infof("QS(%s) at t=%s R=%v: dispatching request %#+v %#+v work %v from queue %d with start R %v, queue will have %d waiting & %d requests occupying %d seats, set will have %d seats occupied",
@@ -725,8 +714,6 @@ func (qs *queueSet) dispatchLocked() bool {
 	}
 	// When a request is dequeued for service -> qs.virtualStart += G * width
 	queue.nextDispatchR += request.totalWork()
-	qs.boundNextDispatchLocked(queue)
-	request.decision.Set(decisionExecute)
 	return true
 }
 
