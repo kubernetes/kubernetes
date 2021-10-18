@@ -22,6 +22,7 @@ package mount
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -666,4 +667,89 @@ func forceUmount(path string) error {
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
 	}
 	return nil
+}
+
+// IsNotMountPoint determines if a directory is a mountpoint.
+// It should return ErrNotExist when the directory does not exist.
+// IsNotMountPoint is more expensive than IsLikelyNotMountPoint.
+// IsNotMountPoint detects bind mounts in linux.
+// IsNotMountPoint enumerates all the mountpoints using List() and
+// the list of mountpoints may be large, then it uses
+// isMountPointMatch to evaluate whether the directory is a mountpoint.
+func IsNotMountPoint(mounter Interface, file string) (bool, error) {
+	// IsLikelyNotMountPoint provides a quick check
+	// to determine whether file IS A mountpoint.
+	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
+	if notMntErr != nil && os.IsPermission(notMntErr) {
+		// We were not allowed to do the simple stat() check, e.g. on NFS with
+		// root_squash. Fall back to /proc/mounts check below.
+		notMnt = true
+		notMntErr = nil
+	}
+	if notMntErr != nil {
+		return notMnt, notMntErr
+	}
+	// identified as mountpoint, so return this fact.
+	if notMnt == false {
+		return notMnt, nil
+	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
+	resolvedFile, err := filepath.EvalSymlinks(file)
+	if err != nil {
+		return true, err
+	}
+
+	hasMnt, err := isConsistentMountPoint(procMountsPath, resolvedFile, maxListTries, nil)
+	if err != nil {
+		// !hasMnt because this function returns if a mount-point is present or not.
+		return !hasMnt, err
+	}
+	// !hasMnt because this function returns if a mount-point is present or not.
+	return !hasMnt, nil
+}
+
+func isConsistentMountPoint(mountFilePath string, resolvedPath string, attempts int,
+	/* used for writing tests */ recreateMountFileContents func(path string, i int) error) (bool, error) {
+	hasMnt, err := mountFilesContains(mountFilePath, resolvedPath)
+	if err != nil {
+		return hasMnt, err
+	}
+
+	for i := 0; i < attempts; i++ {
+		fmt.Println("attempting")
+		if recreateMountFileContents != nil {
+			err := recreateMountFileContents(mountFilePath, i)
+			if err != nil {
+				return false, err
+			}
+		}
+		newHasMnt, err := mountFilesContains(mountFilePath, resolvedPath)
+		if err != nil {
+			return newHasMnt, err
+		}
+		if hasMnt == newHasMnt {
+			return hasMnt, nil
+		}
+		hasMnt = newHasMnt
+	}
+	return hasMnt, nil
+}
+
+func mountFilesContains(mountFilePath string, resolvedPath string) (bool, error) {
+	content, err := ioutil.ReadFile(mountFilePath)
+	if err != nil {
+		return false, err
+	}
+	mps, err := parseProcMounts(content)
+	if err != nil {
+		return false, err
+	}
+
+	for _, mp := range mps {
+		if isMountPointMatch(mp, resolvedPath) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

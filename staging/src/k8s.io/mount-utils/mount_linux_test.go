@@ -20,6 +20,7 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -544,4 +545,170 @@ func mountArgsContainOption(t *testing.T, mountArgs []string, option string) boo
 	}
 
 	return strings.Contains(mountArgs[optionsIndex], option)
+}
+
+func TestMountFilesContains(t *testing.T) {
+	const procContents = `/dev/root / ext4 rw,relatime,discard 0 0
+devtmpfs /dev devtmpfs rw,relatime,size=32570048k,nr_inodes=8142512,mode=755,inode64 0 0
+sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /dev/shm tmpfs rw,nosuid,nodev,inode64 0 0
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
+tmpfs /run tmpfs rw,nosuid,nodev,size=6515208k,mode=755,inode64 0 0
+tmpfs /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k,inode64 0 0
+tmpfs /sys/fs/cgroup tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0
+cgroup2 /sys/fs/cgroup/unified cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate 0 0
+cgroup /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,xattr,name=systemd 0 0
+`
+	// create a tempfile.
+	f, err := ioutil.TempFile(os.TempDir(), "mountFileContains")
+	if err != nil {
+		t.Errorf("unable to create temp file: %s", err.Error())
+	}
+	defer os.Remove(f.Name())
+
+	_, err = f.Write([]byte(procContents))
+	if err != nil {
+		t.Errorf("unable to write procContents: %s", err.Error())
+	}
+
+	existingMountPoint := "/sys"
+	hasMnt, _ := mountFilesContains(f.Name(), existingMountPoint)
+	if hasMnt == false {
+		t.Errorf("mount point %s exists in procContents, but could not find it", existingMountPoint)
+	}
+
+	nonExistingMountPoint := "/non-existent-mount-point"
+	hasMnt, _ = mountFilesContains(f.Name(), "/non-existent-mount-point")
+	if hasMnt == true {
+		t.Errorf("mount point %s does not exist in procContents, but found it", nonExistingMountPoint)
+	}
+}
+
+func TestIsConsistentMountPoint(t *testing.T) {
+	// There are 3 cases that we are testing for.
+	// Let's suppose there are 3 reads of /proc/mounts and they yield the following output.
+	// READ 1    READ 2    READ 3
+	// M1        M2        M1
+	// M2        M3        M4
+	// In the above cases
+	// M1 should return false, M2 should return true (order does not matter),
+	// M3 should return false as it has consecutive volume mounts.
+	// This test mimics all of the above scenarios.
+
+	// This is the default proc reads on the first read when IsConsistentMountPoint
+	// See below on mutation.
+	const procContents = `/dev/root / ext4 rw,relatime,discard 0 0
+devtmpfs /dev devtmpfs rw,relatime,size=32570048k,nr_inodes=8142512,mode=755,inode64 0 0
+sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /dev/shm tmpfs rw,nosuid,nodev,inode64 0 0
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
+tmpfs /run tmpfs rw,nosuid,nodev,size=6515208k,mode=755,inode64 0 0
+tmpfs /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k,inode64 0 0
+tmpfs /sys/fs/cgroup tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0
+cgroup2 /sys/fs/cgroup/unified cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate 0 0
+cgroup /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,xattr,name=systemd 0 0
+`
+	// create a tempfile.
+	f, err := ioutil.TempFile(os.TempDir(), "mountFileContains")
+	if err != nil {
+		t.Errorf("unable to create temp file: %s", err.Error())
+	}
+	defer os.Remove(f.Name())
+
+	_, err = f.Write([]byte(procContents))
+	if err != nil {
+		t.Errorf("unable to write procContents: %s", err.Error())
+	}
+	f.Close()
+
+	testCases := []struct {
+		path    string
+		wantMnt bool
+		wantErr bool
+	}{
+		{"/",
+			true,
+			false,
+		},
+		{"/sys/kernel/security",
+			false,
+			false,
+		},
+		{"/sys/fs/cgroup/unified",
+			false,
+			false,
+		},
+	}
+
+	for _, tc := range testCases {
+		gotMnt, gotErr := isConsistentMountPoint(f.Name(), tc.path, 2, recreateFileContents)
+		if gotMnt != tc.wantMnt {
+			if tc.wantMnt {
+				t.Errorf("isConsistentMountPoint() expected %s to be a consistent mount point, but is not.", tc.path)
+			} else {
+				t.Errorf("isConsistentMountPoint() expected %s not to be a consistent mount point, but it is.", tc.path)
+			}
+		}
+
+		if (gotErr != nil) != tc.wantErr {
+			t.Errorf("isConsistentMountPoint() error = %v, wantErr %v", err, tc.wantErr)
+		}
+	}
+
+}
+
+func recreateFileContents(path string, i int) error {
+	fmt.Println(path, i)
+	// subsequent attempts called and the mount path is mutated as below.
+	procContents := []string{
+		// In the below iteration /dev/root has been moved to the end (change of order),
+		// securityfs has been removed (removal of a mount-point)
+		// cgroup2 has been removed.
+		`devtmpfs /dev devtmpfs rw,relatime,size=32570048k,nr_inodes=8142512,mode=755,inode64 0 0
+sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /dev/shm tmpfs rw,nosuid,nodev,inode64 0 0
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
+tmpfs /run tmpfs rw,nosuid,nodev,size=6515208k,mode=755,inode64 0 0
+tmpfs /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k,inode64 0 0
+tmpfs /sys/fs/cgroup tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0
+cgroup /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,xattr,name=systemd 0 0
+/dev/root / ext4 rw,relatime,discard 0 0
+tmpfs /run2 tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0
+tmpfs /run3 tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0`,
+		// In the below iteration /dev/root has been removed. (a consistent mount is no longer available),
+		// securityfs has been added (a mount point shows up on a non-consecutive read)
+		// cgroup2 has been removed (so that only one occurrence occurs)
+		`/dev/root / ext4 rw,relatime,discard 0 0
+devtmpfs /dev devtmpfs rw,relatime,size=32570048k,nr_inodes=8142512,mode=755,inode64 0 0
+sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
+securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime 0 0
+tmpfs /dev/shm tmpfs rw,nosuid,nodev,inode64 0 0
+devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
+tmpfs /run tmpfs rw,nosuid,nodev,size=6515208k,mode=755,inode64 0 0
+tmpfs /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k,inode64 0 0
+tmpfs /sys/fs/cgroup tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0
+cgroup /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,xattr,name=systemd 0 0
+tmpfs /run2 tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0
+tmpfs /run3 tmpfs ro,nosuid,nodev,noexec,mode=755,inode64 0 0`,
+	}
+
+	f, err := os.OpenFile(path, os.O_RDWR, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// Needed otherwise a smaller file will have contents of the older file and it will lead to
+	// test failures.
+	err = f.Truncate(0)
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(procContents[i])
+	return err
 }
