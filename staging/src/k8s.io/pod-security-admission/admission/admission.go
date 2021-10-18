@@ -430,7 +430,7 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 
 	// avoid adding warnings to a request we're already going to reject with an error
 	if response.Allowed {
-		if !enforce || nsPolicy.Warn.String() != nsPolicy.Enforce.String() || nsPolicy.Warn.String() != nsPolicy.Audit.String() {
+		if nsPolicy.Warn.String() != nsPolicy.Enforce.String() || nsPolicy.Warn.String() != nsPolicy.Audit.String() {
 			result = policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Warn, podMetadata, podSpec))
 		}
 		if !result.Allowed {
