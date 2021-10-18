@@ -1511,8 +1511,8 @@ func (PodDNSConfigOption) SwaggerDoc() map[string]string {
 var map_PodExecOptions = map[string]string{
 	"":          "PodExecOptions is the query options to a Pod's remote exec call.",
 	"stdin":     "Redirect the standard input stream of the pod for this call. Defaults to false.",
-	"stdout":    "Redirect the standard output stream of the pod for this call. Defaults to true.",
-	"stderr":    "Redirect the standard error stream of the pod for this call. Defaults to true.",
+	"stdout":    "Redirect the standard output stream of the pod for this call.",
+	"stderr":    "Redirect the standard error stream of the pod for this call.",
 	"tty":       "TTY if true indicates that a tty will be allocated for the exec call. Defaults to false.",
 	"container": "Container in which to execute the command. Defaults to only container if there is only one container in the pod.",
 	"command":   "Command is the remote command to execute. argv array. Not executed within a shell.",
