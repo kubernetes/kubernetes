@@ -22,7 +22,8 @@ import (
 
 // removeFromFIFOFunc removes a designated element from the list.
 // The complexity of the runtime cost is O(1)
-// It returns the request removed from the list.
+// It returns the request that has been removed from the list,
+// it returns nil if the request has already been removed.
 type removeFromFIFOFunc func() *request
 
 // walkFunc is called for each request in the list in the
@@ -89,11 +90,12 @@ func (l *requestFIFO) Enqueue(req *request) removeFromFIFOFunc {
 	addToQueueSum(&l.sum, req)
 
 	return func() *request {
-		if e.Value != nil {
-			l.Remove(e)
-			e.Value = nil
-			deductFromQueueSum(&l.sum, req)
+		if e.Value == nil {
+			return nil
 		}
+		l.Remove(e)
+		e.Value = nil
+		deductFromQueueSum(&l.sum, req)
 		return req
 	}
 }

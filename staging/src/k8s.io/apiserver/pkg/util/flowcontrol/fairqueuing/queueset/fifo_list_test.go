@@ -100,6 +100,21 @@ func TestFIFOWithRemoveMultipleRequestsInArrivalOrder(t *testing.T) {
 	verifyOrder(t, arrival, dequeued)
 }
 
+func TestFIFORemoveFromFIFOFunc(t *testing.T) {
+	list := newRequestFIFO()
+	reqWant := &request{}
+	removeFn := list.Enqueue(reqWant)
+
+	reqGot := removeFn()
+	if reqWant != reqGot {
+		t.Errorf("Expected request identity: %p, but got: %p)", reqWant, reqGot)
+	}
+
+	if got := removeFn(); got != nil {
+		t.Errorf("Expected a nil request, but got: %v)", got)
+	}
+}
+
 func TestFIFOWithRemoveMultipleRequestsInRandomOrder(t *testing.T) {
 	list := newRequestFIFO()
 
