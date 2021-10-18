@@ -386,11 +386,12 @@ func (req *request) wait() (bool, bool) {
 	// TODO(aaron-prindle) add metrics for this case
 	klog.V(5).Infof("QS(%s): Ejecting request %#+v %#+v from its queue", qs.qCfg.Name, req.descr1, req.descr2)
 	// remove the request from the queue as it has timed out
-	req.removeFromQueueLocked()
-	qs.totRequestsWaiting--
-	metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
-	req.NoteQueued(false)
-	qs.obsPair.RequestsWaiting.Add(-1)
+	if req.removeFromQueueLocked() != nil {
+		qs.totRequestsWaiting--
+		metrics.AddRequestsInQueues(req.ctx, qs.qCfg.Name, req.fsName, -1)
+		req.NoteQueued(false)
+		qs.obsPair.RequestsWaiting.Add(-1)
+	}
 	return false, qs.isIdleLocked()
 }
 
