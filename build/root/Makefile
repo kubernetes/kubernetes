@@ -254,6 +254,7 @@ define TEST_E2E_NODE_HELP_INFO
 #  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
 #    Defaults to false.
 #  TEST_SUITE: For REMOTE=true only. Test suite to use. Defaults to "default".
+#  SSH_KEY: For existing SSH keys.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
