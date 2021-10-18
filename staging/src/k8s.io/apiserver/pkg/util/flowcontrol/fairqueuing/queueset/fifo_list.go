@@ -20,15 +20,18 @@ import (
 	"container/list"
 )
 
-// removeFromFIFOFunc removes a designated element from the list.
-// The complexity of the runtime cost is O(1)
-// It returns the request that has been removed from the list,
-// it returns nil if the request has already been removed.
+// removeFromFIFOFunc removes a designated element from the list
+// if that element is in the list.
+// The complexity of the runtime cost is O(1).
+// The returned value is the element removed, if indeed one was removed,
+// otherwise `nil`.
 type removeFromFIFOFunc func() *request
 
 // walkFunc is called for each request in the list in the
 // oldest -> newest order.
 // ok: if walkFunc returns false then the iteration stops immediately.
+// walkFunc may remove the given request from the fifo,
+// but may not mutate the fifo in any othe way.
 type walkFunc func(*request) (ok bool)
 
 // Internal interface to abstract out the implementation details
@@ -129,7 +132,9 @@ func (l *requestFIFO) getFirst(remove bool) (*request, bool) {
 }
 
 func (l *requestFIFO) Walk(f walkFunc) {
-	for current := l.Front(); current != nil; current = current.Next() {
+	var next *list.Element
+	for current := l.Front(); current != nil; current = next {
+		next = current.Next() // f is allowed to remove current
 		if r, ok := current.Value.(*request); ok {
 			if !f(r) {
 				return
