@@ -61,9 +61,12 @@ build-env:
       etcd: "v3.4.13"
     fips:
       go-boringcrypto:
-        # golang-boringcrypto-image was last updated for
-        # /build/build-image/cross/VERSION:
-        last-updated-for-oss-kubecross-version: v1.16.6-1
+        # golang-boringcrypto-image was last updated for the go version
+        # corresponding to the file
+        # /build/build-image/cross/VERSION
+        # This value should include only the semver for the go version, not the
+        # additional build kubecross build info.
+        last-updated-for-oss-kubecross-version: 1.16.6
 
   # This is a separate image that is used for the package-tarballs.sh step,
   # which requires Docker.
