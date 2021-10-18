@@ -17,7 +17,6 @@ limitations under the License.
 package e2enode
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -161,27 +160,8 @@ func reserveHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int) er
 	return nil
 }
 
-func traceMemInfo() {
-	file, err := os.Open("/proc/meminfo")
-	if err != nil {
-		framework.Logf("Can't read meminfo %v", err)
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	// optionally, resize scanner's capacity for lines over 64K, see next example
-	for scanner.Scan() {
-		framework.Logf(scanner.Text())
-	}
-
-	if err := scanner.Err(); err != nil {
-		framework.Logf("Can't read meminfo %v", err)
-	}
-}
-
 // configureHugePages attempts to allocate hugepages of the specified size
-func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int, raiseError bool) error {
+func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int, raiseError bool, memoryProblemOccured *bool) error {
 	// Compact memory to make bigger contiguous blocks of memory available
 	// before allocating huge pages.
 	// https://www.kernel.org/doc/Documentation/sysctl/vm.txt
@@ -199,8 +179,9 @@ func configureHugePages(hugepagesSize int, hugepagesCount int, numaNodeID *int, 
 
 		// clear it eventually and trace
 		if err != nil {
-			if attempts == 0 {
-				traceMemInfo()
+
+			if attempts == 0 && memoryProblemOccured != nil {
+				*memoryProblemOccured = true
 			}
 			reserveHugePages(hugepagesSize, 0, numaNodeID)
 		}
@@ -314,7 +295,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 				}
 
 				ginkgo.By(fmt.Sprintf("Configuring the host to reserve %d of pre-allocated hugepages of size %d", count, size))
-				err := configureHugePages(size, count, nil, true)
+				err := configureHugePages(size, count, nil, true, &f.MemoryProblemOccured)
 				framework.ExpectNoError(err)
 			}
 		}

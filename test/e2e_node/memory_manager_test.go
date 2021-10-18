@@ -323,9 +323,8 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		// allocate hugepages
 		if *is2MiHugepagesSupported {
 			ginkgo.By("Configuring hugepages")
-			gomega.Eventually(func() error {
-				return configureHugePages(hugepagesSize2M, hugepages2MiCount, pointer.IntPtr(0), true)
-			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+			err := configureHugePages(hugepagesSize2M, hugepages2MiCount, pointer.IntPtr(0), true, &f.MemoryProblemOccured)
+			framework.ExpectNoError(err)
 		}
 	})
 
@@ -355,10 +354,7 @@ var _ = SIGDescribe("Memory Manager [Disruptive] [Serial] [Feature:MemoryManager
 		// release hugepages
 		if *is2MiHugepagesSupported {
 			ginkgo.By("Releasing allocated hugepages")
-			gomega.Eventually(func() error {
-				// configure hugepages on the NUMA node 0 to avoid hugepages split across NUMA nodes
-				return configureHugePages(hugepagesSize2M, 0, pointer.IntPtr(0), false)
-			}, 90*time.Second, 15*time.Second).ShouldNot(gomega.HaveOccurred(), "failed to release hugepages")
+			configureHugePages(hugepagesSize2M, 0, pointer.IntPtr(0), false, &f.MemoryProblemOccured)
 		}
 	})
 

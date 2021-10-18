@@ -122,6 +122,8 @@ type Framework struct {
 
 	// Timeouts contains the custom timeouts used during the test execution.
 	Timeouts *TimeoutContext
+
+	MemoryProblemOccured bool
 }
 
 // AfterEachActionFunc is a function that can be called after each test
@@ -460,6 +462,10 @@ func (f *Framework) AfterEach() {
 			(*e2emetrics.ComponentCollection)(&received).ComputeClusterAutoscalerMetricsDelta(f.clusterAutoscalerMetricsBeforeTest)
 			f.TestSummaries = append(f.TestSummaries, (*e2emetrics.ComponentCollection)(&received))
 		}
+	}
+
+	if TestContext.GatherMemoryAfterTest && f.MemoryProblemOccured {
+		f.TestSummaries = append(f.TestSummaries, getMemorySummaries(f))
 	}
 
 	TestContext.CloudConfig.Provider.FrameworkAfterEach(f)

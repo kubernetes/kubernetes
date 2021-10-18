@@ -134,6 +134,7 @@ type TestContextType struct {
 	GatherLogsSizes                   bool
 	GatherMetricsAfterTest            string
 	GatherSuiteMetricsAfterTest       bool
+	GatherMemoryAfterTest             bool
 	MaxNodesToGather                  int
 	// If set to 'true' framework will gather ClusterAutoscaler metrics when gathering them for other components.
 	IncludeClusterAutoscalerMetrics bool
