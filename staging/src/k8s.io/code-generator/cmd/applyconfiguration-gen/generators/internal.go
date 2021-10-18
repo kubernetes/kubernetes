@@ -19,13 +19,11 @@ package generators
 import (
 	"io"
 
-	"gopkg.in/yaml.v2"
-
-	"k8s.io/kube-openapi/pkg/schemaconv"
-
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
+	"k8s.io/kube-openapi/pkg/schemaconv"
+	"sigs.k8s.io/yaml"
 )
 
 // utilGenerator generates the ForKind() utility function.

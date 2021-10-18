@@ -17,11 +17,11 @@ limitations under the License.
 package kubeadm
 
 import (
-	yaml "gopkg.in/yaml.v2"
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"sigs.k8s.io/yaml"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"

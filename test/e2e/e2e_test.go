@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 
 	// Never, ever remove the line with "/ginkgo". Without it,
 	// the ginkgo test runner will not detect that this
@@ -110,7 +110,7 @@ func TestMain(m *testing.M) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		if err := yaml.NewEncoder(os.Stdout).Encode(tests); err != nil {
+		if _, err := yaml.Marshal(tests); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

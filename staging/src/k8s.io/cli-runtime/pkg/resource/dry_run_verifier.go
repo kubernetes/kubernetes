@@ -21,10 +21,10 @@ import (
 	"fmt"
 
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	yaml "gopkg.in/yaml.v2"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	"sigs.k8s.io/yaml"
 )
 
 func NewDryRunVerifier(dynamicClient dynamic.Interface, openAPIGetter discovery.OpenAPISchemaInterface) *DryRunVerifier {
