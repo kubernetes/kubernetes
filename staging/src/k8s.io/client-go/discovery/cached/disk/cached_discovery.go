@@ -26,7 +26,6 @@ import (
 	"time"
 
 	openapi_v2 "github.com/google/gnostic/openapiv2"
-	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +33,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 // CachedDiscoveryClient implements the functions that discovery server-supported API groups,
@@ -52,6 +52,8 @@ type CachedDiscoveryClient struct {
 
 	// ourFiles are all filenames of cache files created by this process
 	ourFiles map[string]struct{}
+	// cache holds cached data if disk is not writable
+	cache map[string][]byte
 	// invalidated is true if all cache files should be ignored that are not ours (e.g. after Invalidate() was called)
 	invalidated bool
 	// fresh is true if all used cache files were ours
@@ -134,8 +136,13 @@ func (d *CachedDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
 }
 
 func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
-	// after invalidation ignore cache files not created by this process
 	d.mutex.Lock()
+	cachedBytes, ok := d.cache[filename]
+	if ok {
+		d.mutex.Unlock()
+		return cachedBytes, nil
+	}
+	// after invalidation ignore cache files not created by this process
 	_, ourFile := d.ourFiles[filename]
 	if d.invalidated && !ourFile {
 		d.mutex.Unlock()
@@ -159,7 +166,7 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	}
 
 	// the cache is present and its valid.  Try to read and use it.
-	cachedBytes, err := ioutil.ReadAll(file)
+	cachedBytes, err = ioutil.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}
@@ -172,44 +179,61 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 }
 
 func (d *CachedDiscoveryClient) writeCachedFile(filename string, obj runtime.Object) error {
-	if err := os.MkdirAll(filepath.Dir(filename), 0750); err != nil {
-		return err
-	}
-
 	bytes, err := runtime.Encode(scheme.Codecs.LegacyCodec(), obj)
 	if err != nil {
 		return err
 	}
-
-	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
-	_, err = f.Write(bytes)
-	if err != nil {
-		return err
-	}
-
-	err = os.Chmod(f.Name(), 0660)
-	if err != nil {
-		return err
-	}
-
-	name := f.Name()
-	err = f.Close()
-	if err != nil {
-		return err
-	}
-
-	// atomic rename
+	tmpFilename, err := d.writeCachedTmpFile(filename, bytes)
 	d.mutex.Lock()
 	defer d.mutex.Unlock()
-	err = os.Rename(name, filename)
-	if err == nil {
-		d.ourFiles[filename] = struct{}{}
+	if err != nil {
+		d.cache[filename] = bytes
+		return err
 	}
-	return err
+	// atomic rename
+	err = os.Rename(tmpFilename, filename)
+	if err != nil {
+		_ = os.Remove(tmpFilename)
+		d.cache[filename] = bytes
+		return err
+	}
+	delete(d.cache, filename) // drop in-memory cache (if it existed) on success
+	d.ourFiles[filename] = struct{}{}
+	return nil
+}
+
+func (d *CachedDiscoveryClient) writeCachedTmpFile(filename string, bytes []byte) (string /* tmpFilename */, error) {
+	if err := os.MkdirAll(filepath.Dir(filename), 0750); err != nil {
+		return "", err
+	}
+	f, err := ioutil.TempFile(filepath.Dir(filename), filepath.Base(filename)+".")
+	if err != nil {
+		return "", err
+	}
+	allGood := false
+	name := f.Name()
+	defer func() {
+		if !allGood {
+			_ = f.Close()
+			_ = os.Remove(name)
+		}
+	}()
+	_, err = f.Write(bytes)
+	if err != nil {
+		return "", err
+	}
+
+	err = os.Chmod(name, 0660)
+	if err != nil {
+		return "", err
+	}
+
+	err = f.Close()
+	if err != nil {
+		return "", err
+	}
+	allGood = true
+	return name, nil
 }
 
 // RESTClient returns a RESTClient that is used to communicate with API server
@@ -255,6 +279,7 @@ func (d *CachedDiscoveryClient) Invalidate() {
 	defer d.mutex.Unlock()
 
 	d.ourFiles = map[string]struct{}{}
+	d.cache = map[string][]byte{}
 	d.fresh = true
 	d.invalidated = true
 }
@@ -293,6 +318,7 @@ func newCachedDiscoveryClient(delegate discovery.DiscoveryInterface, cacheDirect
 		cacheDirectory: cacheDirectory,
 		ttl:            ttl,
 		ourFiles:       map[string]struct{}{},
+		cache:          map[string][]byte{},
 		fresh:          true,
 	}
 }

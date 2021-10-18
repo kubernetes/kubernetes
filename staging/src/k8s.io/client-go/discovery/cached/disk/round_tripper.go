@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	"github.com/gregjones/httpcache"
-	"github.com/gregjones/httpcache/diskcache"
 	"github.com/peterbourgon/diskv"
 	"k8s.io/klog/v2"
 )
@@ -41,7 +40,7 @@ func newCacheRoundTripper(cacheDir string, rt http.RoundTripper) http.RoundTripp
 		BasePath: cacheDir,
 		TempDir:  filepath.Join(cacheDir, ".diskv-temp"),
 	})
-	t := httpcache.NewTransport(diskcache.NewWithDiskv(d))
+	t := httpcache.NewTransport(newMemDiskCache(d))
 	t.Transport = rt
 
 	return &cacheRoundTripper{rt: t}

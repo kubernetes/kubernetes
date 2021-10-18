@@ -18,6 +18,7 @@ package disk
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -41,12 +42,16 @@ func (rt *testRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func TestCacheRoundTripper(t *testing.T) {
-	rt := &testRoundTripper{}
-	cacheDir, err := ioutil.TempDir("", "cache-rt")
-	defer os.RemoveAll(cacheDir)
-	if err != nil {
-		t.Fatal(err)
+	for _, readonly := range []bool{false, true} {
+		t.Run(fmt.Sprintf("readonly_%t", readonly), func(t *testing.T) {
+			cacheDir := setupTempDir(t, readonly)
+			testCacheRoundTripper(t, cacheDir)
+		})
 	}
+}
+
+func testCacheRoundTripper(t *testing.T, cacheDir string) {
+	rt := &testRoundTripper{}
 	cache := newCacheRoundTripper(cacheDir, rt)
 
 	// First call, caches the response
