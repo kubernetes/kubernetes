@@ -75,7 +75,7 @@
   - subresource
   - verb
   - version
-  buckets:
+- Buckets:
   - 0.05
   - 0.1
   - 0.15
@@ -113,12 +113,28 @@
   - 40
   - 50
   - 60
-- name: apiserver_request_total
-  help: Counter of apiserver requests broken out for each verb, dry run value, group,
+  DeprecatedVersion: ""
+  Help: Response latency distribution in seconds for each verb, dry run value, group,
+    version, resource, subresource, scope and component.
+  Labels:
+  - component
+  - dry_run
+  - group
+  - resource
+  - scope
+  - subresource
+  - verb
+  - version
+  Name: apiserver_request_duration_seconds
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: ""
+  Type: Histogram
+- Buckets: null
+  DeprecatedVersion: ""
+  Help: Counter of apiserver requests broken out for each verb, dry run value, group,
     version, resource, scope, component, and HTTP response code.
-  type: Counter
-  stabilityLevel: STABLE
-  labels:
+  Labels:
   - code
   - component
   - dry_run
@@ -128,20 +144,33 @@
   - subresource
   - verb
   - version
-- name: apiserver_requested_deprecated_apis
-  help: Gauge of deprecated APIs that have been requested, broken out by API group,
+  Name: apiserver_request_total
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: ""
+  Type: Counter
+- Buckets: null
+  DeprecatedVersion: ""
+  Help: Gauge of deprecated APIs that have been requested, broken out by API group,
     version, resource, subresource, and removed_release.
-  type: Gauge
-  stabilityLevel: STABLE
-  labels:
+  Labels:
   - group
   - removed_release
   - resource
   - subresource
   - version
-- name: apiserver_storage_objects
-  help: Number of stored objects at the time of last check split by kind.
-  type: Gauge
-  stabilityLevel: STABLE
-  labels:
+  Name: apiserver_requested_deprecated_apis
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: ""
+  Type: Gauge
+- Buckets: null
+  DeprecatedVersion: ""
+  Help: Number of stored objects at the time of last check split by kind.
+  Labels:
   - resource
+  Name: apiserver_storage_objects
+  Namespace: ""
+  StabilityLevel: STABLE
+  Subsystem: ""
+  Type: Gauge
