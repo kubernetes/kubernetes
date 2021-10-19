@@ -93,10 +93,6 @@ func StartTestServer(t Logger, customFlags []string) (result TestServer, err err
 	}
 	fs.Parse(customFlags)
 
-	if err := opts.Complete(&namedFlagSets); err != nil {
-		return TestServer{}, err
-	}
-
 	if opts.SecureServing.BindPort != 0 {
 		opts.SecureServing.Listener, opts.SecureServing.BindPort, err = createListenerOnFreePort()
 		if err != nil {

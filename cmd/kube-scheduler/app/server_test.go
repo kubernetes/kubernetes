@@ -26,9 +26,13 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/testing/defaults"
@@ -152,10 +156,35 @@ profiles:
 		t.Fatal(err)
 	}
 
+	// empty leader-election config
+	emptyLeaderElectionConfig := filepath.Join(tmpDir, "empty-leader-election-config.yaml")
+	if err := ioutil.WriteFile(emptyLeaderElectionConfig, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1beta2
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
+	// leader-election config
+	leaderElectionConfig := filepath.Join(tmpDir, "leader-election-config.yaml")
+	if err := ioutil.WriteFile(leaderElectionConfig, []byte(fmt.Sprintf(`
+apiVersion: kubescheduler.config.k8s.io/v1beta2
+kind: KubeSchedulerConfiguration
+clientConnection:
+  kubeconfig: "%s"
+leaderElection:
+  leaseDuration: 1h
+`, configKubeconfig)), os.FileMode(0600)); err != nil {
+		t.Fatal(err)
+	}
+
 	testcases := []struct {
-		name        string
-		flags       []string
-		wantPlugins map[string]*config.Plugins
+		name               string
+		flags              []string
+		wantPlugins        map[string]*config.Plugins
+		wantLeaderElection *componentbaseconfig.LeaderElectionConfiguration
 	}{
 		{
 			name: "default config",
@@ -230,6 +259,75 @@ profiles:
 				},
 			},
 		},
+		{
+			name: "leader election CLI args, along with --config arg",
+			flags: []string{
+				"--leader-elect=false",
+				"--leader-elect-lease-duration=2h", // CLI args are favored over the fields in ComponentConfig
+				"--lock-object-namespace=default",  // deprecated CLI arg will be ignored if --config is specified
+				"--config", emptyLeaderElectionConfig,
+			},
+			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
+				LeaderElect:       false,                                    // from CLI args
+				LeaseDuration:     metav1.Duration{Duration: 2 * time.Hour}, // from CLI args
+				RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+				ResourceLock:      "leases",
+				ResourceName:      v1beta2.SchedulerDefaultLockObjectName,
+				ResourceNamespace: v1beta2.SchedulerDefaultLockObjectNamespace,
+			},
+		},
+		{
+			name: "leader election CLI args, without --config arg",
+			flags: []string{
+				"--leader-elect=false",
+				"--leader-elect-lease-duration=2h",
+				"--lock-object-namespace=default", // deprecated CLI arg is honored if --config is not specified
+				"--kubeconfig", configKubeconfig,
+			},
+			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
+				LeaderElect:       false,                                    // from CLI args
+				LeaseDuration:     metav1.Duration{Duration: 2 * time.Hour}, // from CLI args
+				RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+				ResourceLock:      "leases",
+				ResourceName:      v1beta2.SchedulerDefaultLockObjectName,
+				ResourceNamespace: "default", // from deprecated CLI args
+			},
+		},
+		{
+			name: "leader election settings specified by ComponentConfig only",
+			flags: []string{
+				"--config", leaderElectionConfig,
+			},
+			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
+				LeaderElect:       true,
+				LeaseDuration:     metav1.Duration{Duration: 1 * time.Hour}, // from CC
+				RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+				RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+				ResourceLock:      "leases",
+				ResourceName:      v1beta2.SchedulerDefaultLockObjectName,
+				ResourceNamespace: v1beta2.SchedulerDefaultLockObjectNamespace,
+			},
+		},
+		{
+			name: "leader election settings specified by CLI args and ComponentConfig",
+			flags: []string{
+				"--leader-elect=true",
+				"--leader-elect-renew-deadline=5s",
+				"--leader-elect-retry-period=1s",
+				"--config", leaderElectionConfig,
+			},
+			wantLeaderElection: &componentbaseconfig.LeaderElectionConfiguration{
+				LeaderElect:       true,
+				LeaseDuration:     metav1.Duration{Duration: 1 * time.Hour},   // from CC
+				RenewDeadline:     metav1.Duration{Duration: 5 * time.Second}, // from CLI args
+				RetryPeriod:       metav1.Duration{Duration: 1 * time.Second}, // from CLI args
+				ResourceLock:      "leases",
+				ResourceName:      v1beta2.SchedulerDefaultLockObjectName,
+				ResourceNamespace: v1beta2.SchedulerDefaultLockObjectNamespace,
+			},
+		},
 	}
 
 	makeListener := func(t *testing.T) net.Listener {
@@ -248,6 +346,13 @@ profiles:
 			if err != nil {
 				t.Fatal(err)
 			}
+			// use listeners instead of static ports so parallel test runs don't conflict
+			opts.SecureServing.Listener = makeListener(t)
+			defer opts.SecureServing.Listener.Close()
+			opts.CombinedInsecureServing.Metrics.Listener = makeListener(t)
+			defer opts.CombinedInsecureServing.Metrics.Listener.Close()
+			opts.CombinedInsecureServing.Healthz.Listener = makeListener(t)
+			defer opts.CombinedInsecureServing.Healthz.Listener.Close()
 
 			nfs := opts.Flags()
 			for _, f := range nfs.FlagSets {
@@ -257,18 +362,6 @@ profiles:
 				t.Fatal(err)
 			}
 
-			if err := opts.Complete(&nfs); err != nil {
-				t.Fatal(err)
-			}
-
-			// use listeners instead of static ports so parallel test runs don't conflict
-			opts.SecureServing.Listener = makeListener(t)
-			defer opts.SecureServing.Listener.Close()
-			opts.CombinedInsecureServing.Metrics.Listener = makeListener(t)
-			defer opts.CombinedInsecureServing.Metrics.Listener.Close()
-			opts.CombinedInsecureServing.Healthz.Listener = makeListener(t)
-			defer opts.CombinedInsecureServing.Healthz.Listener.Close()
-
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			_, sched, err := Setup(ctx, opts)
@@ -276,13 +369,22 @@ profiles:
 				t.Fatal(err)
 			}
 
-			gotPlugins := make(map[string]*config.Plugins)
-			for n, p := range sched.Profiles {
-				gotPlugins[n] = p.ListPlugins()
+			if tc.wantPlugins != nil {
+				gotPlugins := make(map[string]*config.Plugins)
+				for n, p := range sched.Profiles {
+					gotPlugins[n] = p.ListPlugins()
+				}
+
+				if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
+					t.Errorf("Unexpected plugins diff (-want, +got): %s", diff)
+				}
 			}
 
-			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
-				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
+			if tc.wantLeaderElection != nil {
+				gotLeaderElection := opts.ComponentConfig.LeaderElection
+				if diff := cmp.Diff(*tc.wantLeaderElection, gotLeaderElection); diff != "" {
+					t.Errorf("Unexpected leaderElection diff (-want, +got): %s", diff)
+				}
 			}
 		})
 	}
