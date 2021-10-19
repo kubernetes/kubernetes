@@ -30,7 +30,7 @@ import (
 )
 
 // request is a temporary container for "requests" with additional
-// tracking fields required for the functionality FQScheduler
+// tracking fields required for QueueSet functionality.
 type request struct {
 	ctx context.Context
 
@@ -42,9 +42,6 @@ type request struct {
 	// The relevant queue.  Is nil if this request did not go through
 	// a queue.
 	queue *queue
-
-	// startTime is the real time when the request began executing
-	startTime time.Time
 
 	// estimated amount of work of the request
 	workEstimate completedWorkEstimate
@@ -61,22 +58,29 @@ type request struct {
 	// arrivalTime is the real time when the request entered this system
 	arrivalTime time.Time
 
-	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
-	// This field is meaningful only while the request is waiting in the virtual world.
-	arrivalR SeatSeconds
-
 	// descr1 and descr2 are not used in any logic but they appear in
 	// log messages
 	descr1, descr2 interface{}
 
-	// Indicates whether client has called Request::Wait()
-	waitStarted bool
-
 	queueNoteFn fq.QueueNoteFn
+
+	// The preceding fields are filled in at creation and not modified since;
+	// the following fields may be modified later and must only be accessed while
+	// holding the queueSet's lock.
 
 	// Removes this request from its queue. If the request is not put into a
 	// a queue it will be nil.
-	removeFromQueueFn removeFromFIFOFunc
+	removeFromQueueLocked removeFromFIFOFunc
+
+	// arrivalR is R(arrivalTime).  R is, confusingly, also called "virtual time".
+	// This field is meaningful only while the request is waiting in the virtual world.
+	arrivalR SeatSeconds
+
+	// startTime is the real time when the request began executing
+	startTime time.Time
+
+	// Indicates whether client has called Request::Wait()
+	waitStarted bool
 }
 
 type completedWorkEstimate struct {
@@ -85,8 +89,8 @@ type completedWorkEstimate struct {
 	finalWork SeatSeconds // only final work
 }
 
-// queue is an array of requests with additional metadata required for
-// the FQScheduler
+// queue is a sequence of requests that have arrived but not yet finished
+// execution in both the real and virtual worlds.
 type queue struct {
 	// The requests not yet executing in the real world are stored in a FIFO list.
 	requests fifo
@@ -95,9 +99,11 @@ type queue struct {
 	// which the next request will be dispatched in the virtual world.
 	nextDispatchR SeatSeconds
 
-	// requestsExecuting is the count in the real world
+	// requestsExecuting is the count in the real world.
 	requestsExecuting int
-	index             int
+
+	// index is the position of this queue among those in its queueSet.
+	index int
 
 	// seatsInUse is the total number of "seats" currently occupied
 	// by all the requests that are currently executing in this queue.
@@ -140,19 +146,7 @@ func (qs *queueSet) computeFinalWork(we *fcrequest.WorkEstimate) SeatSeconds {
 	return SeatsTimesDuration(float64(we.FinalSeats), we.AdditionalLatency)
 }
 
-// Enqueue enqueues a request into the queue and
-// sets the removeFromQueueFn of the request appropriately.
-func (q *queue) Enqueue(request *request) {
-	request.removeFromQueueFn = q.requests.Enqueue(request)
-}
-
-// Dequeue dequeues a request from the queue
-func (q *queue) Dequeue() (*request, bool) {
-	request, ok := q.requests.Dequeue()
-	return request, ok
-}
-
-func (q *queue) dump(includeDetails bool) debug.QueueDump {
+func (q *queue) dumpLocked(includeDetails bool) debug.QueueDump {
 	digest := make([]debug.RequestDump, q.requests.Length())
 	i := 0
 	q.requests.Walk(func(r *request) bool {

@@ -33,9 +33,8 @@ type walkFunc func(*request) (ok bool)
 // Internal interface to abstract out the implementation details
 // of the underlying list used to maintain the requests.
 //
-// Note that the FIFO list is not safe for concurrent use by multiple
-// goroutines without additional locking or coordination. It rests with
-// the user to ensure that the FIFO list is used with proper locking.
+// Note that a fifo, including the removeFromFIFOFuncs returned from Enqueue,
+// is not safe for concurrent use by multiple goroutines.
 type fifo interface {
 	// Enqueue enqueues the specified request into the list and
 	// returns a removeFromFIFOFunc function that can be used to remove the
@@ -64,7 +63,7 @@ type fifo interface {
 }
 
 // the FIFO list implementation is not safe for concurrent use by multiple
-// goroutines without additional locking or coordination.
+// goroutines.
 type requestFIFO struct {
 	*list.List
 
