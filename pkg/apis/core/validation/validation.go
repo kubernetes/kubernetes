@@ -84,6 +84,7 @@ var allowedEphemeralContainerFields = map[string]bool{
 	"Env":                      true,
 	"Resources":                false,
 	"VolumeMounts":             true,
+	"VolumeDevices":            true,
 	"LivenessProbe":            false,
 	"ReadinessProbe":           false,
 	"StartupProbe":             false,

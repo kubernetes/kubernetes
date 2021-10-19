@@ -6169,7 +6169,10 @@ func getResourceLimits(cpu, memory string) core.ResourceList {
 func TestValidateEphemeralContainers(t *testing.T) {
 	containers := []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
 	initContainers := []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
-	vols := map[string]core.VolumeSource{"vol": {EmptyDir: &core.EmptyDirVolumeSource{}}}
+	vols := map[string]core.VolumeSource{
+		"blk": {PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "pvc"}},
+		"vol": {EmptyDir: &core.EmptyDirVolumeSource{}},
+	}
 
 	// Success Cases
 	for title, ephemeralContainers := range map[string][]core.EphemeralContainer{
@@ -6187,7 +6190,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				TargetContainerName:      "ctr",
 			},
 		},
-		"All allowed Fields": {
+		"All allowed fields": {
 			{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 
@@ -6209,6 +6212,9 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 					VolumeMounts: []core.VolumeMount{
 						{Name: "vol", MountPath: "/vol"},
+					},
+					VolumeDevices: []core.VolumeDevice{
+						{Name: "blk", DevicePath: "/dev/block"},
 					},
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: "File",
