@@ -128,6 +128,13 @@ func (obj *TypeMeta) GroupVersionKind() schema.GroupVersionKind {
 	return schema.FromAPIVersionAndKind(obj.APIVersion, obj.Kind)
 }
 
+var _ Type = &TypeMeta{}
+
+func (obj *TypeMeta) GetAPIVersion() string  { return obj.APIVersion }
+func (obj *TypeMeta) SetAPIVersion(v string) { obj.APIVersion = v }
+func (obj *TypeMeta) GetKind() string        { return obj.Kind }
+func (obj *TypeMeta) SetKind(k string)       { obj.Kind = k }
+
 func (obj *ListMeta) GetListMeta() ListInterface { return obj }
 
 func (obj *ObjectMeta) GetObjectMeta() Object { return obj }
