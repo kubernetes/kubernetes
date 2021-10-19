@@ -1098,7 +1098,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if hasNodePort {
 		nodeAddrSet, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 		if err != nil {
-			klog.ErrorS(err, "Failed to get node ip address matching nodeport cidr")
+			klog.ErrorS(err, "Failed to get node IP address matching nodeport cidr")
 		} else {
 			nodeAddresses = nodeAddrSet.List()
 			for _, address := range nodeAddresses {
@@ -1216,10 +1216,10 @@ func (proxier *Proxier) syncProxyRules() {
 				internalNodeLocal = true
 			}
 			if err := proxier.syncEndpoint(svcName, internalNodeLocal, serv); err != nil {
-				klog.ErrorS(err, "Failed to sync endpoint for service", "service", serv)
+				klog.ErrorS(err, "Failed to sync endpoint for service", "service", svcName, "virtualServer", serv)
 			}
 		} else {
-			klog.ErrorS(err, "Failed to sync service", "service", serv)
+			klog.ErrorS(err, "Failed to sync service", "service", svcName, "virtualServer", serv)
 		}
 
 		// Capture externalIPs.
@@ -1298,10 +1298,10 @@ func (proxier *Proxier) syncProxyRules() {
 				activeBindAddrs[serv.Address.String()] = true
 
 				if err := proxier.syncEndpoint(svcName, svcInfo.NodeLocalExternal(), serv); err != nil {
-					klog.ErrorS(err, "Failed to sync endpoint for service", "service", serv)
+					klog.ErrorS(err, "Failed to sync endpoint for service", "service", svcName, "virtualServer", serv)
 				}
 			} else {
-				klog.ErrorS(err, "Failed to sync service", "service", serv)
+				klog.ErrorS(err, "Failed to sync service", "service", svcName, "virtualServer", serv)
 			}
 		}
 
