@@ -113,6 +113,19 @@ func PodResourceNameAndContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Co
 	}
 }
 
+// ContainerCompletionFunc Returns a completion function that completes the containers within the
+// pod specified by the first argument.
+func ContainerCompletionFunc(f cmdutil.Factory) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		var comps []string
+		if len(args) > 0 {
+			// We need the pod name to be able to complete the container names, it must be in args[0]
+			comps = get.CompGetContainers(f, cmd, args[0], toComplete)
+		}
+		return comps, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
 // ContextCompletionFunc is a completion function that completes as a first argument the
 // context names that match the toComplete prefix
 func ContextCompletionFunc(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
