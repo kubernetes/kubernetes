@@ -1298,7 +1298,7 @@ func (proxier *Proxier) syncProxyRules() {
 				activeBindAddrs[serv.Address.String()] = true
 
 				if err := proxier.syncEndpoint(svcName, svcInfo.NodeLocalExternal(), serv); err != nil {
-					klog.ErrorS(err, "Failed to sync endpoint for service", "service", svcName, "virtualServer", serv)
+					klog.ErrorS(err, "Failed to sync endpoint for service", "serviceName", svcName, "virtualServer", serv)
 				}
 			} else {
 				klog.ErrorS(err, "Failed to sync service", "service", svcName, "virtualServer", serv)
