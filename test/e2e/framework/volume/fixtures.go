@@ -448,14 +448,14 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 	return clientPod, nil
 }
 
-func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
+func testVolumeContent(f *framework.Framework, pod *v1.Pod, containerName string, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		if test.Mode == v1.PersistentVolumeBlock {
 			// Block: check content
 			deviceName := fmt.Sprintf("/opt/%d", i)
 			commands := GenerateReadBlockCmd(deviceName, len(test.ExpectedContent))
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
@@ -464,7 +464,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
 			commands := GenerateReadFileCmd(fileName)
-			_, err := framework.LookForStringInPodExec(pod.Namespace, pod.Name, commands, test.ExpectedContent, time.Minute)
+			_, err := framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, commands, test.ExpectedContent, time.Minute)
 			framework.ExpectNoError(err, "failed: finding the contents of the mounted file %s.", fileName)
 
 			// Check that a directory has been mounted
@@ -475,14 +475,14 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 				// Filesystem: check fsgroup
 				if fsGroup != nil {
 					ginkgo.By("Checking fsGroup is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
+					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"ls", "-ld", dirName}, strconv.Itoa(int(*fsGroup)), time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right privileges in the file %v", int(*fsGroup))
 				}
 
 				// Filesystem: check fsType
 				if fsType != "" {
 					ginkgo.By("Checking fsType is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+					_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, containerName, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
 					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
 				}
 			}
@@ -521,7 +521,23 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
-	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
+	testVolumeContent(f, clientPod, "", fsGroup, fsType, tests)
+
+	ginkgo.By("Repeating the test on an ephemeral container (if enabled)")
+	ec := &v1.EphemeralContainer{
+		EphemeralContainerCommon: v1.EphemeralContainerCommon(clientPod.Spec.Containers[0]),
+	}
+	ec.Name = "volume-ephemeral-container"
+	err = f.PodClient().AddEphemeralContainerSync(clientPod, ec, timeouts.PodStart)
+	// The API server will return NotFound for the subresource when the feature is disabled
+	// BEGIN TODO: remove after EphemeralContainers feature gate is retired
+	if apierrors.IsNotFound(err) {
+		framework.Logf("Skipping ephemeral container re-test because feature is disabled (error: %q)", err)
+		return
+	}
+	// END TODO: remove after EphemeralContainers feature gate is retired
+	framework.ExpectNoError(err, "failed to add ephemeral container for re-test")
+	testVolumeContent(f, clientPod, ec.Name, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
@@ -562,7 +578,7 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
-	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
+	testVolumeContent(f, injectorPod, "", fsGroup, fsType, tests)
 }
 
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd

@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -60,7 +61,8 @@ var _ = SIGDescribe("Ephemeral Containers", func() {
 				TTY:     true,
 			},
 		}
-		podClient.AddEphemeralContainerSync(pod, ec, time.Minute)
+		err := podClient.AddEphemeralContainerSync(pod, ec, time.Minute)
+		framework.ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
 
 		ginkgo.By("confirm that the container is really running")
 		marco := f.ExecCommandInContainer(pod.Name, "debugger", "/bin/echo", "polo")
