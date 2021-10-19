@@ -26,18 +26,20 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 )
 
 const configMapName = "configmap"
 
-func TestPatchNodeNonErrorCases(t *testing.T) {
+func TestPatchNode(t *testing.T) {
 	testcases := []struct {
 		name       string
 		lookupName string
 		node       v1.Node
 		success    bool
+		fakeError  error
 	}{
 		{
 			name:       "simple update",
@@ -65,6 +67,30 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 			},
 			success: false,
 		},
+		{
+			name:       "patch node when timeout",
+			lookupName: "testnode",
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "testnode",
+					Labels: map[string]string{v1.LabelHostname: ""},
+				},
+			},
+			success:   false,
+			fakeError: apierrors.NewTimeoutError("fake timeout", -1),
+		},
+		{
+			name:       "patch node when conflict",
+			lookupName: "testnode",
+			node: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "testnode",
+					Labels: map[string]string{v1.LabelHostname: ""},
+				},
+			},
+			success:   false,
+			fakeError: apierrors.NewConflict(schema.GroupResource{}, "fake conflict", nil),
+		},
 	}
 
 	for _, tc := range testcases {
@@ -73,6 +99,11 @@ func TestPatchNodeNonErrorCases(t *testing.T) {
 			_, err := client.CoreV1().Nodes().Create(context.TODO(), &tc.node, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to create node to fake client: %v", err)
+			}
+			if tc.fakeError != nil {
+				client.PrependReactor("patch", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+					return true, nil, tc.fakeError
+				})
 			}
 			var lastError error
 			conditionFunction := PatchNodeOnce(client, tc.lookupName, func(node *v1.Node) {
