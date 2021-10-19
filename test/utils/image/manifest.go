@@ -203,7 +203,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.17.5"}
-	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.3"}
+	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-2"}
 	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
@@ -215,15 +215,15 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-2"}
 	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-2"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
-	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.2"}
+	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.3"}
 	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.5"}
 	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.5"}
 	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.5"}
 	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-2"}
 	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-2"}
-	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.1"}
-	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.1"}
+	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.2"}
+	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.2"}
 	configs[NodePerfTfWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.2"}
@@ -236,10 +236,10 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.2"}
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.10"}
 	configs[SdDummyExporter] = Config{list.GcRegistry, "sd-dummy-exporter", "v0.2.0"}
-	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.2"}
-	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.2"}
-	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.2"}
-	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.3"}
+	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.3"}
+	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.3"}
+	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.3"}
+	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.4"}
 	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
 	// if requested, map all the SHAs into a known format based on the input
