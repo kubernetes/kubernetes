@@ -47,7 +47,7 @@ timeout_arg=""
 system_spec_name=${SYSTEM_SPEC_NAME:-}
 extra_envs=${EXTRA_ENVS:-}
 runtime_config=${RUNTIME_CONFIG:-}
-ssh_user=${SSH_USER:-${USER}}
+ssh_user=${SSH_USER:-"${USER}"}
 ssh_key=${SSH_KEY:-}
 
 # Parse the flags to pass to ginkgo
