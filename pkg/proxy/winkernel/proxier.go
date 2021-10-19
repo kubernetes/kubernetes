@@ -149,7 +149,7 @@ func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
 
 func getNetworkName(hnsNetworkName string) (string, error) {
 	if len(hnsNetworkName) == 0 {
-		klog.V(3).InfoS("Network-name flag not set, checking environment variable")
+		klog.V(3).InfoS("Flag --network-name not set, checking environment variable")
 		hnsNetworkName = os.Getenv("KUBE_NETWORK")
 		if len(hnsNetworkName) == 0 {
 			return "", fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
