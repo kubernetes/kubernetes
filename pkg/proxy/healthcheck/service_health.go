@@ -201,7 +201,7 @@ func (hcI *hcInstance) closeAll() error {
 	errors := []error{}
 	for _, listener := range hcI.listeners {
 		if err := listener.Close(); err != nil {
-			klog.ErrorS(err, "Error closing listener for health check service", "healthCheckService", hcI.nsn, "listener", listener.Addr())
+			klog.ErrorS(err, "Error closing listener for health check service", "service", hcI.nsn, "address", listener.Addr())
 			errors = append(errors, err)
 		}
 	}
