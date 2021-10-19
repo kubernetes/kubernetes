@@ -946,7 +946,7 @@ func (proxier *Proxier) cleanupAllPolicies() {
 	for svcName, svc := range proxier.serviceMap {
 		svcInfo, ok := svc.(*serviceInfo)
 		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "svcName", svcName)
+			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
 			continue
 		}
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[svcName])
