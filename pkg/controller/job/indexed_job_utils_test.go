@@ -446,6 +446,11 @@ func TestPodGenerateNameWithIndex(t *testing.T) {
 		index               int
 		wantPodGenerateName string
 	}{
+		"unknown completion index": {
+			jobname:             "indexed-job",
+			index:               -1,
+			wantPodGenerateName: "indexed-job-",
+		},
 		"short job name": {
 			jobname:             "indexed-job",
 			index:               1,

@@ -317,7 +317,10 @@ func addCompletionIndexAnnotation(template *v1.PodTemplateSpec, index int) {
 }
 
 func podGenerateNameWithIndex(jobName string, index int) string {
-	appendIndex := "-" + strconv.Itoa(index) + "-"
+	appendIndex := "-"
+	if index != unknownCompletionIndex {
+		appendIndex = "-" + strconv.Itoa(index) + "-"
+	}
 	generateNamePrefix := jobName + appendIndex
 	if len(generateNamePrefix) > names.MaxGeneratedNameLength {
 		generateNamePrefix = generateNamePrefix[:names.MaxGeneratedNameLength-len(appendIndex)] + appendIndex

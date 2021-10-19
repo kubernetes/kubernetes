@@ -163,6 +163,7 @@ type JobSpec struct {
 	// `NonIndexed` means that the Job is considered complete when there have
 	// been .spec.completions successfully completed Pods. Each Pod completion is
 	// homologous to each other.
+	// The Pod name takes the form `$(job-name)-$(random-string)`.
 	//
 	// `Indexed` means that the Pods of a
 	// Job get an associated completion index from 0 to (.spec.completions - 1),
