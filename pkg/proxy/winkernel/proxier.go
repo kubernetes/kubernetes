@@ -975,7 +975,7 @@ func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
 	defer func() {
 		SyncProxyRulesLatency.Observe(metrics.SinceInSeconds(start))
-		klog.V(4).InfoS("SyncProxyRules complete", "elapsed", time.Since(start))
+		klog.V(4).InfoS("Syncing proxy rules complete", "elapsed", time.Since(start))
 	}()
 	// don't sync rules till we've received services and endpoints
 	if !proxier.isInitialized() {

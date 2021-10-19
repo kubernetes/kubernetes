@@ -110,6 +110,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 			_ = svc.closeAll()
 
 			delete(hcs.services, nsn)
+
 		}
 	}
 
@@ -126,7 +127,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 		err := svc.listenAndServeAll(hcs)
 
 		if err != nil {
-			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.hostname, nsn, port, err)
+			msg := fmt.Sprintf("node %s failed to start healthcheck %q on port %d: %v", hcs.hostname, nsn.String(), port, err)
 
 			if hcs.recorder != nil {
 				hcs.recorder.Eventf(
