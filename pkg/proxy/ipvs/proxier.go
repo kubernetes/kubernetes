@@ -1135,7 +1135,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for svcName, svc := range proxier.serviceMap {
 		svcInfo, ok := svc.(*serviceInfo)
 		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "svcName", svcName)
+			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
 			continue
 		}
 		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
