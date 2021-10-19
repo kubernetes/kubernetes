@@ -367,7 +367,7 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 		svcInfo, ok := svc.(*serviceInfo)
 
 		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "svcPortName", svcPortName)
+			klog.ErrorS(nil, "Failed to cast serviceInfo", "servicePortName", svcPortName)
 			return
 		}
 
