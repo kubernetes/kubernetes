@@ -195,7 +195,6 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 	}
 
 	for _, test := range tests {
-
 		pod := &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				UID:       "12345678",
