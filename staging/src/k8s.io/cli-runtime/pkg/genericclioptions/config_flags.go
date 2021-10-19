@@ -48,6 +48,7 @@ const (
 	flagCAFile           = "certificate-authority"
 	flagBearerToken      = "token"
 	flagImpersonate      = "as"
+	flagImpersonateUID   = "as-uid"
 	flagImpersonateGroup = "as-group"
 	flagUsername         = "username"
 	flagPassword         = "password"
@@ -94,6 +95,7 @@ type ConfigFlags struct {
 	CAFile           *string
 	BearerToken      *string
 	Impersonate      *string
+	ImpersonateUID   *string
 	ImpersonateGroup *[]string
 	Username         *string
 	Password         *string
@@ -170,6 +172,9 @@ func (f *ConfigFlags) toRawKubeConfigLoader() clientcmd.ClientConfig {
 	}
 	if f.Impersonate != nil {
 		overrides.AuthInfo.Impersonate = *f.Impersonate
+	}
+	if f.ImpersonateUID != nil {
+		overrides.AuthInfo.ImpersonateUID = *f.ImpersonateUID
 	}
 	if f.ImpersonateGroup != nil {
 		overrides.AuthInfo.ImpersonateGroups = *f.ImpersonateGroup
@@ -336,6 +341,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Impersonate != nil {
 		flags.StringVar(f.Impersonate, flagImpersonate, *f.Impersonate, "Username to impersonate for the operation. User could be a regular user or a service account in a namespace.")
 	}
+	if f.ImpersonateUID != nil {
+		flags.StringVar(f.ImpersonateUID, flagImpersonateUID, *f.ImpersonateUID, "UID to impersonate for the operation.")
+	}
 	if f.ImpersonateGroup != nil {
 		flags.StringArrayVar(f.ImpersonateGroup, flagImpersonateGroup, *f.ImpersonateGroup, "Group to impersonate for the operation, this flag can be repeated to specify multiple groups.")
 	}
@@ -410,6 +418,7 @@ func NewConfigFlags(usePersistentConfig bool) *ConfigFlags {
 		CAFile:           stringptr(""),
 		BearerToken:      stringptr(""),
 		Impersonate:      stringptr(""),
+		ImpersonateUID:   stringptr(""),
 		ImpersonateGroup: &impersonateGroup,
 
 		usePersistentConfig: usePersistentConfig,

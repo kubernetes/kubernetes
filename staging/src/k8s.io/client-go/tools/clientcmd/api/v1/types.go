@@ -111,10 +111,13 @@ type AuthInfo struct {
 	// TokenFile is a pointer to a file that contains a bearer token (as described above).  If both Token and TokenFile are present, Token takes precedence.
 	// +optional
 	TokenFile string `json:"tokenFile,omitempty"`
-	// Impersonate is the username to imperonate.  The name matches the flag.
+	// Impersonate is the username to impersonate.  The name matches the flag.
 	// +optional
 	Impersonate string `json:"as,omitempty"`
-	// ImpersonateGroups is the groups to imperonate.
+	// ImpersonateUID is the uid to impersonate.
+	// +optional
+	ImpersonateUID string `json:"as-uid,omitempty"`
+	// ImpersonateGroups is the groups to impersonate.
 	// +optional
 	ImpersonateGroups []string `json:"as-groups,omitempty"`
 	// ImpersonateUserExtra contains additional information for impersonated user.
