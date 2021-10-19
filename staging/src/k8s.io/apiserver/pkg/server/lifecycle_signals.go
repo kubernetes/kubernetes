@@ -131,10 +131,10 @@ type lifecycleSignals struct {
 	// HasBeenReady is signaled when the readyz endpoint succeeds for the first time.
 	HasBeenReady lifecycleSignal
 
-	// MuxComplete is signaled when all known HTTP paths have been installed.
+	// MuxAndDiscoveryComplete is signaled when all known HTTP paths have been installed.
 	// It exists primarily to avoid returning a 404 response when a resource actually exists but we haven't installed the path to a handler.
 	// The actual logic is implemented by an APIServer using the generic server library.
-	MuxComplete lifecycleSignal
+	MuxAndDiscoveryComplete lifecycleSignal
 }
 
 // newLifecycleSignals returns an instance of lifecycleSignals interface to be used
@@ -146,7 +146,7 @@ func newLifecycleSignals() lifecycleSignals {
 		InFlightRequestsDrained:    newNamedChannelWrapper("InFlightRequestsDrained"),
 		HTTPServerStoppedListening: newNamedChannelWrapper("HTTPServerStoppedListening"),
 		HasBeenReady:               newNamedChannelWrapper("HasBeenReady"),
-		MuxComplete:                newNamedChannelWrapper("MuxComplete"),
+		MuxAndDiscoveryComplete:    newNamedChannelWrapper("MuxAndDiscoveryComplete"),
 	}
 }
 

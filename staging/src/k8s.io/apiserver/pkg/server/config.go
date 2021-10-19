@@ -627,7 +627,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		Version: c.Version,
 
-		muxCompleteSignals: map[string]<-chan struct{}{},
+		muxAndDiscoveryCompleteSignals: map[string]<-chan struct{}{},
 	}
 
 	for {
@@ -660,8 +660,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 	}
 
 	// register mux signals from the delegated server
-	for k, v := range delegationTarget.MuxCompleteSignals() {
-		if err := s.RegisterMuxCompleteSignal(k, v); err != nil {
+	for k, v := range delegationTarget.MuxAndDiscoveryCompleteSignals() {
+		if err := s.RegisterMuxAndDiscoveryCompleteSignal(k, v); err != nil {
 			return nil, err
 		}
 	}
@@ -816,7 +816,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	}
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
-	handler = genericapifilters.WithMuxCompleteProtection(handler, c.lifecycleSignals.MuxComplete.Signaled())
+	handler = genericapifilters.WithMuxAndDiscoveryComplete(handler, c.lifecycleSignals.MuxAndDiscoveryComplete.Signaled())
 	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
 	handler = genericapifilters.WithAuditID(handler)
 	return handler

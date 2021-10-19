@@ -21,21 +21,21 @@ import (
 	"net/http"
 )
 
-type muxCompleteProtectionKeyType int
+type muxAndDiscoveryIncompleteKeyType int
 
 const (
-	// muxCompleteProtectionKey is a key under which a protection signal for all requests made before the server have installed all known HTTP paths is stored in the request's context
-	muxCompleteProtectionKey muxCompleteProtectionKeyType = iota
+	// muxAndDiscoveryIncompleteKey is a key under which a protection signal for all requests made before the server have installed all known HTTP paths is stored in the request's context
+	muxAndDiscoveryIncompleteKey muxAndDiscoveryIncompleteKeyType = iota
 )
 
-// HasMuxCompleteProtectionKey checks if the context contains muxCompleteProtectionKey.
+// NoMuxAndDiscoveryIncompleteKey checks if the context contains muxAndDiscoveryIncompleteKey.
 // The presence of the key indicates the request has been made when the HTTP paths weren't installed.
-func HasMuxCompleteProtectionKey(ctx context.Context) bool {
-	muxCompleteProtectionKeyValue, _ := ctx.Value(muxCompleteProtectionKey).(string)
-	return len(muxCompleteProtectionKeyValue) != 0
+func NoMuxAndDiscoveryIncompleteKey(ctx context.Context) bool {
+	muxAndDiscoveryCompleteProtectionKeyValue, _ := ctx.Value(muxAndDiscoveryIncompleteKey).(string)
+	return len(muxAndDiscoveryCompleteProtectionKeyValue) == 0
 }
 
-// WithMuxCompleteProtection puts the muxCompleteProtectionKey in the context if a request has been made before muxCompleteSignal has been ready.
+// WithMuxAndDiscoveryComplete puts the muxAndDiscoveryIncompleteKey in the context if a request has been made before muxAndDiscoveryCompleteSignal has been ready.
 // Putting the key protect us from returning a 404 response instead of a 503.
 // It is especially important for controllers like GC and NS since they act on 404s.
 //
@@ -44,10 +44,10 @@ func HasMuxCompleteProtectionKey(ctx context.Context) bool {
 // The race may happen when a request reaches the NotFoundHandler because not all paths have been registered in the mux
 // but when the registered checks are examined in the handler they indicate that the paths have been actually installed.
 // In that case, the presence of the key will make the handler return 503 instead of 404.
-func WithMuxCompleteProtection(handler http.Handler, muxCompleteSignal <-chan struct{}) http.Handler {
+func WithMuxAndDiscoveryComplete(handler http.Handler, muxAndDiscoveryCompleteSignal <-chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		if muxCompleteSignal != nil && !isClosed(muxCompleteSignal) {
-			req = req.WithContext(context.WithValue(req.Context(), muxCompleteProtectionKey, "MuxInstallationNotComplete"))
+		if muxAndDiscoveryCompleteSignal != nil && !isClosed(muxAndDiscoveryCompleteSignal) {
+			req = req.WithContext(context.WithValue(req.Context(), muxAndDiscoveryIncompleteKey, "MuxAndDiscoveryInstallationNotComplete"))
 		}
 		handler.ServeHTTP(w, req)
 	})
