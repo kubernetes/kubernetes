@@ -1041,7 +1041,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if strings.EqualFold(proxier.network.networkType, NETWORK_TYPE_OVERLAY) {
 			serviceVipEndpoint, _ := hns.getEndpointByIpAddress(svcInfo.ClusterIP().String(), hnsNetworkName)
 			if serviceVipEndpoint == nil {
-				klog.V(4).InfoS("No existing remote endpoint", "ip", svcInfo.ClusterIP())
+				klog.V(4).InfoS("No existing remote endpoint", "IP", svcInfo.ClusterIP())
 				hnsEndpoint := &endpointsInfo{
 					ip:              svcInfo.ClusterIP().String(),
 					isLocal:         false,
@@ -1118,7 +1118,7 @@ func (proxier *Proxier) syncProxyRules() {
 					proxier.network = *updatedNetwork
 					providerAddress := proxier.network.findRemoteSubnetProviderAddress(ep.IP())
 					if len(providerAddress) == 0 {
-						klog.InfoS("Could not find provider address, assuming it is a public IP", "ip", ep.IP())
+						klog.InfoS("Could not find provider address, assuming it is a public IP", "IP", ep.IP())
 						providerAddress = proxier.nodeIP.String()
 					}
 
@@ -1210,7 +1210,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		sessionAffinityClientIP := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
 		if sessionAffinityClientIP && !proxier.supportedFeatures.SessionAffinity {
-			klog.InfoS("Session Affinity is not supported on this version of Windows.")
+			klog.InfoS("Session Affinity is not supported on this version of Windows")
 		}
 
 		hnsLoadBalancer, err := hns.getLoadBalancer(
@@ -1326,7 +1326,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// TODO: these could be made more consistent.
 	for _, svcIP := range staleServices.UnsortedList() {
 		// TODO : Check if this is required to cleanup stale services here
-		klog.V(5).InfoS("Pending delete stale service IP connections", "ip", svcIP)
+		klog.V(5).InfoS("Pending delete stale service IP connections", "IP", svcIP)
 	}
 
 	// remove stale endpoint refcount entries
