@@ -371,7 +371,7 @@ func (proxier *Proxier) onServiceMapChange(svcPortName *proxy.ServicePortName) {
 			return
 		}
 
-		klog.V(3).InfoS("Updating existing service port", "svcPortName", svcPortName, "clusterIP", svcInfo.ClusterIP(), "port", svcInfo.Port(), "protocol", svcInfo.Protocol())
+		klog.V(3).InfoS("Updating existing service port", "servicePortName", svcPortName, "clusterIP", svcInfo.ClusterIP(), "port", svcInfo.Port(), "protocol", svcInfo.Protocol())
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName])
 	}
 }
