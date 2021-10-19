@@ -1219,7 +1219,7 @@ func (proxier *Proxier) syncProxyRules() {
 				klog.ErrorS(err, "Failed to sync endpoint for service", "service", svcName, "virtualServer", serv)
 			}
 		} else {
-			klog.ErrorS(err, "Failed to sync service", "service", svcName, "virtualServer", serv)
+			klog.ErrorS(err, "Failed to sync service", "serviceName", svcName, "virtualServer", serv)
 		}
 
 		// Capture externalIPs.
