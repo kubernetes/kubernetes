@@ -442,6 +442,16 @@ func (r RealControllerRevisionControl) PatchControllerRevision(namespace, name s
 	return err
 }
 
+// FakeControllerRevisionControl is the fake implementation of ControllerRevisionControlInterface for test.
+type FakeControllerRevisionControl struct {
+}
+
+func (f FakeControllerRevisionControl) PatchControllerRevision(namespace, name string, data []byte) error {
+	return nil
+}
+
+var _ ControllerRevisionControlInterface = &FakeControllerRevisionControl{}
+
 // PodControlInterface is an interface that knows how to add or delete pods
 // created as an interface to allow testing.
 type PodControlInterface interface {

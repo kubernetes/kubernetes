@@ -593,17 +593,17 @@ func TestAdoptOrphanRevisions(t *testing.T) {
 	spc.revisionsIndexer.Add(ss1Rev1)
 	spc.revisionsIndexer.Add(ss1Rev2)
 
-	err = ssc.adoptOrphanRevisions(context.TODO(), ss1)
+	claimed, err := ssc.adoptOrphanRevisions(context.TODO(), ss1)
 	if err != nil {
 		t.Errorf("adoptOrphanRevisions() error: %v", err)
 	}
 
-	if revisions, err := ssc.control.ListRevisions(ss1); err != nil {
+	if _, err := ssc.control.ListRevisions(ss1); err != nil {
 		t.Errorf("ListRevisions() error: %v", err)
 	} else {
 		var adopted bool
-		for i := range revisions {
-			if revisions[i].Name == ss1Rev2.Name && metav1.GetControllerOf(revisions[i]) != nil {
+		for i := range claimed {
+			if claimed[i].Name == ss1Rev2.Name {
 				adopted = true
 			}
 		}
@@ -668,6 +668,7 @@ func newFakeStatefulSetController(initialObjects ...runtime.Object) (*StatefulSe
 	ssc.setListerSynced = alwaysReady
 	recorder := record.NewFakeRecorder(10)
 	ssc.control = NewDefaultStatefulSetControl(fpc, ssu, ssh, recorder)
+	ssc.crControl = controller.FakeControllerRevisionControl{}
 
 	return ssc, fpc, ssh
 }

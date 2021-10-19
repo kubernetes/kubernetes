@@ -60,6 +60,8 @@ type StatefulSetController struct {
 	control StatefulSetControlInterface
 	// podControl is used for patching pods.
 	podControl controller.PodControlInterface
+	// crControl is used for patching controllerRevisions.
+	crControl controller.ControllerRevisionControlInterface
 	// podLister is able to list/get pods from a shared informer's store
 	podLister corelisters.PodLister
 	// podListerSynced returns true if the pod shared informer has synced at least once
@@ -104,6 +106,7 @@ func NewStatefulSetController(
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		crControl:       controller.RealControllerRevisionControl{KubeClient: kubeClient},
 
 		revListerSynced: revInformer.Informer().HasSynced,
 	}
@@ -320,25 +323,19 @@ func (ssc *StatefulSetController) canAdoptFunc(ctx context.Context, set *apps.St
 }
 
 // adoptOrphanRevisions adopts any orphaned ControllerRevisions matched by set's Selector.
-func (ssc *StatefulSetController) adoptOrphanRevisions(ctx context.Context, set *apps.StatefulSet) error {
+// The list of ControllerRevisions that the StatefulSet now own is returned.
+func (ssc *StatefulSetController) adoptOrphanRevisions(ctx context.Context, set *apps.StatefulSet) ([]*apps.ControllerRevision, error) {
 	revisions, err := ssc.control.ListRevisions(set)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	orphanRevisions := make([]*apps.ControllerRevision, 0)
-	for i := range revisions {
-		if metav1.GetControllerOf(revisions[i]) == nil {
-			orphanRevisions = append(orphanRevisions, revisions[i])
-		}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		return nil, err
 	}
-	if len(orphanRevisions) > 0 {
-		canAdoptErr := ssc.canAdoptFunc(ctx, set)(ctx)
-		if canAdoptErr != nil {
-			return fmt.Errorf("can't adopt ControllerRevisions: %v", canAdoptErr)
-		}
-		return ssc.control.AdoptOrphanRevisions(set, orphanRevisions)
-	}
-	return nil
+	cm := controller.NewControllerRevisionControllerRefManager(ssc.crControl, set, selector, controllerKind, ssc.canAdoptFunc(ctx, set))
+	claimed, err := cm.ClaimControllerRevisions(ctx, revisions)
+	return claimed, err
 }
 
 // getStatefulSetsForPod returns a list of StatefulSets that potentially match
@@ -452,7 +449,7 @@ func (ssc *StatefulSetController) sync(ctx context.Context, key string) error {
 		return nil
 	}
 
-	if err := ssc.adoptOrphanRevisions(ctx, set); err != nil {
+	if _, err := ssc.adoptOrphanRevisions(ctx, set); err != nil {
 		return err
 	}
 
