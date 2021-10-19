@@ -1197,7 +1197,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 
 		if len(hnsEndpoints) == 0 {
-			klog.ErrorS(nil, "Endpoint information not available for service, not applying any policy", "svcName", svcName)
+			klog.ErrorS(nil, "Endpoint information not available for service, not applying any policy", "serviceName", svcName)
 			continue
 		}
 
