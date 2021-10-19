@@ -324,7 +324,7 @@ func (proxier *Proxier) onEndpointsMapChange(svcPortName *proxy.ServicePortName)
 			return
 		}
 
-		klog.V(3).InfoS("Endpoints are modified. Service is stale", "svcPortName", svcPortName)
+		klog.V(3).InfoS("Endpoints are modified. Service is stale", "servicePortName", svcPortName)
 		svcInfo.cleanupAllPolicies(proxier.endpointsMap[*svcPortName])
 	} else {
 		// If no service exists, just cleanup the remote endpoints
