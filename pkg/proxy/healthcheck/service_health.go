@@ -56,7 +56,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 
 	nodeAddresses, err := utilproxy.GetNodeAddresses(nodePortAddresses, utilproxy.RealNetwork{})
 	if err != nil || nodeAddresses.Len() == 0 {
-		klog.ErrorS(err, "Health Check Port:Failed to get node ip address matching node port addresses. Health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
+		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
 		nodeAddresses = sets.NewString()
 		nodeAddresses.Insert(utilproxy.IPv4ZeroCIDR)
 	}
@@ -138,7 +138,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 						UID:       types.UID(nsn.String()),
 					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
-			klog.ErrorS(err, "failed to start healthcheck", "node", hcs.hostname, "service", nsn, "port", port)
+			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.hostname, "service", nsn, "port", port)
 			continue
 		}
 		hcs.services[nsn] = svc
