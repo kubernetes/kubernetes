@@ -361,7 +361,7 @@ func NewProxier(ipt utiliptables.Interface,
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
 	// plugins handle this, log when config is missing
 	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
-		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
+		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables, proxy may not work as intended")
 	}
 
 	// Set the conntrack sysctl we need for
@@ -378,7 +378,7 @@ func NewProxier(ipt utiliptables.Interface,
 		return nil, fmt.Errorf("error parsing kernel version %q: %v", kernelVersionStr, err)
 	}
 	if kernelVersion.LessThan(version.MustParseGeneric(connReuseMinSupportedKernelVersion)) {
-		klog.ErrorS(nil, fmt.Sprintf("can't set sysctl %s, kernel version must be at least %s", sysctlConnReuse, connReuseMinSupportedKernelVersion))
+		klog.ErrorS(nil, "Can't set sysctl, kernel version doesn't satisfy minimum version requirements", "sysctl", sysctlConnReuse, "minimumSupportedKernelVersion", connReuseMinSupportedKernelVersion)
 	} else if kernelVersion.AtLeast(version.MustParseGeneric(connReuseFixedKernelVersion)) {
 		// https://github.com/kubernetes/kubernetes/issues/93297
 		klog.V(2).InfoS("Left as-is", "sysctl", sysctlConnReuse)
@@ -620,7 +620,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
 	modulesFile, err := os.Open("/proc/modules")
 	if err == os.ErrNotExist {
-		klog.ErrorS(err, "Failed to read file /proc/modules. Assuming this is a kernel without loadable modules support enabled")
+		klog.ErrorS(err, "Failed to read file /proc/modules, assuming this is a kernel without loadable modules support enabled")
 		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
 		kConfig, err := ioutil.ReadFile(kernelConfigFile)
 		if err != nil {
@@ -646,7 +646,7 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
 	b, err := ioutil.ReadFile(builtinModsFilePath)
 	if err != nil {
-		klog.ErrorS(err, "Failed to read builtin modules file. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
+		klog.ErrorS(err, "Failed to read builtin modules file, you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "filePath", builtinModsFilePath)
 	}
 
 	for _, module := range ipvsModules {
@@ -656,8 +656,8 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 			// Try to load the required IPVS kernel modules if not built in
 			err := handle.executor.Command("modprobe", "--", module).Run()
 			if err != nil {
-				klog.InfoS("Failed to load kernel module with modprobe. "+
-					"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "moduleName", module)
+				klog.InfoS("Failed to load kernel module with modprobe, "+
+					"you can ignore this message when kube-proxy is running inside container without mounting /lib/modules", "moduleName", module)
 			} else {
 				lmods = append(lmods, module)
 			}
@@ -804,7 +804,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	if ipvs != nil {
 		err := ipvs.Flush()
 		if err != nil {
-			klog.ErrorS(err, "Error flushing IPVS rules")
+			klog.ErrorS(err, "Error flushing ipvs rules")
 			encounteredError = true
 		}
 	}
@@ -812,7 +812,7 @@ func CleanupLeftovers(ipvs utilipvs.Interface, ipt utiliptables.Interface, ipset
 	nl := NewNetLinkHandle(false)
 	err := nl.DeleteDummyDevice(DefaultDummyDevice)
 	if err != nil {
-		klog.ErrorS(err, "Error deleting dummy device created by IPVS proxier", "device", DefaultDummyDevice)
+		klog.ErrorS(err, "Error deleting dummy device created by ipvs proxier", "device", DefaultDummyDevice)
 		encounteredError = true
 	}
 	// Clear iptables created by ipvs Proxier.
@@ -1031,7 +1031,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 
-	klog.V(3).InfoS("Syncing ipvs Proxier rules")
+	klog.V(3).InfoS("Syncing ipvs proxier rules")
 
 	// Begin install iptables
 
@@ -1672,7 +1672,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// TODO: these could be made more consistent.
 	for _, svcIP := range staleServices.UnsortedList() {
 		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
-			klog.ErrorS(err, "Failed to delete stale service IP connections", "ip", svcIP)
+			klog.ErrorS(err, "Failed to delete stale service IP connections", "IP", svcIP)
 		}
 	}
 	proxier.deleteEndpointConnections(endpointUpdateResult.StaleEndpoints)
@@ -1982,15 +1982,15 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 	if appliedVirtualServer == nil || !appliedVirtualServer.Equal(vs) {
 		if appliedVirtualServer == nil {
 			// IPVS service is not found, create a new service
-			klog.V(3).InfoS("Adding new service", "svcName", svcName, "address", fmt.Sprintf("%s:%d/%s", vs.Address, vs.Port, vs.Protocol))
+			klog.V(3).InfoS("Adding new service", "serviceName", svcName, "address", "virtualServerAdd", vs.Address, "virtualServerPort", vs.Port, "virtualServerProtocol", vs.Protocol)
 			if err := proxier.ipvs.AddVirtualServer(vs); err != nil {
-				klog.ErrorS(err, "Failed to add IPVS service", "svcName", svcName)
+				klog.ErrorS(err, "Failed to add IPVS service", "serviceName", svcName)
 				return err
 			}
 		} else {
 			// IPVS service was changed, update the existing one
 			// During updates, service VIP will not go down
-			klog.V(3).InfoS("IPVS service was changed", "svcName", svcName)
+			klog.V(3).InfoS("IPVS service was changed", "serviceName", svcName)
 			if err := proxier.ipvs.UpdateVirtualServer(vs); err != nil {
 				klog.ErrorS(err, "Failed to update IPVS service")
 				return err
@@ -2006,10 +2006,10 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 			return nil
 		}
 
-		klog.V(4).InfoS("Bind addr", "address", vs.Address)
+		klog.V(4).InfoS("Bind address", "address", vs.Address)
 		_, err := proxier.netlinkHandle.EnsureAddressBind(vs.Address.String(), DefaultDummyDevice)
 		if err != nil {
-			klog.ErrorS(err, "Failed to bind service address to dummy device", "svcName", svcName)
+			klog.ErrorS(err, "Failed to bind service address to dummy device", "serviceName", svcName)
 			return err
 		}
 	}
@@ -2054,7 +2054,7 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 	// externalTrafficPolicy=Local.
 	svcInfo, ok := proxier.serviceMap[svcPortName]
 	if !ok {
-		klog.InfoS("Unable to filter endpoints due to missing Service info", "svcPortName", svcPortName)
+		klog.InfoS("Unable to filter endpoints due to missing service info", "servicePortName", svcPortName)
 	} else {
 		endpoints = proxy.FilterEndpoints(endpoints, svcInfo, proxier.nodeLabels)
 	}

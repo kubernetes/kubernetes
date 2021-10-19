@@ -272,7 +272,7 @@ func NewProxier(ipt utiliptables.Interface,
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
 	// plugins handle this, log when config is missing
 	if val, err := sysctl.GetSysctl(sysctlBridgeCallIPTables); err == nil && val != 1 {
-		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
+		klog.InfoS("Missing br-netfilter module or unset sysctl br-nf-call-iptables, proxy may not work as intended")
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -291,7 +291,7 @@ func NewProxier(ipt utiliptables.Interface,
 	nodePortAddresses = ipFamilyMap[ipFamily]
 	// Log the IPs not matching the ipFamily
 	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(ipFamily)]; ok && len(ips) > 0 {
-		klog.InfoS("Found node IPs of the wrong family", "ipFamily", ipFamily, "ips", strings.Join(ips, ","))
+		klog.InfoS("Found node IPs of the wrong family", "ipFamily", ipFamily, "IPs", strings.Join(ips, ","))
 	}
 
 	proxier := &Proxier{
@@ -1546,7 +1546,7 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 		// Ignore IP addresses with incorrect version
 		if isIPv6 && !netutils.IsIPv6String(address) || !isIPv6 && netutils.IsIPv6String(address) {
-			klog.ErrorS(nil, "IP has incorrect IP version", "ip", address)
+			klog.ErrorS(nil, "IP has incorrect IP version", "IP", address)
 			continue
 		}
 		// create nodeport rules for each IP one by one
@@ -1659,17 +1659,17 @@ func (proxier *Proxier) syncProxyRules() {
 	// Finish housekeeping.
 	// Clear stale conntrack entries for UDP Services, this has to be done AFTER the iptables rules are programmed.
 	// TODO: these could be made more consistent.
-	klog.V(4).InfoS("Deleting conntrack stale entries for Services", "ips", conntrackCleanupServiceIPs.UnsortedList())
+	klog.V(4).InfoS("Deleting conntrack stale entries for services", "IPs", conntrackCleanupServiceIPs.UnsortedList())
 	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
 		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
-			klog.ErrorS(err, "Failed to delete stale service connections", "ip", svcIP)
+			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP)
 		}
 	}
-	klog.V(4).InfoS("Deleting conntrack stale entries for Services", "nodeports", conntrackCleanupServiceNodePorts.UnsortedList())
+	klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
 	for _, nodePort := range conntrackCleanupServiceNodePorts.UnsortedList() {
 		err := conntrack.ClearEntriesForPort(proxier.exec, nodePort, isIPv6, v1.ProtocolUDP)
 		if err != nil {
-			klog.ErrorS(err, "Failed to clear udp conntrack", "port", nodePort)
+			klog.ErrorS(err, "Failed to clear udp conntrack", "nodePort", nodePort)
 		}
 	}
 	klog.V(4).InfoS("Deleting stale endpoint connections", "endpoints", endpointUpdateResult.StaleEndpoints)
