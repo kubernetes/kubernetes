@@ -38,6 +38,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
+	"k8s.io/client-go/util/retry"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util"
@@ -136,7 +137,9 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 		return err
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
-	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	errorChan := make(chan error)
+	defer close(errorChan)
+	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, errorChan, f.Out, f.ErrOut)
 	if err != nil {
 		return err
 	}
@@ -412,5 +415,22 @@ func (o PortForwardOptions) RunPortForward() error {
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	/*
+		There are two options for a fix.
+		We can:
+
+		1: Watch for events of pod deletion. This adds the overheard of having
+			 shared informer but it will be easier to catch and refactor than
+			 passing an error chan. This also allows us the ability to easily
+			 restart the port forwarding.
+
+		2: We can refactor and pass an error chan. It won't really be possible
+			 to tell if the error was a pod being deleted. Can we assume that the
+			 user will cancel the command and continue to retry?
+	*/
+	return retry.OnError(retry.DefaultBackoff, func(error) bool {
+		return true
+	}, func() error {
+		return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
+	})
 }

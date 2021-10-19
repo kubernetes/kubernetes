@@ -45,6 +45,8 @@ type PortForwarder struct {
 	ports     []ForwardedPort
 	stopChan  <-chan struct{}
 
+	errorChan chan error
+
 	dialer        httpstream.Dialer
 	streamConn    httpstream.Connection
 	listeners     []io.Closer
@@ -153,12 +155,12 @@ func parseAddresses(addressesToParse []string) ([]listenAddress, error) {
 }
 
 // New creates a new PortForwarder with localhost listen addresses.
-func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
-	return NewOnAddresses(dialer, []string{"localhost"}, ports, stopChan, readyChan, out, errOut)
+func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, errorChan chan error, out, errOut io.Writer) (*PortForwarder, error) {
+	return NewOnAddresses(dialer, []string{"localhost"}, ports, stopChan, readyChan, errorChan, out, errOut)
 }
 
 // NewOnAddresses creates a new PortForwarder with custom listen addresses.
-func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, errorChan chan error, out, errOut io.Writer) (*PortForwarder, error) {
 	if len(addresses) == 0 {
 		return nil, errors.New("you must specify at least 1 address")
 	}
@@ -179,6 +181,7 @@ func NewOnAddresses(dialer httpstream.Dialer, addresses []string, ports []string
 		ports:     parsedPorts,
 		stopChan:  stopChan,
 		Ready:     readyChan,
+		errorChan: errorChan,
 		out:       out,
 		errOut:    errOut,
 	}, nil
@@ -230,6 +233,8 @@ func (pf *PortForwarder) forward() error {
 	// wait for interrupt or conn closure
 	select {
 	case <-pf.stopChan:
+	case err = <-pf.errorChan:
+		return err
 	case <-pf.streamConn.CloseChan():
 		runtime.HandleError(errors.New("lost connection to pod"))
 	}
@@ -399,6 +404,7 @@ func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	err = <-errorChan
 	if err != nil {
 		runtime.HandleError(err)
+		pf.errorChan <- err
 	}
 }
 
