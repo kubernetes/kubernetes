@@ -498,7 +498,8 @@ with the apiserver API to configure the proxy.`,
 			}
 
 			if err := opts.Run(); err != nil {
-				klog.Exit(err)
+				klog.ErrorS(err, "Error running ProxyServer")
+				os.Exit(1)
 			}
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -843,7 +844,7 @@ func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
 	if nodeIP == nil {
-		klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
+		klog.V(0).InfoS("Can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
 		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
 	return nodeIP

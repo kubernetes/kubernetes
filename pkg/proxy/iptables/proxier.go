@@ -737,23 +737,23 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 			if nodePort != 0 {
 				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, svcProto)
 				if err != nil {
-					klog.ErrorS(err, "Failed to delete nodeport-related endpoint connections", "servicePortName", epSvcPair.ServicePortName.String())
+					klog.ErrorS(err, "Failed to delete nodeport-related endpoint connections", "servicePortName", epSvcPair.ServicePortName)
 				}
 			}
 			err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			if err != nil {
-				klog.ErrorS(err, "Failed to delete endpoint connections", "servicePortName", epSvcPair.ServicePortName.String())
+				klog.ErrorS(err, "Failed to delete endpoint connections", "servicePortName", epSvcPair.ServicePortName)
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
 				if err != nil {
-					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName.String(), "externalIP", extIP)
+					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
 				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
-					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName.String(), "loadBalancerIP", lbIP)
+					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "loadBalancerIP", lbIP)
 				}
 			}
 		}
@@ -807,7 +807,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// an UDP service that changes from 0 to non-0 endpoints is considered stale.
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
-			klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "svcPortName", svcPortName.String(), "clusterIP", svcInfo.ClusterIP().String())
+			klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "svcPortName", svcPortName, "clusterIP", svcInfo.ClusterIP())
 			conntrackCleanupServiceIPs.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				conntrackCleanupServiceIPs.Insert(extIP)
@@ -817,7 +817,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			nodePort := svcInfo.NodePort()
 			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
-				klog.V(2).Infof("Stale %s service NodePort %v -> %d", strings.ToLower(string(svcInfo.Protocol())), svcPortName, nodePort)
+				klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "svcPortName", svcPortName, "nodePort", nodePort)
 				conntrackCleanupServiceNodePorts.Insert(nodePort)
 			}
 		}
@@ -984,7 +984,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for svcName, svc := range proxier.serviceMap {
 		svcInfo, ok := svc.(*serviceInfo)
 		if !ok {
-			klog.ErrorS(nil, "Failed to cast serviceInfo", "svcName", svcName.String())
+			klog.ErrorS(nil, "Failed to cast serviceInfo", "svcName", svcName)
 			continue
 		}
 		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
@@ -1072,7 +1072,7 @@ func (proxier *Proxier) syncProxyRules() {
 					Protocol:    netutils.Protocol(svcInfo.Protocol()),
 				}
 				if proxier.portsMap[lp] != nil {
-					klog.V(4).InfoS("Port was open before and is still needed", "port", lp.String())
+					klog.V(4).InfoS("Port was open before and is still needed", "port", lp)
 					replacementPortsMap[lp] = proxier.portsMap[lp]
 				} else {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
@@ -1086,10 +1086,10 @@ func (proxier *Proxier) syncProxyRules() {
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
 							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
-						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
+						klog.ErrorS(err, "can't open port, skipping it", "port", lp)
 						continue
 					}
-					klog.V(2).InfoS("Opened local port", "port", lp.String())
+					klog.V(2).InfoS("Opened local port", "port", lp)
 					replacementPortsMap[lp] = socket
 				}
 			}
@@ -1244,7 +1244,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// For ports on node IPs, open the actual port and hold it.
 			for _, lp := range lps {
 				if proxier.portsMap[lp] != nil {
-					klog.V(4).InfoS("Port was open before and is still needed", "port", lp.String())
+					klog.V(4).InfoS("Port was open before and is still needed", "port", lp)
 					replacementPortsMap[lp] = proxier.portsMap[lp]
 				} else if svcInfo.Protocol() != v1.ProtocolSCTP {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
@@ -1258,10 +1258,10 @@ func (proxier *Proxier) syncProxyRules() {
 								UID:       types.UID(proxier.hostname),
 								Namespace: "",
 							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
-						klog.ErrorS(err, "can't open port, skipping it", "port", lp.String())
+						klog.ErrorS(err, "can't open port, skipping it", "port", lp)
 						continue
 					}
-					klog.V(2).InfoS("Opened local port", "port", lp.String())
+					klog.V(2).InfoS("Opened local port", "port", lp)
 					replacementPortsMap[lp] = socket
 				}
 			}
@@ -1328,7 +1328,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, ep := range allEndpoints {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
-				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep.String())
+				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep)
 				continue
 			}
 
