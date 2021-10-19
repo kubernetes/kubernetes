@@ -28,10 +28,10 @@ import (
 )
 
 func TestNotFoundHandler(t *testing.T) {
-	hasMuxIncompleteKeyGlobalValue := false
-	hasMuxIncompleteKeyTestFn := func(ctx context.Context) bool { return hasMuxIncompleteKeyGlobalValue }
+	isMuxAndDiscoveryCompleteGlobalValue := true
+	isMuxAndDiscoveryCompleteTestFn := func(ctx context.Context) bool { return isMuxAndDiscoveryCompleteGlobalValue }
 	serializer := serializer.NewCodecFactory(runtime.NewScheme()).WithoutConversion()
-	target := New(serializer, hasMuxIncompleteKeyTestFn)
+	target := New(serializer, isMuxAndDiscoveryCompleteTestFn)
 
 	// scenario 1: pretend the request has been made after the signal has been ready
 	req := httptest.NewRequest("GET", "http://apiserver.com/apis/flowcontrol.apiserver.k8s.io/v1beta1", nil)
@@ -54,7 +54,7 @@ func TestNotFoundHandler(t *testing.T) {
 	}
 
 	// scenario 2: pretend the request has been made before the signal has been ready
-	hasMuxIncompleteKeyGlobalValue = true
+	isMuxAndDiscoveryCompleteGlobalValue = false
 	rw = httptest.NewRecorder()
 
 	target.ServeHTTP(rw, req)

@@ -214,11 +214,11 @@ type GenericAPIServer struct {
 	// lifecycleSignals provides access to the various signals that happen during the life cycle of the apiserver.
 	lifecycleSignals lifecycleSignals
 
-	// muxCompleteSignals holds signals that indicate all known HTTP paths have been registered.
+	// muxAndDiscoveryCompleteSignals holds signals that indicate all known HTTP paths have been registered.
 	// it exists primarily to avoid returning a 404 response when a resource actually exists but we haven't installed the path to a handler.
 	// it is exposed for easier composition of the individual servers.
 	// the primary users of this field are the WithMuxCompleteProtection filter and the NotFoundHandler
-	muxCompleteSignals map[string]<-chan struct{}
+	muxAndDiscoveryCompleteSignals map[string]<-chan struct{}
 
 	// ShutdownSendRetryAfter dictates when to initiate shutdown of the HTTP
 	// Server during the graceful termination of the apiserver. If true, we wait
@@ -254,8 +254,8 @@ type DelegationTarget interface {
 	// PrepareRun does post API installation setup steps. It calls recursively the same function of the delegates.
 	PrepareRun() preparedGenericAPIServer
 
-	// MuxCompleteSignals exposes registered signals that indicate if all known HTTP paths have been installed.
-	MuxCompleteSignals() map[string]<-chan struct{}
+	// MuxAndDiscoveryCompleteSignals exposes registered signals that indicate if all known HTTP paths have been installed.
+	MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{}
 }
 
 func (s *GenericAPIServer) UnprotectedHandler() http.Handler {
@@ -279,18 +279,18 @@ func (s *GenericAPIServer) NextDelegate() DelegationTarget {
 	return s.delegationTarget
 }
 
-// RegisterMuxCompleteSignal registers the given signal that will be used to determine if all known
+// RegisterMuxAndDiscoveryCompleteSignal registers the given signal that will be used to determine if all known
 // HTTP paths have been registered. It is okay to call this method after instantiating the generic server but before running.
-func (s *GenericAPIServer) RegisterMuxCompleteSignal(signalName string, signal <-chan struct{}) error {
-	if _, exists := s.muxCompleteSignals[signalName]; exists {
+func (s *GenericAPIServer) RegisterMuxAndDiscoveryCompleteSignal(signalName string, signal <-chan struct{}) error {
+	if _, exists := s.muxAndDiscoveryCompleteSignals[signalName]; exists {
 		return fmt.Errorf("%s already registered", signalName)
 	}
-	s.muxCompleteSignals[signalName] = signal
+	s.muxAndDiscoveryCompleteSignals[signalName] = signal
 	return nil
 }
 
-func (s *GenericAPIServer) MuxCompleteSignals() map[string]<-chan struct{} {
-	return s.muxCompleteSignals
+func (s *GenericAPIServer) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
+	return s.muxAndDiscoveryCompleteSignals
 }
 
 type emptyDelegate struct {
@@ -329,7 +329,7 @@ func (s emptyDelegate) NextDelegate() DelegationTarget {
 func (s emptyDelegate) PrepareRun() preparedGenericAPIServer {
 	return preparedGenericAPIServer{nil}
 }
-func (s emptyDelegate) MuxCompleteSignals() map[string]<-chan struct{} {
+func (s emptyDelegate) MuxAndDiscoveryCompleteSignals() map[string]<-chan struct{} {
 	return map[string]<-chan struct{}{}
 }
 
@@ -379,21 +379,21 @@ func (s preparedGenericAPIServer) Run(stopCh <-chan struct{}) error {
 	delayedStopCh := s.lifecycleSignals.AfterShutdownDelayDuration
 	shutdownInitiatedCh := s.lifecycleSignals.ShutdownInitiated
 
-	// spawn a new goroutine for closing the MuxComplete signal
+	// spawn a new goroutine for closing the MuxAndDiscoveryComplete signal
 	// registration happens during construction of the generic api server
 	// the last server in the chain aggregates signals from the previous instances
 	go func() {
-		for _, muxInstalledSignal := range s.GenericAPIServer.MuxCompleteSignals() {
+		for _, muxAndDiscoveryCompletedSignal := range s.GenericAPIServer.MuxAndDiscoveryCompleteSignals() {
 			select {
-			case <-muxInstalledSignal:
+			case <-muxAndDiscoveryCompletedSignal:
 				continue
 			case <-stopCh:
-				klog.V(1).Infof("haven't completed %s, stop requested", s.lifecycleSignals.MuxComplete.Name())
+				klog.V(1).Infof("haven't completed %s, stop requested", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 				return
 			}
 		}
-		s.lifecycleSignals.MuxComplete.Signal()
-		klog.V(1).Infof("%s completed, all registered mux complete signals (%d) have finished", s.lifecycleSignals.MuxComplete.Name(), s.GenericAPIServer.MuxCompleteSignals())
+		s.lifecycleSignals.MuxAndDiscoveryComplete.Signal()
+		klog.V(1).Infof("%s has all endpoints registered and discovery information is complete", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 	}()
 
 	go func() {

@@ -23,23 +23,24 @@ import (
 	"testing"
 )
 
-func TestWithMuxCompleteProtectionFilter(t *testing.T) {
+func TestWithMuxAndDiscoveryCompleteProtection(t *testing.T) {
 	scenarios := []struct {
-		name                           string
-		muxCompleteSignal              <-chan struct{}
-		expectMuxCompleteProtectionKey bool
+		name                             string
+		muxAndDiscoveryCompleteSignal    <-chan struct{}
+		expectNoMuxAndDiscoIncompleteKey bool
 	}{
 		{
-			name: "no signals, no protection key in the ctx",
+			name:                             "no signals, no key in the ctx",
+			expectNoMuxAndDiscoIncompleteKey: true,
 		},
 		{
-			name:              "signal ready, no protection key in the ctx",
-			muxCompleteSignal: func() chan struct{} { ch := make(chan struct{}); close(ch); return ch }(),
+			name:                             "signal ready, no key in the ctx",
+			muxAndDiscoveryCompleteSignal:    func() chan struct{} { ch := make(chan struct{}); close(ch); return ch }(),
+			expectNoMuxAndDiscoIncompleteKey: true,
 		},
 		{
-			name:                           "signal not ready, the protection key in the ctx",
-			muxCompleteSignal:              make(chan struct{}),
-			expectMuxCompleteProtectionKey: true,
+			name:                          "signal not ready, the key in the ctx",
+			muxAndDiscoveryCompleteSignal: make(chan struct{}),
 		},
 	}
 
@@ -50,15 +51,15 @@ func TestWithMuxCompleteProtectionFilter(t *testing.T) {
 			delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				actualContext = req.Context()
 			})
-			target := WithMuxCompleteProtection(delegate, scenario.muxCompleteSignal)
+			target := WithMuxAndDiscoveryComplete(delegate, scenario.muxAndDiscoveryCompleteSignal)
 
 			// act
 			req := &http.Request{}
 			target.ServeHTTP(httptest.NewRecorder(), req)
 
 			// validate
-			if scenario.expectMuxCompleteProtectionKey != HasMuxCompleteProtectionKey(actualContext) {
-				t.Fatalf("expectMuxCompleteProtectionKey in the context = %v, does the actual context contain the key = %v", scenario.expectMuxCompleteProtectionKey, HasMuxCompleteProtectionKey(actualContext))
+			if scenario.expectNoMuxAndDiscoIncompleteKey != NoMuxAndDiscoveryIncompleteKey(actualContext) {
+				t.Fatalf("expectNoMuxAndDiscoIncompleteKey in the context = %v, does the actual context contain the key = %v", scenario.expectNoMuxAndDiscoIncompleteKey, NoMuxAndDiscoveryIncompleteKey(actualContext))
 			}
 		})
 	}

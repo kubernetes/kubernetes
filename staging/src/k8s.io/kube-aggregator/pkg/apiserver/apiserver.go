@@ -187,7 +187,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 	//
 	// Note that the APIServiceRegistrationController waits for APIServiceInformer to synced before doing its work.
 	apiServiceRegistrationControllerInitiated := make(chan struct{})
-	if err := genericServer.RegisterMuxCompleteSignal("APIServiceRegistrationControllerInitiated", apiServiceRegistrationControllerInitiated); err != nil {
+	if err := genericServer.RegisterMuxAndDiscoveryCompleteSignal("APIServiceRegistrationControllerInitiated", apiServiceRegistrationControllerInitiated); err != nil {
 		return nil, err
 	}
 

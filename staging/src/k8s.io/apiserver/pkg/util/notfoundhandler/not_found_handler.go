@@ -35,17 +35,17 @@ import (
 //
 // Note that we don't want to add additional checks to the readyz path as it might prevent fixing bricked clusters.
 // This specific handler is meant to "protect" requests that arrive before the paths and handlers are fully initialized.
-func New(serializer runtime.NegotiatedSerializer, hasMuxIncompleteKeyFn func(ctx context.Context) bool) *Handler {
-	return &Handler{serializer: serializer, hasMuxIncompleteKeyFn: hasMuxIncompleteKeyFn}
+func New(serializer runtime.NegotiatedSerializer, isMuxAndDiscoveryCompleteFn func(ctx context.Context) bool) *Handler {
+	return &Handler{serializer: serializer, isMuxAndDiscoveryCompleteFn: isMuxAndDiscoveryCompleteFn}
 }
 
 type Handler struct {
-	serializer            runtime.NegotiatedSerializer
-	hasMuxIncompleteKeyFn func(ctx context.Context) bool
+	serializer                  runtime.NegotiatedSerializer
+	isMuxAndDiscoveryCompleteFn func(ctx context.Context) bool
 }
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if h.hasMuxIncompleteKeyFn(req.Context()) {
+	if !h.isMuxAndDiscoveryCompleteFn(req.Context()) {
 		errMsg := fmt.Sprintf("the request has been made before all known HTTP paths have been installed, please try again")
 		err := apierrors.NewServiceUnavailable(errMsg)
 		if err.ErrStatus.Details == nil {
