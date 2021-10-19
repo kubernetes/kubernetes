@@ -817,7 +817,7 @@ func (proxier *Proxier) syncProxyRules() {
 			}
 			nodePort := svcInfo.NodePort()
 			if svcInfo.Protocol() == v1.ProtocolUDP && nodePort != 0 {
-				klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "svcPortName", svcPortName, "nodePort", nodePort)
+				klog.V(2).InfoS("Stale service", "protocol", strings.ToLower(string(svcInfo.Protocol())), "servicePortName", svcPortName, "nodePort", nodePort)
 				conntrackCleanupServiceNodePorts.Insert(nodePort)
 			}
 		}
