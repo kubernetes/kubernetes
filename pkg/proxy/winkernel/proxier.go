@@ -895,7 +895,7 @@ func (proxier *Proxier) OnServiceSynced() {
 func shouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 	// if ClusterIP is "None" or empty, skip proxying
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).InfoS("Skipping service due to clusterIP", "svcName", svcName, "clusterIP", service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service due to clusterIP", "serviceName", svcName, "clusterIP", service.Spec.ClusterIP)
 		return true
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
