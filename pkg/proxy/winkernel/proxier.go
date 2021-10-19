@@ -1071,7 +1071,7 @@ func (proxier *Proxier) syncProxyRules() {
 		for _, epInfo := range proxier.endpointsMap[svcName] {
 			ep, ok := epInfo.(*endpointsInfo)
 			if !ok {
-				klog.ErrorS(nil, "Failed to cast endpointsInfo", "svcName", svcName)
+				klog.ErrorS(nil, "Failed to cast endpointsInfo", "serviceName", svcName)
 				continue
 			}
 
