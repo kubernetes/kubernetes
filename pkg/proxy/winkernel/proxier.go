@@ -900,7 +900,7 @@ func shouldSkipService(svcName types.NamespacedName, service *v1.Service) bool {
 	}
 	// Even if ClusterIP is set, ServiceTypeExternalName services don't get proxied
 	if service.Spec.Type == v1.ServiceTypeExternalName {
-		klog.V(3).InfoS("Skipping service due to Type=ExternalName", "svcName", svcName)
+		klog.V(3).InfoS("Skipping service due to Type=ExternalName", "serviceName", svcName)
 		return true
 	}
 	return false
