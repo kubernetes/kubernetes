@@ -26,13 +26,15 @@ import (
 )
 
 const (
-	// FullPCPUsOnlyOption is the name of the CPU Manager policy option
-	FullPCPUsOnlyOption string = "full-pcpus-only"
+	FullPCPUsOnlyOption            string = "full-pcpus-only"
+	DistributeCPUsAcrossNUMAOption string = "distribute-cpus-across-numa"
 )
 
 var (
-	alphaOptions = sets.NewString()
-	betaOptions  = sets.NewString(
+	alphaOptions = sets.NewString(
+		DistributeCPUsAcrossNUMAOption,
+	)
+	betaOptions = sets.NewString(
 		FullPCPUsOnlyOption,
 	)
 	stableOptions = sets.NewString()
@@ -64,6 +66,9 @@ type StaticPolicyOptions struct {
 	// any possible naming scheme will lead to ambiguity to some extent.
 	// We picked "pcpu" because it the established docs hints at vCPU already.
 	FullPhysicalCPUsOnly bool
+	// Flag to evenly distribute CPUs across NUMA nodes in cases where more
+	// than one NUMA node is required to satisfy the allocation.
+	DistributeCPUsAcrossNUMA bool
 }
 
 func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOptions, error) {
@@ -80,6 +85,12 @@ func NewStaticPolicyOptions(policyOptions map[string]string) (StaticPolicyOption
 				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
 			}
 			opts.FullPhysicalCPUsOnly = optValue
+		case DistributeCPUsAcrossNUMAOption:
+			optValue, err := strconv.ParseBool(value)
+			if err != nil {
+				return opts, fmt.Errorf("bad value for option %q: %w", name, err)
+			}
+			opts.DistributeCPUsAcrossNUMA = optValue
 		default:
 			// this should never be reached, we already detect unknown options,
 			// but we keep it as further safety.
