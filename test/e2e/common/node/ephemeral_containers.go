@@ -14,15 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2enode
+package node
 
 import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -52,20 +55,28 @@ var _ = SIGDescribe("Ephemeral Containers", func() {
 		})
 
 		ginkgo.By("adding an ephemeral container")
+		ecName := "debugger"
 		ec := &v1.EphemeralContainer{
 			EphemeralContainerCommon: v1.EphemeralContainerCommon{
-				Name:    "debugger",
+				Name:    ecName,
 				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-				Command: []string{"/bin/sh"},
+				Command: e2epod.GenerateScriptCmd("while true; do sleep 2; echo polo; done"),
 				Stdin:   true,
 				TTY:     true,
 			},
 		}
 		err := podClient.AddEphemeralContainerSync(pod, ec, time.Minute)
+		// BEGIN TODO: Remove when EphemeralContainers feature gate is retired.
+		if apierrors.IsNotFound(err) {
+			e2eskipper.Skipf("Skipping test because EphemeralContainers feature disabled (error: %q)", err)
+		}
+		// END TODO: Remove when EphemeralContainers feature gate is retired.
 		framework.ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
 
-		ginkgo.By("confirm that the container is really running")
-		marco := f.ExecCommandInContainer(pod.Name, "debugger", "/bin/echo", "polo")
-		framework.ExpectEqual(marco, "polo")
+		ginkgo.By("checking pod container endpoints")
+		_, err = framework.LookForStringInPodExecToContainer(pod.Namespace, pod.Name, ecName, []string{"/bin/echo", "marco"}, "marco", time.Minute)
+		framework.ExpectNoError(err, "Failed to exec in pod %q ephemeral container %q", format.Pod(pod), ecName)
+		_, err = framework.LookForStringInLog(pod.Namespace, pod.Name, ecName, "polo", time.Minute)
+		framework.ExpectNoError(err, "Failed to find logs in pod %q ephemeral container %q", format.Pod(pod), ecName)
 	})
 })
