@@ -1308,7 +1308,7 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 					minQueueExpected = test.queues[queueIdx]
 				}
 
-				minQueueGot := qs.findDispatchQueueLocked()
+				minQueueGot, reqGot := qs.findDispatchQueueLocked()
 				if minQueueExpected != minQueueGot {
 					t.Errorf("Expected queue: %#v, but got: %#v", minQueueExpected, minQueueGot)
 				}
@@ -1316,6 +1316,10 @@ func TestFindDispatchQueueLocked(t *testing.T) {
 				robinIndexExpected := test.robinIndexExpected[i]
 				if robinIndexExpected != qs.robinIndex {
 					t.Errorf("Expected robin index: %d for attempt: %d, but got: %d", robinIndexExpected, attempt, qs.robinIndex)
+				}
+
+				if (reqGot == nil) != (minQueueGot == nil) {
+					t.Errorf("reqGot=%p but minQueueGot=%p", reqGot, minQueueGot)
 				}
 			}
 		})
@@ -1451,7 +1455,7 @@ func TestRequestWork(t *testing.T) {
 func newFIFO(requests ...*request) fifo {
 	l := newRequestFIFO()
 	for i := range requests {
-		l.Enqueue(requests[i])
+		requests[i].removeFromQueueLocked = l.Enqueue(requests[i])
 	}
 	return l
 }
