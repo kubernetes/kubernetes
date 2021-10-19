@@ -415,14 +415,16 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 	if enforce {
 		if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Enforce, podMetadata, podSpec)); !result.Allowed {
 			response = forbiddenResponse(result.ForbiddenDetail())
-			a.RecordEnforceEvaluation(nsPolicy, metrics.DecisionDeny, attrs)
+			a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
+		} else {
+			a.Metrics.RecordEvaluation(metrics.DecisionAllow, nsPolicy.Enforce, metrics.ModeEnforce, attrs)
 		}
 	}
 
 	// TODO: reuse previous evaluation if audit level+version is the same as enforce level+version
 	if result := policy.AggregateCheckResults(a.Evaluator.EvaluatePod(nsPolicy.Audit, podMetadata, podSpec)); !result.Allowed {
 		auditAnnotations["audit"] = result.ForbiddenDetail()
-		a.RecordAuditEvaluation(nsPolicy, metrics.DecisionDeny, attrs)
+		a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Audit, metrics.ModeAudit, attrs)
 	}
 
 	// avoid adding warnings to a request we're already going to reject with an error
@@ -436,9 +438,8 @@ func (a *Admission) EvaluatePod(ctx context.Context, nsPolicy api.Policy, nsPoli
 				nsPolicy.Warn.Level,
 				result.ForbiddenDetail(),
 			))
-			a.RecordWarnEvaluation(nsPolicy, metrics.DecisionDeny, attrs)
+			a.Metrics.RecordEvaluation(metrics.DecisionDeny, nsPolicy.Warn, metrics.ModeWarn, attrs)
 		}
-		a.RecordEnforceEvaluation(nsPolicy, metrics.DecisionAllow, attrs)
 	}
 
 	response.AuditAnnotations = auditAnnotations
@@ -495,18 +496,6 @@ var _sharedAllowedResponse = allowedResponse()
 
 func sharedAllowedResponse() *admissionv1.AdmissionResponse {
 	return _sharedAllowedResponse
-}
-
-func (a *Admission) RecordEnforceEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
-	a.Metrics.RecordEvaluation(decision, policy.Enforce, metrics.ModeEnforce, attrs)
-}
-
-func (a *Admission) RecordAuditEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
-	a.Metrics.RecordEvaluation(decision, policy.Audit, metrics.ModeAudit, attrs)
-}
-
-func (a *Admission) RecordWarnEvaluation(policy api.Policy, decision metrics.Decision, attrs api.Attributes) {
-	a.Metrics.RecordEvaluation(decision, policy.Warn, metrics.ModeWarn, attrs)
 }
 
 // allowedResponse is the response used when the admission decision is allow.
