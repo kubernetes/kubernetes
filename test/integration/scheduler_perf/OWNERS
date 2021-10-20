@@ -4,3 +4,6 @@ approvers:
 - sig-scheduling-maintainers
 reviewers:
 - sig-scheduling
+- sanposhiho
+labels:
+- sig/scheduling
