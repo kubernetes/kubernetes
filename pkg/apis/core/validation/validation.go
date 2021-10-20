@@ -98,6 +98,12 @@ var allowedEphemeralContainerFields = map[string]bool{
 	"TTY":                      true,
 }
 
+// validOS stores the set of valid OSes within pod spec.
+// The valid values currently are linux, windows.
+// In future, they can be expanded to values from
+// https://github.com/opencontainers/runtime-spec/blob/master/config.md#platform-specific-configuration
+var validOS = sets.NewString(string(core.Linux), string(core.Windows))
+
 // ValidateHasLabel requires that metav1.ObjectMeta has a Label with key and expectedValue
 func ValidateHasLabel(meta metav1.ObjectMeta, fldPath *field.Path, key, expectedValue string) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -2923,7 +2929,7 @@ func validateFieldAllowList(value interface{}, allowedFields map[string]bool, er
 	return allErrs
 }
 
-func validateInitContainers(containers, otherContainers []core.Container, deviceVolumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+func validateInitContainers(containers []core.Container, otherContainers []core.Container, deviceVolumes map[string]core.VolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(containers) > 0 {
 		allErrs = append(allErrs, validateContainers(containers, true, deviceVolumes, fldPath, opts)...)
@@ -3347,6 +3353,8 @@ type PodValidationOptions struct {
 	AllowWindowsHostProcessField bool
 	// Allow more DNSSearchPaths and longer DNSSearchListChars
 	AllowExpandedDNSConfig bool
+	// Allow OSField to be set in the pod spec
+	AllowOSField bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -3503,6 +3511,115 @@ func ValidatePodSpec(spec *core.PodSpec, podMeta *metav1.ObjectMeta, fldPath *fi
 		allErrs = append(allErrs, validateOverhead(spec.Overhead, fldPath.Child("overhead"), opts)...)
 	}
 
+	if spec.OS != nil {
+		osErrs := validateOS(spec, fldPath.Child("os"), opts)
+		switch {
+		case len(osErrs) > 0:
+			allErrs = append(allErrs, osErrs...)
+		case spec.OS.Name == core.Linux:
+			allErrs = append(allErrs, validateLinux(spec, fldPath)...)
+		case spec.OS.Name == core.Windows:
+			allErrs = append(allErrs, validateWindows(spec, fldPath)...)
+		}
+	}
+	return allErrs
+}
+
+func validateLinux(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	securityContext := spec.SecurityContext
+	if securityContext != nil && securityContext.WindowsOptions != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("windowsOptions"), "windows options cannot be set for a linux pod"))
+	}
+	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		sc := c.SecurityContext
+		if sc != nil && sc.WindowsOptions != nil {
+			fldPath := cFldPath.Child("securityContext")
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("windowsOptions"), "windows options cannot be set for a linux pod"))
+		}
+		return true
+	})
+	return allErrs
+}
+
+func validateWindows(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	securityContext := spec.SecurityContext
+	// validate Pod SecurityContext
+	if securityContext != nil {
+		if securityContext.SELinuxOptions != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seLinuxOptions"), "cannot be set for a windows pod"))
+		}
+		if securityContext.HostPID {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostPID"), "cannot be set for a windows pod"))
+		}
+		if securityContext.HostIPC {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("hostIPC"), "cannot be set for a windows pod"))
+		}
+		if securityContext.SeccompProfile != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("seccompProfile"), "cannot be set for a windows pod"))
+		}
+		if securityContext.FSGroup != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("fsGroup"), "cannot be set for a windows pod"))
+		}
+		if securityContext.FSGroupChangePolicy != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("fsGroupChangePolicy"), "cannot be set for a windows pod"))
+		}
+		if len(securityContext.Sysctls) > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("sysctls"), "cannot be set for a windows pod"))
+		}
+		if securityContext.ShareProcessNamespace != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("shareProcessNamespace"), "cannot be set for a windows pod"))
+		}
+		if securityContext.RunAsUser != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("runAsUser"), "cannot be set for a windows pod"))
+		}
+		if securityContext.RunAsGroup != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("runAsGroup"), "cannot be set for a windows pod"))
+		}
+		if securityContext.SupplementalGroups != nil {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("securityContext").Child("supplementalGroups"), "cannot be set for a windows pod"))
+		}
+	}
+	podshelper.VisitContainersWithPath(spec, fldPath, func(c *core.Container, cFldPath *field.Path) bool {
+		// validate container security context
+		sc := c.SecurityContext
+		// OS based podSecurityContext validation
+		// There is some naming overlap between Windows and Linux Security Contexts but all the Windows Specific options
+		// are set via securityContext.WindowsOptions which we validate below
+		// TODO: Think if we need to relax this restriction or some of the restrictions
+		if sc != nil {
+			fldPath := cFldPath.Child("securityContext")
+			if sc.SELinuxOptions != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("seLinuxOptions"), "cannot be set for a windows pod"))
+			}
+			if sc.SeccompProfile != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("seccompProfile"), "cannot be set for a windows pod"))
+			}
+			if sc.Capabilities != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("capabilities"), "cannot be set for a windows pod"))
+			}
+			if sc.ReadOnlyRootFilesystem != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("readOnlyRootFilesystem"), "cannot be set for a windows pod"))
+			}
+			if sc.Privileged != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("privileged"), "cannot be set for a windows pod"))
+			}
+			if sc.AllowPrivilegeEscalation != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("allowPrivilegeEscalation"), "cannot be set for a windows pod"))
+			}
+			if sc.ProcMount != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("procMount"), "cannot be set for a windows pod"))
+			}
+			if sc.RunAsUser != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("runAsUser"), "cannot be set for a windows pod"))
+			}
+			if sc.RunAsGroup != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("runAsGroup"), "cannot be set for a windows pod"))
+			}
+		}
+		return true
+	})
 	return allErrs
 }
 
@@ -6171,6 +6288,26 @@ func validateWindowsHostProcessPod(podSpec *core.PodSpec, fieldPath *field.Path,
 		}
 	}
 
+	return allErrs
+}
+
+// validateOS validates the OS field within pod spec
+func validateOS(podSpec *core.PodSpec, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
+	allErrs := field.ErrorList{}
+	os := podSpec.OS
+	if os == nil {
+		return allErrs
+	}
+	if !opts.AllowOSField {
+		return append(allErrs, field.Forbidden(fldPath, "cannot be set when IdentifyPodOS feature is not enabled"))
+	}
+	if len(os.Name) == 0 {
+		return append(allErrs, field.Required(fldPath.Child("name"), "cannot be empty"))
+	}
+	osName := string(os.Name)
+	if !validOS.Has(osName) {
+		allErrs = append(allErrs, field.NotSupported(fldPath, osName, validOS.List()))
+	}
 	return allErrs
 }
 
