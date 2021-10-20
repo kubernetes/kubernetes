@@ -41,9 +41,9 @@ func NoMuxAndDiscoveryIncompleteKey(ctx context.Context) bool {
 //
 // The presence of the key is checked in the NotFoundHandler (staging/src/k8s.io/apiserver/pkg/util/notfoundhandler/not_found_handler.go)
 //
-// The race may happen when a request reaches the NotFoundHandler because not all paths have been registered in the mux
-// but when the registered checks are examined in the handler they indicate that the paths have been actually installed.
-// In that case, the presence of the key will make the handler return 503 instead of 404.
+// The primary reason this filter exists is to protect from a potential race between the client's requests reaching the NotFoundHandler and the server becoming ready.
+// Without the protection key a request could still get a 404 response when the registered signals changed their status just slightly before reaching the new handler.
+// In that case, the presence of the key will make the handler return a 503 instead of a 404.
 func WithMuxAndDiscoveryComplete(handler http.Handler, muxAndDiscoveryCompleteSignal <-chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if muxAndDiscoveryCompleteSignal != nil && !isClosed(muxAndDiscoveryCompleteSignal) {
