@@ -1982,7 +1982,7 @@ func (proxier *Proxier) syncService(svcName string, vs *utilipvs.VirtualServer, 
 	if appliedVirtualServer == nil || !appliedVirtualServer.Equal(vs) {
 		if appliedVirtualServer == nil {
 			// IPVS service is not found, create a new service
-			klog.V(3).InfoS("Adding new service", "serviceName", svcName, "address", "virtualServerAdd", vs.Address, "virtualServerPort", vs.Port, "virtualServerProtocol", vs.Protocol)
+			klog.V(3).InfoS("Adding new service", "serviceName", svcName, "virtualServer", vs)
 			if err := proxier.ipvs.AddVirtualServer(vs); err != nil {
 				klog.ErrorS(err, "Failed to add IPVS service", "serviceName", svcName)
 				return err
@@ -2167,9 +2167,9 @@ func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, curre
 			continue
 		}
 		if _, ok := activeServices[cs]; !ok {
-			klog.V(4).InfoS("Delete service", "service", svc)
+			klog.V(4).InfoS("Delete service", "virtualServer", svc)
 			if err := proxier.ipvs.DeleteVirtualServer(svc); err != nil {
-				klog.ErrorS(err, "Failed to delete service", "service", svc)
+				klog.ErrorS(err, "Failed to delete service", "virtualServer", svc)
 			}
 			addr := svc.Address.String()
 			if _, ok := legacyBindAddrs[addr]; ok {
