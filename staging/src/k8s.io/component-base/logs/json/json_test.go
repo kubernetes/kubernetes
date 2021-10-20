@@ -61,10 +61,9 @@ func TestZapLoggerInfo(t *testing.T) {
 			keysValues: []interface{}{"duration", time.Duration(5 * time.Second)},
 		},
 		{
-			msg:   "test for WithName",
-			names: []string{"hello", "world"},
-			// TODO: log names
-			format: "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for WithName\",\"v\":0}\n",
+			msg:    "test for WithName",
+			names:  []string{"hello", "world"},
+			format: "{\"ts\":%f,\"logger\":\"hello.world\",\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for WithName\",\"v\":0}\n",
 		},
 	}
 
