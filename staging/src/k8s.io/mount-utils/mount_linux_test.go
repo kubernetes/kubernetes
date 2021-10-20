@@ -20,7 +20,6 @@ limitations under the License.
 package mount
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -662,7 +661,6 @@ cgroup /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,xattr,name=
 }
 
 func recreateFileContents(path string, i int) error {
-	fmt.Println(path, i)
 	// subsequent attempts called and the mount path is mutated as below.
 	procContents := []string{
 		// In the below iteration /dev/root has been moved to the end (change of order),

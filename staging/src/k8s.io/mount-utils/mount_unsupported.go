@@ -74,6 +74,12 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, errUnsupported
 }
 
+// IsNotMountPoint determines if a directory is a mountpoint. It returns an error on unsupported
+// platforms.
+func IsNotMountPoint(mounter Interface, file string) (bool, error) {
+	return false, errUnsupported
+}
+
 // GetMountRefs always returns an error on unsupported platforms
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	return nil, errUnsupported
