@@ -739,22 +739,26 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, svcProto)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete nodeport-related endpoint connections", "servicePortName", epSvcPair.ServicePortName)
+					metrics.IptablesConntrackErrorsTotal.Inc()
 				}
 			}
 			err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			if err != nil {
 				klog.ErrorS(err, "Failed to delete endpoint connections", "servicePortName", epSvcPair.ServicePortName)
+				metrics.IptablesConntrackErrorsTotal.Inc()
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
+					metrics.IptablesConntrackErrorsTotal.Inc()
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
 				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "loadBalancerIP", lbIP)
+					metrics.IptablesConntrackErrorsTotal.Inc()
 				}
 			}
 		}
@@ -1570,6 +1574,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
 		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
 			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP)
+			metrics.IptablesConntrackErrorsTotal.Inc()
 		}
 	}
 	klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
@@ -1577,6 +1582,7 @@ func (proxier *Proxier) syncProxyRules() {
 		err := conntrack.ClearEntriesForPort(proxier.exec, nodePort, isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			klog.ErrorS(err, "Failed to clear udp conntrack", "nodePort", nodePort)
+			metrics.IptablesConntrackErrorsTotal.Inc()
 		}
 	}
 	klog.V(4).InfoS("Deleting stale endpoint connections", "endpoints", endpointUpdateResult.StaleEndpoints)
@@ -1606,6 +1612,8 @@ func (proxier *Proxier) openPort(lp netutils.LocalPort, replacementPortsMap map[
 				Namespace: "",
 			}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 		klog.ErrorS(err, "can't open port, skipping it", "port", lp)
+		metrics.IptablesLocalPortBindingErrorsTotal.Inc()
+
 		return
 	}
 

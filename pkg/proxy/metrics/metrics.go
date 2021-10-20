@@ -137,6 +137,28 @@ var (
 		[]string{"table"},
 	)
 
+	// IptablesConntrackErrorsTotal is the number of conntrack errors that the proxy has
+	// seen when syncing iptables rules.
+	IptablesConntrackErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_conntrack_errors_total",
+			Help:           "Cumulative conntrack errors in the sync of iptables rules",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// IptablesLocalPortBindingErrorsTotal is the number of local port binding errors that the proxy has
+	// seen when syncing iptables rules.
+	IptablesLocalPortBindingErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_iptables_local_port_binding_errors_total",
+			Help:           "Cumulative local port binding errors in the sync of iptables rules",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
 	// SyncProxyRulesLastQueuedTimestamp is the last time a proxy sync was
 	// requested. If this is much larger than
 	// kubeproxy_sync_proxy_rules_last_timestamp_seconds, then something is hung.
@@ -164,6 +186,8 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(ServiceChangesTotal)
 		legacyregistry.MustRegister(IptablesRulesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
+		legacyregistry.MustRegister(IptablesConntrackErrorsTotal)
+		legacyregistry.MustRegister(IptablesLocalPortBindingErrorsTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
 	})
 }
