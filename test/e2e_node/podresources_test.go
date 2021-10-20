@@ -679,9 +679,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 		})
 
 		ginkgo.It("should return the expected error with the feature gate disabled", func() {
-			if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.KubeletPodResourcesGetAllocatable) {
-				e2eskipper.Skipf("this test is meant to run with the POD Resources Extensions feature gate disabled")
-			}
+			e2eskipper.SkipIfFeatureGateEnabled(kubefeatures.KubeletPodResourcesGetAllocatable)
 
 			endpoint, err := util.LocalEndpoint(defaultPodResourcesPath, podresources.Socket)
 			framework.ExpectNoError(err)
