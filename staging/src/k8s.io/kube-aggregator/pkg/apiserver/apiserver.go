@@ -270,12 +270,10 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		return nil
 	})
 	s.GenericAPIServer.AddPostStartHookOrDie("apiservice-registration-controller", func(context genericapiserver.PostStartHookContext) error {
-		handlerSyncedCh := make(chan struct{})
-		go apiserviceRegistrationController.Run(context.StopCh, handlerSyncedCh)
+		go apiserviceRegistrationController.Run(context.StopCh, apiServiceRegistrationControllerInitiated)
 		select {
 		case <-context.StopCh:
-		case <-handlerSyncedCh:
-			close(apiServiceRegistrationControllerInitiated)
+		case <-apiServiceRegistrationControllerInitiated:
 		}
 
 		return nil

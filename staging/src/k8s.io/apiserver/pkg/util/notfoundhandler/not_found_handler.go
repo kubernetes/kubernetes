@@ -18,7 +18,6 @@ package notfoundhandler
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +45,7 @@ type Handler struct {
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !h.isMuxAndDiscoveryCompleteFn(req.Context()) {
-		errMsg := fmt.Sprintf("the request has been made before all known HTTP paths have been installed, please try again")
+		errMsg := "the request has been made before all known HTTP paths have been installed, please try again"
 		err := apierrors.NewServiceUnavailable(errMsg)
 		if err.ErrStatus.Details == nil {
 			err.ErrStatus.Details = &metav1.StatusDetails{}

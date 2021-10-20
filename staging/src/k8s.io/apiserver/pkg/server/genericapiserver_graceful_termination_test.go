@@ -381,10 +381,10 @@ func TestGracefulTerminationWithKeepListeningDuringGracefulTerminationEnabled(t 
 
 func TestMuxAndDiscoveryComplete(t *testing.T) {
 	// setup
-	testSignal := make(chan struct{})
+	testSignal1 := make(chan struct{})
 	testSignal2 := make(chan struct{})
 	s := newGenericAPIServer(t, true)
-	s.muxAndDiscoveryCompleteSignals["TestSignal"] = testSignal
+	s.muxAndDiscoveryCompleteSignals["TestSignal1"] = testSignal1
 	s.muxAndDiscoveryCompleteSignals["TestSignal2"] = testSignal2
 	doer := setupDoer(t, s.SecureServingInfo)
 	isChanClosed := func(ch <-chan struct{}, delay time.Duration) bool {
@@ -410,7 +410,7 @@ func TestMuxAndDiscoveryComplete(t *testing.T) {
 		t.Fatalf("%s is closed whereas the TestSignal is still open", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 	}
 
-	close(testSignal)
+	close(testSignal1)
 	if isChanClosed(s.lifecycleSignals.MuxAndDiscoveryComplete.Signaled(), 1*time.Second) {
 		t.Fatalf("%s is closed whereas the TestSignal2 is still open", s.lifecycleSignals.MuxAndDiscoveryComplete.Name())
 	}
