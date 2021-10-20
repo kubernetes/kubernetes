@@ -329,6 +329,10 @@ message LinuxPodSandboxConfig {
     LinuxSandboxSecurityContext security_context = 2;
     // Sysctls holds linux sysctls config for the sandbox.
     map<string, string> sysctls = 3;
+    // Optional overhead represents the overheads associated with this sandbox
+    LinuxContainerResources overhead = 4;
+    // Optional resources represents the sum of container resources for this sandbox
+    LinuxContainerResources resources = 5;
 }
 
 // PodSandboxMetadata holds all necessary information for building the sandbox name.
