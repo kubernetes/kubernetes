@@ -738,22 +738,26 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceE
 				err = conntrack.ClearEntriesForPortNAT(proxier.exec, endpointIP, nodePort, svcProto)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete nodeport-related endpoint connections", "servicePortName", epSvcPair.ServicePortName)
+					metrics.SyncProxyRulesErrorsTotal.Inc()
 				}
 			}
 			err = conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
 			if err != nil {
 				klog.ErrorS(err, "Failed to delete endpoint connections", "servicePortName", epSvcPair.ServicePortName)
+				metrics.SyncProxyRulesErrorsTotal.Inc()
 			}
 			for _, extIP := range svcInfo.ExternalIPStrings() {
 				err := conntrack.ClearEntriesForNAT(proxier.exec, extIP, endpointIP, svcProto)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for externalIP", "servicePortName", epSvcPair.ServicePortName, "externalIP", extIP)
+					metrics.SyncProxyRulesErrorsTotal.Inc()
 				}
 			}
 			for _, lbIP := range svcInfo.LoadBalancerIPStrings() {
 				err := conntrack.ClearEntriesForNAT(proxier.exec, lbIP, endpointIP, svcProto)
 				if err != nil {
 					klog.ErrorS(err, "Failed to delete endpoint connections for LoadBalancerIP", "servicePortName", epSvcPair.ServicePortName, "loadBalancerIP", lbIP)
+					metrics.SyncProxyRulesErrorsTotal.Inc()
 				}
 			}
 		}
@@ -978,6 +982,7 @@ func (proxier *Proxier) syncProxyRules() {
 	nodeAddresses, err := utilproxy.GetNodeAddresses(proxier.nodePortAddresses, proxier.networkInterfacer)
 	if err != nil {
 		klog.ErrorS(err, "Failed to get node ip address matching nodeport cidrs, services with nodeport may not work as intended", "CIDRs", proxier.nodePortAddresses)
+		metrics.SyncProxyRulesErrorsTotal.Inc()
 	}
 
 	// Build rules for each service.
@@ -985,6 +990,7 @@ func (proxier *Proxier) syncProxyRules() {
 		svcInfo, ok := svc.(*serviceInfo)
 		if !ok {
 			klog.ErrorS(nil, "Failed to cast serviceInfo", "serviceName", svcName)
+			metrics.SyncProxyRulesErrorsTotal.Inc()
 			continue
 		}
 		isIPv6 := netutils.IsIPv6(svcInfo.ClusterIP())
@@ -1087,6 +1093,8 @@ func (proxier *Proxier) syncProxyRules() {
 								Namespace: "",
 							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 						klog.ErrorS(err, "Can't open port, skipping it", "port", lp)
+						metrics.SyncProxyRulesErrorsTotal.Inc()
+
 						continue
 					}
 					klog.V(2).InfoS("Opened local port", "port", lp)
@@ -1183,6 +1191,7 @@ func (proxier *Proxier) syncProxyRules() {
 							_, cidr, err := netutils.ParseCIDRSloppy(src)
 							if err != nil {
 								klog.ErrorS(err, "Error parsing CIDR in LoadBalancerSourceRanges, dropping it", "cidr", cidr)
+								metrics.SyncProxyRulesErrorsTotal.Inc()
 							} else if cidr.Contains(proxier.nodeIP) {
 								allowFromNode = true
 							}
@@ -1259,6 +1268,7 @@ func (proxier *Proxier) syncProxyRules() {
 								Namespace: "",
 							}, nil, v1.EventTypeWarning, err.Error(), "SyncProxyRules", msg)
 						klog.ErrorS(err, "Can't open port, skipping it", "port", lp)
+						metrics.SyncProxyRulesErrorsTotal.Inc()
 						continue
 					}
 					klog.V(2).InfoS("Opened local port", "port", lp)
@@ -1329,6 +1339,7 @@ func (proxier *Proxier) syncProxyRules() {
 			epInfo, ok := ep.(*endpointsInfo)
 			if !ok {
 				klog.ErrorS(err, "Failed to cast endpointsInfo", "endpointsInfo", ep)
+				metrics.SyncProxyRulesErrorsTotal.Inc()
 				continue
 			}
 
@@ -1547,6 +1558,7 @@ func (proxier *Proxier) syncProxyRules() {
 		// Ignore IP addresses with incorrect version
 		if isIPv6 && !netutils.IsIPv6String(address) || !isIPv6 && netutils.IsIPv6String(address) {
 			klog.ErrorS(nil, "IP has incorrect IP version", "IP", address)
+			metrics.SyncProxyRulesErrorsTotal.Inc()
 			continue
 		}
 		// create nodeport rules for each IP one by one
@@ -1651,9 +1663,11 @@ func (proxier *Proxier) syncProxyRules() {
 	// will just drop those endpoints.
 	if err := proxier.serviceHealthServer.SyncServices(serviceUpdateResult.HCServiceNodePorts); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck services")
+		metrics.SyncProxyRulesErrorsTotal.Inc()
 	}
 	if err := proxier.serviceHealthServer.SyncEndpoints(endpointUpdateResult.HCEndpointsLocalIPSize); err != nil {
 		klog.ErrorS(err, "Error syncing healthcheck endpoints")
+		metrics.SyncProxyRulesErrorsTotal.Inc()
 	}
 
 	// Finish housekeeping.
@@ -1663,6 +1677,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for _, svcIP := range conntrackCleanupServiceIPs.UnsortedList() {
 		if err := conntrack.ClearEntriesForIP(proxier.exec, svcIP, v1.ProtocolUDP); err != nil {
 			klog.ErrorS(err, "Failed to delete stale service connections", "IP", svcIP)
+			metrics.SyncProxyRulesErrorsTotal.Inc()
 		}
 	}
 	klog.V(4).InfoS("Deleting conntrack stale entries for services", "nodePorts", conntrackCleanupServiceNodePorts.UnsortedList())
@@ -1670,6 +1685,7 @@ func (proxier *Proxier) syncProxyRules() {
 		err := conntrack.ClearEntriesForPort(proxier.exec, nodePort, isIPv6, v1.ProtocolUDP)
 		if err != nil {
 			klog.ErrorS(err, "Failed to clear udp conntrack", "nodePort", nodePort)
+			metrics.SyncProxyRulesErrorsTotal.Inc()
 		}
 	}
 	klog.V(4).InfoS("Deleting stale endpoint connections", "endpoints", endpointUpdateResult.StaleEndpoints)

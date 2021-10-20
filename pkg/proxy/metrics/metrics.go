@@ -148,6 +148,16 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
+	// SyncProxyRulesErrorsTotal is the number of errors that the proxy has
+	// seen when syncing rules.
+	SyncProxyRulesErrorsTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      kubeProxySubsystem,
+			Name:           "sync_proxy_rules_errors_total",
+			Help:           "Cumulative errors in the sync of proxy rules",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetricsOnce sync.Once
@@ -165,6 +175,7 @@ func RegisterMetrics() {
 		legacyregistry.MustRegister(IptablesRulesTotal)
 		legacyregistry.MustRegister(IptablesRestoreFailuresTotal)
 		legacyregistry.MustRegister(SyncProxyRulesLastQueuedTimestamp)
+		legacyregistry.MustRegister(SyncProxyRulesErrorsTotal)
 	})
 }
 
