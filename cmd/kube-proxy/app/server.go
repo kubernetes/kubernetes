@@ -222,7 +222,7 @@ func NewOptions() *Options {
 // Complete completes all the required options.
 func (o *Options) Complete() error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		klog.InfoS("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP")
+		klog.InfoS("Warning, all flags other than --config, --write-config-to, and --cleanup are deprecated, please begin using a config file ASAP")
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
 		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
 	}
@@ -498,7 +498,8 @@ with the apiserver API to configure the proxy.`,
 			}
 
 			if err := opts.Run(); err != nil {
-				klog.Exit(err)
+				klog.ErrorS(err, "Error running ProxyServer")
+				os.Exit(1)
 			}
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
@@ -560,7 +561,7 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	var err error
 
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		klog.InfoS("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config")
+		klog.InfoS("Neither kubeconfig file nor master URL was specified, falling back to in-cluster config")
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
 		// This creates a client, first loading any specified kubeconfig
@@ -843,7 +844,7 @@ func detectNodeIP(client clientset.Interface, hostname, bindAddress string) net.
 		nodeIP = utilnode.GetNodeIP(client, hostname)
 	}
 	if nodeIP == nil {
-		klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
+		klog.V(0).InfoS("Can't determine this node's IP, assuming 127.0.0.1; if this is incorrect, please set the --bind-address flag")
 		nodeIP = netutils.ParseIPSloppy("127.0.0.1")
 	}
 	return nodeIP
