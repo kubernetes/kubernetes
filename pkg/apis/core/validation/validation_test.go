@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -523,7 +524,7 @@ func TestValidatePersistentVolumeSpec(t *testing.T) {
 				AccessModes: []core.PersistentVolumeAccessMode{core.ReadWriteOnce},
 			},
 		},
-		"inline-pvspec-with-sc": {
+		"inline-pvspec-with-podSec": {
 			isExpectedFailure: true,
 			isInlineSpec:      true,
 			pvSpec: &core.PersistentVolumeSpec{
@@ -6448,6 +6449,124 @@ func TestValidateEphemeralContainers(t *testing.T) {
 	}
 }
 
+func TestValidateWindowsPodSecurityContext(t *testing.T) {
+	validWindowsSC := &core.PodSecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}
+	invalidWindowsSC := &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummyRole"}}
+	cases := map[string]struct {
+		podSec         *core.PodSpec
+		expectErr      bool
+		errorType      field.ErrorType
+		errorDetail    string
+		featureEnabled bool
+	}{
+		"valid SC, windows, no error": {
+			podSec:         &core.PodSpec{SecurityContext: validWindowsSC},
+			expectErr:      false,
+			featureEnabled: true,
+		},
+		"invalid SC, windows, error": {
+			podSec:         &core.PodSpec{SecurityContext: invalidWindowsSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "cannot be set for a windows pod",
+			expectErr:      true,
+			featureEnabled: true,
+		},
+		"valid SC, windows, no error, no IdentifyPodOS featuregate": {
+			podSec:         &core.PodSpec{SecurityContext: validWindowsSC},
+			expectErr:      false,
+			featureEnabled: false,
+		},
+		"invalid SC, windows, error, no IdentifyPodOS featuregate": {
+			podSec:         &core.PodSpec{SecurityContext: invalidWindowsSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "cannot be set for a windows pod",
+			expectErr:      true,
+			featureEnabled: false,
+		},
+	}
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
+			errs := validateWindows(v.podSec, field.NewPath("field"))
+			if v.expectErr && len(errs) > 0 {
+				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+				}
+			} else if v.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !v.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateLinuxPodSecurityContext(t *testing.T) {
+	runAsUser := int64(1)
+	validLinuxSC := &core.PodSecurityContext{
+		SELinuxOptions: &core.SELinuxOptions{
+			User:  "user",
+			Role:  "role",
+			Type:  "type",
+			Level: "level",
+		},
+		RunAsUser: &runAsUser,
+	}
+	invalidLinuxSC := &core.PodSecurityContext{
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+	}
+
+	cases := map[string]struct {
+		podSpec        *core.PodSpec
+		expectErr      bool
+		errorType      field.ErrorType
+		errorDetail    string
+		featureEnabled bool
+	}{
+		"valid SC, linux, no error": {
+			podSpec:        &core.PodSpec{SecurityContext: validLinuxSC},
+			expectErr:      false,
+			featureEnabled: true,
+		},
+		"invalid SC, linux, error": {
+			podSpec:        &core.PodSpec{SecurityContext: invalidLinuxSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: true,
+		},
+		"valid SC, linux, no error, no IdentifyPodOS featuregate": {
+			podSpec:        &core.PodSpec{SecurityContext: validLinuxSC},
+			expectErr:      false,
+			featureEnabled: false,
+		},
+		"invalid SC, linux, error, no IdentifyPodOS featuregate": {
+			podSpec:        &core.PodSpec{SecurityContext: invalidLinuxSC},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: false,
+		},
+	}
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
+			errs := validateLinux(v.podSpec, field.NewPath("field"))
+			if v.expectErr && len(errs) > 0 {
+				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+				}
+			} else if v.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !v.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
 func TestValidateContainers(t *testing.T) {
 	volumeDevices := make(map[string]core.VolumeSource)
 	capabilities.SetForTests(capabilities.Capabilities{
@@ -9447,24 +9566,25 @@ func TestValidatePodUpdate(t *testing.T) {
 	)
 
 	tests := []struct {
-		new  core.Pod
-		old  core.Pod
-		err  string
-		test string
+		new         core.Pod
+		old         core.Pod
+		err         string
+		test        string
+		enablePodOS bool
 	}{
-		{core.Pod{}, core.Pod{}, "", "nothing"},
+		{new: core.Pod{}, old: core.Pod{}, err: "", test: "nothing"},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "bar"},
 			},
-			"metadata.name",
-			"ids",
+			err:  "metadata.name",
+			test: "ids",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -9472,7 +9592,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -9480,11 +9600,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"labels",
+			err:  "",
+			test: "labels",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Annotations: map[string]string{
@@ -9492,7 +9612,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Annotations: map[string]string{
@@ -9500,11 +9620,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"annotations",
+			err:  "",
+			test: "annotations",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -9516,7 +9636,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9529,11 +9649,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"may not add or remove containers",
-			"less containers",
+			err:  "may not add or remove containers",
+			test: "less containers",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -9548,7 +9668,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9558,11 +9678,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"may not add or remove containers",
-			"more containers",
+			err:  "may not add or remove containers",
+			test: "more containers",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -9574,7 +9694,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9587,47 +9707,47 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"may not add or remove containers",
-			"more init containers",
+			err:  "may not add or remove containers",
+			test: "more init containers",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"metadata.deletionTimestamp",
-			"deletion timestamp removed",
+			err:  "metadata.deletionTimestamp",
+			test: "deletion timestamp removed",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"metadata.deletionTimestamp",
-			"deletion timestamp added",
+			err:  "metadata.deletionTimestamp",
+			test: "deletion timestamp added",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo", DeletionTimestamp: &now, DeletionGracePeriodSeconds: &grace2},
 				Spec:       core.PodSpec{Containers: []core.Container{{Image: "foo:V1"}}},
 			},
-			"metadata.deletionGracePeriodSeconds",
-			"deletion grace period seconds changed",
+			err:  "metadata.deletionGracePeriodSeconds",
+			test: "deletion grace period seconds changed",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9640,7 +9760,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9653,11 +9773,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"image change",
+			err:  "",
+			test: "image change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9670,7 +9790,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9683,11 +9803,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"init container image change",
+			err:  "",
+			test: "init container image change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9699,7 +9819,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9712,11 +9832,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec.containers[0].image",
-			"image change to empty",
+			err:  "spec.containers[0].image",
+			test: "image change to empty",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9728,7 +9848,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					InitContainers: []core.Container{
@@ -9741,11 +9861,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec.initContainers[0].image",
-			"init container image change to empty",
+			err:  "spec.initContainers[0].image",
+			test: "init container image change to empty",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					EphemeralContainers: []core.EphemeralContainer{
@@ -9758,136 +9878,136 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec:       core.PodSpec{},
 			},
-			"Forbidden: pod updates may not change fields other than",
-			"ephemeralContainer changes are not allowed via normal pod update",
+			err:  "Forbidden: pod updates may not change fields other than",
+			test: "ephemeralContainer changes are not allowed via normal pod update",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{},
 			},
-			"",
-			"activeDeadlineSeconds no change, nil",
+			err:  "",
+			test: "activeDeadlineSeconds no change, nil",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"",
-			"activeDeadlineSeconds no change, set",
+			err:  "",
+			test: "activeDeadlineSeconds no change, set",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			core.Pod{},
-			"",
-			"activeDeadlineSeconds change to positive from nil",
+			old:  core.Pod{},
+			err:  "",
+			test: "activeDeadlineSeconds change to positive from nil",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
 				},
 			},
-			"",
-			"activeDeadlineSeconds change to smaller positive",
+			err:  "",
+			test: "activeDeadlineSeconds change to smaller positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsLarger,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to larger positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to larger positive",
 		},
 
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
 				},
 			},
-			core.Pod{},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to negative from nil",
+			old:  core.Pod{},
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to negative from nil",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsNegative,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to negative from positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to negative from positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to zero from positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to zero from positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsZero,
 				},
 			},
-			core.Pod{},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to zero from nil",
+			old:  core.Pod{},
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to zero from nil",
 		},
 		{
-			core.Pod{},
-			core.Pod{
+			new: core.Pod{},
+			old: core.Pod{
 				Spec: core.PodSpec{
 					ActiveDeadlineSeconds: &activeDeadlineSecondsPositive,
 				},
 			},
-			"spec.activeDeadlineSeconds",
-			"activeDeadlineSeconds change to nil from positive",
+			err:  "spec.activeDeadlineSeconds",
+			test: "activeDeadlineSeconds change to nil from positive",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9900,7 +10020,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9913,11 +10033,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec: Forbidden: pod updates may not change fields",
-			"cpu change",
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "cpu change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9930,7 +10050,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9943,11 +10063,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec: Forbidden: pod updates may not change fields",
-			"fsGroupChangePolicy change",
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "fsGroupChangePolicy change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9960,7 +10080,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"},
 				Spec: core.PodSpec{
 					Containers: []core.Container{
@@ -9973,11 +10093,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"spec: Forbidden: pod updates may not change fields",
-			"port change",
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "port change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -9985,7 +10105,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -9993,11 +10113,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					},
 				},
 			},
-			"",
-			"bad label change",
+			err:  "",
+			test: "bad label change",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10006,7 +10126,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value2"}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10015,11 +10135,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			"spec.tolerations: Forbidden",
-			"existing toleration value modified in pod spec updates",
+			err:  "spec.tolerations: Forbidden",
+			test: "existing toleration value modified in pod spec updates",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10028,7 +10148,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: nil}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10037,11 +10157,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			"spec.tolerations: Forbidden",
-			"existing toleration value modified in pod spec updates with modified tolerationSeconds",
+			err:  "spec.tolerations: Forbidden",
+			test: "existing toleration value modified in pod spec updates with modified tolerationSeconds",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10050,7 +10170,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10058,11 +10178,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					NodeName:    "node1",
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{20}[0]}},
 				}},
-			"",
-			"modified tolerationSeconds in existing toleration value in pod spec updates",
+			err:  "",
+			test: "modified tolerationSeconds in existing toleration value in pod spec updates",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10070,7 +10190,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value2"}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10079,11 +10199,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			"spec.tolerations: Forbidden",
-			"toleration modified in updates to an unscheduled pod",
+			err:  "spec.tolerations: Forbidden",
+			test: "toleration modified in updates to an unscheduled pod",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10092,7 +10212,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10101,11 +10221,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1"}},
 				},
 			},
-			"",
-			"tolerations unmodified in updates to a scheduled pod",
+			err:  "",
+			test: "tolerations unmodified in updates to a scheduled pod",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10116,7 +10236,7 @@ func TestValidatePodUpdate(t *testing.T) {
 						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{30}[0]},
 					},
 				}},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10125,11 +10245,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				},
 			},
-			"",
-			"added valid new toleration to existing tolerations in pod spec updates",
+			err:  "",
+			test: "added valid new toleration to existing tolerations in pod spec updates",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{
 					NodeName: "node1",
 					Tolerations: []core.Toleration{
@@ -10137,42 +10257,42 @@ func TestValidatePodUpdate(t *testing.T) {
 						{Key: "key2", Value: "value2", Operator: "Equal", Effect: "NoSchedule", TolerationSeconds: &[]int64{30}[0]},
 					},
 				}},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
 				Spec: core.PodSpec{
 					NodeName: "node1", Tolerations: []core.Toleration{{Key: "key1", Value: "value1", Operator: "Equal", Effect: "NoExecute", TolerationSeconds: &[]int64{10}[0]}},
 				}},
-			"spec.tolerations[1].effect",
-			"added invalid new toleration to existing tolerations in pod spec updates",
+			err:  "spec.tolerations[1].effect",
+			test: "added invalid new toleration to existing tolerations in pod spec updates",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
-			"spec: Forbidden: pod updates may not change fields",
-			"removed nodeName from pod spec",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}},
+			err:  "spec: Forbidden: pod updates may not change fields",
+			test: "removed nodeName from pod spec",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			"metadata.annotations[kubernetes.io/config.mirror]",
-			"added mirror pod annotation",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
+			err:  "metadata.annotations[kubernetes.io/config.mirror]",
+			test: "added mirror pod annotation",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
-			"metadata.annotations[kubernetes.io/config.mirror]",
-			"removed mirror pod annotation",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: ""}}, Spec: core.PodSpec{NodeName: "foo"}},
+			err:  "metadata.annotations[kubernetes.io/config.mirror]",
+			test: "removed mirror pod annotation",
 		},
 		{
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "foo"}}, Spec: core.PodSpec{NodeName: "foo"}},
-			core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "bar"}}, Spec: core.PodSpec{NodeName: "foo"}},
-			"metadata.annotations[kubernetes.io/config.mirror]",
-			"changed mirror pod annotation",
+			new:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "foo"}}, Spec: core.PodSpec{NodeName: "foo"}},
+			old:  core.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{core.MirrorPodAnnotationKey: "bar"}}, Spec: core.PodSpec{NodeName: "foo"}},
+			err:  "metadata.annotations[kubernetes.io/config.mirror]",
+			test: "changed mirror pod annotation",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10181,7 +10301,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "bar-priority",
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10190,11 +10310,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "foo-priority",
 				},
 			},
-			"spec: Forbidden: pod updates",
-			"changed priority class name",
+			err:  "spec: Forbidden: pod updates",
+			test: "changed priority class name",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10203,7 +10323,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "",
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10212,11 +10332,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					PriorityClassName: "foo-priority",
 				},
 			},
-			"spec: Forbidden: pod updates",
-			"removed priority class name",
+			err:  "spec: Forbidden: pod updates",
+			test: "removed priority class name",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10224,7 +10344,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(1),
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10232,11 +10352,11 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
 				},
 			},
-			"",
-			"update termination grace period seconds",
+			err:  "",
+			test: "update termination grace period seconds",
 		},
 		{
-			core.Pod{
+			new: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10244,7 +10364,7 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(0),
 				},
 			},
-			core.Pod{
+			old: core.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "foo",
 				},
@@ -10252,11 +10372,137 @@ func TestValidatePodUpdate(t *testing.T) {
 					TerminationGracePeriodSeconds: utilpointer.Int64Ptr(-1),
 				},
 			},
-			"spec: Forbidden: pod updates",
-			"update termination grace period seconds not 1",
+			err:  "spec: Forbidden: pod updates",
+			test: "update termination grace period seconds not 1",
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Windows},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Linux},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image`,",
+			test:        "pod OS changing from Linux to Windows, no IdentifyPodOS featuregate set, no validation done",
+			enablePodOS: false,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Windows},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Linux},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test:        "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set",
+			enablePodOS: true,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Windows},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS:              &core.PodOS{Name: core.Linux},
+					SecurityContext: &core.PodSecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}},
+				},
+			},
+			err:         "spec.securityContext.seLinuxOptions: Forbidden",
+			test:        "pod OS changing from Linux to Windows, IdentifyPodOS featuregate set, we'd get SELinux errors as well",
+			enablePodOS: true,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: "dummy"},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test:        "invalid PodOS update, IdentifyPodOS featuregate set",
+			enablePodOS: true,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: core.Windows},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{},
+			},
+			err:         "Forbidden: pod updates may not change fields other than `spec.containers[*].image",
+			test:        "no pod spec OS to a valid value, no featuregate",
+			enablePodOS: false,
+		},
+		{
+			new: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: core.Linux},
+				},
+			},
+			old: core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Spec: core.PodSpec{
+					OS: &core.PodOS{Name: core.Windows},
+				},
+			},
+			err:  "Forbidden: pod updates may not change fields other than ",
+			test: "update pod spec OS to a valid value, featuregate disabled",
 		},
 	}
-
 	for _, test := range tests {
 		test.new.ObjectMeta.ResourceVersion = "1"
 		test.old.ObjectMeta.ResourceVersion = "1"
@@ -10283,7 +10529,7 @@ func TestValidatePodUpdate(t *testing.T) {
 			test.old.Spec.RestartPolicy = "Always"
 		}
 
-		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{})
+		errs := ValidatePodUpdate(&test.new, &test.old, PodValidationOptions{AllowOSField: test.enablePodOS})
 		if test.err == "" {
 			if len(errs) != 0 {
 				t.Errorf("unexpected invalid: %s (%+v)\nA: %+v\nB: %+v", test.test, errs, test.new, test.old)
@@ -16728,6 +16974,281 @@ func TestValidateEndpointsUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateWindowsSecurityContext(t *testing.T) {
+	tests := []struct {
+		name           string
+		sc             *core.PodSpec
+		expectError    bool
+		errorMsg       string
+		errorType      field.ErrorType
+		featureEnabled bool
+	}{
+		{
+			name:           "pod with SELinux Options",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: true,
+		},
+		{
+			name:           "pod with SeccompProfile",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: true,
+		},
+		{
+			name:           "pod with WindowsOptions, no error",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
+			expectError:    false,
+			featureEnabled: true,
+		},
+		{
+			name:           "pod with SELinux Options,  no IdentifyPodOS enabled",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SELinuxOptions: &core.SELinuxOptions{Role: "dummy"}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: false,
+		},
+		{
+			name:           "pod with SeccompProfile, no IdentifyPodOS enabled",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{SeccompProfile: &core.SeccompProfile{LocalhostProfile: utilpointer.String("dummy")}}}}},
+			expectError:    true,
+			errorMsg:       "cannot be set for a windows pod",
+			errorType:      "FieldValueForbidden",
+			featureEnabled: false,
+		},
+		{
+			name:           "pod with WindowsOptions, no error,  no IdentifyPodOS enabled",
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: &core.SecurityContext{WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("dummy")}}}}},
+			expectError:    false,
+			featureEnabled: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, test.featureEnabled)()
+			errs := validateWindows(test.sc, field.NewPath("field"))
+			if test.expectError && len(errs) > 0 {
+				if errs[0].Type != test.errorType {
+					t.Errorf("expected error type %q got %q", test.errorType, errs[0].Type)
+				}
+				if errs[0].Detail != test.errorMsg {
+					t.Errorf("expected error detail %q, got %q", test.errorMsg, errs[0].Detail)
+				}
+			} else if test.expectError && len(errs) == 0 {
+				t.Error("Unexpected success")
+			}
+			if !test.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateOSFields(t *testing.T) {
+	// Contains the list of OS specific fields within pod spec.
+	// All the fields in pod spec should be either osSpecific or osNeutral field
+	// To make a field OS specific:
+	// - Add documentation to the os specific field indicating which os it can/cannot be set for
+	// - Add documentation to the os field in the api
+	// - Add validation logic validateLinux, validateWindows functions to make sure the field is only set for eligible OSes
+	osSpecificFields := sets.NewString(
+		"Containers[*].SecurityContext.AllowPrivilegeEscalation",
+		"Containers[*].SecurityContext.Capabilities",
+		"Containers[*].SecurityContext.Privileged",
+		"Containers[*].SecurityContext.ProcMount",
+		"Containers[*].SecurityContext.ReadOnlyRootFilesystem",
+		"Containers[*].SecurityContext.RunAsGroup",
+		"Containers[*].SecurityContext.RunAsUser",
+		"Containers[*].SecurityContext.SELinuxOptions",
+		"Containers[*].SecurityContext.SeccompProfile",
+		"Containers[*].SecurityContext.WindowsOptions",
+		"InitContainers[*].SecurityContext.AllowPrivilegeEscalation",
+		"InitContainers[*].SecurityContext.Capabilities",
+		"InitContainers[*].SecurityContext.Privileged",
+		"InitContainers[*].SecurityContext.ProcMount",
+		"InitContainers[*].SecurityContext.ReadOnlyRootFilesystem",
+		"InitContainers[*].SecurityContext.RunAsGroup",
+		"InitContainers[*].SecurityContext.RunAsUser",
+		"InitContainers[*].SecurityContext.SELinuxOptions",
+		"InitContainers[*].SecurityContext.SeccompProfile",
+		"InitContainers[*].SecurityContext.WindowsOptions",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.AllowPrivilegeEscalation",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Capabilities",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.Privileged",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.ProcMount",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.ReadOnlyRootFilesystem",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsGroup",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsUser",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SELinuxOptions",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.SeccompProfile",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.WindowsOptions",
+		"OS",
+		"SecurityContext.FSGroup",
+		"SecurityContext.FSGroupChangePolicy",
+		"SecurityContext.HostIPC",
+		"SecurityContext.HostNetwork",
+		"SecurityContext.HostPID",
+		"SecurityContext.RunAsGroup",
+		"SecurityContext.RunAsUser",
+		"SecurityContext.SELinuxOptions",
+		"SecurityContext.SeccompProfile",
+		"SecurityContext.ShareProcessNamespace",
+		"SecurityContext.SupplementalGroups",
+		"SecurityContext.Sysctls",
+		"SecurityContext.WindowsOptions",
+	)
+	osNeutralFields := sets.NewString(
+		"ActiveDeadlineSeconds",
+		"Affinity",
+		"AutomountServiceAccountToken",
+		"Containers[*].Args",
+		"Containers[*].Command",
+		"Containers[*].Env",
+		"Containers[*].EnvFrom",
+		"Containers[*].Image",
+		"Containers[*].ImagePullPolicy",
+		"Containers[*].Lifecycle",
+		"Containers[*].LivenessProbe",
+		"Containers[*].Name",
+		"Containers[*].Ports",
+		"Containers[*].ReadinessProbe",
+		"Containers[*].Resources",
+		"Containers[*].SecurityContext.RunAsNonRoot",
+		"Containers[*].Stdin",
+		"Containers[*].StdinOnce",
+		"Containers[*].StartupProbe",
+		"Containers[*].VolumeDevices[*]",
+		"Containers[*].VolumeMounts[*]",
+		"Containers[*].TTY",
+		"Containers[*].TerminationMessagePath",
+		"Containers[*].TerminationMessagePolicy",
+		"Containers[*].WorkingDir",
+		"DNSPolicy",
+		"EnableServiceLinks",
+		"EphemeralContainers[*].EphemeralContainerCommon.Args",
+		"EphemeralContainers[*].EphemeralContainerCommon.Command",
+		"EphemeralContainers[*].EphemeralContainerCommon.Env",
+		"EphemeralContainers[*].EphemeralContainerCommon.EnvFrom",
+		"EphemeralContainers[*].EphemeralContainerCommon.Image",
+		"EphemeralContainers[*].EphemeralContainerCommon.ImagePullPolicy",
+		"EphemeralContainers[*].EphemeralContainerCommon.Lifecycle",
+		"EphemeralContainers[*].EphemeralContainerCommon.LivenessProbe",
+		"EphemeralContainers[*].EphemeralContainerCommon.Name",
+		"EphemeralContainers[*].EphemeralContainerCommon.Ports",
+		"EphemeralContainers[*].EphemeralContainerCommon.ReadinessProbe",
+		"EphemeralContainers[*].EphemeralContainerCommon.Resources",
+		"EphemeralContainers[*].EphemeralContainerCommon.Stdin",
+		"EphemeralContainers[*].EphemeralContainerCommon.StdinOnce",
+		"EphemeralContainers[*].EphemeralContainerCommon.TTY",
+		"EphemeralContainers[*].EphemeralContainerCommon.TerminationMessagePath",
+		"EphemeralContainers[*].EphemeralContainerCommon.TerminationMessagePolicy",
+		"EphemeralContainers[*].EphemeralContainerCommon.WorkingDir",
+		"EphemeralContainers[*].TargetContainerName",
+		"EphemeralContainers[*].EphemeralContainerCommon.SecurityContext.RunAsNonRoot",
+		"EphemeralContainers[*].EphemeralContainerCommon.StartupProbe",
+		"EphemeralContainers[*].EphemeralContainerCommon.VolumeDevices[*]",
+		"EphemeralContainers[*].EphemeralContainerCommon.VolumeMounts[*]",
+		"HostAliases",
+		"Hostname",
+		"ImagePullSecrets",
+		"InitContainers[*].Args",
+		"InitContainers[*].Command",
+		"InitContainers[*].Env",
+		"InitContainers[*].EnvFrom",
+		"InitContainers[*].Image",
+		"InitContainers[*].ImagePullPolicy",
+		"InitContainers[*].Lifecycle",
+		"InitContainers[*].LivenessProbe",
+		"InitContainers[*].Name",
+		"InitContainers[*].Ports",
+		"InitContainers[*].ReadinessProbe",
+		"InitContainers[*].Resources",
+		"InitContainers[*].Stdin",
+		"InitContainers[*].StdinOnce",
+		"InitContainers[*].TTY",
+		"InitContainers[*].TerminationMessagePath",
+		"InitContainers[*].TerminationMessagePolicy",
+		"InitContainers[*].WorkingDir",
+		"InitContainers[*].SecurityContext.RunAsNonRoot",
+		"InitContainers[*].StartupProbe",
+		"InitContainers[*].VolumeDevices[*]",
+		"InitContainers[*].VolumeMounts[*]",
+		"NodeName",
+		"NodeSelector",
+		"PreemptionPolicy",
+		"Priority",
+		"PriorityClassName",
+		"ReadinessGates",
+		"RestartPolicy",
+		"RuntimeClassName",
+		"SchedulerName",
+		"SecurityContext.RunAsNonRoot",
+		"ServiceAccountName",
+		"SetHostnameAsFQDN",
+		"Subdomain",
+		"TerminationGracePeriodSeconds",
+		"Volumes",
+		"DNSConfig",
+		"Overhead",
+		"Tolerations",
+		"TopologySpreadConstraints",
+	)
+
+	expect := sets.NewString().Union(osSpecificFields).Union(osNeutralFields)
+
+	result := collectResourcePaths(t, expect, reflect.TypeOf(&core.PodSpec{}), nil)
+
+	if !expect.Equal(result) {
+		// expected fields missing from result
+		missing := expect.Difference(result)
+		// unexpected fields in result but not specified in expect
+		unexpected := result.Difference(expect)
+		if len(missing) > 0 {
+			t.Errorf("the following fields were expected, but missing from the result. "+
+				"If the field has been removed, please remove it from the osNeutralFields set "+
+				"or remove it from the osSpecificFields set, as appropriate:\n%s",
+				strings.Join(missing.List(), "\n"))
+		}
+		if len(unexpected) > 0 {
+			t.Errorf("the following fields were in the result, but unexpected. "+
+				"If the field is new, please add it to the osNeutralFields set "+
+				"or add it to the osSpecificFields set, as appropriate:\n%s",
+				strings.Join(unexpected.List(), "\n"))
+		}
+	}
+}
+
+// collectResourcePaths traverses the object, computing all the struct paths.
+func collectResourcePaths(t *testing.T, skipRecurseList sets.String, tp reflect.Type, path *field.Path) sets.String {
+	if pathStr := path.String(); len(pathStr) > 0 && skipRecurseList.Has(pathStr) {
+		return sets.NewString(pathStr)
+	}
+
+	paths := sets.NewString()
+	switch tp.Kind() {
+	case reflect.Ptr:
+		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path).List()...)
+	case reflect.Struct:
+		for i := 0; i < tp.NumField(); i++ {
+			field := tp.Field(i)
+			paths.Insert(collectResourcePaths(t, skipRecurseList, field.Type, path.Child(field.Name)).List()...)
+		}
+	case reflect.Map, reflect.Slice:
+		paths.Insert(collectResourcePaths(t, skipRecurseList, tp.Elem(), path.Key("*")).List()...)
+	case reflect.Interface:
+		t.Fatalf("unexpected interface{} field %s", path.String())
+	default:
+		// if we hit a primitive type, we're at a leaf
+		paths.Insert(path.String())
+	}
+	return paths
+}
+
 func TestValidateTLSSecret(t *testing.T) {
 	successCases := map[string]core.Secret{
 		"empty certificate chain": {
@@ -16771,6 +17292,75 @@ func TestValidateTLSSecret(t *testing.T) {
 		if errs := ValidateSecret(&v.secrets); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %s with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
+	}
+}
+
+func TestValidateLinuxSecurityContext(t *testing.T) {
+	runAsUser := int64(1)
+	validLinuxSC := &core.SecurityContext{
+		Privileged: utilpointer.BoolPtr(false),
+		Capabilities: &core.Capabilities{
+			Add:  []core.Capability{"foo"},
+			Drop: []core.Capability{"bar"},
+		},
+		SELinuxOptions: &core.SELinuxOptions{
+			User:  "user",
+			Role:  "role",
+			Type:  "type",
+			Level: "level",
+		},
+		RunAsUser: &runAsUser,
+	}
+	invalidLinuxSC := &core.SecurityContext{
+		WindowsOptions: &core.WindowsSecurityContextOptions{RunAsUserName: utilpointer.String("myUser")},
+	}
+	cases := map[string]struct {
+		sc             *core.PodSpec
+		expectErr      bool
+		errorType      field.ErrorType
+		errorDetail    string
+		featureEnabled bool
+	}{
+		"valid SC, linux, no error": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: validLinuxSC}}},
+			expectErr:      false,
+			featureEnabled: true,
+		},
+		"invalid SC, linux, error": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: invalidLinuxSC}}},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: true,
+		},
+		"valid SC, linux, no error, no IdentifyPodOS featuregate": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: validLinuxSC}}},
+			expectErr:      false,
+			featureEnabled: false,
+		},
+		"invalid SC, linux, error, no IdentifyPodOS featuregate": {
+			sc:             &core.PodSpec{Containers: []core.Container{{SecurityContext: invalidLinuxSC}}},
+			errorType:      "FieldValueForbidden",
+			errorDetail:    "windows options cannot be set for a linux pod",
+			expectErr:      true,
+			featureEnabled: false,
+		},
+	}
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, v.featureEnabled)()
+			errs := validateLinux(v.sc, field.NewPath("field"))
+			if v.expectErr && len(errs) > 0 {
+				if errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+					t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
+				}
+			} else if v.expectErr && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !v.expectErr && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
 	}
 }
 
@@ -19136,6 +19726,95 @@ func TestValidateWindowsHostProcessPod(t *testing.T) {
 			})
 
 			errs := validateWindowsHostProcessPod(testCase.podSpec, field.NewPath("spec"), opts)
+			if testCase.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !testCase.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateOS(t *testing.T) {
+	testCases := []struct {
+		name           string
+		expectError    bool
+		featureEnabled bool
+		podSpec        *core.PodSpec
+	}{
+		{
+			name:           "no OS field, featuregate",
+			expectError:    false,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: nil},
+		},
+		{
+			name:           "empty OS field, featuregate",
+			expectError:    true,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{}},
+		},
+		{
+			name:           "no OS field, no featuregate",
+			expectError:    false,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: nil},
+		},
+		{
+			name:           "empty OS field, no featuregate",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{}},
+		},
+		{
+			name:           "OS field, featuregate, valid OS",
+			expectError:    false,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Linux}},
+		},
+		{
+			name:           "OS field, featuregate, valid OS",
+			expectError:    false,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Windows}},
+		},
+		{
+			name:           "OS field, featuregate, empty OS",
+			expectError:    true,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: ""}},
+		},
+		{
+			name:           "OS field, no featuregate, empty OS",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: ""}},
+		},
+		{
+			name:           "OS field, featuregate, invalid OS",
+			expectError:    true,
+			featureEnabled: true,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: "dummyOS"}},
+		},
+		{
+			name:           "OS field, no featuregate, valid OS",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: core.Linux}},
+		},
+		{
+			name:           "OS field, no featuregate, invalid OS",
+			expectError:    true,
+			featureEnabled: false,
+			podSpec:        &core.PodSpec{OS: &core.PodOS{Name: "dummyOS"}},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IdentifyPodOS, testCase.featureEnabled)()
+
+			errs := validateOS(testCase.podSpec, field.NewPath("spec"), PodValidationOptions{AllowOSField: testCase.featureEnabled})
 			if testCase.expectError && len(errs) == 0 {
 				t.Errorf("Unexpected success")
 			}
