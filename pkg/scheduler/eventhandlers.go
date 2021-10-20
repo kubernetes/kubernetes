@@ -399,11 +399,6 @@ func addAllEventHandlers(
 					},
 				)
 			}
-		case framework.Service:
-			// ServiceAffinity: affected by the selector of the service is updated.
-			informerFactory.Core().V1().Services().Informer().AddEventHandler(
-				buildEvtResHandler(at, framework.Service, "Service"),
-			)
 		default:
 			// Tests may not instantiate dynInformerFactory.
 			if dynInformerFactory == nil {

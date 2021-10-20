@@ -74,9 +74,6 @@ type PriorityPolicy struct {
 // PredicateArgument represents the arguments to configure predicate functions in scheduler policy configuration.
 // Only one of its members may be specified
 type PredicateArgument struct {
-	// The predicate that provides affinity for pods belonging to a service
-	// It uses a label to identify nodes that belong to the same "group"
-	ServiceAffinity *ServiceAffinity
 	// The predicate that checks whether a particular node has a certain label
 	// defined or not, regardless of value
 	LabelsPresence *LabelsPresence
@@ -85,21 +82,11 @@ type PredicateArgument struct {
 // PriorityArgument represents the arguments to configure priority functions in scheduler policy configuration.
 // Only one of its members may be specified
 type PriorityArgument struct {
-	// The priority function that ensures a good spread (anti-affinity) for pods belonging to a service
-	// It uses a label to identify nodes that belong to the same "group"
-	ServiceAntiAffinity *ServiceAntiAffinity
 	// The priority function that checks whether a particular node has a certain label
 	// defined or not, regardless of value
 	LabelPreference *LabelPreference
 	// The RequestedToCapacityRatio priority function is parametrized with function shape.
 	RequestedToCapacityRatioArguments *RequestedToCapacityRatioArguments
-}
-
-// ServiceAffinity holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
-type ServiceAffinity struct {
-	// The list of labels that identify node "groups"
-	// All of the labels should match for the node to be considered a fit for hosting the pod
-	Labels []string
 }
 
 // LabelsPresence holds the parameters that are used to configure the corresponding predicate in scheduler policy configuration.
@@ -109,12 +96,6 @@ type LabelsPresence struct {
 	Labels []string
 	// The boolean flag that indicates whether the labels should be present or absent from the node
 	Presence bool
-}
-
-// ServiceAntiAffinity holds the parameters that are used to configure the corresponding priority function
-type ServiceAntiAffinity struct {
-	// Used to identify node "groups"
-	Label string
 }
 
 // LabelPreference holds the parameters that are used to configure the corresponding priority function
