@@ -1446,14 +1446,29 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 				}
 				klog.V(10).Infof("EnsureBackendPoolDeleted(%s) for service %s: end", lbBackendPoolID, serviceName)
 
-				// Remove the LB.
-				klog.V(10).Infof("reconcileLoadBalancer: az.DeleteLB(%q): start", lbName)
-				err = az.DeleteLB(service, lbName)
+				existingLBs, err := az.ListLB(service)
 				if err != nil {
-					klog.V(2).Infof("reconcileLoadBalancer for service(%s) abort backoff: lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
+					klog.Errorf("reconcileLoadBalancer: failed to list load balancer for service %q: %s", serviceName, err.Error())
 					return nil, err
 				}
-				klog.V(10).Infof("az.DeleteLB(%q): end", lbName)
+
+				foundLB := false
+				for _, existingLB := range existingLBs {
+					if strings.EqualFold(lbName, to.String(existingLB.Name)) {
+						foundLB = true
+						break
+					}
+				}
+				// Remove the LB if it exists.
+				if foundLB {
+					klog.V(10).Infof("reconcileLoadBalancer: az.DeleteLB(%q): start", lbName)
+					err = az.DeleteLB(service, lbName)
+					if err != nil {
+						klog.V(2).Infof("reconcileLoadBalancer for service(%s) abort backoff: lb(%s) - deleting; no remaining frontendIPConfigurations", serviceName, lbName)
+						return nil, err
+					}
+					klog.V(10).Infof("az.DeleteLB(%q): end", lbName)
+				}
 			}
 		} else {
 			klog.V(2).Infof("reconcileLoadBalancer: reconcileLoadBalancer for service(%s): lb(%s) - updating", serviceName, lbName)
