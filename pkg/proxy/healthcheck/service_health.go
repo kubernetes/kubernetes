@@ -56,7 +56,7 @@ func newServiceHealthServer(hostname string, recorder events.EventRecorder, list
 
 	nodeAddresses, err := utilproxy.GetNodeAddresses(nodePortAddresses, utilproxy.RealNetwork{})
 	if err != nil || nodeAddresses.Len() == 0 {
-		klog.ErrorS(err, "Health Check Port:Failed to get node ip address matching node port addresses. Health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
+		klog.ErrorS(err, "Failed to get node ip address matching node port addresses, health check port will listen to all node addresses", "nodePortAddresses", nodePortAddresses)
 		nodeAddresses = sets.NewString()
 		nodeAddresses.Insert(utilproxy.IPv4ZeroCIDR)
 	}
@@ -104,23 +104,24 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 	// Remove any that are not needed any more.
 	for nsn, svc := range hcs.services {
 		if port, found := newServices[nsn]; !found || port != svc.port {
-			klog.V(2).InfoS("Closing healthcheck", "service", nsn.String(), "port", svc.port)
+			klog.V(2).InfoS("Closing healthcheck", "service", nsn, "port", svc.port)
 
 			// errors are loged in closeAll()
 			_ = svc.closeAll()
 
 			delete(hcs.services, nsn)
+
 		}
 	}
 
 	// Add any that are needed.
 	for nsn, port := range newServices {
 		if hcs.services[nsn] != nil {
-			klog.V(3).InfoS("Existing healthcheck", "service", nsn.String(), "port", port)
+			klog.V(3).InfoS("Existing healthcheck", "service", nsn, "port", port)
 			continue
 		}
 
-		klog.V(2).InfoS("Opening healthcheck", "service", nsn.String(), "port", port)
+		klog.V(2).InfoS("Opening healthcheck", "service", nsn, "port", port)
 
 		svc := &hcInstance{nsn: nsn, port: port}
 		err := svc.listenAndServeAll(hcs)
@@ -137,7 +138,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 						UID:       types.UID(nsn.String()),
 					}, nil, api.EventTypeWarning, "FailedToStartServiceHealthcheck", "Listen", msg)
 			}
-			klog.ErrorS(err, "failed to start healthcheck", "node", hcs.hostname, "service", nsn.String(), "port", port)
+			klog.ErrorS(err, "Failed to start healthcheck", "node", hcs.hostname, "service", nsn, "port", port)
 			continue
 		}
 		hcs.services[nsn] = svc
@@ -181,12 +182,12 @@ func (hcI *hcInstance) listenAndServeAll(hcs *server) error {
 		// start serving
 		go func(hcI *hcInstance, listener net.Listener, httpSrv httpServer) {
 			// Serve() will exit when the listener is closed.
-			klog.V(3).InfoS("Starting goroutine for healthcheck", "service", hcI.nsn.String(), "address", listener.Addr().String())
+			klog.V(3).InfoS("Starting goroutine for healthcheck", "service", hcI.nsn, "address", listener.Addr())
 			if err := httpSrv.Serve(listener); err != nil {
-				klog.ErrorS(err, "Healthcheck closed", "service", hcI.nsn.String())
+				klog.ErrorS(err, "Healthcheck closed", "service", hcI.nsn)
 				return
 			}
-			klog.V(3).InfoS("Healthcheck closed", "service", hcI.nsn.String(), "address", listener.Addr().String())
+			klog.V(3).InfoS("Healthcheck closed", "service", hcI.nsn, "address", listener.Addr())
 		}(hcI, listener, httpSrv)
 
 		hcI.listeners = append(hcI.listeners, listener)
@@ -200,7 +201,7 @@ func (hcI *hcInstance) closeAll() error {
 	errors := []error{}
 	for _, listener := range hcI.listeners {
 		if err := listener.Close(); err != nil {
-			klog.Errorf("Service %q -- CloseListener(%v) error:%v", hcI.nsn, listener.Addr(), err)
+			klog.ErrorS(err, "Error closing listener for health check service", "service", hcI.nsn, "address", listener.Addr())
 			errors = append(errors, err)
 		}
 	}
@@ -224,7 +225,7 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	svc, ok := h.hcs.services[h.name]
 	if !ok || svc == nil {
 		h.hcs.lock.RUnlock()
-		klog.ErrorS(nil, "Received request for closed healthcheck", "service", h.name.String())
+		klog.ErrorS(nil, "Received request for closed healthcheck", "service", h.name)
 		return
 	}
 	count := svc.endpoints
@@ -254,10 +255,10 @@ func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) erro
 
 	for nsn, count := range newEndpoints {
 		if hcs.services[nsn] == nil {
-			klog.V(3).InfoS("Not saving endpoints for unknown healthcheck", "service", nsn.String())
+			klog.V(3).InfoS("Not saving endpoints for unknown healthcheck", "service", nsn)
 			continue
 		}
-		klog.V(3).InfoS("Reporting endpoints for healthcheck", "endpointCount", count, "service", nsn.String())
+		klog.V(3).InfoS("Reporting endpoints for healthcheck", "endpointCount", count, "service", nsn)
 		hcs.services[nsn].endpoints = count
 	}
 	for nsn, hci := range hcs.services {
