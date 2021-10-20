@@ -94,6 +94,7 @@ const (
 
 	// owner: @verb
 	// alpha: v1.16
+	// beta: v1.23
 	//
 	// Allows running an ephemeral container in pod namespaces to troubleshoot a running pod.
 	EphemeralContainers featuregate.Feature = "EphemeralContainers"
@@ -792,7 +793,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	DevicePlugins:                                  {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletServerCertificate:                 {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolation:                  {Default: true, PreRelease: featuregate.Beta},
-	EphemeralContainers:                            {Default: false, PreRelease: featuregate.Alpha},
+	EphemeralContainers:                            {Default: true, PreRelease: featuregate.Beta},
 	QOSReserved:                                    {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:                        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.Beta},

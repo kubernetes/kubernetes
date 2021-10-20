@@ -151,7 +151,7 @@ func (c *PodClient) Update(name string, updateFn func(pod *v1.Pod)) {
 }
 
 // AddEphemeralContainerSync adds an EphemeralContainer to a pod and waits for it to be running.
-func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralContainer, timeout time.Duration) {
+func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralContainer, timeout time.Duration) error {
 	namespace := c.f.Namespace.Name
 
 	podJS, err := json.Marshal(pod)
@@ -165,10 +165,13 @@ func (c *PodClient) AddEphemeralContainerSync(pod *v1.Pod, ec *v1.EphemeralConta
 	patch, err := strategicpatch.CreateTwoWayMergePatch(podJS, ecJS, pod)
 	ExpectNoError(err, "error creating patch to add ephemeral container %q", format.Pod(pod))
 
-	_, err = c.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers")
-	ExpectNoError(err, "Failed to patch ephemeral containers in pod %q", format.Pod(pod))
+	// Clients may optimistically attempt to add an ephemeral container to determine whether the EphemeralContainers feature is enabled.
+	if _, err := c.Patch(context.TODO(), pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "ephemeralcontainers"); err != nil {
+		return err
+	}
 
 	ExpectNoError(e2epod.WaitForContainerRunning(c.f.ClientSet, namespace, pod.Name, ec.Name, timeout))
+	return nil
 }
 
 // DeleteSync deletes the pod and wait for the pod to disappear for `timeout`. If the pod doesn't

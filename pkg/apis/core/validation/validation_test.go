@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	asserttestify "github.com/stretchr/testify/assert"
@@ -6142,7 +6143,10 @@ func getResourceLimits(cpu, memory string) core.ResourceList {
 func TestValidateEphemeralContainers(t *testing.T) {
 	containers := []core.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
 	initContainers := []core.Container{{Name: "ictr", Image: "iimage", ImagePullPolicy: "IfNotPresent", TerminationMessagePolicy: "File"}}
-	vols := map[string]core.VolumeSource{"vol": {EmptyDir: &core.EmptyDirVolumeSource{}}}
+	vols := map[string]core.VolumeSource{
+		"blk": {PersistentVolumeClaim: &core.PersistentVolumeClaimVolumeSource{ClaimName: "pvc"}},
+		"vol": {EmptyDir: &core.EmptyDirVolumeSource{}},
+	}
 
 	// Success Cases
 	for title, ephemeralContainers := range map[string][]core.EphemeralContainer{
@@ -6160,7 +6164,7 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				TargetContainerName:      "ctr",
 			},
 		},
-		"All allowed Fields": {
+		"All allowed fields": {
 			{
 				EphemeralContainerCommon: core.EphemeralContainerCommon{
 
@@ -6182,6 +6186,9 @@ func TestValidateEphemeralContainers(t *testing.T) {
 					},
 					VolumeMounts: []core.VolumeMount{
 						{Name: "vol", MountPath: "/vol"},
+					},
+					VolumeDevices: []core.VolumeDevice{
+						{Name: "blk", DevicePath: "/dev/block"},
 					},
 					TerminationMessagePath:   "/dev/termination-log",
 					TerminationMessagePolicy: "File",
@@ -6358,6 +6365,42 @@ func TestValidateEphemeralContainers(t *testing.T) {
 				},
 			},
 			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].resources"},
+		},
+		{
+			"Container uses disallowed field: VolumeMount.SubPath",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol", MountPath: "/vol"},
+							{Name: "vol", MountPath: "/volsub", SubPath: "foo"},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPath"},
+		},
+		{
+			"Container uses disallowed field: VolumeMount.SubPathExpr",
+			[]core.EphemeralContainer{
+				{
+					EphemeralContainerCommon: core.EphemeralContainerCommon{
+						Name:                     "debug",
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						VolumeMounts: []core.VolumeMount{
+							{Name: "vol", MountPath: "/vol"},
+							{Name: "vol", MountPath: "/volsub", SubPathExpr: "$(POD_NAME)"},
+						},
+					},
+				},
+			},
+			field.Error{Type: field.ErrorTypeForbidden, Field: "ephemeralContainers[0].volumeMounts[1].subPathExpr"},
 		},
 	}
 
@@ -10331,6 +10374,406 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 			},
 			"",
 			"Update nominatedNodeName",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						Name:        "init",
+						Ready:       false,
+						Started:     proto.Bool(false),
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						Name:        "main",
+						Ready:       false,
+						Started:     proto.Bool(false),
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			"",
+			"Container statuses pending",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "init",
+						Ready:       true,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						Name:        "init",
+						Ready:       false,
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						Name:        "main",
+						Ready:       false,
+						Started:     proto.Bool(false),
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses running",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses add ephemeral container",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Waiting: &core.ContainerStateWaiting{
+								Reason: "PodInitializing",
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses ephemeral container running",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+								StartedAt:   metav1.NewTime(time.Now()),
+								FinishedAt:  metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses ephemeral container exited",
+		},
+		{
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "init",
+						Ready:       true,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+								StartedAt:   metav1.NewTime(time.Now()),
+								FinishedAt:  metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+								StartedAt:   metav1.NewTime(time.Now()),
+								FinishedAt:  metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			core.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Status: core.PodStatus{
+					InitContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "init",
+						Ready:       true,
+						State: core.ContainerState{
+							Terminated: &core.ContainerStateTerminated{
+								ContainerID: "docker://numbers",
+								Reason:      "Completed",
+							},
+						},
+					}},
+					ContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "nginx:alpine",
+						ImageID:     "docker-pullable://nginx@sha256:d0gf00d",
+						Name:        "nginx",
+						Ready:       true,
+						Started:     proto.Bool(true),
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+					EphemeralContainerStatuses: []core.ContainerStatus{{
+						ContainerID: "docker://numbers",
+						Image:       "busybox",
+						ImageID:     "docker-pullable://busybox@sha256:d0gf00d",
+						Name:        "debug",
+						Ready:       false,
+						State: core.ContainerState{
+							Running: &core.ContainerStateRunning{
+								StartedAt: metav1.NewTime(time.Now()),
+							},
+						},
+					}},
+				},
+			},
+			"",
+			"Container statuses all containers terminated",
 		},
 	}
 
