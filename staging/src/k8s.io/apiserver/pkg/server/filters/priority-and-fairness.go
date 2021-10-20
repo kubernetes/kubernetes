@@ -111,7 +111,12 @@ func WithPriorityAndFairness(
 			httplog.AddKeyValue(ctx, "apf_pl", truncateLogField(pl.Name))
 			httplog.AddKeyValue(ctx, "apf_fs", truncateLogField(fs.Name))
 			httplog.AddKeyValue(ctx, "apf_fd", truncateLogField(flowDistinguisher))
-			return workEstimator(r, fs.Name, pl.Name)
+
+			workEstimate := workEstimator(r, fs.Name, pl.Name)
+			httplog.AddKeyValue(ctx, "apf_i_seats", workEstimate.InitialSeats)
+			httplog.AddKeyValue(ctx, "apf_f_seatss", workEstimate.FinalSeats)
+
+			return workEstimate
 		}
 
 		var served bool

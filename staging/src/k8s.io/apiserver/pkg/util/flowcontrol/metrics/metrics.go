@@ -310,6 +310,16 @@ var (
 		},
 		[]string{priorityLevel, "success"},
 	)
+	apiserverNoDispatch = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "no_dispatch_total",
+			Help:           "Number of times apf failed to dispatch a request",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{priorityLevel, flowSchema},
+	)
 
 	metrics = Registerables{
 		apiserverRejectedRequestsTotal,
@@ -328,6 +338,7 @@ var (
 		apiserverRequestExecutionSeconds,
 		watchCountSamples,
 		apiserverEpochAdvances,
+		apiserverNoDispatch,
 	}.
 		Append(PriorityLevelExecutionSeatsObserverGenerator.metrics()...).
 		Append(PriorityLevelConcurrencyObserverPairGenerator.metrics()...).
@@ -403,4 +414,8 @@ func ObserveWatchCount(ctx context.Context, priorityLevel, flowSchema string, co
 // AddEpochAdvance notes an advance of the progress meter baseline for a given priority level
 func AddEpochAdvance(ctx context.Context, priorityLevel string, success bool) {
 	apiserverEpochAdvances.WithContext(ctx).WithLabelValues(priorityLevel, strconv.FormatBool(success)).Inc()
+}
+
+func AddNoDispatch(priorityLevel, flowSchema string) {
+	apiserverNoDispatch.WithLabelValues(priorityLevel, flowSchema).Inc()
 }

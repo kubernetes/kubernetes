@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/flowcontrol/debug"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/eventclock"
@@ -796,6 +797,11 @@ func (qs *queueSet) findDispatchQueueLocked() (*queue, *request) {
 			klog.Infof("QS(%s): request %v %v seats %d cannot be dispatched from queue %d, waiting for currently executing requests to complete, %d requests are occupying %d seats and the limit is %d",
 				qs.qCfg.Name, oldestReqFromMinQueue.descr1, oldestReqFromMinQueue.descr2, oldestReqFromMinQueue.MaxSeats(), minQueue.index, qs.totRequestsExecuting, qs.totSeatsInUse, qs.dCfg.ConcurrencyLimit)
 		}
+
+		// test: we can't accommodate this request at this moment, this is going to
+		// increase its queue wait time, let's count this
+		metrics.AddNoDispatch(qs.qCfg.Name, oldestReqFromMinQueue.fsName)
+		httplog.IncrementCount(oldestReqFromMinQueue.ctx, "apf_no_dispatch")
 		return nil, nil
 	}
 	oldestReqFromMinQueue.removeFromQueueLocked()

@@ -27,10 +27,10 @@ import (
 
 const (
 	watchesPerSeat          = 10.0
-	eventAdditionalDuration = 5 * time.Millisecond
+	eventAdditionalDuration = 0 * time.Millisecond
 	// TODO(wojtekt): Remove it once we tune the algorithm to not fail
 	// scalability tests.
-	enableMutatingWorkEstimator = false
+	enableMutatingWorkEstimator = true
 )
 
 func newMutatingWorkEstimator(countFn watchCountGetterFunc) WorkEstimatorFunc {
@@ -129,6 +129,8 @@ func (e *mutatingWorkEstimator) estimate(r *http.Request, flowSchemaName, priori
 		//
 		// TODO: Confirm that the current cap of maximumSeats allow us to
 		//   achieve the above.
+
+		// test: no cap
 		if finalSeats > maximumSeats {
 			finalSeats = maximumSeats
 		}

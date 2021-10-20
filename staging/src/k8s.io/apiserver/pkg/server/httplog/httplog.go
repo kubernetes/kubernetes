@@ -73,6 +73,8 @@ type respLogger struct {
 	w         http.ResponseWriter
 
 	logStacktracePred StacktracePred
+
+	counts map[string]int
 }
 
 var _ http.ResponseWriter = &respLogger{}
@@ -216,6 +218,20 @@ func (rl *respLogger) AddKeyValue(key string, value interface{}) {
 	rl.addedKeyValuePairs = append(rl.addedKeyValuePairs, key, value)
 }
 
+func (rl *respLogger) IncrementCount(key string) {
+	if len(rl.counts) == 0 {
+		rl.counts = map[string]int{}
+	}
+
+	rl.counts[key] = rl.counts[key] + 1
+}
+
+func IncrementCount(ctx context.Context, key string) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.IncrementCount(key)
+	}
+}
+
 // AddKeyValue adds a (key, value) pair to the httplog associated
 // with the request.
 // Use this function if you want your data to show up in httplog
@@ -270,6 +286,10 @@ func (rl *respLogger) Log() {
 		if len(info) > 0 {
 			keysAndValues = append(keysAndValues, "addedInfo", info)
 		}
+	}
+
+	for k, v := range rl.counts {
+		keysAndValues = append(keysAndValues, k, v)
 	}
 
 	klog.InfoSDepth(1, "HTTP", keysAndValues...)
