@@ -213,7 +213,6 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 	}
 
 	filesystemMode := func(isEphemeral bool) {
-		pvcName := pvc.Name
 		if !isEphemeral {
 			pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
@@ -230,6 +229,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
+		pvcName := pvc.Name
 		if isEphemeral {
 			pvcName = ephemeral.VolumeClaimName(pod, &pod.Spec.Volumes[0])
 		}
