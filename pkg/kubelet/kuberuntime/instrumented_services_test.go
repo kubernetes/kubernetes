@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"net"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,10 +30,17 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
+var registerMetrics sync.Once
+
 func TestRecordOperation(t *testing.T) {
-	legacyregistry.MustRegister(metrics.RuntimeOperations)
-	legacyregistry.MustRegister(metrics.RuntimeOperationsDuration)
-	legacyregistry.MustRegister(metrics.RuntimeOperationsErrors)
+
+	registerMetrics.Do(func() {
+		legacyregistry.MustRegister(metrics.RuntimeOperations)
+		legacyregistry.MustRegister(metrics.RuntimeOperationsDuration)
+		legacyregistry.MustRegister(metrics.RuntimeOperationsErrors)
+	},
+	)
+	defer legacyregistry.Reset()
 
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
