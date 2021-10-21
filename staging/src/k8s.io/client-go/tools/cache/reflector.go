@@ -319,7 +319,9 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			panic(r)
 		case <-listCh:
 		}
+		initTrace.Step("Objects listed", trace.Field{"error", err})
 		if err != nil {
+			klog.Warningf("%s: failed to list %v: %v", r.name, r.expectedTypeName, err)
 			return fmt.Errorf("failed to list %v: %v", r.expectedTypeName, err)
 		}
 
@@ -338,7 +340,6 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 		}
 
 		r.setIsLastSyncResourceVersionUnavailable(false) // list was successful
-		initTrace.Step("Objects listed")
 		listMetaInterface, err := meta.ListAccessor(list)
 		if err != nil {
 			return fmt.Errorf("unable to understand list result %#v: %v", list, err)
