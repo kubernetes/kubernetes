@@ -152,35 +152,6 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 	})
 }
 
-// DownloadConfig downloads the kubelet configuration from a ConfigMap and writes it to disk.
-// DEPRECATED: Do not use in new code!
-func DownloadConfig(client clientset.Interface, kubeletVersionStr string, kubeletDir string) error {
-	// Parse the desired kubelet version
-	kubeletVersion, err := version.ParseSemantic(kubeletVersionStr)
-	if err != nil {
-		return err
-	}
-
-	// Download the ConfigMap from the cluster based on what version the kubelet is
-	configMapName := kubeadmconstants.GetKubeletConfigMapName(kubeletVersion)
-
-	fmt.Printf("[kubelet-start] Downloading configuration for the kubelet from the %q ConfigMap in the %s namespace\n",
-		configMapName, metav1.NamespaceSystem)
-
-	kubeletCfgMap, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, configMapName)
-	if err != nil {
-		return err
-	}
-
-	// Check for the key existence, otherwise we'll panic here
-	kubeletCfg, ok := kubeletCfgMap.Data[kubeadmconstants.KubeletBaseConfigurationConfigMapKey]
-	if !ok {
-		return errors.Errorf("no key %q found in config map %s", kubeadmconstants.KubeletBaseConfigurationConfigMapKey, configMapName)
-	}
-
-	return writeConfigBytesToDisk([]byte(kubeletCfg), kubeletDir)
-}
-
 // configMapRBACName returns the name for the Role/RoleBinding for the kubelet config configmap for the right branch of k8s
 // TODO: Remove the legacy arg once UnversionedKubeletConfigMap graduates to GA:
 // https://github.com/kubernetes/kubeadm/issues/1582
