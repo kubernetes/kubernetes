@@ -56,9 +56,9 @@ func eventsRule() rbacv1.PolicyRule {
 }
 
 func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) {
-	// controllerRoles is a slice of roles used for controllers
+	// controllerRoles is a slice of clusterroles used for controllers
 	controllerRoles := []rbacv1.ClusterRole{}
-	// controllerRoleBindings is a slice of roles used for controllers
+	// controllerRoleBindings is a slice of clusterrolebindings used for controllers
 	controllerRoleBindings := []rbacv1.ClusterRoleBinding{}
 
 	addControllerRole(&controllerRoles, &controllerRoleBindings, func() rbacv1.ClusterRole {
@@ -429,7 +429,7 @@ func ControllerRoles() []rbacv1.ClusterRole {
 	return controllerRoles
 }
 
-// ControllerRoleBindings returns the role bindings used by controllers
+// ControllerRoleBindings returns the cluster role bindings used by controllers
 func ControllerRoleBindings() []rbacv1.ClusterRoleBinding {
 	_, controllerRoleBindings := buildControllerRoles()
 	return controllerRoleBindings
