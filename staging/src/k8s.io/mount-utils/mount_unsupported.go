@@ -86,3 +86,10 @@ func (mounter *SafeFormatAndMount) formatAndMountSensitive(source string, target
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	return true, errUnsupported
 }
+
+// isMountFastPath is a method of detecting a mount that really fast.
+// It should return a true and no-error ONLY when it is an actual mount point.
+// In cases, where it is not guaranteed or cannot be determined, it should return an error.
+func isMountFastPath(path string) (bool, error) {
+	return false, errUnsupported
+}

@@ -21,7 +21,9 @@ package mount
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,6 +50,11 @@ const (
 	fsckErrorsUncorrected = 4
 	// Error thrown by exec cmd.Run() when process spawned by cmd.Start() completes before cmd.Wait() is called (see - k/k issue #103753)
 	errNoChildProcesses = "wait: no child processes"
+)
+
+var (
+	// Error thrown when path is not absolute
+	errPathNotAbsolute = errors.New("path is not absolute")
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -666,4 +673,86 @@ func forceUmount(path string) error {
 		return fmt.Errorf("unmount failed: %v\nUnmounting arguments: %s\nOutput: %s", cmderr, path, string(out))
 	}
 	return nil
+}
+
+// isMountFastPath is a method of detecting a mount that really fast.
+// It should return a true and no-error ONLY when it is an actual mount point.
+// In cases, where it is not guaranteed or cannot be determined, it should return an error.
+// For Linux, it avoids parsing /proc/mounts which is a very slow operation.
+func isMountFastPath(path string) (bool, error) {
+	// the second parameter should be nil always in production code path.
+	// it is used to inject mock function for openat2 for unit-testing.
+	return isMountPointUsingOpenAt2(path, nil)
+}
+
+// isMountPointUsingOpenAt2 uses openat2 syscall is a method of detecting a mount that works for all kinds
+// of mounts (incl. bind mounts), but requires a recent (v5.6+) linux kernel.
+// The code takes inspiration from here:
+// https://github.com/moby/sys/blob/40883be4345cf291513e2a4112896d393455fdfb/mountinfo/mounted_linux.go#L10
+// It expects that all symlinks have been evaluated.
+// If an ENOENT is returned by openat2, return os.ErrNotExist to satisfy isNotMountPoint return values.
+// openat2 is injected for testing purposes. In production code path, it should always be nil.
+func isMountPointUsingOpenAt2(path string, openat2 func(int, string, *unix.OpenHow) (int, error)) (bool, error) {
+
+	if openat2 == nil {
+		openat2 = unix.Openat2
+	}
+
+	// explicitly clean the path to remove trailing slashes.
+	// ref: https://pkg.go.dev/path/filepath#Clean
+	// otherwise, this will remove false +-ves or return errors.
+	// Ref: https://github.com/kubernetes/kubernetes/pull/105833#issuecomment-951092014
+	path = filepath.Clean(path)
+
+	// only work on absolute paths i.e starting with /
+	if !filepath.IsAbs(path) {
+		// don't add the path to the error as it can be sensitive.
+		return false, errPathNotAbsolute
+	}
+
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+
+	dirfd, err := openat2(-1, dir, &unix.OpenHow{
+		// O_PATH: indicates not to open the file and run operations solely on FD.
+		// O_CLOEXEC: will stop creating another file descriptor.
+		// Ref: https://man7.org/linux/man-pages/man2/open.2.html
+		Flags: unix.O_PATH | unix.O_CLOEXEC,
+		// Resolve no symlinks or magiclinks as the functions expects them to be evaluated already.
+		Resolve: unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS,
+	})
+	if err != nil {
+		if err == unix.ENOENT {
+			return false, os.NewSyscallError("openat2", os.ErrNotExist)
+		}
+		return false, err
+	}
+	defer unix.Close(dirfd)
+
+	fd, err := openat2(dirfd, base, &unix.OpenHow{
+		// O_PATH: indicates not to open the file and run operations solely on FD.
+		// O_CLOEXEC: will stop creating another file descriptor.
+		// Ref: https://man7.org/linux/man-pages/man2/open.2.html
+		Flags: unix.O_PATH | unix.O_CLOEXEC,
+		// Disallow traversal of mount points during path
+		// resolution (including all bind mounts).
+		// Resolve no symlinks or magiclinks as the functions expects them to be evaluated already.
+		// Ref: https://man7.org/linux/man-pages/man2/openat2.2.html
+		Resolve: unix.RESOLVE_NO_XDEV | unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS,
+	})
+	switch err {
+	case nil: // definitely not a mount
+		defer unix.Close(fd)
+		return false, nil
+	case unix.EXDEV: // definitely a mount
+		// this is because for an absolute path, if we have RESOLVE_NO_XDEV, the only way to get
+		// this error is when a path is on a mount-point.
+		return true, nil
+	case unix.ENOENT:
+		// Failed to detect if the path is mount, because a mounted path can be overshadowed
+		// by another mount, and still present in mountinfo.
+		return false, os.NewSyscallError("openat2", os.ErrNotExist)
+	}
+	// not sure
+	return false, os.NewSyscallError("openat2", err)
 }

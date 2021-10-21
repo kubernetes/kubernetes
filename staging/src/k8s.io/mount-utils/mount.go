@@ -251,8 +251,17 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 		return true, err
 	}
 
-	// check all mountpoints since IsLikelyNotMountPoint
-	// is not reliable for some mountpoint types.
+	// determine mount points much faster.
+	// if an error is returned on the fast path, ignore the error and fallback to
+	// the previous method.
+	isMnt, err := isMountFastPath(resolvedFile)
+	if err == nil {
+		return !isMnt, err
+	}
+
+	// fallback for os / kernels that do not support a fast path or is unable to determine a mount-point.
+	// check all mount points since IsLikelyNotMountPoint and fast paths as either it is unreliable
+	// or could not be determined by fast path because isMountFastPath threw an error.
 	mountPoints, mountPointsErr := mounter.List()
 	if mountPointsErr != nil {
 		return notMnt, mountPointsErr

@@ -20,10 +20,15 @@ limitations under the License.
 package mount
 
 import (
+	"errors"
+	"fmt"
+	"golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -544,4 +549,227 @@ func mountArgsContainOption(t *testing.T, mountArgs []string, option string) boo
 	}
 
 	return strings.Contains(mountArgs[optionsIndex], option)
+}
+
+func TestIsMountPointUsingOpenAt2(t *testing.T) {
+	tests := map[string]struct {
+		expectedErr        error
+		expectedMountPoint bool
+		// returns the path to be tested for.
+		// returns an error if something went wrong during prepare.
+		prepare     func(*testing.T) (string, error)
+		openat2Mock func(int, string, *unix.OpenHow) (fd int, err error)
+	}{
+		"path is not absolute": {
+			expectedErr:        errPathNotAbsolute,
+			expectedMountPoint: false,
+			prepare: func(t *testing.T) (string, error) {
+				return "../hello/", nil
+			},
+		},
+		"path is a symlink": {
+			expectedMountPoint: false,
+			prepare: func(t *testing.T) (string, error) {
+				tmpDir, err := os.MkdirTemp("", "symlink")
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					os.RemoveAll(tmpDir)
+				})
+
+				f, err := os.CreateTemp(tmpDir, "some")
+				if err != nil {
+					return "", err
+				}
+
+				symlink := filepath.Join(tmpDir, "symlink")
+				err = os.Symlink(f.Name(), symlink)
+				if err != nil {
+					return "", err
+				}
+				return tmpDir, nil
+			},
+		},
+		"path is a mount point": {
+			expectedErr:        nil,
+			expectedMountPoint: true,
+			prepare: func(t *testing.T) (string, error) {
+				// /proc is a known mount-point and since mount-utils heavily relies on /proc/mounts
+				// it is a good option where we can test for mount points in non-privileged mode.
+				return "/proc", nil
+			},
+		},
+		"path is not a mount point": {
+			expectedErr:        nil,
+			expectedMountPoint: false,
+			prepare: func(t *testing.T) (string, error) {
+				source, err := os.MkdirTemp("", "source")
+				if err != nil {
+					return "", err
+				}
+				t.Cleanup(func() {
+					os.RemoveAll(source)
+				})
+				return source, nil
+			},
+		},
+		"path is a magiclink": {
+			expectedErr:        unix.ELOOP,
+			expectedMountPoint: false,
+			prepare: func(t *testing.T) (string, error) {
+				// only /proc/1/exe is valid
+				return "/proc/1/exe", nil
+			},
+		},
+		"path does not exist": {
+			expectedErr:        os.ErrNotExist,
+			expectedMountPoint: false,
+			prepare: func(t *testing.T) (string, error) {
+				f, err := os.CreateTemp(os.TempDir(), "unexisting")
+				if err != nil {
+					return "", err
+				}
+				err = os.Remove(f.Name())
+				if err != nil {
+					return "", err
+				}
+				return f.Name(), nil
+			},
+		},
+		"parent directory does not exist": {
+			expectedErr:        os.ErrNotExist,
+			expectedMountPoint: false,
+			prepare: func(t *testing.T) (string, error) {
+
+				f, err := os.MkdirTemp("", "unexisting")
+				if err != nil {
+					return "", err
+				}
+				err = os.Remove(f)
+				if err != nil {
+					return "", err
+				}
+				// guaranteed to not exist at this point.
+				return filepath.Join(f, "random"), nil
+			},
+		},
+	}
+
+	hasOpenAt2Support := isOpenAt2Supported()
+	if !hasOpenAt2Support {
+		t.Logf("openat2 is not supported, will use mock function openAt2Mock")
+	} else {
+		t.Log("openat2 is supported, will use openat2 syscall.")
+	}
+	for name, test := range tests {
+		path, err := test.prepare(t)
+		if err != nil {
+			t.Errorf("test (%s) failed during prepare with error: %s", name, err.Error())
+			continue
+		}
+
+		// let's not use mock if openat2 is supported on a CI.
+		var isMountPoint bool
+		if hasOpenAt2Support {
+			isMountPoint, err = isMountPointUsingOpenAt2(path, nil)
+		} else {
+			isMountPoint, err = isMountPointUsingOpenAt2(path, openAt2Mock)
+		}
+
+		if isMountPoint != test.expectedMountPoint {
+			t.Errorf("test (%s) has a mis-match for expected mount point (%t) and got (%t)",
+				name, test.expectedMountPoint, isMountPoint)
+		}
+
+		if test.expectedErr != nil {
+			if err == nil || !errors.Is(err, test.expectedErr) {
+				t.Errorf("test (%s) has a mis-match for expected error (%s) and got (%s)", name,
+					test.expectedErr, err)
+			}
+		} else if err != nil {
+			t.Errorf("test (%s) did not expect any error to be returned but got (%s)", name,
+				err)
+		}
+	}
+}
+
+func openAt2Mock(dirfd int, path string, how *unix.OpenHow) (int, error) {
+	// construct path based on given fd.
+	if dirfd != -1 {
+		// path from fd takes a valid file and returns the filename.
+		fName, err := os.Readlink(fmt.Sprint("/proc/self/fd/", dirfd))
+		if err != nil {
+			return -1, err
+		}
+		path = filepath.Join(fName, path)
+	}
+
+	// case 0: magic links. use heurestics.
+	// Return error fast and do not deal with file descriptor.
+	if path == "/proc/1/exe" {
+		return -1, unix.ELOOP
+	}
+
+	fd, err := syscall.Open(path, int(how.Flags), unix.O_RDONLY)
+	if err != nil {
+		return -1, err
+	}
+
+	// detect if symlink or not.
+	fInfo, err := os.Stat(path)
+	if err != nil {
+		_ = unix.Close(fd)
+		return -1, err
+	}
+	isSymLink := fInfo.Mode()&os.ModeSymlink != 0
+
+	// detect if mount-point or not.
+	isMntPoint := false
+	procFile, err := ioutil.ReadFile(procMountsPath)
+	if err != nil {
+		_ = unix.Close(fd)
+		return -1, err
+	}
+	mps, err := parseProcMounts(procFile)
+	if err != nil {
+		_ = unix.Close(fd)
+		return -1, err
+	}
+
+	for _, mp := range mps {
+		if isMountPointMatch(mp, path) {
+			// close here since in error conditions openat2 will close the fd.
+			isMntPoint = true
+		}
+	}
+
+	if isMntPoint {
+		// we cannot cross a fs filesystem when dirfd is -1
+		if dirfd != -1 {
+			_ = unix.Close(fd)
+			return -1, unix.EXDEV
+		}
+	}
+
+	if isSymLink {
+		_ = unix.Close(fd)
+		return -1, unix.ELOOP
+	}
+
+	return fd, nil
+}
+
+func isOpenAt2Supported() bool {
+	fd, err := unix.Openat2(-1, "/", &unix.OpenHow{
+		Mode: unix.O_RDONLY,
+	})
+	if err == nil {
+		defer unix.Close(fd)
+		return true
+	}
+	if err == unix.ENOSYS || err == unix.EPERM {
+		return false
+	}
+	return true
 }

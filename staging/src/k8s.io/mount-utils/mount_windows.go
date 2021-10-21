@@ -335,3 +335,10 @@ func getAllParentLinks(path string) ([]string, error) {
 
 	return links, nil
 }
+
+// isMountFastPath is a method of detecting a mount that really fast.
+// It should return a true and no-error ONLY when it is an actual mount point.
+// In cases, where it is not guaranteed or cannot be determined, it should return an error.
+func isMountFastPath(path string) (bool, error) {
+	return false, fmt.Errorf("isMountFastPath is supported only on Linux")
+}
