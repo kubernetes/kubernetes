@@ -283,29 +283,6 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 	return errs
 }
 
-// ValidatePolicy checks for errors in the Config
-// It does not return early so that it can find as many errors as possible
-func ValidatePolicy(policy config.Policy) error {
-	var validationErrors []error
-
-	priorities := make(map[string]config.PriorityPolicy, len(policy.Priorities))
-	for _, priority := range policy.Priorities {
-		if priority.Weight <= 0 || priority.Weight >= config.MaxWeight {
-			validationErrors = append(validationErrors, fmt.Errorf("priority %s should have a positive weight applied to it or it has overflown", priority.Name))
-		}
-		validationErrors = append(validationErrors, validateCustomPriorities(priorities, priority))
-	}
-
-	if extenderErrs := validateExtenders(field.NewPath("extenders"), policy.Extenders); len(extenderErrs) > 0 {
-		validationErrors = append(validationErrors, extenderErrs...)
-	}
-
-	if policy.HardPodAffinitySymmetricWeight < 0 || policy.HardPodAffinitySymmetricWeight > 100 {
-		validationErrors = append(validationErrors, field.Invalid(field.NewPath("hardPodAffinitySymmetricWeight"), policy.HardPodAffinitySymmetricWeight, "not in valid range [0-100]"))
-	}
-	return utilerrors.NewAggregate(validationErrors)
-}
-
 // validateExtenders validates the configured extenders for the Scheduler
 func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error {
 	var errs []error
@@ -335,43 +312,6 @@ func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error
 		errs = append(errs, field.Invalid(fldPath, fmt.Sprintf("found %d extenders implementing bind", binders), "only one extender can implement bind"))
 	}
 	return errs
-}
-
-// validateCustomPriorities validates that:
-// 1. RequestedToCapacityRatioRedeclared custom priority cannot be declared multiple times,
-// 2. LabelPreference/ServiceAntiAffinity custom priorities can be declared multiple times,
-// however the weights for each custom priority type should be the same.
-func validateCustomPriorities(priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
-	verifyRedeclaration := func(priorityType string) error {
-		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			return fmt.Errorf("priority %q redeclares custom priority %q, from: %q", priority.Name, priorityType, existing.Name)
-		}
-		priorities[priorityType] = priority
-		return nil
-	}
-	verifyDifferentWeights := func(priorityType string) error {
-		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			if existing.Weight != priority.Weight {
-				return fmt.Errorf("%s  priority %q has a different weight with %q", priorityType, priority.Name, existing.Name)
-			}
-		}
-		priorities[priorityType] = priority
-		return nil
-	}
-	if priority.Argument != nil {
-		if priority.Argument.LabelPreference != nil {
-			if err := verifyDifferentWeights("LabelPreference"); err != nil {
-				return err
-			}
-		} else if priority.Argument.RequestedToCapacityRatioArguments != nil {
-			if err := verifyRedeclaration("RequestedToCapacityRatio"); err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("no priority arguments set for priority %s", priority.Name)
-		}
-	}
-	return nil
 }
 
 // validateExtendedResourceName checks whether the specified name is a valid
