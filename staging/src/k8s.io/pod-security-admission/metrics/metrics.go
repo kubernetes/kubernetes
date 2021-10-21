@@ -16,9 +16,68 @@ limitations under the License.
 
 package metrics
 
-type EvaluationRecorder interface {
-	// TODO: fill in args required to record https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/2579-psp-replacement#monitoring
-	RecordEvaluation()
+import (
+	"k8s.io/component-base/metrics"
+	"k8s.io/pod-security-admission/api"
+)
+
+const (
+	ModeAudit     = "audit"
+	ModeEnforce   = "enforce"
+	ModeWarn      = "warn"
+	DecisionAllow = "allow" // Policy evaluated, request allowed
+	DecisionDeny  = "deny"  // Policy evaluated, request denied
+)
+
+var (
+	SecurityEvaluation = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "pod_security_evaluations_total",
+			Help:           "Counter of pod security evaluations.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"decision", "policy_level", "policy_version", "mode", "operation", "resource", "subresource"},
+	)
+
+	Registry = metrics.NewKubeRegistry()
+)
+
+type Decision string
+type Mode string
+
+type Recorder interface {
+	RecordEvaluation(decision Decision, policy api.LevelVersion, evalMode Mode, attrs api.Attributes)
 }
 
-// TODO: default prometheus-based implementation
+type PrometheusRecorder struct {
+	apiVersion api.Version
+}
+
+func init() {
+	Registry.MustRegister(SecurityEvaluation)
+}
+
+func NewPrometheusRecorder(version api.Version) *PrometheusRecorder {
+	return &PrometheusRecorder{apiVersion: version}
+}
+
+func (r PrometheusRecorder) RecordEvaluation(decision Decision, policy api.LevelVersion, evalMode Mode, attrs api.Attributes) {
+	dec := string(decision)
+	operation := string(attrs.GetOperation())
+	resource := attrs.GetResource().String()
+	subresource := attrs.GetSubresource()
+	var version string
+	if policy.Valid() {
+		if policy.Version.Latest() {
+			version = "latest"
+		} else {
+			if !r.apiVersion.Older(policy.Version) {
+				version = policy.Version.String()
+			} else {
+				version = "future"
+			}
+		}
+		SecurityEvaluation.WithLabelValues(dec, string(policy.Level),
+			version, string(evalMode), operation, resource, subresource).Inc()
+	}
+}

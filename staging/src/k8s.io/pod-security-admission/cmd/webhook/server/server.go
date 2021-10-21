@@ -42,7 +42,9 @@ import (
 	"k8s.io/pod-security-admission/admission"
 	admissionapi "k8s.io/pod-security-admission/admission/api"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
+	"k8s.io/pod-security-admission/api"
 	"k8s.io/pod-security-admission/cmd/webhook/server/options"
+	"k8s.io/pod-security-admission/metrics"
 	"k8s.io/pod-security-admission/policy"
 )
 
@@ -265,7 +267,7 @@ func Setup(c *Config) (*Server, error) {
 	s.delegate = &admission.Admission{
 		Configuration:    c.PodSecurityConfig,
 		Evaluator:        evaluator,
-		Metrics:          nil, // TODO: wire to default prometheus metrics
+		Metrics:          metrics.NewPrometheusRecorder(api.GetAPIVersion()),
 		PodSpecExtractor: admission.DefaultPodSpecExtractor{},
 		PodLister:        admission.PodListerFromClient(client),
 		NamespaceGetter:  admission.NamespaceGetterFromListerAndClient(namespaceLister, client),

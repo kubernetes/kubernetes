@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/component-base/version"
 )
 
 type Version struct {
@@ -64,6 +65,23 @@ func (v *Version) Latest() bool {
 
 func MajorMinorVersion(major, minor int) Version {
 	return Version{major: major, minor: minor}
+}
+
+// GetAPIVersion get the version of apiServer and return the version major and minor
+func GetAPIVersion() Version {
+	var err error
+	v := Version{}
+	apiVersion := version.Get()
+	major, err := strconv.Atoi(apiVersion.Major)
+	if err != nil {
+		return v
+	}
+	minor, err := strconv.Atoi(apiVersion.Minor)
+	if err != nil {
+		return v
+	}
+	v = MajorMinorVersion(major, minor)
+	return v
 }
 
 func LatestVersion() Version {
