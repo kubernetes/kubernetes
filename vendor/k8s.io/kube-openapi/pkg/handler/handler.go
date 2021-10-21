@@ -20,9 +20,12 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha512"
+	"encoding/json"
 	"fmt"
 	"mime"
 	"net/http"
+	"strings"
+	"sort"
 	"sync"
 	"time"
 
@@ -30,6 +33,7 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
+	openapi_v3 "github.com/googleapis/gnostic/openapiv3"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/munnerz/goautoneg"
 	"gopkg.in/yaml.v2"
@@ -57,6 +61,22 @@ type OpenAPIService struct {
 
 	specBytes []byte
 	specPb    []byte
+	specPbGz  []byte
+
+	specBytesETag string
+	specPbETag    string
+	specPbGzETag  string
+
+	v3Schema map[string]*OpenAPIV3Group
+}
+
+type OpenAPIV3Group struct {
+	rwMutex sync.RWMutex
+
+	lastModified time.Time
+
+	specBytes []byte
+	specPb []byte
 	specPbGz  []byte
 
 	specBytesETag string
@@ -99,6 +119,75 @@ func (o *OpenAPIService) getSwaggerPbGzBytes() ([]byte, string, time.Time) {
 	o.rwMutex.RLock()
 	defer o.rwMutex.RUnlock()
 	return o.specPbGz, o.specPbGzETag, o.lastModified
+}
+
+func (o *OpenAPIService) getGroupBytes() ([]byte, error) {
+	o.rwMutex.RLock()
+	defer o.rwMutex.RUnlock()
+	keys := make([]string, len(o.v3Schema))
+	i := 0
+	for k := range o.v3Schema {
+		keys[i] = k
+		i++
+	}
+
+	sort.Strings(keys)
+
+	group := make(map[string][]string)
+	// TODO: Is there a standard for outputting an array of paths?
+	group["Paths"] = keys
+
+	j, _ := json.Marshal(group)
+
+	return j, nil
+}
+
+func (o *OpenAPIService) getSingleGroupBytes(group string) ([]byte, string, time.Time, error) {
+	o.rwMutex.RLock()
+	defer o.rwMutex.RUnlock()
+	v, ok := o.v3Schema[group]
+	if ok {
+		return v.specBytes, v.specBytesETag, v.lastModified, nil
+	}
+	return nil, "", time.Now(), fmt.Errorf("Cannot find CRD group %s", group)
+}
+
+func (o *OpenAPIService) UpdateGroup(group string, specBytes []byte) (err error) {
+	o.rwMutex.Lock()
+	defer o.rwMutex.Unlock()
+	if _, ok := o.v3Schema[group]; !ok {
+		o.v3Schema[group] = &OpenAPIV3Group{
+		}
+
+	}
+	specPb, err := ToV3ProtoBinary(specBytes)
+	if err != nil {
+		return err
+	}
+
+	specPbGz := toGzip(specPb)
+
+	specBytesETag := computeETag(specBytes)
+	specPbETag := computeETag(specPb)
+	specPbGzETag := computeETag(specPbGz)
+
+	lastModified := time.Now()
+
+	o.v3Schema[group].rwMutex.Lock()
+	defer o.v3Schema[group].rwMutex.Unlock()
+
+
+	o.v3Schema[group].specBytes = specBytes
+	o.v3Schema[group].specPb = specPb
+	o.v3Schema[group].specPbGz = specPbGz
+
+	o.v3Schema[group].specBytesETag = specBytesETag
+	o.v3Schema[group].specPbETag = specPbETag
+	o.v3Schema[group].specPbGzETag = specPbGzETag
+
+	o.v3Schema[group].lastModified = lastModified
+
+	return nil
 }
 
 func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
@@ -182,6 +271,14 @@ func ToProtoBinary(json []byte) ([]byte, error) {
 	return proto.Marshal(document)
 }
 
+func ToV3ProtoBinary(json []byte) ([]byte, error) {
+	document, err := openapi_v3.ParseDocument(json)
+	if err != nil {
+		return nil, err
+	}
+	return proto.Marshal(document)
+}
+
 func toGzip(data []byte) []byte {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
@@ -199,6 +296,23 @@ func RegisterOpenAPIVersionedService(spec *spec.Swagger, servePath string, handl
 		return nil, err
 	}
 	return o, o.RegisterOpenAPIVersionedService(servePath, handler)
+}
+
+func (o *OpenAPIService) Handle(w http.ResponseWriter, r *http.Request) {
+	data, _ := o.getGroupBytes()
+	http.ServeContent(w, r, "/openapi/v3", time.Now(), bytes.NewReader(data))
+	return
+
+}
+
+func (o *OpenAPIService) HandleGroup(w http.ResponseWriter, r *http.Request) {
+	url := strings.SplitAfterN(r.URL.Path, "/", 4)
+	group := url[3]
+
+	data, etag, lastModified, _ := o.getSingleGroupBytes(group)
+	w.Header().Set("Etag", etag)
+	http.ServeContent(w, r, "", lastModified, bytes.NewReader(data))
+	return
 }
 
 // RegisterOpenAPIVersionedService registers a handler to provide access to provided swagger spec.

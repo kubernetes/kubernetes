@@ -19,6 +19,7 @@ package builder
 import (
 	"k8s.io/kube-openapi/pkg/aggregator"
 	"k8s.io/kube-openapi/pkg/validation/spec"
+	"k8s.io/kube-openapi/pkg/spec3"
 )
 
 // MergeSpecs aggregates all OpenAPI specs, reusing the metadata of the first, static spec as the basis.
@@ -75,6 +76,58 @@ func mergeSpec(dest, source *spec.Swagger) {
 	for k, v := range source.Paths.Paths {
 		if dest.Paths.Paths == nil {
 			dest.Paths.Paths = map[string]spec.PathItem{}
+		}
+		dest.Paths.Paths[k] = v
+	}
+}
+
+// MergeSpecs aggregates all OpenAPI specs, reusing the metadata of the first, static spec as the basis.
+// The static spec has the highest priority, and its paths and definitions won't get overlapped by
+// user-defined CRDs. None of the input is mutated, but input and output share data structures.
+func MergeSpecsV3(crdSpecs ...*spec3.OpenAPI) (*spec3.OpenAPI, error) {
+	// create shallow copy of staticSpec, but replace paths and definitions because we modify them.
+	crdSpec := &spec3.OpenAPI{}
+	if len(crdSpecs) > 0 {
+		crdSpec.Version = crdSpecs[0].Version
+		crdSpec.Info = crdSpecs[0].Info
+	}
+	for _, s := range crdSpecs {
+		// merge specs without checking conflicts, since the naming controller prevents
+		// conflicts between user-defined CRDs
+		mergeSpecV3(crdSpec, s)
+	}
+
+	return crdSpec, nil
+	// The static spec has the highest priority. Resolve conflicts to prevent user-defined
+	// CRDs potentially overlapping the built-in apiextensions API
+	// if err := aggregator.MergeSpecsIgnorePathConflict(&specToReturn, crdSpec); err != nil {
+	// 	return nil, err
+	// }
+	// return &specToReturn, nil
+}
+
+// mergeSpec copies paths and definitions from source to dest, mutating dest, but not source.
+// We assume that conflicts do not matter.
+func mergeSpecV3(dest, source *spec3.OpenAPI) {
+	if source == nil || source.Paths == nil {
+		return
+	}
+	if dest.Paths == nil {
+		dest.Paths = &spec3.Paths{}
+	}
+
+	for k, v := range source.Components.Schemas {
+		if dest.Components == nil {
+			dest.Components = &spec3.Components{}
+		}
+		if dest.Components.Schemas == nil {
+			dest.Components.Schemas = map[string]*spec.Schema{}
+		}
+		dest.Components.Schemas[k] = v
+	}
+	for k, v := range source.Paths.Paths {
+		if dest.Paths.Paths == nil {
+			dest.Paths.Paths = map[string]*spec3.Path{}
 		}
 		dest.Paths.Paths[k] = v
 	}

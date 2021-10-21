@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	// "k8s.io/kube-openapi/pkg/spec3"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -96,9 +97,80 @@ func (s *Downloader) Download(handler http.Handler, etag string) (returnSpec *sp
 				}
 			}
 		}
+
 		return openAPISpec, newEtag, http.StatusOK, nil
 	default:
 		return nil, "", 0, fmt.Errorf("failed to retrieve openAPI spec, http error: %s", writer.String())
+	}
+}
+
+type Thing struct {
+	Paths []string `json:"Paths"`
+}
+
+func (s *Downloader) DownloadV3(handler http.Handler, etag string) (returnSpec map[string][]byte, err error) {
+	// TODO: ETag caching needs to be done per group/version rather than per apiservice
+	handler = s.handlerWithUser(handler, &user.DefaultInfo{Name: aggregatorUser})
+	handler = http.TimeoutHandler(handler, specDownloadTimeout, "request timed out")
+
+	req, err := http.NewRequest("GET", "/openapi/v3", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept", "application/json")
+
+	// Only pass eTag if it is not generated locally
+	// if len(etag) > 0 && !strings.HasPrefix(etag, locallyGeneratedEtagPrefix) {
+	// 	req.Header.Add("If-None-Match", etag)
+	// }
+
+	writer := newInMemoryResponseWriter()
+	handler.ServeHTTP(writer, req)
+
+	switch writer.respCode {
+	case http.StatusNotFound:
+		// Gracefully skip 404, assuming the server won't provide any spec
+		return nil, nil
+	case http.StatusOK:
+		groups := &Thing{}
+		if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(writer.data, groups); err != nil {
+			return nil, err
+		}
+
+		aggregated := make(map[string][]byte)
+
+		for _, path := range groups.Paths {
+			reqPath := fmt.Sprintf("/openapi/v3/%s", path)
+			req, err := http.NewRequest("GET", reqPath, nil)
+			if err != nil {
+				return nil, err
+			}
+			req.Header.Add("Accept", "application/json")
+			openAPIWriter := newInMemoryResponseWriter()
+			handler.ServeHTTP(openAPIWriter, req)
+			aggregated[path] = openAPIWriter.data
+		}
+
+
+
+
+		// newEtag = writer.Header().Get("Etag")
+		// if len(newEtag) == 0 {
+		// 	newEtag = etagFor(writer.data)
+		// 	if len(etag) > 0 && strings.HasPrefix(etag, locallyGeneratedEtagPrefix) {
+		// 		// The function call with an etag and server does not report an etag.
+		// 		// That means this server does not support etag and the etag that passed
+		// 		// to the function generated previously by us. Just compare etags and
+		// 		// return StatusNotModified if they are the same.
+		// 		if etag == newEtag {
+		// 			return nil, etag, http.StatusNotModified, nil
+		// 		}
+		// 	}
+		// }
+
+		return aggregated, nil
+	default:
+		return nil, fmt.Errorf("failed to retrieve openAPI spec, http error: %s", writer.String())
 	}
 }
 

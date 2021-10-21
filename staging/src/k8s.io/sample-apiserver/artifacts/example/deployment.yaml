@@ -22,8 +22,9 @@ spec:
         # or
         # docker pull gcr.io/kubernetes-e2e-test-images/sample-apiserver:1.17
         # docker tag gcr.io/kubernetes-e2e-test-images/sample-apiserver:1.17 kube-sample-apiserver:latest
-        image: kube-sample-apiserver:latest
-        imagePullPolicy: Never
+        # image: kube-sample-apiserver:latest
+        image: gcr.io/jying-gke-dev/kube-sample-apiserver:test
+        # imagePullPolicy: Never
         args: [ "--etcd-servers=http://localhost:2379" ]
       - name: etcd
         image: quay.io/coreos/etcd:v3.4.13

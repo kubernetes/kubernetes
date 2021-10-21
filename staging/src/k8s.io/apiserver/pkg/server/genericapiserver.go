@@ -53,6 +53,7 @@ import (
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/handler"
+	"k8s.io/kube-openapi/pkg/handler3"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"k8s.io/kube-openapi/pkg/validation/spec"
@@ -143,6 +144,10 @@ type GenericAPIServer struct {
 	// OpenAPIVersionedService controls the /openapi/v2 endpoint, and can be used to update the served spec.
 	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
 	OpenAPIVersionedService *handler.OpenAPIService
+
+	// OpenAPIV3VersionedService controls the /openapi/v3 endpoint and can be used to update the served spec.
+	// It is set during PrepareRun if `openAPIConfig` is non-nil unless `skipOpenAPIInstallation` is true.
+	OpenAPIV3VersionedService *handler3.OpenAPIService
 
 	// StaticOpenAPISpec is the spec derived from the restful container endpoints.
 	// It is set during PrepareRun.
@@ -303,6 +308,10 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 		s.OpenAPIVersionedService, s.StaticOpenAPISpec = routes.OpenAPI{
 			Config: s.openAPIConfig,
 		}.Install(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
+
+		s.OpenAPIV3VersionedService, _ = routes.OpenAPI{
+			Config: s.openAPIConfig,
+		}.InstallV3(s.Handler.GoRestfulContainer, s.Handler.NonGoRestfulMux)
 	}
 
 	s.installHealthz()
@@ -599,6 +608,7 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	pathsToIgnore := openapiutil.NewTrie(s.openAPIConfig.IgnorePrefixes)
 	resourceNames := make([]string, 0)
 	for _, apiGroupInfo := range apiGroupInfos {
+	fmt.Println(apiGroupInfo)
 		groupResources, err := getResourceNamesForGroup(apiPrefix, apiGroupInfo, pathsToIgnore)
 		if err != nil {
 			return nil, err
@@ -614,6 +624,7 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	for _, apiGroupInfo := range apiGroupInfos {
 		apiGroupInfo.StaticOpenAPISpec = openAPISpec
 	}
+
 	return utilopenapi.ToProtoModels(openAPISpec)
 }
 
