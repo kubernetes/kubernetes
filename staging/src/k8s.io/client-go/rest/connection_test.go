@@ -54,14 +54,14 @@ func (lb *tcpLB) handleConnection(in net.Conn, stopCh chan struct{}) {
 	go io.Copy(in, out)
 	<-stopCh
 	if err := out.Close(); err != nil {
-		lb.t.Fatalf("failed to close connection: %v", err)
+		lb.t.Errorf("failed to close connection: %v", err)
 	}
 }
 
 func (lb *tcpLB) serve(stopCh chan struct{}) {
 	conn, err := lb.ln.Accept()
 	if err != nil {
-		lb.t.Fatalf("failed to accept: %v", err)
+		lb.t.Errorf("failed to accept: %v", err)
 	}
 	atomic.AddInt32(&lb.dials, 1)
 	go lb.handleConnection(conn, stopCh)
