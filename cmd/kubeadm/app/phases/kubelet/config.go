@@ -33,6 +33,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
@@ -61,8 +62,17 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 		return err
 	}
 
-	configMapName := kubeadmconstants.GetKubeletConfigMapName(k8sVersion)
+	// TODO: cleanup after UnversionedKubeletConfigMap goes GA:
+	// https://github.com/kubernetes/kubeadm/issues/1582
+	legacyKubeletCM := !features.Enabled(cfg.FeatureGates, features.UnversionedKubeletConfigMap)
+	configMapName := kubeadmconstants.GetKubeletConfigMapName(k8sVersion, legacyKubeletCM)
 	fmt.Printf("[kubelet] Creating a ConfigMap %q in namespace %s with the configuration for the kubelets in the cluster\n", configMapName, metav1.NamespaceSystem)
+	if legacyKubeletCM {
+		fmt.Printf("NOTE: The %q naming of the kubelet ConfigMap is deprecated. "+
+			"Once the UnversionedKubeletConfigMap feature gate graduates to Beta the default name will become just %q. "+
+			"Kubeadm upgrade will handle this transition transparently.\n",
+			configMapName, kubeadmconstants.KubeletBaseConfigurationConfigMap)
+	}
 
 	kubeletCfg, ok := cfg.ComponentConfigs[componentconfigs.KubeletGroup]
 	if !ok {
@@ -92,17 +102,19 @@ func CreateConfigMap(cfg *kubeadmapi.ClusterConfiguration, client clientset.Inte
 		return err
 	}
 
-	if err := createConfigMapRBACRules(client, k8sVersion); err != nil {
+	if err := createConfigMapRBACRules(client, k8sVersion, legacyKubeletCM); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration configmap RBAC rules")
 	}
 	return nil
 }
 
 // createConfigMapRBACRules creates the RBAC rules for exposing the base kubelet ConfigMap in the kube-system namespace to unauthenticated users
-func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Version) error {
+// TODO: Remove the legacy arg once UnversionedKubeletConfigMap graduates to GA:
+// https://github.com/kubernetes/kubeadm/issues/1582
+func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Version, legacy bool) error {
 	if err := apiclient.CreateOrUpdateRole(client, &rbac.Role{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapRBACName(k8sVersion),
+			Name:      configMapRBACName(k8sVersion, legacy),
 			Namespace: metav1.NamespaceSystem,
 		},
 		Rules: []rbac.PolicyRule{
@@ -110,7 +122,7 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 				Verbs:         []string{"get"},
 				APIGroups:     []string{""},
 				Resources:     []string{"configmaps"},
-				ResourceNames: []string{kubeadmconstants.GetKubeletConfigMapName(k8sVersion)},
+				ResourceNames: []string{kubeadmconstants.GetKubeletConfigMapName(k8sVersion, legacy)},
 			},
 		},
 	}); err != nil {
@@ -119,13 +131,13 @@ func createConfigMapRBACRules(client clientset.Interface, k8sVersion *version.Ve
 
 	return apiclient.CreateOrUpdateRoleBinding(client, &rbac.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapRBACName(k8sVersion),
+			Name:      configMapRBACName(k8sVersion, legacy),
 			Namespace: metav1.NamespaceSystem,
 		},
 		RoleRef: rbac.RoleRef{
 			APIGroup: rbac.GroupName,
 			Kind:     "Role",
-			Name:     configMapRBACName(k8sVersion),
+			Name:     configMapRBACName(k8sVersion, legacy),
 		},
 		Subjects: []rbac.Subject{
 			{
@@ -170,7 +182,12 @@ func DownloadConfig(client clientset.Interface, kubeletVersionStr string, kubele
 }
 
 // configMapRBACName returns the name for the Role/RoleBinding for the kubelet config configmap for the right branch of k8s
-func configMapRBACName(k8sVersion *version.Version) string {
+// TODO: Remove the legacy arg once UnversionedKubeletConfigMap graduates to GA:
+// https://github.com/kubernetes/kubeadm/issues/1582
+func configMapRBACName(k8sVersion *version.Version, legacy bool) string {
+	if !legacy {
+		return kubeadmconstants.KubeletBaseConfigMapRole
+	}
 	return fmt.Sprintf("%s%d.%d", kubeadmconstants.KubeletBaseConfigMapRolePrefix, k8sVersion.Major(), k8sVersion.Minor())
 }
 
