@@ -104,7 +104,7 @@ func (hs *proxierHealthServer) Run() error {
 		return fmt.Errorf("%v", msg)
 	}
 
-	klog.V(3).Infof("starting healthz on %s", hs.addr)
+	klog.V(3).InfoS("Starting healthz HTTP server", "address", hs.addr)
 
 	if err := server.Serve(listener); err != nil {
 		return fmt.Errorf("proxier healthz closed with error: %v", err)
