@@ -393,8 +393,8 @@ github.com/opencontainers/selinux v1.8.2 h1:c4ca10UMgRcvZ6h0K4HtS15UaVSBEaE+iln2
 github.com/opencontainers/selinux v1.8.2/go.mod h1:MUIHuUEvKB1wtJjQdOyYRgOnLD2xAPP8dBsCoU0KuF8=
 github.com/openshift/api v0.0.0-20210913115639-4809c1ef6b8e h1:XsxFkPW2fgme9OyWC8jhGdrbQlA8CMesDsMFbVZfWLI=
 github.com/openshift/api v0.0.0-20210913115639-4809c1ef6b8e/go.mod h1:RsQCVJu4qhUawxxDP7pGlwU3IA4F01wYm3qKEu29Su8=
-github.com/openshift/apiserver-library-go v0.0.0-20211007061025-6f7e691ac427 h1:sCHMBV6TQczEUzti6uN035qC87jACTZOZSQs25JXf4I=
-github.com/openshift/apiserver-library-go v0.0.0-20211007061025-6f7e691ac427/go.mod h1:zl9Q7KxHokDX4mc8NEeYlSnrHkAsKAzptlQESi/jNJw=
+github.com/openshift/apiserver-library-go v0.0.0-20211021140628-7d7260431775 h1:fNz1iZjs6SKMBk5hjogzHycSCWtHnCGxR5i4eYICSLg=
+github.com/openshift/apiserver-library-go v0.0.0-20211021140628-7d7260431775/go.mod h1:zl9Q7KxHokDX4mc8NEeYlSnrHkAsKAzptlQESi/jNJw=
 github.com/openshift/build-machinery-go v0.0.0-20210806203541-4ea9b6da3a37/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
 github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7 h1:iKVU5Tga76kiCWpq9giPi0TfI/gZcFoYb7/x+1SkgwM=
 github.com/openshift/client-go v0.0.0-20210831095141-e19a065e79f7/go.mod h1:D6P8RkJzwdkBExQdYUnkWcePMLBiTeCCr8eQIQ7y8Dk=

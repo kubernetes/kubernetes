@@ -12,6 +12,7 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
+	kutilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -168,7 +169,7 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 	// get all constraints that are usable by the user
 	klog.V(4).Infof("getting security context constraints for pod %s (generate: %s) in namespace %s with user info %v", pod.Name, pod.GenerateName, a.GetNamespace(), a.GetUserInfo())
 
-	err := wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	err := wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, func(context.Context) (bool, error) {
 		return c.sccSynced(), nil
 	})
 	if err != nil {
@@ -180,7 +181,7 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 	// If the SCCs were all deleted, then no pod will pass SCC admission until the SCCs are recreated, but the kas-o (which recreates them)
 	// bypasses SCC admission, so this does not create a cycle.
 	var requiredSCCErr error
-	err = wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+	err = wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, func(context.Context) (bool, error) {
 		if requiredSCCErr = requireStandardSCCs(c.sccLister.List(labels.Everything())); requiredSCCErr != nil {
 			return false, nil
 		}
@@ -222,8 +223,11 @@ func (c *constraint) computeSecurityContext(ctx context.Context, a admission.Att
 		return i < j
 	})
 
-	providers, errs := sccmatching.CreateProvidersFromConstraints(a.GetNamespace(), constraints, c.client)
+	providers, errs := sccmatching.CreateProvidersFromConstraints(ctx, a.GetNamespace(), constraints, c.client)
 	logProviders(pod, providers, errs)
+	if len(errs) > 0 {
+		return nil, "", nil, kutilerrors.NewAggregate(errs)
+	}
 
 	if len(providers) == 0 {
 		return nil, "", nil, admission.NewForbidden(a, fmt.Errorf("no SecurityContextConstraintsProvider available to validate pod request"))
@@ -439,6 +443,6 @@ func logProviders(pod *coreapi.Pod, providers []sccmatching.SecurityContextConst
 	klog.V(4).Infof("validating pod %s (generate: %s) against providers %s", pod.Name, pod.GenerateName, strings.Join(names, ","))
 
 	for _, err := range providerCreationErrs {
-		klog.V(4).Infof("provider creation error: %v", err)
+		klog.V(2).Infof("provider creation error: %v", err)
 	}
 }
