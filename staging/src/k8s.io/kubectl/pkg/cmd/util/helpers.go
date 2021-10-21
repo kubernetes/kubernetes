@@ -682,7 +682,9 @@ func ManualStrip(file []byte) []byte {
 	stripped := []byte{}
 	lines := bytes.Split(file, []byte("\n"))
 	for i, line := range lines {
-		if bytes.HasPrefix(bytes.TrimSpace(line), []byte("#")) {
+		trimline := bytes.TrimSpace(line)
+
+		if bytes.HasPrefix(trimline, []byte("#")) && !bytes.HasPrefix(trimline, []byte("#!")) {
 			continue
 		}
 		stripped = append(stripped, line...)
