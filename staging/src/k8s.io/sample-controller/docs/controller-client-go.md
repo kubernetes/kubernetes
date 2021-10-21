@@ -32,7 +32,7 @@ is to save the object for later retrieval, and to invoke our controller passing 
 It is defined in [type *Indexer* inside package *cache*](https://github.com/kubernetes/client-go/blob/master/tools/cache/index.go). A typical indexing use-case is to create an index based on object labels. Indexer can
 maintain indexes based on several indexing functions.
 Indexer uses a thread-safe data store to store objects and their keys.
-There is a default function named *MetaNamespaceKeyFunc* defined in [type Store inside package cache](https://github.com/kubernetes/client-go/blob/master/tools/cache/store.go)
+There is a default function named *MetaNamespaceKeyFunc* defined in [type *Store* inside package *cache*](https://github.com/kubernetes/client-go/blob/master/tools/cache/store.go)
 that generates an object’s key as `<namespace>/<name>` combination for that object.
 
 
