@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"k8s.io/klog/v2"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 
 	"github.com/openshift/api/security"
@@ -159,17 +160,9 @@ func constraintSupportsGroup(group string, constraintGroups []string) bool {
 	return false
 }
 
-// getNamespaceByName retrieves a namespace only if ns is nil.
-func getNamespaceByName(name string, ns *corev1.Namespace, client kubernetes.Interface) (*corev1.Namespace, error) {
-	if ns != nil && name == ns.Name {
-		return ns, nil
-	}
-	return client.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
-}
-
 // CreateProvidersFromConstraints creates providers from the constraints supplied, including
 // looking up pre-allocated values if necessary using the pod's namespace.
-func CreateProvidersFromConstraints(ns string, sccs []*securityv1.SecurityContextConstraints, client kubernetes.Interface) ([]SecurityContextConstraintsProvider, []error) {
+func CreateProvidersFromConstraints(ctx context.Context, namespaceName string, sccs []*securityv1.SecurityContextConstraints, client kubernetes.Interface) ([]SecurityContextConstraintsProvider, []error) {
 	var (
 		// namespace is declared here for reuse but we will not fetch it unless required by the matched constraints
 		namespace *corev1.Namespace
@@ -179,13 +172,39 @@ func CreateProvidersFromConstraints(ns string, sccs []*securityv1.SecurityContex
 		errs []error
 	)
 
+	var lastErr error
+	err := wait.PollImmediateWithContext(ctx, 1*time.Second, 10*time.Second, func(ctx context.Context) (bool, error) {
+		namespace, lastErr = client.CoreV1().Namespaces().Get(ctx, namespaceName, metav1.GetOptions{})
+		if lastErr != nil {
+			return false, nil
+		}
+
+		if _, ok := namespace.GetAnnotations()[securityv1.UIDRangeAnnotation]; !ok {
+			lastErr = fmt.Errorf("unable to find annotation %s", securityv1.UIDRangeAnnotation)
+			return false, nil
+		}
+
+		if _, ok := namespace.GetAnnotations()[securityv1.MCSAnnotation]; !ok {
+			lastErr = fmt.Errorf("unable to find annotation %s", securityv1.MCSAnnotation)
+			return false, nil
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		if lastErr != nil {
+			return nil, []error{fmt.Errorf("error fetching namespace %q: %w", namespaceName, lastErr)}
+		}
+		return nil, []error{fmt.Errorf("error fetching namespace %q: %w", namespaceName, err)}
+	}
+
 	// set pre-allocated values on constraints
 	for _, constraint := range sccs {
 		var (
 			provider SecurityContextConstraintsProvider
 			err      error
 		)
-		provider, namespace, err = CreateProviderFromConstraint(ns, namespace, constraint, client)
+		provider, err = CreateProviderFromConstraint(namespace, constraint)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -196,36 +215,23 @@ func CreateProvidersFromConstraints(ns string, sccs []*securityv1.SecurityContex
 }
 
 // CreateProviderFromConstraint creates a SecurityContextConstraintProvider from a SecurityContextConstraint
-func CreateProviderFromConstraint(ns string, namespace *corev1.Namespace, constraint *securityv1.SecurityContextConstraints, client kubernetes.Interface) (SecurityContextConstraintsProvider, *corev1.Namespace, error) {
+func CreateProviderFromConstraint(namespace *corev1.Namespace, constraint *securityv1.SecurityContextConstraints) (SecurityContextConstraintsProvider, error) {
 	var err error
-	resolveUIDRange := requiresPreAllocatedUIDRange(constraint)
-	resolveSELinuxLevel := requiresPreAllocatedSELinuxLevel(constraint)
-	resolveFSGroup := requiresPreallocatedFSGroup(constraint)
-	resolveSupplementalGroups := requiresPreallocatedSupplementalGroups(constraint)
-	requiresNamespaceAllocations := resolveUIDRange || resolveSELinuxLevel || resolveFSGroup || resolveSupplementalGroups
-
-	if requiresNamespaceAllocations {
-		// Ensure we have the namespace
-		namespace, err = getNamespaceByName(ns, namespace, client)
-		if err != nil {
-			return nil, namespace, fmt.Errorf("error fetching namespace %s required to preallocate values for %s: %v", ns, constraint.Name, err)
-		}
-	}
 
 	// Make a copy of the constraint so we don't mutate the store's cache
 	constraint = constraint.DeepCopy()
 
 	// Resolve the values from the namespace
-	if resolveUIDRange {
+	if requiresPreAllocatedUIDRange(constraint) {
 		constraint.RunAsUser.UIDRangeMin, constraint.RunAsUser.UIDRangeMax, err = getPreallocatedUIDRange(namespace)
 		if err != nil {
-			return nil, namespace, fmt.Errorf("unable to find pre-allocated uid annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
+			return nil, fmt.Errorf("unable to find pre-allocated uid annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
 		}
 	}
-	if resolveSELinuxLevel {
+	if requiresPreAllocatedSELinuxLevel(constraint) {
 		var level string
 		if level, err = getPreallocatedLevel(namespace); err != nil {
-			return nil, namespace, fmt.Errorf("unable to find pre-allocated mcs annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
+			return nil, fmt.Errorf("unable to find pre-allocated mcs annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
 		}
 
 		if constraint.SELinuxContext.SELinuxOptions == nil {
@@ -233,17 +239,17 @@ func CreateProviderFromConstraint(ns string, namespace *corev1.Namespace, constr
 		}
 		constraint.SELinuxContext.SELinuxOptions.Level = level
 	}
-	if resolveFSGroup {
+	if requiresPreallocatedFSGroup(constraint) {
 		fsGroup, err := getPreallocatedFSGroup(namespace)
 		if err != nil {
-			return nil, namespace, fmt.Errorf("unable to find pre-allocated group annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
+			return nil, fmt.Errorf("unable to find pre-allocated group annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
 		}
 		constraint.FSGroup.Ranges = fsGroup
 	}
-	if resolveSupplementalGroups {
+	if requiresPreallocatedSupplementalGroups(constraint) {
 		supplementalGroups, err := getPreallocatedSupplementalGroups(namespace)
 		if err != nil {
-			return nil, namespace, fmt.Errorf("unable to find pre-allocated group annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
+			return nil, fmt.Errorf("unable to find pre-allocated group annotation for namespace %s while trying to configure SCC %s: %v", namespace.Name, constraint.Name, err)
 		}
 		constraint.SupplementalGroups.Ranges = supplementalGroups
 	}
@@ -251,9 +257,9 @@ func CreateProviderFromConstraint(ns string, namespace *corev1.Namespace, constr
 	// Create the provider
 	provider, err := NewSimpleProvider(constraint)
 	if err != nil {
-		return nil, namespace, fmt.Errorf("error creating provider for SCC %s in namespace %s: %v", constraint.Name, ns, err)
+		return nil, fmt.Errorf("error creating provider for SCC %s in namespace %s: %v", constraint.Name, namespace.GetName(), err)
 	}
-	return provider, namespace, nil
+	return provider, nil
 }
 
 // getPreallocatedUIDRange retrieves the annotated value from the namespace, splits it to make
