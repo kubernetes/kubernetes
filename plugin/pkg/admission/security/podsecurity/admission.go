@@ -51,6 +51,7 @@ import (
 	podsecurityadmission "k8s.io/pod-security-admission/admission"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
 	podsecurityadmissionapi "k8s.io/pod-security-admission/api"
+	podsecuritymetrics "k8s.io/pod-security-admission/metrics"
 	"k8s.io/pod-security-admission/policy"
 )
 
@@ -99,7 +100,7 @@ func newPlugin(reader io.Reader) (*Plugin, error) {
 		delegate: &podsecurityadmission.Admission{
 			Configuration:    config,
 			Evaluator:        evaluator,
-			Metrics:          nil, // TODO: wire to default prometheus metrics
+			Metrics:          podsecuritymetrics.NewPrometheusRecorder(podsecurityadmissionapi.GetAPIVersion()),
 			PodSpecExtractor: podsecurityadmission.DefaultPodSpecExtractor{},
 		},
 	}, nil
