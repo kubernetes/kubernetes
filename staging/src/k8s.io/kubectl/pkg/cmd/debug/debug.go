@@ -534,6 +534,7 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) *corev1.Pod {
 		fmt.Fprintf(o.Out, "Creating debugging pod %s with container %s on node %s.\n", pn, cn, node.Name)
 	}
 
+	bTrue := true
 	p := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: pn,
@@ -553,6 +554,9 @@ func (o *DebugOptions) generateNodeDebugPod(node *corev1.Node) *corev1.Pod {
 							MountPath: "/host",
 							Name:      "host-root",
 						},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						Privileged: &bTrue,
 					},
 				},
 			},

@@ -1026,6 +1026,7 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 		return fmt.Sprint(suffixCounter)
 	}
 
+	bTrue := true
 	for _, tc := range []struct {
 		name     string
 		node     *corev1.Node
@@ -1059,6 +1060,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 									MountPath: "/host",
 									Name:      "host-root",
 								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: &bTrue,
 							},
 						},
 					},
@@ -1114,6 +1118,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 									Name:      "host-root",
 								},
 							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: &bTrue,
+							},
 						},
 					},
 					HostIPC:       true,
@@ -1168,6 +1175,9 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 									MountPath: "/host",
 									Name:      "host-root",
 								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: &bTrue,
 							},
 						},
 					},
