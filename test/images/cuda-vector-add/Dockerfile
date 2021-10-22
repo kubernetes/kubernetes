@@ -17,8 +17,9 @@ FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
+# keep versions in sync with BASEIMAGE
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        cuda-samples-$CUDA_PKG_VERSION && \
+        cuda-samples-11-1 nvidia-utils-455 && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/local/cuda/samples/0_Simple/vectorAdd
