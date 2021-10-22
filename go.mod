@@ -118,7 +118,7 @@ require (
 	k8s.io/cri-api v0.0.0
 	k8s.io/csi-translation-lib v0.0.0
 	k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
-	k8s.io/klog/v2 v2.20.0
+	k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
 	k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8
@@ -245,8 +245,8 @@ replace (
 	github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 	github.com/go-kit/log => github.com/go-kit/log v0.1.0
 	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.5.0
-	github.com/go-logr/logr => github.com/go-logr/logr v1.1.0
-	github.com/go-logr/zapr => github.com/go-logr/zapr v1.1.0
+	github.com/go-logr/logr => github.com/go-logr/logr v1.2.0
+	github.com/go-logr/zapr => github.com/go-logr/zapr v1.2.0
 	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
 	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
 	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
@@ -493,7 +493,7 @@ replace (
 	k8s.io/cri-api => ./staging/src/k8s.io/cri-api
 	k8s.io/csi-translation-lib => ./staging/src/k8s.io/csi-translation-lib
 	k8s.io/gengo => k8s.io/gengo v0.0.0-20210813121822-485abfe95c7c
-	k8s.io/klog/v2 => k8s.io/klog/v2 v2.20.0
+	k8s.io/klog/v2 => k8s.io/klog/v2 v2.30.0
 	k8s.io/kube-aggregator => ./staging/src/k8s.io/kube-aggregator
 	k8s.io/kube-controller-manager => ./staging/src/k8s.io/kube-controller-manager
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20210817084001-7fbd8d59e5b8
