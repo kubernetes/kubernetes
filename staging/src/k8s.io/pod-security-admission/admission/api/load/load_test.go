@@ -277,7 +277,7 @@ exemptions:
 "apiVersion":"pod-security.admission.config.k8s.io/v1alpha1",
 "kind":"PodSecurityConfiguration",
 "deflaults":{"enforce":"baseline"}}`),
-			expectErr: `unknown field: deflaults`,
+			expectErr: `unknown field "deflaults"`,
 		},
 	}
 

@@ -274,7 +274,7 @@ func TestRoundTrip(t *testing.T) {
 		{
 			// Test slice of interface{} with different values.
 			obj: &D{
-				A: []interface{}{3.0, "3.0", nil},
+				A: []interface{}{float64(3.5), int64(4), "3.0", nil},
 			},
 		},
 	}
@@ -322,11 +322,11 @@ func TestUnrecognized(t *testing.T) {
 		err  error
 	}{
 		{
-			data: "{\"da\":[3.0,\"3.0\",null]}",
+			data: "{\"da\":[3.5,4,\"3.0\",null]}",
 			obj:  &D{},
 		},
 		{
-			data: "{\"ea\":[3.0,\"3.0\",null]}",
+			data: "{\"ea\":[3.5,4,\"3.0\",null]}",
 			obj:  &E{},
 		},
 		{
