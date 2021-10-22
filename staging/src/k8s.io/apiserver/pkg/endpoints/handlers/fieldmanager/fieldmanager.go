@@ -173,7 +173,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (o
 		return newObj, nil
 	}
 
-	internal.RemoveObjectManagedFields(liveObj)
 	internal.RemoveObjectManagedFields(newObj)
 
 	if object, managed, err = f.fieldManager.Update(liveObj, newObj, managed, manager); err != nil {
@@ -241,8 +240,6 @@ func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string,
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 	}
-
-	internal.RemoveObjectManagedFields(liveObj)
 
 	object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
 	if err != nil {

@@ -22,6 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 )
 
 type managedFieldsUpdater struct {
@@ -80,7 +81,11 @@ func (f *managedFieldsUpdater) Apply(liveObj, appliedObj runtime.Object, managed
 		managed.Times()[fieldManager] = &metav1.Time{Time: time.Now().UTC()}
 	}
 	if object == nil {
-		object = liveObj
+		// apply did nothing, use the input object as the result.
+		// return a copy so it doesn't get mutated by anything later in the pipeline,
+		// and clear managed fields since those get populated at the end of the apply operation.
+		object = liveObj.DeepCopyObject()
+		internal.RemoveObjectManagedFields(object)
 	}
 	return object, managed, nil
 }

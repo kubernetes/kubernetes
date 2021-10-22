@@ -780,14 +780,14 @@ func TestNoOpChanges(t *testing.T) {
 	}`), &obj.Object); err != nil {
 		t.Fatalf("error decoding YAML: %v", err)
 	}
-	if err := f.Apply(obj, "fieldmanager_test_apply", false); err != nil {
+	if err := f.Apply(obj.DeepCopyObject(), "fieldmanager_test_apply", false); err != nil {
 		t.Fatalf("failed to apply object: %v", err)
 	}
 	before := f.liveObj.DeepCopyObject()
 	// Wait to make sure the timestamp is different
 	time.Sleep(time.Second)
 	// Applying with a different fieldmanager will create an entry..
-	if err := f.Apply(obj, "fieldmanager_test_apply_other", false); err != nil {
+	if err := f.Apply(obj.DeepCopyObject(), "fieldmanager_test_apply_other", false); err != nil {
 		t.Fatalf("failed to update object: %v", err)
 	}
 	if reflect.DeepEqual(before, f.liveObj) {
@@ -796,7 +796,7 @@ func TestNoOpChanges(t *testing.T) {
 	before = f.liveObj.DeepCopyObject()
 	// Wait to make sure the timestamp is different
 	time.Sleep(time.Second)
-	if err := f.Update(obj, "fieldmanager_test_update"); err != nil {
+	if err := f.Update(obj.DeepCopyObject(), "fieldmanager_test_update"); err != nil {
 		t.Fatalf("failed to update object: %v", err)
 	}
 	if !reflect.DeepEqual(before, f.liveObj) {
@@ -805,7 +805,7 @@ func TestNoOpChanges(t *testing.T) {
 	before = f.liveObj.DeepCopyObject()
 	// Wait to make sure the timestamp is different
 	time.Sleep(time.Second)
-	if err := f.Apply(obj, "fieldmanager_test_apply", true); err != nil {
+	if err := f.Apply(obj.DeepCopyObject(), "fieldmanager_test_apply", true); err != nil {
 		t.Fatalf("failed to re-apply object: %v", err)
 	}
 	if !reflect.DeepEqual(before, f.liveObj) {
