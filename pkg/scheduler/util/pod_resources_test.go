@@ -21,7 +21,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -74,18 +74,20 @@ func TestGetNonZeroRequest(t *testing.T) {
 	}
 }
 
-func TestGetLeastRequestResource(t *testing.T) {
+func TestGetRequestForResource(t *testing.T) {
 	tests := []struct {
 		name             string
 		requests         v1.ResourceList
 		resource         v1.ResourceName
 		expectedQuantity int64
+		nonZero          bool
 	}{
 		{
 			"extended_resource_not_found",
 			v1.ResourceList{},
 			v1.ResourceName("intel.com/foo"),
 			0,
+			true,
 		},
 		{
 			"extended_resource_found",
@@ -94,18 +96,21 @@ func TestGetLeastRequestResource(t *testing.T) {
 			},
 			v1.ResourceName("intel.com/foo"),
 			4,
+			true,
 		},
 		{
 			"cpu_not_found",
 			v1.ResourceList{},
 			v1.ResourceCPU,
 			DefaultMilliCPURequest,
+			true,
 		},
 		{
 			"memory_not_found",
 			v1.ResourceList{},
 			v1.ResourceMemory,
 			DefaultMemoryRequest,
+			true,
 		},
 		{
 			"cpu_exist",
@@ -114,6 +119,7 @@ func TestGetLeastRequestResource(t *testing.T) {
 			},
 			v1.ResourceCPU,
 			200,
+			true,
 		},
 		{
 			"memory_exist",
@@ -122,6 +128,7 @@ func TestGetLeastRequestResource(t *testing.T) {
 			},
 			v1.ResourceMemory,
 			400 * 1024 * 1024,
+			true,
 		},
 		{
 			"ephemeralStorage_exist",
@@ -130,18 +137,34 @@ func TestGetLeastRequestResource(t *testing.T) {
 			},
 			v1.ResourceEphemeralStorage,
 			400 * 1024 * 1024,
+			true,
 		},
 		{
 			"ephemeralStorage_not_found",
 			v1.ResourceList{},
 			v1.ResourceEphemeralStorage,
 			0,
+			true,
+		},
+		{
+			"cpu_not_found, useRequested is true",
+			v1.ResourceList{},
+			v1.ResourceCPU,
+			0,
+			false,
+		},
+		{
+			"memory_not_found, useRequested is true",
+			v1.ResourceList{},
+			v1.ResourceMemory,
+			0,
+			false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			realQuantity := GetNonzeroRequestForResource(test.resource, &test.requests)
+			realQuantity := GetRequestForResource(test.resource, &test.requests, test.nonZero)
 			assert.EqualValuesf(t, test.expectedQuantity, realQuantity, "Failed to test: %s", test.name)
 		})
 	}
