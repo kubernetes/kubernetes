@@ -1648,8 +1648,16 @@ function start-kubelet {
   echo "Using kubelet binary at ${kubelet_bin}"
 
   local -r kubelet_env_file="/etc/default/kubelet"
+
+  local kubelet_cgroup_driver=""
+  # Default to systemd cgroup driver for cgroupv2
+  # TODO(b/203597173): Consider if this needs to be disabled for gvisor
+  if [[ "${CGROUP_CONFIG-}" == "cgroup2fs" ]]; then
+    kubelet_cgroup_driver="--cgroup-driver=systemd"
+  fi
+
   # POD_SYSCTLS is set in function configure-node-sysctls.
-  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-} --pod-sysctls='${POD_SYSCTLS:-}'"
+  local kubelet_opts="${KUBELET_ARGS} ${KUBELET_CONFIG_FILE_ARG:-} --pod-sysctls='${POD_SYSCTLS:-}' ${kubelet_cgroup_driver:-}"
   echo "KUBELET_OPTS=\"${kubelet_opts}\"" > "${kubelet_env_file}"
   echo "KUBE_COVERAGE_FILE=\"/var/log/kubelet.cov\"" >> "${kubelet_env_file}"
 
@@ -3044,6 +3052,11 @@ function override-kubectl {
     fi
 }
 
+function detect-cgroup-config {
+  CGROUP_CONFIG=$(stat -fc %T /sys/fs/cgroup/)
+  echo "Detected cgroup config as ${CGROUP_CONFIG}"
+}
+
 function override-pv-recycler {
   if [[ -z "${PV_RECYCLER_OVERRIDE_TEMPLATE:-}" ]]; then
     echo "PV_RECYCLER_OVERRIDE_TEMPLATE is not set"
@@ -3505,6 +3518,7 @@ function main() {
     fi
   fi
 
+  log-wrap 'DetectCgroupConfig' detect-cgroup-config
   log-wrap 'OverrideKubectl' override-kubectl
   container_runtime="${CONTAINER_RUNTIME:-docker}"
   # Run the containerized mounter once to pre-cache the container image.

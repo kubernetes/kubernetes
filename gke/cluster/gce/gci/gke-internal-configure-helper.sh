@@ -414,6 +414,11 @@ function gke-setup-containerd {
       cni_template_path=""
     fi
   fi
+  # Use systemd cgroup driver when running on cgroupv2
+  local systemdCgroup="false"
+  if [[ "${CGROUP_CONFIG-}" == "cgroup2fs" ]]; then
+    systemdCgroup="true"
+  fi
   # Reuse docker group for containerd.
   local -r containerd_gid="$(cat /etc/group | grep ^docker: | cut -d: -f 3)"
   cat > "${config_path}" <<EOF
@@ -438,6 +443,8 @@ oom_score = -999
   conf_template = "${cni_template_path}"
 [plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  SystemdCgroup = ${systemdCgroup}
 EOF
 
   if [[ "${ENABLE_GCFS:-}" == "true" ]]; then
