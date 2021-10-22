@@ -615,7 +615,7 @@ func TestPatchResourceWithStaleVersionConflict(t *testing.T) {
 		startingPod: &example.Pod{},
 		updatePod:   &example.Pod{},
 
-		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 2, new 1`,
+		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io 'foo': existing 2, new 1`,
 		expectedTries: 1,
 	}
 
@@ -646,7 +646,7 @@ func TestPatchResourceWithRacingVersionConflict(t *testing.T) {
 		startingPod: &example.Pod{},
 		updatePod:   &example.Pod{},
 
-		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io "foo": existing 3, new 2`,
+		expectedError: `Operation cannot be fulfilled on pods.example.apiserver.k8s.io 'foo': existing 3, new 2`,
 		expectedTries: 2,
 	}
 

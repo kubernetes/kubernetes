@@ -68,7 +68,7 @@ func TestAPIStatus(t *testing.T) {
 			Status:  metav1.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",
-			Message: "Operation cannot be fulfilled on foos \"bar\": failure",
+			Message: "Operation cannot be fulfilled on foos 'bar': failure",
 			Details: &metav1.StatusDetails{
 				Group: "",
 				Kind:  "foos",

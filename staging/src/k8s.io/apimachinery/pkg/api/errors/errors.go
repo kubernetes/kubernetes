@@ -238,7 +238,7 @@ func NewConflict(qualifiedResource schema.GroupResource, name string, err error)
 			Kind:  qualifiedResource.Resource,
 			Name:  name,
 		},
-		Message: fmt.Sprintf("Operation cannot be fulfilled on %s %q: %v", qualifiedResource.String(), name, err),
+		Message: fmt.Sprintf("Operation cannot be fulfilled on %s '%s': %v", qualifiedResource.String(), name, err),
 	}}
 }
 
