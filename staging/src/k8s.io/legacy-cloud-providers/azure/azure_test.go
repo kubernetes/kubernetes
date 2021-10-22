@@ -3069,17 +3069,6 @@ func TestCanCombineSharedAndPrivateRulesInSameGroup(t *testing.T) {
 	}
 }
 
-// TODO: sanity check if the same IP address incorrectly gets put in twice?
-// (shouldn't happen but...)
-
-// func TestIfServiceIsEditedFromOwnRuleToSharedRuleThenOwnRuleIsDeletedAndSharedRuleIsCreated(t *testing.T) {
-// 	t.Error()
-// }
-
-// func TestIfServiceIsEditedFromSharedRuleToOwnRuleThenItIsRemovedFromSharedRuleAndOwnRuleIsCreated(t *testing.T) {
-// 	t.Error()
-// }
-
 func TestGetResourceGroupFromDiskURI(t *testing.T) {
 	tests := []struct {
 		diskURL        string
@@ -3244,6 +3233,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 	az.nodeZones = map[string]sets.String{zone: nodesInZone}
 	az.nodeResourceGroups = map[string]string{"prevNode": "rg"}
 	az.unmanagedNodes = sets.NewString("prevNode")
+	az.excludeLoadBalancerNodes = sets.NewString("prevNode")
 
 	prevNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3260,6 +3250,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 	assert.Equal(t, 0, len(az.nodeZones[zone]))
 	assert.Equal(t, 0, len(az.nodeResourceGroups))
 	assert.Equal(t, 0, len(az.unmanagedNodes))
+	assert.Equal(t, 0, len(az.excludeLoadBalancerNodes))
 
 	newNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3267,6 +3258,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 				LabelFailureDomainBetaZone: zone,
 				externalResourceGroupLabel: "true",
 				managedByAzureLabel:        "false",
+				LabelNodeExcludeBalancers:  "true",
 			},
 			Name: "newNode",
 		},
@@ -3276,6 +3268,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 	assert.Equal(t, 1, len(az.nodeZones[zone]))
 	assert.Equal(t, 1, len(az.nodeResourceGroups))
 	assert.Equal(t, 1, len(az.unmanagedNodes))
+	assert.Equal(t, 1, len(az.excludeLoadBalancerNodes))
 }
 
 func TestGetActiveZones(t *testing.T) {
