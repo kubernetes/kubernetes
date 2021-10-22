@@ -1591,6 +1591,15 @@ func (ref ObjectRef) String() string {
 	return ref.Name
 }
 
+// MarshalLog ensures that loggers with support for structured output will log
+// as a struct by removing the String method via a custom type.
+func (ref ObjectRef) MarshalLog() interface{} {
+	type or ObjectRef
+	return or(ref)
+}
+
+var _ logr.Marshaler = ObjectRef{}
+
 // KMetadata is a subset of the kubernetes k8s.io/apimachinery/pkg/apis/meta/v1.Object interface
 // this interface may expand in the future, but will always be a subset of the
 // kubernetes k8s.io/apimachinery/pkg/apis/meta/v1.Object interface
