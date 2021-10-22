@@ -134,7 +134,7 @@ func (zl *zapLogger) handleFields(lvl int, args []interface{}, additional ...zap
 				continue
 			}
 			if zl.panicMessages {
-				zl.l.WithOptions(zap.AddCallerSkip(1)).DPanic("strongly-typed Zap Field passed to logr", zap.Any("zap field", args[i]))
+				zl.l.WithOptions(zap.AddCallerSkip(1)).DPanic("strongly-typed Zap Field passed to logr", zapIt("zap field", args[i]))
 			}
 			break
 		}
@@ -142,7 +142,7 @@ func (zl *zapLogger) handleFields(lvl int, args []interface{}, additional ...zap
 		// make sure this isn't a mismatched key
 		if i == len(args)-1 {
 			if zl.panicMessages {
-				zl.l.WithOptions(zap.AddCallerSkip(1)).DPanic("odd number of arguments passed as key-value pairs for logging", zap.Any("ignored key", args[i]))
+				zl.l.WithOptions(zap.AddCallerSkip(1)).DPanic("odd number of arguments passed as key-value pairs for logging", zapIt("ignored key", args[i]))
 			}
 			break
 		}
@@ -154,16 +154,25 @@ func (zl *zapLogger) handleFields(lvl int, args []interface{}, additional ...zap
 		if !isString {
 			// if the key isn't a string, DPanic and stop logging
 			if zl.panicMessages {
-				zl.l.WithOptions(zap.AddCallerSkip(1)).DPanic("non-string key argument passed to logging, ignoring all later arguments", zap.Any("invalid key", key))
+				zl.l.WithOptions(zap.AddCallerSkip(1)).DPanic("non-string key argument passed to logging, ignoring all later arguments", zapIt("invalid key", key))
 			}
 			break
 		}
 
-		fields = append(fields, zap.Any(keyStr, val))
+		fields = append(fields, zapIt(keyStr, val))
 		i += 2
 	}
 
 	return append(fields, additional...)
+}
+
+func zapIt(field string, val interface{}) zap.Field {
+	// Handle types that implement logr.Marshaler: log the replacement
+	// object instead of the original one.
+	if marshaler, ok := val.(logr.Marshaler); ok {
+		val = marshaler.MarshalLog()
+	}
+	return zap.Any(field, val)
 }
 
 func (zl *zapLogger) Init(ri logr.RuntimeInfo) {
